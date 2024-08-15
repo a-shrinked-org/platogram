@@ -77,16 +77,19 @@ async function updateUI() {
         const token = await auth0Client.getTokenSilently({
             audience: "https://platogram.vercel.app",
         });
+        console.log("Obtained token:", token);
         pollStatus(token);
         console.log("Logged in as:", user.email);
     }
 }
 
+// Additional debug statements for reset function
 async function reset() {
     try {
         const token = await auth0Client.getTokenSilently({
             audience: "https://platogram.vercel.app",
         });
+        console.log("Obtained token for reset:", token);
 
         // Call the /reset endpoint
         const response = await fetch("/reset", {
@@ -97,8 +100,11 @@ async function reset() {
         });
 
         if (!response.ok) {
+            console.error("Failed to reset:", response.statusText);
             throw new Error("Failed to reset");
         }
+
+        console.log("Reset successful");
 
         // Clear input fields
         document.getElementById("url-input").value = "";
@@ -109,11 +115,6 @@ async function reset() {
         console.error("Error resetting:", error);
         updateUIStatus("error", "Failed to reset. Please try again.");
     }
-}
-
-async function onDonateClick() {
-    // Open Stripe payment link in a new tab
-    window.open("https://buy.stripe.com/eVa29p3PK5OXbq84gl", "_blank");
 }
 
 // Handle the 'Convert' button click
@@ -200,6 +201,7 @@ async function logout() {
     }
 }
 
+// Additional debug statements for postToConvert function
 async function postToConvert(inputData, lang) {
     let body;
     let headers = {
@@ -223,12 +225,15 @@ async function postToConvert(inputData, lang) {
         const token = await auth0Client.getTokenSilently({
             audience: "https://platogram.vercel.app",
         });
+        console.log("Obtained token for convert:", token);
+
         const response = await fetch("/convert", {
             method: "POST",
             headers: headers,
             body: body,
         });
         const result = await response.json();
+        console.log("Convert response:", result);
 
         if (result.message === "Conversion started") {
             pollStatus(token);
@@ -236,11 +241,12 @@ async function postToConvert(inputData, lang) {
             updateUIStatus("error", "Unexpected response from server");
         }
     } catch (error) {
-        console.error("Error:", error);
+        console.error("Error in postToConvert:", error);
         updateUIStatus("error", error);
     }
 }
 
+// Additional debug statements for pollStatus function
 async function pollStatus(token) {
     try {
         const response = await fetch("/status", {
@@ -251,10 +257,12 @@ async function pollStatus(token) {
 
         // Check if the response is ok
         if (!response.ok) {
+            console.error("Polling status failed with status:", response.status);
             throw new Error(`Polling status failed: ${response.statusText}`);
         }
 
         const result = await response.json();
+        console.log("Polling status response:", result);
 
         if (result.status === "running") {
             updateUIStatus("running");
@@ -280,6 +288,7 @@ function updateProcessingStage() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOM fully loaded and parsed");
     const loginButton = document.getElementById('login-button');
     const logoutButton = document.getElementById('logout-button');
     const convertButton = document.getElementById('convert-button');
@@ -329,7 +338,7 @@ async function testAuth() {
         const token = await auth0Client.getTokenSilently({
             audience: "https://platogram.vercel.app",
         });
-        console.log("Token obtained:", token.substring(0, 10) + "...");
+        console.log("Token obtained for test auth:", token.substring(0, 10) + "...");
 
         const response = await fetch("/test-auth", {
             headers: {

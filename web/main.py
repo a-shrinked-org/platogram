@@ -94,6 +94,10 @@ async def root():
 async def web_root():
     return FileResponse(os.path.join(static_dir, "index.html"))
 
+@app.get("/test-auth")
+async def test_auth():
+    return {"message": "Auth works!"}
+
 async def get_auth0_public_key():
     current_time = time.time()
 

@@ -78,12 +78,15 @@ async function updateUI() {
             audience: "https://platogram.vercel.app",
         });
         console.log("Obtained token:", token);
-        pollStatus(token);
+        try {
+            await pollStatus(token);
+        } catch (error) {
+            console.error("Error polling status:", error);
+        }
         console.log("Logged in as:", user.email);
     }
 }
 
-// Additional debug statements for reset function
 async function reset() {
     try {
         const token = await auth0Client.getTokenSilently({
@@ -110,14 +113,13 @@ async function reset() {
         document.getElementById("url-input").value = "";
 
         // Poll status after reset
-        pollStatus(token);
+        await pollStatus(token);
     } catch (error) {
         console.error("Error resetting:", error);
         updateUIStatus("error", "Failed to reset. Please try again.");
     }
 }
 
-// Handle the 'Convert' button click
 async function onConvertClick() {
     const inputData = getInputData();
     if (await auth0Client.isAuthenticated()) {
@@ -168,14 +170,12 @@ async function onConvertClick() {
     }
 }
 
-// Get input data (URL or File)
 function getInputData() {
     const urlInput = document.getElementById("url-input").value;
     const fileInput = document.getElementById("file-upload").files[0];
     return urlInput || fileInput;
 }
 
-// Login
 async function login() {
     try {
         await auth0Client.loginWithRedirect({
@@ -188,7 +188,6 @@ async function login() {
     }
 }
 
-// Logout
 async function logout() {
     try {
         await auth0Client.logout({
@@ -201,7 +200,6 @@ async function logout() {
     }
 }
 
-// Additional debug statements for postToConvert function
 async function postToConvert(inputData, lang) {
     let body;
     let headers = {
@@ -236,7 +234,7 @@ async function postToConvert(inputData, lang) {
         console.log("Convert response:", result);
 
         if (result.message === "Conversion started") {
-            pollStatus(token);
+            await pollStatus(token);
         } else {
             updateUIStatus("error", "Unexpected response from server");
         }
@@ -246,7 +244,6 @@ async function postToConvert(inputData, lang) {
     }
 }
 
-// Additional debug statements for pollStatus function
 async function pollStatus(token) {
     try {
         const response = await fetch("/status", {
@@ -255,7 +252,6 @@ async function pollStatus(token) {
             },
         });
 
-        // Check if the response is ok
         if (!response.ok) {
             console.error("Polling status failed with status:", response.status);
             throw new Error(`Polling status failed: ${response.statusText}`);
@@ -266,7 +262,7 @@ async function pollStatus(token) {
 
         if (result.status === "running") {
             updateUIStatus("running");
-            setTimeout(() => pollStatus(token), 5000); // Poll every 5 seconds
+            setTimeout(() => pollStatus(token), 5000);
         } else if (result.status === "idle") {
             updateUIStatus("idle");
         } else if (result.status === "failed") {
@@ -324,7 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     setInterval(updateProcessingStage, 3000);
-    updateProcessingStage(); // Initial update
+    updateProcessingStage();
 
     // Initialize the app
     initAuth0().catch((error) =>
@@ -332,7 +328,6 @@ document.addEventListener('DOMContentLoaded', () => {
     );
 });
 
-// Test Auth function (you might want to add this if it's not already present)
 async function testAuth() {
     try {
         const token = await auth0Client.getTokenSilently({

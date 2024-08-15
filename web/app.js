@@ -69,8 +69,13 @@ function updateUIStatus(status, errorMessage = "") {
 
 async function updateUI() {
     const isAuthenticated = await auth0Client.isAuthenticated();
-    document.getElementById("login-button").classList.toggle("hidden", isAuthenticated);
-    document.getElementById("logout-button").classList.toggle("hidden", !isAuthenticated);
+    console.log("Is authenticated:", isAuthenticated);  // Add this log
+
+    const loginButton = document.getElementById("login-button");
+    const logoutButton = document.getElementById("logout-button");
+
+    if (loginButton) loginButton.classList.toggle("hidden", isAuthenticated);
+    if (logoutButton) logoutButton.classList.toggle("hidden", !isAuthenticated);
 
     if (isAuthenticated) {
         const user = await auth0Client.getUser();
@@ -81,6 +86,8 @@ async function updateUI() {
             console.error("Error polling status:", error);
         }
         console.log("Logged in as:", user.email);
+    } else {
+        console.log("User is not authenticated");
     }
 }
 
@@ -196,6 +203,19 @@ async function login() {
     } catch (error) {
         console.error("Error logging in:", error);
         updateUIStatus("error", "Failed to log in. Please try again.");
+    }
+}
+
+async function handleRedirectCallback() {
+    try {
+        const query = window.location.search;
+        if (query.includes("code=") && query.includes("state=")) {
+            await auth0Client.handleRedirectCallback();
+            window.history.replaceState({}, document.title, "/");
+            await updateUI();
+        }
+    } catch (error) {
+        console.error("Error handling redirect callback:", error);
     }
 }
 

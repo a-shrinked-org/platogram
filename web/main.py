@@ -29,9 +29,18 @@ from fastapi import (
     Request,
 )
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 # Logfire configuration
 logfire_token = os.getenv('LOGFIRE_TOKEN')

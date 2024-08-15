@@ -79,13 +79,19 @@ function updateUIStatus(status, errorMessage = "") {
 
 async function updateUI() {
     const isAuthenticated = await auth0Client.isAuthenticated();
-    console.log("Is authenticated:", isAuthenticated);  // Add this log
+    console.log("Is authenticated:", isAuthenticated);
 
     const loginButton = document.getElementById("login-button");
     const logoutButton = document.getElementById("logout-button");
 
-    if (loginButton) loginButton.classList.toggle("hidden", isAuthenticated);
-    if (logoutButton) logoutButton.classList.toggle("hidden", !isAuthenticated);
+    if (loginButton) {
+        loginButton.classList.toggle("hidden", isAuthenticated);
+        console.log("Login button visibility:", !isAuthenticated);
+    }
+    if (logoutButton) {
+        logoutButton.classList.toggle("hidden", !isAuthenticated);
+        console.log("Logout button visibility:", isAuthenticated);
+    }
 
     if (isAuthenticated) {
         const user = await auth0Client.getUser();
@@ -222,7 +228,8 @@ async function handleRedirectCallback() {
         if (query.includes("code=") && query.includes("state=")) {
             await auth0Client.handleRedirectCallback();
             window.history.replaceState({}, document.title, "/");
-            await updateUI();
+            await updateUI();  // Make sure to call updateUI here
+            console.log("Redirect callback handled successfully");
         }
     } catch (error) {
         console.error("Error handling redirect callback:", error);
@@ -335,7 +342,7 @@ function debounce(func, wait) {
     };
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     console.log("DOM fully loaded and parsed");
     const loginButton = document.getElementById('login-button');
     const logoutButton = document.getElementById('logout-button');
@@ -367,9 +374,21 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(updateProcessingStage, 3000);
     updateProcessingStage();
 
-    initAuth0().catch((error) =>
-        console.error("Error initializing app:", error)
-    );
+    try {
+        await initAuth0();
+
+        // Check if we're returning from an authentication redirect
+        if (window.location.search.includes("code=")) {
+            console.log("Detected authentication code in URL, handling callback");
+            await handleRedirectCallback();
+        } else {
+            console.log("No authentication code detected, updating UI");
+            await updateUI();
+        }
+    } catch (error) {
+        console.error("Error initializing app:", error);
+        updateUIStatus("error", "Failed to initialize the application. Please try refreshing the page.");
+    }
 });
 
 async function testAuth() {

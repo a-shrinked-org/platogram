@@ -15,7 +15,6 @@ from uuid import uuid4
 
 import httpx
 import jwt
-import os
 import logfire
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
@@ -27,40 +26,37 @@ from fastapi import (
     Form,
     HTTPException,
     UploadFile,
+    Request,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+# Logfire configuration
 logfire_token = os.getenv('LOGFIRE_TOKEN')
 if logfire_token:
     logfire.configure(token=logfire_token)
 else:
-    # Fallback for local development or if token is not set
     try:
         logfire.configure()
     except Exception as e:
         print(f"Logfire configuration failed: {e}")
-        # Optionally, set up a fallback logging mechanism here
-        
-app = FastAPI()
 
+app = FastAPI()
 
 AUTH0_DOMAIN = "dev-w0dm4z23pib7oeui.us.auth0.com"
 API_AUDIENCE = "https://platogram.vercel.app"
 ALGORITHMS = ["RS256"]
 JWKS_URL = f"https://{AUTH0_DOMAIN}/.well-known/jwks.json"
 
-
 tasks = {}
 processes = {}
 Language = Literal["en", "es"]
 
-
 class ConversionRequest(BaseModel):
     payload: str
     lang: Language = "en"
-
 
 class Task(BaseModel):
     start_time: datetime
@@ -68,9 +64,7 @@ class Task(BaseModel):
     status: Literal["running", "done", "failed"] = "running"
     error: Optional[str] = None
 
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
 
 # Cache for the Auth0 public key
 auth0_public_key_cache = {
@@ -79,10 +73,10 @@ auth0_public_key_cache = {
     "expires_in": 3600,  # Cache expiration time in seconds (1 hour)
 }
 
-
-@app.get("/")
-@app.get("/web")
-@app.get("/web/")
+# Serve static files
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -92,13 +86,19 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"message": "An internal error occurred", "detail": str(exc)}
     )
 
+@app.get("/")
+@app.get("/web")
+@app.get("/web/")
 async def read_root():
-    return FileResponse(os.path.join(static_dir, "index.html"))
+    index_path = os.path.join(static_dir, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    else:
+        raise HTTPException(status_code=404, detail="Index file not found")
 
 async def get_auth0_public_key():
     current_time = time.time()
 
-    # Check if the cached key is still valid
     if (
         auth0_public_key_cache["key"]
         and current_time - auth0_public_key_cache["last_updated"]
@@ -106,7 +106,6 @@ async def get_auth0_public_key():
     ):
         return auth0_public_key_cache["key"]
 
-    # If not, fetch the JWKS from Auth0
     async with httpx.AsyncClient() as client:
         response = await client.get(JWKS_URL)
         response.raise_for_status()
@@ -114,7 +113,6 @@ async def get_auth0_public_key():
 
     x5c = jwks["keys"][0]["x5c"][0]
 
-    # Convert the X.509 certificate to a public key
     cert = load_pem_x509_certificate(
         f"-----BEGIN CERTIFICATE-----\n{x5c}\n-----END CERTIFICATE-----".encode()
     )
@@ -123,12 +121,10 @@ async def get_auth0_public_key():
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
 
-    # Update the cache
     auth0_public_key_cache["key"] = public_key
     auth0_public_key_cache["last_updated"] = current_time
 
     return public_key
-
 
 async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
     try:

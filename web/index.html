@@ -606,11 +606,11 @@
       async function initAuth0() {
         try {
           auth0Client = await auth0.createAuth0Client({
-            domain: "dev-df8axtz2fh7qc2n2.us.auth0.com",
-            clientId: "oamC4opFTmNhvswdIGFAk7YXE6r9pQoE",
+            domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
+            clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
             authorizationParams: {
               redirect_uri: window.location.origin,
-              audience: "https://web.platogram.ai",
+              audience: "https://platogram.vercel.app",
               scope: "openid profile email",
             },
             cacheLocation: "localstorage",
@@ -673,7 +673,7 @@
         if (isAuthenticated) {
           const user = await auth0Client.getUser();
           const token = await auth0Client.getTokenSilently({
-            audience: "https://web.platogram.ai",
+            audience: "https://platogram.vercel.app",
           });
           pollStatus(token);
           console.log("Logged in as:", user.email);
@@ -683,7 +683,7 @@
       async function reset() {
         try {
           const token = await auth0Client.getTokenSilently({
-            audience: "https://web.platogram.ai",
+            audience: "https://platogram.vercel.app",
           });
 
           // Call the /reset endpoint
@@ -803,7 +803,7 @@
         let body;
         let headers = {
           Authorization: `Bearer ${await auth0Client.getTokenSilently({
-            audience: "https://web.platogram.ai",
+            audience: "https://platogram.vercel.app",
           })}`,
         };
 
@@ -820,7 +820,7 @@
         
         try {
           const token = await auth0Client.getTokenSilently({
-            audience: "https://web.platogram.ai",
+            audience: "https://platogram.vercel.app",
           });
           const response = await fetch("/convert", {
             method: "POST",

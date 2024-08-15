@@ -11,6 +11,7 @@ let currentStageIndex = 0;
 
 // Initialize Auth0
 async function initAuth0() {
+    console.log("Initializing Auth0...");
     try {
         auth0Client = await auth0.createAuth0Client({
             domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
@@ -24,24 +25,35 @@ async function initAuth0() {
         });
         console.log("Auth0 client initialized successfully");
 
-        // Handle the redirect callback
-        await handleRedirectCallback();
+        const isAuthenticated = await auth0Client.isAuthenticated();
+        console.log("Is authenticated after initialization:", isAuthenticated);
 
-        // Update the UI
-        await updateUI();
+        if (window.location.search.includes("code=")) {
+            console.log("Authentication code detected, handling callback...");
+            await handleRedirectCallback();
+        } else {
+            console.log("No authentication code detected, updating UI...");
+            await updateUI();
+        }
     } catch (error) {
         console.error("Error initializing Auth0:", error);
         updateUIStatus("error", "Failed to initialize authentication. Please try refreshing the page.");
     }
 }
 
-// Add this new function to handle the redirect callback
 async function handleRedirectCallback() {
+    console.log("Handling redirect callback...");
     try {
         const query = window.location.search;
         if (query.includes("code=") && query.includes("state=")) {
+            console.log("Authentication code detected, processing...");
             await auth0Client.handleRedirectCallback();
+            console.log("Redirect callback processed");
             window.history.replaceState({}, document.title, "/");
+            await updateUI();
+            console.log("UI updated after redirect callback");
+        } else {
+            console.log("No authentication code detected in URL");
         }
     } catch (error) {
         console.error("Error handling redirect callback:", error);
@@ -78,6 +90,7 @@ function updateUIStatus(status, errorMessage = "") {
 }
 
 async function updateUI() {
+    console.log("Updating UI...");
     const isAuthenticated = await auth0Client.isAuthenticated();
     console.log("Is authenticated:", isAuthenticated);
 
@@ -210,6 +223,7 @@ function getInputData() {
 }
 
 async function login() {
+    console.log("Initiating login process...");
     try {
         await auth0Client.loginWithRedirect({
             authorizationParams: {
@@ -217,22 +231,8 @@ async function login() {
             },
         });
     } catch (error) {
-        console.error("Error logging in:", error);
+        console.error("Error during login:", error);
         updateUIStatus("error", "Failed to log in. Please try again.");
-    }
-}
-
-async function handleRedirectCallback() {
-    try {
-        const query = window.location.search;
-        if (query.includes("code=") && query.includes("state=")) {
-            await auth0Client.handleRedirectCallback();
-            window.history.replaceState({}, document.title, "/");
-            await updateUI();  // Make sure to call updateUI here
-            console.log("Redirect callback handled successfully");
-        }
-    } catch (error) {
-        console.error("Error handling redirect callback:", error);
     }
 }
 
@@ -250,23 +250,26 @@ async function logout() {
 }
 
 async function postToConvert(inputData, lang) {
-    let body;
-    let headers = {
-        Authorization: `Bearer ${await auth0Client.getTokenSilently({
-            audience: "https://platogram.vercel.app",
-        })}`,
-    };
+    try {
+        const token = await getValidToken();
+        console.log("Obtained token for convert:", token);
 
-    const formData = new FormData();
-    formData.append('lang', lang);
+        const formData = new FormData();
+        formData.append('lang', lang);
 
-    if (inputData instanceof File) {
-        formData.append('file', inputData);
-    } else {
-        formData.append("payload", inputData);
-    }
+        if (inputData instanceof File) {
+            formData.append('file', inputData);
+        } else {
+            formData.append("payload", inputData);
+        }
 
-    body = formData;
+        const response = await fetch("/convert", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            body: formData,
+        });
 
     try {
         const token = await auth0Client.getTokenSilently({
@@ -374,19 +377,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     setInterval(updateProcessingStage, 3000);
     updateProcessingStage();
 
-    try {
+     try {
+        console.log("Initializing application...");
         await initAuth0();
 
-        // Check if we're returning from an authentication redirect
+        // This check is now handled inside initAuth0, but we'll keep it here for extra safety
         if (window.location.search.includes("code=")) {
-            console.log("Detected authentication code in URL, handling callback");
+            console.log("Authentication code detected in URL, handling callback...");
             await handleRedirectCallback();
         } else {
-            console.log("No authentication code detected, updating UI");
+            console.log("No authentication code detected, updating UI...");
             await updateUI();
         }
     } catch (error) {
-        console.error("Error initializing app:", error);
+        console.error("Error during application initialization:", error);
         updateUIStatus("error", "Failed to initialize the application. Please try refreshing the page.");
     }
 });

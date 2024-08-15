@@ -1,13 +1,26 @@
 {
+  "version": 2,
+  "builds": [
+    {
+      "src": "web/main.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "web/main.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "web/main.py"
+    }
+  ],
   "redirects": [
     {
       "source": "/",
       "destination": "/web",
       "permanent": true
     }
-  ],
-  "rewrites": [
-    { "source": "/", "destination": "/web",
-      "source": "/api/(.*)", "destination": "/api"}
   ]
 }

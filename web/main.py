@@ -81,9 +81,19 @@ auth0_public_key_cache = {
 
 
 @app.get("/")
-async def index():
-    return FileResponse("web/index.html")
+@app.get("/web")
+@app.get("/web/")
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    print(f"An error occurred: {str(exc)}")
+    return JSONResponse(
+        status_code=500,
+        content={"message": "An internal error occurred", "detail": str(exc)}
+    )
+
+async def read_root():
+    return FileResponse(os.path.join(static_dir, "index.html"))
 
 async def get_auth0_public_key():
     current_time = time.time()

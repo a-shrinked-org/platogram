@@ -4,16 +4,24 @@
     {
       "src": "web/main.py",
       "use": "@vercel/python"
+    },
+    {
+      "src": "web/*",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
+      "src": "/web/index.html",
+      "dest": "/web/index.html"
+    },
+    {
       "src": "/web/(.*)",
-      "dest": "web/main.py"
+      "dest": "/web/main.py"
     },
     {
       "src": "/(.*)",
-      "dest": "web/main.py"
+      "dest": "/web/main.py"
     }
   ]
 }

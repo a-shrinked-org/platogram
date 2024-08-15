@@ -28,7 +28,7 @@ from fastapi import (
     UploadFile,
     Request,
 )
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -87,9 +87,8 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 @app.get("/")
-
 async def root():
-    return RedirectResponse(url="/web/")
+    return RedirectResponse(url="/web/index.html")
 
 @app.get("/web/")
 async def web_root():
@@ -139,7 +138,6 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
     except Exception as e:
         raise HTTPException(status_code=401, detail="Couldn't verify token") from e
 
-
 @app.post("/convert")
 @logfire.instrument()
 async def convert(
@@ -177,7 +175,6 @@ async def convert(
     background_tasks.add_task(convert_and_send_with_error_handling, request, user_id)
     return {"message": "Conversion started"}
 
-
 @app.get("/status")
 async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
     try:
@@ -194,7 +191,6 @@ async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
     except Exception as e:
         return {"status": "error", "detail": str(e)}
 
-
 @app.get("/reset")
 @logfire.instrument()
 async def reset(user_id: str = Depends(verify_token_and_get_user_id)):
@@ -206,7 +202,6 @@ async def reset(user_id: str = Depends(verify_token_and_get_user_id)):
         del tasks[user_id]
 
     return {"message": "Session reset"}
-
 
 async def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> tuple[str, str]:
     # Get absolute path of current working directory
@@ -241,14 +236,12 @@ stderr:
 
     return stdout.decode(), stderr.decode()
 
-
 async def send_email(user_id: str, subj: str, body: str, files: list[Path]):
     loop = asyncio.get_running_loop()
     with ProcessPoolExecutor() as pool:
         await loop.run_in_executor(
             pool, _send_email_sync, user_id, subj, body, files
         )
-
 
 async def convert_and_send_with_error_handling(request: ConversionRequest, user_id: str):
     try:
@@ -263,7 +256,6 @@ async def convert_and_send_with_error_handling(request: ConversionRequest, user_
                 error = "🤯🤯🤯"
             tasks[user_id].error = error
             tasks[user_id].status = "failed"
-
 
 async def convert_and_send(request: ConversionRequest, user_id: str):
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -314,7 +306,6 @@ Suggested donation: $2 per hour of content converted."""
 
         await send_email(user_id, subject, body, files)    
 
-
 def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):
     # Email configuration
     smtp_user = os.getenv("PLATOGRAM_SMTP_USER")
@@ -343,9 +334,7 @@ def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):
         server.login(smtp_user, sender_password)
         server.send_message(msg)
 
-
 if __name__ == "__main__":
     import uvicorn
-
 
     uvicorn.run(app, host="0.0.0.0", port=8000)

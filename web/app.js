@@ -1,3 +1,4 @@
+// Ensure this variable is declared only once
 let auth0Client = null;
 
 const processingStages = [

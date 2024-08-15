@@ -6,7 +6,6 @@ from tqdm import tqdm  # type: ignore
 from platogram.llm import LanguageModel
 from platogram.types import Content, SpeechEvent
 
-
 # Example regular expressions with raw strings
 pattern = r'\d+'   # Use r'' for raw strings
 match = re.match(pattern, "123")
@@ -68,7 +67,6 @@ def parse(text_with_markers: str, marker: str = r"(【\d+】)") -> dict[int, str
             text += segment
     return relevant_segment_dict
 
-
 def render(
     segments: dict[int, str], marker_fn: Callable[[int], str] = lambda x: f"【{x}】"
 ) -> str:
@@ -81,7 +79,7 @@ def render(
 
     Args:
         segments: A dictionary where the keys are the numeric markers and the values are the text segments associated with each marker.
-        marker: The regular expression pattern for the markers. Default is r'(【\d+】)'.
+        marker_fn: A function that takes an integer and returns a string representing the marker.
 
     Returns:
         A string containing text segments separated by numeric markers.
@@ -91,13 +89,12 @@ def render(
     """
     return "".join([f"{text}{marker_fn(value)}" for value, text in segments.items()])
 
-
 def chunk_text(
-        text_with_markers: str,
-        chunk_size: int,
-        token_count_fn: Callable[[str], int],
-        marker: str = r"(【\d+】)",
-    ) -> list[str]:
+    text_with_markers: str,
+    chunk_size: int,
+    token_count_fn: Callable[[str], int],
+    marker: str = r"(【\d+】)",
+) -> list[str]:
     """
     Splits a string containing text segments separated by numeric markers into chunks of a specified size.
 
@@ -138,7 +135,6 @@ def chunk_text(
         chunks.append(chunk_segments)
 
     return [render(chunk) for chunk in chunks]
-
 
 def get_paragraphs(
     text: str,
@@ -208,7 +204,6 @@ def get_paragraphs(
 
     return paragraphs
 
-
 def index(
     transcript: list[SpeechEvent],
     llm: LanguageModel,
@@ -237,7 +232,6 @@ def index(
         transcript=transcript,
         chapters=chapters,
     )
-
 
 rewrite_examples = {
     "en": [

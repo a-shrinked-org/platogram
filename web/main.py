@@ -34,6 +34,10 @@ from fastapi.security import OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+# Initialize FastAPI app
+app = FastAPI()
+
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Allows all origins
@@ -52,17 +56,18 @@ else:
     except Exception as e:
         print(f"Logfire configuration failed: {e}")
 
-app = FastAPI()
-
+# Auth0 configuration
 AUTH0_DOMAIN = "dev-w0dm4z23pib7oeui.us.auth0.com"
 API_AUDIENCE = "https://platogram.vercel.app"
 ALGORITHMS = ["RS256"]
 JWKS_URL = f"https://{AUTH0_DOMAIN}/.well-known/jwks.json"
 
+# Global variables
 tasks = {}
 processes = {}
 Language = Literal["en", "es"]
 
+# Pydantic models
 class ConversionRequest(BaseModel):
     payload: str
     lang: Language = "en"
@@ -73,6 +78,7 @@ class Task(BaseModel):
     status: Literal["running", "done", "failed"] = "running"
     error: Optional[str] = None
 
+# OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # Cache for the Auth0 public key

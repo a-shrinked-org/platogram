@@ -26,27 +26,16 @@ from fastapi import (
     Form,
     HTTPException,
     UploadFile,
-    Request,
 )
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import OAuth2PasswordBearer
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-# Logfire configuration
-logfire_token = os.getenv('LOGFIRE_TOKEN')
-if logfire_token:
-    logfire.configure(token=logfire_token)
-else:
-    try:
-        logfire.configure()
-    except Exception as e:
-        print(f"Logfire configuration failed: {e}")
-
+logfire.configure()
 app = FastAPI()
 
-AUTH0_DOMAIN = "dev-w0dm4z23pib7oeui.us.auth0.com"
-API_AUDIENCE = "https://platogram.vercel.app"
+AUTH0_DOMAIN = "dev-df8axtz2fh7qc2n2.us.auth0.com"
+API_AUDIENCE = "https://web.platogram.ai"
 ALGORITHMS = ["RS256"]
 JWKS_URL = f"https://{AUTH0_DOMAIN}/.well-known/jwks.json"
 
@@ -73,13 +62,8 @@ auth0_public_key_cache = {
     "expires_in": 3600,  # Cache expiration time in seconds (1 hour)
 }
 
-# Serve static files
-static_dir = os.path.join(os.path.dirname(__file__), "static")
-if os.path.exists(static_dir):
-    app.mount("/web", StaticFiles(directory=static_dir), name="static")
-
 @app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
+async def global_exception_handler(request: FastAPI.Request, exc: Exception):
     print(f"An error occurred: {str(exc)}")
     return JSONResponse(
         status_code=500,
@@ -87,16 +71,13 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 @app.get("/")
-async def root():
-    return RedirectResponse(url="/web/index.html")
-
-@app.get("/web/")
-async def web_root():
-    return FileResponse(os.path.join(static_dir, "index.html"))
+async def index():
+    return FileResponse("web/index.html")
 
 async def get_auth0_public_key():
     current_time = time.time()
 
+    # Check if the cached key is still valid
     if (
         auth0_public_key_cache["key"]
         and current_time - auth0_public_key_cache["last_updated"]
@@ -104,6 +85,7 @@ async def get_auth0_public_key():
     ):
         return auth0_public_key_cache["key"]
 
+    # If not, fetch the JWKS from Auth0
     async with httpx.AsyncClient() as client:
         response = await client.get(JWKS_URL)
         response.raise_for_status()
@@ -111,6 +93,7 @@ async def get_auth0_public_key():
 
     x5c = jwks["keys"][0]["x5c"][0]
 
+    # Convert the X.509 certificate to a public key
     cert = load_pem_x509_certificate(
         f"-----BEGIN CERTIFICATE-----\n{x5c}\n-----END CERTIFICATE-----".encode()
     )
@@ -119,6 +102,7 @@ async def get_auth0_public_key():
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
 
+    # Update the cache
     auth0_public_key_cache["key"] = public_key
     auth0_public_key_cache["last_updated"] = current_time
 
@@ -134,12 +118,16 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
             audience=API_AUDIENCE,
             issuer=f"https://{AUTH0_DOMAIN}/",
         )
-        return payload["platogram:user_email"]
+        return payload["sub"]
+    except jwt.ExpiredSignatureError:
+        print("Error: Token has expired")
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.JWTClaimsError as e:
+        print(f"Error: Token claims verification failed: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Token claims verification failed: {str(e)}")
     except Exception as e:
-        print(f"Token verification error: {str(e)}")  # Log the exact token verification error
-        raise HTTPException(
-            status_code=401, detail="Couldn't verify token"
-        ) from e
+        print(f"Error: Couldn't verify token: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Couldn't verify token: {str(e)}") from e
 
 @app.post("/convert")
 @logfire.instrument()
@@ -190,27 +178,10 @@ async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
             return {"status": "failed", "error": task.error}
         if task.status == "done":
             return {"status": "done"}
-        return {"status": "idle"}  # fallback to idle
+        return {"status": "idle"}
     except Exception as e:
         print(f"/status endpoint error: {str(e)}")
         return {"status": "error", "detail": str(e)}
-
-# An example function to verify the token
-async def verify_token(token: str = Depends(oauth2_scheme)):
-    # This function should implement your token verification logic.
-    # Here we assume `is_token_valid` is a placeholder for your actual implementation.
-    try:
-        # Placeholder for actual token validation
-        if not token or not is_token_valid(token):
-            raise HTTPException(status_code=401, detail="Unauthorized")
-        return token
-    except Exception as e:
-        print(f"Token verification error in verify_token: {str(e)}")
-        raise HTTPException(status_code=401, detail="Unauthorized") from e
-
-@app.get("/test-auth")
-async def test_auth(token: str = Depends(verify_token)):
-    return {"message": "Auth test successful"}
 
 @app.get("/reset")
 @logfire.instrument()

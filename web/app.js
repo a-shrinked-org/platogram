@@ -23,17 +23,16 @@ async function initAuth0() {
     });
     console.log("Auth0 client initialized successfully");
 
-    if (window.location.search.includes("code=") && window.location.search.includes("state=")) {
-      console.log("Authentication code detected, handling callback...");
-      await auth0Client.handleRedirectCallback();
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
+    // Check for the code and state parameters
+        if (window.location.search.includes("code=") && window.location.search.includes("state=")) {
+            await handleRedirectCallback();
+        }
 
-    await updateUI();
-  } catch (error) {
-    console.error("Error initializing Auth0:", error);
-    updateUIStatus("error", "Failed to initialize authentication. Please try refreshing the page.");
-  }
+        await updateUI();
+    } catch (error) {
+        console.error("Error initializing Auth0:", error);
+        updateUIStatus("error", "Failed to initialize authentication. Please try refreshing the page.");
+    }
 }
 
 function updateUIStatus(status, errorMessage = "") {
@@ -56,6 +55,15 @@ function updateUIStatus(status, errorMessage = "") {
       }
     }
   });
+}
+
+async function handleRedirectCallback() {
+    try {
+        await auth0Client.handleRedirectCallback();
+        window.history.replaceState({}, document.title, "/");
+    } catch (error) {
+        console.error("Error handling redirect callback:", error);
+    }
 }
 
 async function updateUI() {
@@ -194,6 +202,7 @@ async function login() {
         redirect_uri: window.location.origin,
       },
     });
+    console.log("Login with redirect called successfully");
   } catch (error) {
     console.error("Error during login:", error);
     updateUIStatus("error", "Failed to log in. Please try again.");

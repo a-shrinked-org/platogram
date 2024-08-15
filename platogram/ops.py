@@ -7,6 +7,10 @@ from platogram.llm import LanguageModel
 from platogram.types import Content, SpeechEvent
 
 
+# Example regular expressions with raw strings
+pattern = r'\d+'   # Use r'' for raw strings
+match = re.match(pattern, "123")
+
 def remove_markers(text: str) -> str:
     return re.sub(r"(【\d+】)", r" ", text)
 

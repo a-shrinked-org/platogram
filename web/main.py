@@ -137,7 +137,6 @@ async def get_auth0_public_key():
     auth0_public_key_cache["last_updated"] = current_time
 
     return public_key
-
 async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
     try:
         public_key = await get_auth0_public_key()
@@ -152,13 +151,15 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
     except jwt.ExpiredSignatureError:
         print("Token has expired")
         raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.exceptions.JWTClaimsError as e:
-        print(f"Token claims verification failed: {str(e)}")
-        raise HTTPException(status_code=401, detail=f"Token claims verification failed: {str(e)}")
+    except jwt.InvalidAudienceError as e:
+        print(f"Token audience verification failed: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Token audience verification failed: {str(e)}")
+    except jwt.InvalidTokenError as e:
+        print(f"Invalid token: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
     except Exception as e:
         print(f"Couldn't verify token: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Couldn't verify token: {str(e)}") from e
-
 
 @app.post("/convert")
 @logfire.instrument()

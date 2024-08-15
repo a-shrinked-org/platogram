@@ -31,6 +31,7 @@ from fastapi import (
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # Logfire configuration
@@ -44,6 +45,15 @@ else:
         print(f"Logfire configuration failed: {e}")
 
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 AUTH0_DOMAIN = "dev-w0dm4z23pib7oeui.us.auth0.com"
 API_AUDIENCE = "https://platogram.vercel.app"
@@ -80,7 +90,7 @@ if os.path.exists(static_dir):
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    print(f"An error occurred: {str(exc)}")
+    logfire.exception(f"An error occurred: {str(exc)}")
     return JSONResponse(
         status_code=500,
         content={"message": "An internal error occurred", "detail": str(exc)}
@@ -134,19 +144,19 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
             audience=API_AUDIENCE,
             issuer=f"https://{AUTH0_DOMAIN}/",
         )
-        print(f"Token payload: {payload}")  # Log entire payload
+        logfire.info(f"Token payload: {payload}")  # Log entire payload
         user_id = payload.get("sub") or payload.get("platogram:user_email")
         if not user_id:
             raise ValueError("User ID not found in token payload")
         return user_id
     except jwt.ExpiredSignatureError:
-        print("Token has expired")
+        logfire.warning("Token has expired")
         raise HTTPException(status_code=401, detail="Token has expired")
     except jwt.JWTClaimsError as e:
-        print(f"Invalid claims: {e}")
+        logfire.warning(f"Invalid claims: {e}")
         raise HTTPException(status_code=401, detail="Invalid token claims")
     except Exception as e:
-        print(f"Token verification error: {str(e)}")
+        logfire.exception(f"Token verification error: {str(e)}")
         raise HTTPException(status_code=401, detail="Couldn't verify token") from e
 
 @app.post("/convert")
@@ -171,7 +181,6 @@ async def convert(
         if payload is not None:
             request = ConversionRequest(payload=payload, lang=lang)
         else:
-            # Create a named temporary directory if it doesn't exist
             tmpdir = Path(tempfile.gettempdir()) / "platogram_uploads"
             tmpdir.mkdir(parents=True, exist_ok=True)
             file_ext = file.filename.split(".")[-1]
@@ -188,20 +197,14 @@ async def convert(
     except Exception as e:
         logfire.exception(f"Error in convert endpoint: {str(e)}")
         return JSONResponse(content={"error": str(e)}, status_code=500)
-    
+
 @app.get("/status")
 async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
     try:
         if user_id not in tasks:
             return {"status": "idle"}
         task = tasks[user_id]
-        if task.status == "running":
-            return {"status": "running"}
-        if task.status == "failed":
-            return {"status": "failed", "error": task.error}
-        if task.status == "done":
-            return {"status": "done"}
-        return {"status": "idle"}  # fallback to idle
+        return {"status": task.status, "error": task.error if task.status == "failed" else None}
     except Exception as e:
         logfire.exception(f"Error in status endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -248,13 +251,7 @@ async def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: st
             del processes[user_id]
 
     if process.returncode != 0:
-        raise RuntimeError(f"""Failed to execute {command} with return code {process.returncode}.
-
-stdout:
-{stdout.decode()}
-
-stderr:
-{stderr.decode()}""")
+        raise RuntimeError(f"Failed to execute {command} with return code {process.returncode}.\n\nstdout:\n{stdout.decode()}\n\nstderr:\n{stderr.decode()}")
 
     return stdout.decode(), stderr.decode()
 
@@ -280,8 +277,8 @@ async def convert_and_send(request: ConversionRequest, user_id: str):
     with tempfile.TemporaryDirectory() as tmpdir:
         if not (request.payload.startswith("http") or request.payload.startswith("file:///tmp/platogram_uploads")):
             raise HTTPException(status_code=400, detail="Please provide a valid URL.")
-        else:
-            url = request.payload
+
+        url = request.payload
 
         try:
             stdout, stderr = await audio_to_paper(url, request.lang, Path(tmpdir), user_id)
@@ -293,17 +290,14 @@ async def convert_and_send(request: ConversionRequest, user_id: str):
                     logfire.warning(f"Failed to delete temporary file {request.payload}: {e}")
 
         title_match = re.search(r'<title>(.*?)</title>', stdout, re.DOTALL)
-        if title_match:
-            title = title_match.group(1).strip()
-        else:
-            title = "👋"
-            logfire.warning("No title found in stdout, using default title")
+        title = title_match.group(1).strip() if title_match else "👋"
 
         abstract_match = re.search(r'<abstract>(.*?)</abstract>', stdout, re.DOTALL)
-        if abstract_match:
-            abstract = abstract_match.group(1).strip()
-        else:
-            abstract = ""
+        abstract = abstract_match.group(1).strip() if abstract_match else ""
+
+        if not title_match:
+            logfire.warning("No title found in stdout, using default title")
+        if not abstract_match:
             logfire.warning("No abstract found in stdout, using default abstract")
 
         files = [f for f in Path(tmpdir).glob('*') if f.is_file()]
@@ -352,5 +346,4 @@ def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(app, host="0.0.0.0", port=8000)

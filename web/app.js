@@ -28,9 +28,10 @@ async function initAuth0() {
 
         if (window.location.search.includes("code=") && window.location.search.includes("state=")) {
             console.log("Authentication code detected, handling callback...");
-            await handleRedirectCallback();
+            await auth0Client.handleRedirectCallback();
+            window.history.replaceState({}, document.title, window.location.pathname);
+            await updateUI();
         } else {
-            console.log("No authentication code detected, updating UI...");
             await updateUI();
         }
     } catch (error) {
@@ -42,6 +43,8 @@ async function initAuth0() {
 async function handleRedirectCallback() {
     console.log("Handling redirect callback...");
     try {
+        const result = await auth0Client.handleRedirectCallback();
+        console.log("Redirect callback result:", result);
         const query = window.location.search;
         if (query.includes("code=") && query.includes("state=")) {
             console.log("Authentication code detected, processing...");
@@ -174,20 +177,14 @@ function getInputData() {
 async function login() {
     console.log("Initiating login process...");
     try {
-        await auth0Client.loginWithPopup({
+        await auth0Client.loginWithRedirect({
             authorizationParams: {
                 redirect_uri: window.location.origin,
             },
         });
-        console.log("Login successful");
-        await updateUI();
     } catch (error) {
         console.error("Error during login:", error);
-        if (error.error === 'popup_closed_by_user') {
-            console.log("Login popup was closed by the user");
-        } else {
-            updateUIStatus("error", "Failed to log in. Please try again.");
-        }
+        updateUIStatus("error", "Failed to log in. Please try again.");
     }
 }
 

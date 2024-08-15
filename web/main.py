@@ -134,7 +134,7 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
             audience=API_AUDIENCE,
             issuer=f"https://{AUTH0_DOMAIN}/",
         )
-        return payload["platogram:user_email"]
+        return payload["sub"]
     except Exception as e:
         print(f"Token verification error: {str(e)}")  # Log the exact token verification error
         raise HTTPException(
@@ -195,13 +195,10 @@ async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
         print(f"/status endpoint error: {str(e)}")
         return {"status": "error", "detail": str(e)}
 
-# An example function to verify the token
 async def verify_token(token: str = Depends(oauth2_scheme)):
-    # This function should implement your token verification logic.
-    # Here we assume `is_token_valid` is a placeholder for your actual implementation.
     try:
-        # Placeholder for actual token validation
-        if not token or not is_token_valid(token):
+        # Assuming `is_token_valid` is an actual function you have for token validation
+        if not is_token_valid(token):
             raise HTTPException(status_code=401, detail="Unauthorized")
         return token
     except Exception as e:
@@ -225,7 +222,6 @@ async def reset(user_id: str = Depends(verify_token_and_get_user_id)):
     return {"message": "Session reset"}
 
 async def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> tuple[str, str]:
-    # Get absolute path of current working directory
     script_path = Path.cwd() / "examples" / "audio_to_paper.sh"
     command = f"cd {output_dir} && {script_path} \"{url}\" --lang {lang} --verbose"
 
@@ -260,9 +256,7 @@ stderr:
 async def send_email(user_id: str, subj: str, body: str, files: list[Path]):
     loop = asyncio.get_running_loop()
     with ProcessPoolExecutor() as pool:
-        await loop.run_in_executor(
-            pool, _send_email_sync, user_id, subj, body, files
-        )
+        await loop.run_in_executor(pool, _send_email_sync, user_id, subj, body, files)
 
 async def convert_and_send_with_error_handling(request: ConversionRequest, user_id: str):
     try:
@@ -270,7 +264,6 @@ async def convert_and_send_with_error_handling(request: ConversionRequest, user_
         tasks[user_id].status = "done"
     except Exception as e:
         logfire.exception(f"Error in background task for user {user_id}: {str(e)}")
-
         if user_id in tasks:
             error = str(e)
             if len(error) > 256:
@@ -325,16 +318,14 @@ Please reply to this e-mail if any suggestions, feedback, or questions.
 Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
 Suggested donation: $2 per hour of content converted."""
 
-        await send_email(user_id, subject, body, files)    
+        await send_email(user_id, subject, body, files)
 
 def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):
-    # Email configuration
     smtp_user = os.getenv("PLATOGRAM_SMTP_USER")
     smtp_server = os.getenv("PLATOGRAM_SMTP_SERVER")
     smtp_port = 587
     sender_password = os.getenv("PLATOGRAM_SMTP_PASSWORD")
     
-    # Create message
     msg = MIMEMultipart()
     msg['From'] = os.getenv("PLATOGRAM_SMTP_FROM")
     msg['To'] = user_id
@@ -342,11 +333,10 @@ def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):
     
     msg.attach(MIMEText(body, 'plain'))
     
-    # Attach files if provided
     for file in files:
-        with open(file, "rb") as file:
+        with open(file, "rb") as f:
             file_name = file.name.split("/")[-1]
-            part = MIMEApplication(file.read(), Name=file_name)
+            part = MIMEApplication(f.read(), Name=file_name)
         part['Content-Disposition'] = f'attachment; filename="{file_name}"'
         msg.attach(part)
     

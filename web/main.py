@@ -199,25 +199,13 @@ async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
         if task.status == "done":
             return {"status": "done"}
         return {"status": "idle"}  # fallback to idle
-    pass
-except Exception as e:
+    except Exception as e:
         logfire.exception(f"Error in status endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-async def verify_token(token: str = Depends(oauth2_scheme)):
-    try:
-        # Assuming `is_token_valid` is an actual function you have for token validation
-        if not is_token_valid(token):
-            raise HTTPException(status_code=401, detail="Unauthorized")
-        return token
-    except Exception as e:
-        print(f"Token verification error in verify_token: {str(e)}")
-        raise HTTPException(status_code=401, detail="Unauthorized") from e
-
 @app.get("/test-auth")
-async def test_auth(token: str = Depends(verify_token)):
-    return {"message": "Auth test successful"}
+async def test_auth(user_id: str = Depends(verify_token_and_get_user_id)):
+    return {"message": "Auth test successful", "user_id": user_id}
 
 @app.get("/reset")
 @logfire.instrument()
@@ -234,6 +222,7 @@ async def reset(user_id: str = Depends(verify_token_and_get_user_id)):
     except Exception as e:
         logfire.exception(f"Error in reset endpoint for user {user_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to reset session: {str(e)}")
+
 async def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> tuple[str, str]:
     script_path = Path.cwd() / "examples" / "audio_to_paper.sh"
     command = f"cd {output_dir} && {script_path} \"{url}\" --lang {lang} --verbose"
@@ -275,14 +264,14 @@ async def convert_and_send_with_error_handling(request: ConversionRequest, user_
     try:
         await convert_and_send(request, user_id)
         tasks[user_id].status = "done"
+    except HTTPException as e:
+        logfire.exception(f"HTTP error in background task for user {user_id}: {str(e)}")
+        tasks[user_id].error = str(e)
+        tasks[user_id].status = "failed"
     except Exception as e:
-        logfire.exception(f"Error in background task for user {user_id}: {str(e)}")
-        if user_id in tasks:
-            error = str(e)
-            if len(error) > 256:
-                error = "🤯🤯🤯"
-            tasks[user_id].error = error
-            tasks[user_id].status = "failed"
+        logfire.exception(f"Unexpected error in background task for user {user_id}: {str(e)}")
+        tasks[user_id].error = "An unexpected error occurred"
+        tasks[user_id].status = "failed"
 
 async def convert_and_send(request: ConversionRequest, user_id: str):
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -350,8 +339,8 @@ def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):
         with open(file, "rb") as f:
             file_name = file.name.split("/")[-1]
             part = MIMEApplication(f.read(), Name=file_name)
-        part['Content-Disposition'] = f'attachment; filename="{file_name}"'
-        msg.attach(part)
+            part['Content-Disposition'] = f'attachment; filename="{file_name}"'
+            msg.attach(part)
     
     with smtplib.SMTP(smtp_server, smtp_port) as server:
         server.starttls()

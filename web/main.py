@@ -107,6 +107,7 @@ async def web_root():
 async def get_auth0_public_key():
     current_time = time.time()
 
+    # Check if the cached key is still valid
     if (
         auth0_public_key_cache["key"]
         and current_time - auth0_public_key_cache["last_updated"]
@@ -114,6 +115,7 @@ async def get_auth0_public_key():
     ):
         return auth0_public_key_cache["key"]
 
+    # If not, fetch the JWKS from Auth0
     async with httpx.AsyncClient() as client:
         response = await client.get(JWKS_URL)
         response.raise_for_status()
@@ -121,6 +123,7 @@ async def get_auth0_public_key():
 
     x5c = jwks["keys"][0]["x5c"][0]
 
+    # Convert the X.509 certificate to a public key
     cert = load_pem_x509_certificate(
         f"-----BEGIN CERTIFICATE-----\n{x5c}\n-----END CERTIFICATE-----".encode()
     )
@@ -129,6 +132,7 @@ async def get_auth0_public_key():
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
 
+    # Update the cache
     auth0_public_key_cache["key"] = public_key
     auth0_public_key_cache["last_updated"] = current_time
 
@@ -144,20 +148,17 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
             audience=API_AUDIENCE,
             issuer=f"https://{AUTH0_DOMAIN}/",
         )
-        logfire.info(f"Token payload: {payload}")  # Log entire payload
-        user_id = payload.get("sub") or payload.get("platogram:user_email")
-        if not user_id:
-            raise ValueError("User ID not found in token payload")
-        return user_id
+        return payload["sub"]
     except jwt.ExpiredSignatureError:
-        logfire.warning("Token has expired")
+        print("Token has expired")
         raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.JWTClaimsError as e:
-        logfire.warning(f"Invalid claims: {e}")
-        raise HTTPException(status_code=401, detail="Invalid token claims")
+    except jwt.exceptions.JWTClaimsError as e:
+        print(f"Token claims verification failed: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Token claims verification failed: {str(e)}")
     except Exception as e:
-        logfire.exception(f"Token verification error: {str(e)}")
-        raise HTTPException(status_code=401, detail="Couldn't verify token") from e
+        print(f"Couldn't verify token: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Couldn't verify token: {str(e)}") from e
+
 
 @app.post("/convert")
 @logfire.instrument()

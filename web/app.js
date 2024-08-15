@@ -34,6 +34,7 @@ async function initAuth0() {
         await updateUI();
     } catch (error) {
         console.error("Error initializing Auth0:", error);
+        updateUIStatus("error", "Failed to initialize authentication. Please try refreshing the page.");
     }
 }
 
@@ -66,7 +67,6 @@ function updateUIStatus(status, errorMessage = "") {
     }
 }
 
-// Extra logging added to updateUI function
 async function updateUI() {
     const isAuthenticated = await auth0Client.isAuthenticated();
     document.getElementById("login-button").classList.toggle("hidden", isAuthenticated);
@@ -74,13 +74,9 @@ async function updateUI() {
 
     if (isAuthenticated) {
         const user = await auth0Client.getUser();
-        const token = await auth0Client.getTokenSilently({
-            audience: "https://platogram.vercel.app",
-        });
-        console.log("Obtained token:", token);
         console.log("User info:", user);
         try {
-            await pollStatus(token);
+            await pollStatus();
         } catch (error) {
             console.error("Error polling status:", error);
         }
@@ -88,35 +84,44 @@ async function updateUI() {
     }
 }
 
-// Ensure token contains correct information
-async function reset() {
+async function getValidToken() {
     try {
-        const token = await auth0Client.getTokenSilently({
+        return await auth0Client.getTokenSilently({
             audience: "https://platogram.vercel.app",
         });
-        console.log("Obtained token for reset:", token);
-
-        // Call the /reset endpoint
-        const response = await fetch("/reset", {
-            method: "GET",
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-        });
-
-        if (!response.ok) {
-            console.error("Failed to reset:", response.statusText);
-            throw new Error("Failed to reset");
+    } catch (error) {
+        if (error.error === 'login_required') {
+            await auth0Client.loginWithRedirect();
         }
+        throw error;
+    }
+}
 
+async function apiCall(url, method = 'GET', body = null) {
+    const token = await getValidToken();
+    const response = await fetch(url, {
+        method,
+        headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: body ? JSON.stringify(body) : null
+    });
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API call failed: ${response.status} ${response.statusText}\n${errorText}`);
+    }
+    return response.json();
+}
+
+async function reset() {
+    try {
+        await apiCall("/reset");
         console.log("Reset successful");
-
-        // Clear input fields
         document.getElementById("url-input").value = "";
-
-        // Poll status after reset
-        await pollStatus(token);
+        document.getElementById("file-upload").value = "";
+        document.getElementById("file-name").textContent = "";
+        await pollStatus();
     } catch (error) {
         console.error("Error resetting:", error);
         updateUIStatus("error", "Failed to reset. Please try again.");
@@ -126,51 +131,53 @@ async function reset() {
 async function onConvertClick() {
     const inputData = getInputData();
     if (await auth0Client.isAuthenticated()) {
-        // Create and show the language selection modal
-        const modal = document.createElement('div');
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        `;
-
-        const modalContent = document.createElement('div');
-        modalContent.style.cssText = `
-            background-color: white;
-            padding: 20px;
-            border-radius: 5px;
-            text-align: center;
-        `;
-
-        modalContent.innerHTML = `
-            <h3>Select Language</h3>
-            <button id="en-btn">English</button>
-            <button id="es-btn">Spanish</button>
-            <button id="cancel-btn">Cancel</button>
-        `;
-
-        modal.appendChild(modalContent);
-        document.body.appendChild(modal);
-
-        // Handle language selection
-        const handleLanguageSelection = async (lang) => {
-            document.body.removeChild(modal);
-            await postToConvert(inputData, lang);
-        };
-
-        document.getElementById('en-btn').onclick = () => handleLanguageSelection('en');
-        document.getElementById('es-btn').onclick = () => handleLanguageSelection('es');
-        document.getElementById('cancel-btn').onclick = () => document.body.removeChild(modal);
+        showLanguageSelectionModal(inputData);
     } else {
         login();
     }
+}
+
+function showLanguageSelectionModal(inputData) {
+    const modal = document.createElement('div');
+    modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    `;
+
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background-color: white;
+        padding: 20px;
+        border-radius: 5px;
+        text-align: center;
+    `;
+
+    modalContent.innerHTML = `
+        <h3>Select Language</h3>
+        <button id="en-btn">English</button>
+        <button id="es-btn">Spanish</button>
+        <button id="cancel-btn">Cancel</button>
+    `;
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    const handleLanguageSelection = async (lang) => {
+        document.body.removeChild(modal);
+        await postToConvert(inputData, lang);
+    };
+
+    document.getElementById('en-btn').onclick = () => handleLanguageSelection('en');
+    document.getElementById('es-btn').onclick = () => handleLanguageSelection('es');
+    document.getElementById('cancel-btn').onclick = () => document.body.removeChild(modal);
 }
 
 function getInputData() {
@@ -188,6 +195,7 @@ async function login() {
         });
     } catch (error) {
         console.error("Error logging in:", error);
+        updateUIStatus("error", "Failed to log in. Please try again.");
     }
 }
 
@@ -200,18 +208,11 @@ async function logout() {
         });
     } catch (error) {
         console.error("Error logging out:", error);
+        updateUIStatus("error", "Failed to log out. Please try again.");
     }
 }
 
 async function postToConvert(inputData, lang) {
-    let body;
-    let headers = {
-        Authorization: `Bearer ${await auth0Client.getTokenSilently({
-            audience: "https://platogram.vercel.app",
-        })}`,
-        'Content-Type': 'application/json'
-    };
-
     const formData = new FormData();
     formData.append('lang', lang);
 
@@ -221,55 +222,39 @@ async function postToConvert(inputData, lang) {
         formData.append("payload", inputData);
     }
 
-    body = formData;
-
     try {
-        const token = await auth0Client.getTokenSilently({
-            audience: "https://platogram.vercel.app",
-        });
-        console.log("Obtained token for convert:", token);
-
+        const token = await getValidToken();
         const response = await fetch("/convert", {
             method: "POST",
-            headers: headers,
-            body: body,
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            body: formData,
         });
         const result = await response.json();
         console.log("Convert response:", result);
 
         if (result.message === "Conversion started") {
-            await pollStatus(token);
+            await pollStatus();
         } else {
             updateUIStatus("error", "Unexpected response from server");
         }
     } catch (error) {
         console.error("Error in postToConvert:", error);
-        updateUIStatus("error", error);
+        updateUIStatus("error", error.message);
     }
 }
 
-async function pollStatus(token) {
+const debouncedPollStatus = debounce(pollStatus, 5000);
+
+async function pollStatus() {
     try {
-        console.log("Polling status with token:", token);
-        const response = await fetch("/status", {
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-        });
-
-        if (!response.ok) {
-            console.error("Polling status failed with status:", response.status);
-            console.error("Polling status failed response:", await response.text());
-            throw new Error(`Polling status failed: ${response.statusText}`);
-        }
-
-        const result = await response.json();
+        const result = await apiCall("/status");
         console.log("Polling status response:", result);
 
         if (result.status === "running") {
             updateUIStatus("running");
-            setTimeout(() => pollStatus(token), 5000);
+            debouncedPollStatus();
         } else if (result.status === "idle") {
             updateUIStatus("idle");
         } else if (result.status === "failed") {
@@ -290,6 +275,18 @@ function updateProcessingStage() {
     currentStageIndex = (currentStageIndex + 1) % processingStages.length;
 }
 
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log("DOM fully loaded and parsed");
     const loginButton = document.getElementById('login-button');
@@ -300,63 +297,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetButton = document.getElementById('reset-button');
     const resetButtonError = document.getElementById('reset-button-error');
     const testAuthButton = document.getElementById('test-auth-button');
+    const fileUpload = document.getElementById('file-upload');
 
-    if (loginButton) {
-        loginButton.addEventListener('click', login);
-    }
-    if (logoutButton) {
-        logoutButton.addEventListener('click', logout);
-    }
-    if (convertButton) {
-        convertButton.addEventListener('click', onConvertClick);
-    }
-    if (donateButton) {
-        donateButton.addEventListener('click', onDonateClick);
-    }
-    if (donateButtonStatus) {
-        donateButtonStatus.addEventListener('click', onDonateClick);
-    }
-    if (resetButton) {
-        resetButton.addEventListener('click', reset);
-    }
-    if (resetButtonError) {
-        resetButtonError.addEventListener('click', reset);
-    }
-    if (testAuthButton) {
-        testAuthButton.addEventListener('click', testAuth);
+    if (loginButton) loginButton.addEventListener('click', login);
+    if (logoutButton) logoutButton.addEventListener('click', logout);
+    if (convertButton) convertButton.addEventListener('click', onConvertClick);
+    if (donateButton) donateButton.addEventListener('click', onDonateClick);
+    if (donateButtonStatus) donateButtonStatus.addEventListener('click', onDonateClick);
+    if (resetButton) resetButton.addEventListener('click', reset);
+    if (resetButtonError) resetButtonError.addEventListener('click', reset);
+    if (testAuthButton) testAuthButton.addEventListener('click', testAuth);
+    if (fileUpload) {
+        fileUpload.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                document.getElementById('file-name').textContent = file.name;
+            }
+        });
     }
 
     setInterval(updateProcessingStage, 3000);
     updateProcessingStage();
 
-    // Initialize the app
     initAuth0().catch((error) =>
         console.error("Error initializing app:", error)
     );
 });
 
-// Handle the 'Test Auth' button click
 async function testAuth() {
     try {
-        const token = await auth0Client.getTokenSilently({
-            audience: "https://platogram.vercel.app",
-        });
-        console.log("Token obtained for test auth:", token.substring(0, 10) + "...");
-
-        const response = await fetch("/test-auth", {
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-        });
-
-        if (!response.ok) {
-            console.error("Error in test auth response:", await response.text());
-            throw new Error(`Test auth failed: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log("Auth test result:", data);
+        const result = await apiCall("/test-auth");
+        console.log("Auth test result:", result);
         alert("Auth test successful. Check console for details.");
     } catch (error) {
         console.error("Auth test failed:", error);
@@ -364,5 +335,9 @@ async function testAuth() {
     }
 }
 
-// Add event listener for the test auth button
-document.getElementById('test-auth-button').addEventListener('click', testAuth);
+// Note: onDonateClick function is not provided in the original code
+// You may want to implement this function if it's needed
+function onDonateClick() {
+    // Implement donation logic here
+    console.log("Donation button clicked");
+}

@@ -199,9 +199,11 @@ async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
         if task.status == "done":
             return {"status": "done"}
         return {"status": "idle"}  # fallback to idle
-    except Exception as e:
-        print(f"/status endpoint error: {str(e)}")
-        return {"status": "error", "detail": str(e)}
+    pass
+except Exception as e:
+        logfire.exception(f"Error in status endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 async def verify_token(token: str = Depends(oauth2_scheme)):
     try:
@@ -220,15 +222,18 @@ async def test_auth(token: str = Depends(verify_token)):
 @app.get("/reset")
 @logfire.instrument()
 async def reset(user_id: str = Depends(verify_token_and_get_user_id)):
-    if user_id in processes:
-        processes[user_id].terminate()
-        del processes[user_id]
+    try:
+        if user_id in processes:
+            processes[user_id].terminate()
+            del processes[user_id]
 
-    if user_id in tasks:
-        del tasks[user_id]
+        if user_id in tasks:
+            del tasks[user_id]
 
-    return {"message": "Session reset"}
-
+        return {"message": "Session reset"}
+    except Exception as e:
+        logfire.exception(f"Error in reset endpoint for user {user_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to reset session: {str(e)}")
 async def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> tuple[str, str]:
     script_path = Path.cwd() / "examples" / "audio_to_paper.sh"
     command = f"cd {output_dir} && {script_path} \"{url}\" --lang {lang} --verbose"

@@ -45,6 +45,7 @@ async function initAuth0() {
         updateUIStatus("error", "Failed to initialize authentication. Please try refreshing the page.");
     }
 }
+
 function updateUIStatus(status, errorMessage = "") {
     const sections = {
         "input-section": "idle",
@@ -76,6 +77,7 @@ async function updateUI() {
     if (isAuthenticated) {
         const user = await auth0Client.getUser();
         console.log("User info:", user);
+        document.getElementById('user-name').textContent = user.name;  // Display user name
         try {
             await pollStatus();
         } catch (error) {
@@ -84,6 +86,7 @@ async function updateUI() {
         console.log("Logged in as:", user.email);
     } else {
         console.log("User is not authenticated");
+        document.getElementById('user-name').textContent = '';  // Clear user name when not authenticated
     }
 }
 
@@ -137,7 +140,7 @@ async function onConvertClick() {
     if (await auth0Client.isAuthenticated()) {
         showLanguageSelectionModal(inputData);
     } else {
-        login();
+        await login();
     }
 }
 
@@ -210,7 +213,7 @@ async function postToConvert(inputData, lang) {
         console.log("Convert response:", result);
 
         if (result.message === "Conversion started") {
-            await pollStatus(token);
+            await pollStatus();
         } else {
             updateUIStatus("error", "Unexpected response from server");
         }

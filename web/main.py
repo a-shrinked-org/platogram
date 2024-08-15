@@ -191,7 +191,7 @@ async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
     except Exception as e:
         return {"status": "error", "detail": str(e)}
 
-    An example function to verify the token
+# An example function to verify the token
 async def verify_token(token: str = Depends(oauth2_scheme)):
     # ... Implement your token verification logic here, e.g., using a JWT library ...
     if not token or not is_token_valid(token):

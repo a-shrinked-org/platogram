@@ -15,6 +15,7 @@ from uuid import uuid4
 
 import httpx
 import jwt
+import os
 import logfire
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
@@ -31,7 +32,17 @@ from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 
-logfire.configure()
+logfire_token = os.getenv('LOGFIRE_TOKEN')
+if logfire_token:
+    logfire.configure(token=logfire_token)
+else:
+    # Fallback for local development or if token is not set
+    try:
+        logfire.configure()
+    except Exception as e:
+        print(f"Logfire configuration failed: {e}")
+        # Optionally, set up a fallback logging mechanism here
+        
 app = FastAPI()
 
 

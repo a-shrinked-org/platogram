@@ -1,38 +1,31 @@
-import asyncio
 import os
 import re
-import smtplib
-import tempfile
-import time
-from concurrent.futures import ProcessPoolExecutor
-from datetime import datetime
-from email.mime.application import MIMEApplication
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from pathlib import Path
-from typing import Literal, Optional
-from uuid import uuid4
-
-import httpx
 import jwt
+import asyncio
+import httpx
+import tempfile
 import logfire
+from pathlib import Path
+from uuid import uuid4
+from datetime import datetime
+from typing import Literal, Optional
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
-from fastapi import (
-    BackgroundTasks,
-    Depends,
-    FastAPI,
-    File,
-    Form,
-    HTTPException,
-    UploadFile,
-    Request,
-)
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
-from fastapi.security import OAuth2PasswordBearer
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, Form, File, BackgroundTasks, Request
+from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from fastapi.security import OAuth2PasswordBearer
+from concurrent.futures import ProcessPoolExecutor
+
+import platogram as plato  # Ensure this is the correct way to import your SDK
+
+# Retrieve API keys from environment variables
+ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
+ASSEMBLYAI_API_KEY = os.getenv('ASSEMBLYAI_API_KEY')
+
+if not ANTHROPIC_API_KEY or not ASSEMBLYAI_API_KEY:
+    raise RuntimeError("API keys not set in environment variables.")
 
 # Logfire configuration
 logfire_token = os.getenv('LOGFIRE_TOKEN')
@@ -106,8 +99,6 @@ async def web_root():
 
 async def get_auth0_public_key():
     current_time = time.time()
-
-    # Check if the cached key is still valid
     if (
         auth0_public_key_cache["key"]
         and current_time - auth0_public_key_cache["last_updated"]
@@ -115,15 +106,12 @@ async def get_auth0_public_key():
     ):
         return auth0_public_key_cache["key"]
 
-    # If not, fetch the JWKS from Auth0
     async with httpx.AsyncClient() as client:
         response = await client.get(JWKS_URL)
         response.raise_for_status()
         jwks = response.json()
 
     x5c = jwks["keys"][0]["x5c"][0]
-
-    # Convert the X.509 certificate to a public key
     cert = load_pem_x509_certificate(
         f"-----BEGIN CERTIFICATE-----\n{x5c}\n-----END CERTIFICATE-----".encode()
     )
@@ -132,11 +120,11 @@ async def get_auth0_public_key():
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
 
-    # Update the cache
     auth0_public_key_cache["key"] = public_key
     auth0_public_key_cache["last_updated"] = current_time
 
     return public_key
+
 async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
     try:
         public_key = await get_auth0_public_key()
@@ -276,42 +264,31 @@ async def convert_and_send_with_error_handling(request: ConversionRequest, user_
         tasks[user_id].status = "failed"
 
 async def convert_and_send(request: ConversionRequest, user_id: str):
-    with tempfile.TemporaryDirectory() as tmpdir:
-        if not (request.payload.startswith("http") or request.payload.startswith("file:///tmp/platogram_uploads")):
-            raise HTTPException(status_code=400, detail="Please provide a valid URL.")
+    try:
+        # Initialize models
+        llm = plato.llm.get_model("anthropic/claude-3-5-sonnet", ANTHROPIC_API_KEY)
+        asr = plato.asr.get_model("assembly-ai/best", ASSEMBLYAI_API_KEY)
 
         url = request.payload
 
-        try:
-            stdout, stderr = await audio_to_paper(url, request.lang, Path(tmpdir), user_id)
-        finally:
-            if request.payload.startswith("file:///tmp/platogram_uploads"):
-                try:
-                    os.remove(request.payload.replace("file:///tmp/platogram_uploads", "/tmp/platogram_uploads"))
-                except OSError as e:
-                    logfire.warning(f"Failed to delete temporary file {request.payload}: {e}")
+        # Process audio
+        transcript = plato.extract_transcript(url, asr)
+        content = plato.index(transcript, llm)
 
-        title_match = re.search(r'<title>(.*?)</title>', stdout, re.DOTALL)
-        title = title_match.group(1).strip() if title_match else "👋"
+        title = content.title
+        summary = content.summary
 
-        abstract_match = re.search(r'<abstract>(.*?)</abstract>', stdout, re.DOTALL)
-        abstract = abstract_match.group(1).strip() if abstract_match else ""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            files = [f for f in Path(tmpdir).glob('*') if f.is_file()]
 
-        if not title_match:
-            logfire.warning("No title found in stdout, using default title")
-        if not abstract_match:
-            logfire.warning("No abstract found in stdout, using default abstract")
-
-        files = [f for f in Path(tmpdir).glob('*') if f.is_file()]
-
-        subject = f"[Platogram] {title}"
-        body = f"""Hi there!
+            subject = f"[Platogram] {title}"
+            body = f"""Hi there!
 
 Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
 
 You'll find a PDF and a Word file attached. The Word file includes the original transcript with timestamp references. I hope this helps!
 
-{abstract}
+{summary}
 
 Please reply to this e-mail if any suggestions, feedback, or questions.
 
@@ -319,7 +296,11 @@ Please reply to this e-mail if any suggestions, feedback, or questions.
 Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
 Suggested donation: $2 per hour of content converted."""
 
-        await send_email(user_id, subject, body, files)
+            await send_email(user_id, subject, body, files)
+
+    except Exception as e:
+        logfire.exception(f"Conversion and sending failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to convert and send transcript")
 
 def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):
     smtp_user = os.getenv("PLATOGRAM_SMTP_USER")

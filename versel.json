@@ -6,5 +6,8 @@
       "destination": "/web",
       "permanent": true
     }
+  ],
+  "rewrites": [
+    { "source": "/", "destination": "/web" }
   ]
 }

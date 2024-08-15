@@ -164,15 +164,18 @@ async def convert(
 
 @app.get("/status")
 async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
-    if user_id not in tasks:
+    try:
+        if user_id not in tasks:
+            return {"status": "idle"}
+        if tasks[user_id].status == "running":
+            return {"status": "running"}
+        if tasks[user_id].status == "failed":
+            return {"status": "failed", "error": tasks[user_id].error}
+        if tasks[user_id].status == "done":
+            return {"status": "done"}
         return {"status": "idle"}
-    if tasks[user_id].status == "running":
-        return {"status": "running"}
-    if tasks[user_id].status == "failed":
-        return {"status": "failed", "error": tasks[user_id].error}
-    if tasks[user_id].status == "done":
-        return {"status": "done"}
-    return {"status": "idle"}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
 
 
 @app.get("/reset")

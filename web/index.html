@@ -6,14 +6,14 @@
     <title>Platogram - Transform Audio into Actionable Knowledge</title>
     <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="https://platogram.vercel.app/web/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css">
   </head>
   <body>
     <div class="container">
       <header>
         <a href="#" class="cta" id="login-button">Log In</a>
         <a href="#" class="cta" id="logout-button">Log Out</a>
-        <a href="#" class="cta" id="test-auth-button">Test Auth</a>
       </header>
 
       <main>
@@ -52,6 +52,7 @@
           </p>
           <button id="reset-button" class="cta">Got it!</button>
         </div>
+
         <div id="status-section" class="cta-container hidden">
           <p>
             Working on it. You will receive an email from Artyom Astafurov with
@@ -66,10 +67,125 @@
           </div>
           <button class="cta donate" id="donate-button-status">Donate</button>
         </div>
+
         <div id="error-section" class="cta-container hidden">
           <p>An error occurred. Please try again.</p>
           <button id="reset-button-error" class="cta">Reset</button>
         </div>
+
+        <section class="features-section">
+          <div class="features-grid">
+            <div class="feature-card">
+              <h3>Sparks Joy</h3>
+              <p>
+                Platogram doesn't just transcribe - it transforms speech into
+                high-quality, readable documents optimized for knowledge
+                retrieval.
+              </p>
+            </div>
+            <div class="feature-card">
+              <h3>Privacy First</h3>
+              <p>
+                Your data stays yours. We process without storing, ensuring your
+                sensitive information remains confidential.
+              </p>
+            </div>
+            <div class="feature-card">
+              <h3>Just Works</h3>
+              <p>
+                Drop a link or a file with audio or transcript and we will
+                e-mail you a well-organized, readable document.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="examples-section">
+          <h2>Examples</h2>
+          <div class="examples-grid">
+            <div class="example-card">
+              <h3>John Carmack: From Gaming Pioneer to AI Visionary</h3>
+              <a href="https://drive.google.com/file/d/1_w9mv4_mBVSwK4NSnybGXtRysaT7ROFT/view?usp=drive_link" target="_blank" class="sample-link">View sample output</a>
+              <p class="example-description">Transform a 5-hour podcast into a structured document that sparks joy.</p>
+            </div>
+
+            <div class="example-card">
+              <h3>Hair Cells: The Remarkable Sensory Receptors of Hearing</h3>
+              <a href="https://drive.google.com/file/d/1Kswr1tMuS6c0a0tNn9OCuZCuPuP0FLr-/view?usp=drive_link" target="_blank" class="sample-link">View sample output</a>
+              <p class="example-description">Convert this inspiring TED talk into a readable format with key insights highlighted.</p>
+            </div>
+
+            <div class="example-card">
+              <h3>Court Hearing: Data Disclosure and Trial Scheduling</h3>
+              <a href="https://drive.google.com/file/d/1c_70MVz0fb7Zh0teirYt6Pc6S1hMomKV/view?usp=drive_link" target="_blank" class="sample-link">View sample output</a>
+              <p class="example-description">See how Platogram transforms courtroom transcript into a structured document.</p>
+            </div>
+
+            <div class="example-card">
+              <h3>Building and Training GPT-2 from Scratch</h3>
+              <a href="https://drive.google.com/file/d/1w98NFdfeSObpgr-Tmm40zB2UOYctWTaS/view?usp=drive_link" target="_blank" class="sample-link">View sample output</a>
+              <p class="example-description">Experience how a complex academic lecture is transformed into a structured, citable document.</p>
+            </div>
+
+            <div class="example-card">
+              <h3>Intel Q2 2024 Earnings Call: Restructuring and Cost Cutting</h3>
+              <a href="https://drive.google.com/file/d/14HFC36r6xLGBCDrSUdRTi50Z8SXCHD7q/view?usp=drive_link" target="_blank" class="sample-link">View sample output</a>
+              <p class="example-description">Observe how Platogram captures and organizes key points from a business discussion.</p>
+            </div>
+            <div class="example-card">
+              <h3>Conversation with Mark Zuckerberg</h3>
+              <a href="https://drive.google.com/file/d/1DbtND485AFmUv4XVb4mgZgXo27JxdkzE/view?usp=drive_link" target="_blank" class="sample-link">View sample output</a>
+              <p class="example-description">Insights on AI, entrepreneurship, and personal growth in a readable format.</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="use-cases-section">
+          <h2>Use Cases</h2>
+          <div class="use-cases-grid">
+            <div class="use-case-card">
+              <h3>Learning</h3>
+              <p>
+                Turn podcasts, lectures, and interviews into readable, searchable,
+                shareable documents.
+              </p>
+            </div>
+            <div class="use-case-card">
+              <h3>Drafting</h3>
+              <p>
+                Convert raw ideas and discussions into polished drafts for legal
+                briefs, academic papers, and research proposals, streamlining
+                the writing process.
+              </p>
+            </div>
+            <div class="use-case-card">
+              <h3>Professional</h3>
+              <p>
+                Capture key insights from business meetings, coaching sessions,
+                and client calls, ensuring no valuable information is lost.
+              </p>
+            </div>
+          </div>
+        </section>
+        <section>
+          <h2>Pricing: Support Our Mission</h2>
+          <p>
+            We believe in making knowledge accessible. That's why Platogram
+            operates on a donation-based model.
+          </p>
+          <div class="pricing">
+            <h3>Suggested Donation: $2 per hour of audio processed</h3>
+            <p>Your donation supports:</p>
+            <ul>
+              <li>AI inference costs</li>
+              <li>Making Platogram accessible for all users</li>
+              <li>Building fully-offline version of Platogram</li>
+            </ul>
+            <div class="donate-button-container">
+              <a href="#" class="cta donate" id="donate-button-pricing">Donate Now</a>
+            </div>
+          </div>
+        </section>
       </main>
       <footer>
         <p>
@@ -79,7 +195,7 @@
         </p>
       </footer>
     </div>
-    <script src="https://platogram.vercel.app/web/app.js"></script>
+    <script src="app.js"></script>
     <!-- Start of LiveChat (www.livechat.com) code -->
     <script>
       window.__lc = window.__lc || {};
@@ -87,9 +203,42 @@
       window.__lc.integration_name = "manual_onboarding";
       window.__lc.product_name = "livechat";
       (function (n, t, c) {
-        function i(n) { return e._h ? e._h.apply(null, n) : e._q.push(n); }
-        var e = { _q: [], _h: null, _v: "2.0", on: function () { i(["on", c.call(arguments)]); }, once: function () { i(["once", c.call(arguments)]); }, off: function () { i(["off", c.call(arguments)]); }, get: function () { if (!e._h) throw new Error("[LiveChatWidget] You can't use getters before load."); return i(["get", c.call(arguments)]); }, call: function () { i(["call", c.call(arguments)]); }, init: function () { var n = t.createElement("script"); n.async = !0, n.type = "text/javascript", n.src = "https://cdn.livechatinc.com/tracking.js", t.head.appendChild(n); } };
-        !n.__lc.asyncInit && e.init(), n.LiveChatWidget = n.LiveChatWidget || e;
+        function i(n) {
+          return e._h ? e._h.apply(null, n) : e._q.push(n);
+        }
+        var e = {
+          _q: [],
+          _h: null,
+          _v: "2.0",
+          on: function () {
+            i(["on", c.call(arguments)]);
+          },
+          once: function () {
+            i(["once", c.call(arguments)]);
+          },
+          off: function () {
+            i(["off", c.call(arguments)]);
+          },
+          get: function () {
+            if (!e._h)
+              throw new Error(
+                "[LiveChatWidget] You can't use getters before load."
+              );
+            return i(["get", c.call(arguments)]);
+          },
+          call: function () {
+            i(["call", c.call(arguments)]);
+          },
+          init: function () {
+            var n = t.createElement("script");
+            (n.async = !0),
+              (n.type = "text/javascript"),
+              (n.src = "https://cdn.livechatinc.com/tracking.js"),
+              t.head.appendChild(n);
+          },
+        };
+        !n.__lc.asyncInit && e.init(),
+          (n.LiveChatWidget = n.LiveChatWidget || e);
       })(window, document, [].slice);
     </script>
     <noscript>
@@ -97,6 +246,5 @@
       <a href="https://www.livechat.com/?welcome" rel="noopener nofollow" target="_blank">LiveChat</a>
     </noscript>
     <!-- End of LiveChat code -->
-    <script src="https://platogram.vercel.app/web/app.js"></script>
   </body>
 </html>

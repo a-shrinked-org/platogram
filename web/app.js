@@ -10,30 +10,30 @@ let currentStageIndex = 0;
 
 // Initialize Auth0
 async function initAuth0() {
-  try {
-    auth0Client = await auth0.createAuth0Client({
-      domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
-      clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
-      authorizationParams: {
-        redirect_uri: window.location.origin,
-        audience: "https://platogram.vercel.app/",
-        scope: "openid profile email",
-      },
-      cacheLocation: "localstorage",
-    });
-    console.log("Auth0 client initialized successfully");
+    try {
+        auth0Client = await auth0.createAuth0Client({
+            domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
+            clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
+            authorizationParams: {
+                redirect_uri: window.location.origin,
+                audience: "https://platogram.vercel.app/",
+                scope: "openid profile email",
+            },
+            cacheLocation: "localstorage",
+        });
+        console.log("Auth0 client initialized successfully");
 
-    // Check for the code and state parameters
-    const query = window.location.search;
-    if (query.includes("code=") && query.includes("state=")) {
-      await auth0Client.handleRedirectCallback();
-      window.history.replaceState({}, document.title, "/");
+        // Check for the code and state parameters
+        const query = window.location.search;
+        if (query.includes("code=") && query.includes("state=")) {
+            await auth0Client.handleRedirectCallback();
+            window.history.replaceState({}, document.title, "/");
+        }
+
+        await updateUI();
+    } catch (error) {
+        console.error("Error initializing Auth0:", error);
     }
-
-    await updateUI();
-  } catch (error) {
-    console.error("Error initializing Auth0:", error);
-  }
 }
 
 function updateUIStatus(status, errorMessage = "") {
@@ -245,30 +245,36 @@ async function postToConvert(inputData, lang) {
 }
 
 async function pollStatus(token) {
-  try {
-    const response = await fetch("/status", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    const result = await response.json();
+    try {
+        const response = await fetch("/status", {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
 
-    if (result.status === "running") {
-      updateUIStatus("running");
-      setTimeout(() => pollStatus(token), 5000); // Poll every 5 seconds
-    } else if (result.status === "idle") {
-      updateUIStatus("idle");
-    } else if (result.status === "failed") {
-      updateUIStatus("failed", result.error);
-    } else if (result.status === "done") {
-      updateUIStatus("done");
-    } else {
-      updateUIStatus("failed", response.error);
+        // Check if the response is ok
+        if (!response.ok) {
+            throw new Error(`Polling status failed: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        if (result.status === "running") {
+            updateUIStatus("running");
+            setTimeout(() => pollStatus(token), 5000); // Poll every 5 seconds
+        } else if (result.status === "idle") {
+            updateUIStatus("idle");
+        } else if (result.status === "failed") {
+            updateUIStatus("failed", result.error);
+        } else if (result.status === "done") {
+            updateUIStatus("done");
+        } else {
+            updateUIStatus("error", "Unexpected status response");
+        }
+    } catch (error) {
+        console.error("Error polling status:", error);
+        updateUIStatus("error", error.message);
     }
-  } catch (error) {
-    console.error("Error polling status:", error);
-    updateUIStatus("error", error);
-  }
 }
 
 function updateProcessingStage() {
@@ -278,23 +284,22 @@ function updateProcessingStage() {
 
 // ... (all the previous code remains the same)
 
-// Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('login-button').addEventListener('click', login);
-  document.getElementById('logout-button').addEventListener('click', logout);
-  document.getElementById('convert-button').addEventListener('click', onConvertClick);
-  document.getElementById('donate-button').addEventListener('click', onDonateClick);
-  document.getElementById('donate-button-status').addEventListener('click', onDonateClick);
-  document.getElementById('reset-button').addEventListener('click', reset);
-  document.getElementById('reset-button-error').addEventListener('click', reset);
-  
-  setInterval(updateProcessingStage, 3000);
-  updateProcessingStage(); // Initial update
+    document.getElementById('login-button').addEventListener('click', login);
+    document.getElementById('logout-button').addEventListener('click', logout);
+    document.getElementById('convert-button').addEventListener('click', onConvertClick);
+    document.getElementById('donate-button').addEventListener('click', onDonateClick);
+    document.getElementById('donate-button-status').addEventListener('click', onDonateClick);
+    document.getElementById('reset-button').addEventListener('click', reset);
+    document.getElementById('reset-button-error').addEventListener('click', reset);
 
-  // Initialize the app
-  initAuth0().catch((error) =>
-    console.error("Error initializing app:", error)
-  );
+    setInterval(updateProcessingStage, 3000);
+    updateProcessingStage(); // Initial update
+
+    // Initialize the app
+    initAuth0().catch((error) =>
+        console.error("Error initializing app:", error)
+    );
 });
 
 // Test Auth function (you might want to add this if it's not already present)

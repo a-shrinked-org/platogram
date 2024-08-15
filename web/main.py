@@ -167,13 +167,14 @@ async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
     try:
         if user_id not in tasks:
             return {"status": "idle"}
-        if tasks[user_id].status == "running":
+        task = tasks[user_id]
+        if task.status == "running":
             return {"status": "running"}
-        if tasks[user_id].status == "failed":
-            return {"status": "failed", "error": tasks[user_id].error}
-        if tasks[user_id].status == "done":
+        if task.status == "failed":
+            return {"status": "failed", "error": task.error}
+        if task.status == "done":
             return {"status": "done"}
-        return {"status": "idle"}
+        return {"status": "idle"}  # fallback to idle
     except Exception as e:
         return {"status": "error", "detail": str(e)}
 

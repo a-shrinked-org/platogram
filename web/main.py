@@ -158,34 +158,37 @@ async def convert(
     payload: Optional[str] = Form(None),
     lang: Optional[Language] = Form(None),
 ):
-    if not lang:
-        lang = "en"
+    try:
+        if not lang:
+            lang = "en"
 
-    if user_id in tasks and tasks[user_id].status == "running":
-        raise HTTPException(status_code=400, detail="Conversion already in progress")
+        if user_id in tasks and tasks[user_id].status == "running":
+            raise HTTPException(status_code=400, detail="Conversion already in progress")
 
-    if payload is None and file is None:
-        raise HTTPException(status_code=400, detail="Either payload or file must be provided")
+        if payload is None and file is None:
+            raise HTTPException(status_code=400, detail="Either payload or file must be provided")
 
-    if payload is not None:
-        request = ConversionRequest(payload=payload, lang=lang)
-    else:
-        # Create a named temporary directory if it doesn't exist
-        tmpdir = Path(tempfile.gettempdir()) / "platogram_uploads"
-        tmpdir.mkdir(parents=True, exist_ok=True)
-        file_ext = file.filename.split(".")[-1]
-        temp_file = Path(tmpdir) / f"{uuid4()}.{file_ext}" 
-        file_content = await file.read()
-        with open(temp_file, "wb") as fd:
-            fd.write(file_content)
-            fd.close()
+        if payload is not None:
+            request = ConversionRequest(payload=payload, lang=lang)
+        else:
+            # Create a named temporary directory if it doesn't exist
+            tmpdir = Path(tempfile.gettempdir()) / "platogram_uploads"
+            tmpdir.mkdir(parents=True, exist_ok=True)
+            file_ext = file.filename.split(".")[-1]
+            temp_file = Path(tmpdir) / f"{uuid4()}.{file_ext}"
+            file_content = await file.read()
+            with open(temp_file, "wb") as fd:
+                fd.write(file_content)
 
-        request = ConversionRequest(payload=f"file://{temp_file}", lang=lang)
+            request = ConversionRequest(payload=f"file://{temp_file}", lang=lang)
 
-    tasks[user_id] = Task(start_time=datetime.now(), request=request)
-    background_tasks.add_task(convert_and_send_with_error_handling, request, user_id)
-    return {"message": "Conversion started"}
-
+        tasks[user_id] = Task(start_time=datetime.now(), request=request)
+        background_tasks.add_task(convert_and_send_with_error_handling, request, user_id)
+        return JSONResponse(content={"message": "Conversion started"}, status_code=200)
+    except Exception as e:
+        logfire.exception(f"Error in convert endpoint: {str(e)}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+    
 @app.get("/status")
 async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
     try:

@@ -66,7 +66,7 @@ function updateUIStatus(status, errorMessage = "") {
     }
 }
 
-// Update UI based on authentication state
+// Extra logging added to updateUI function
 async function updateUI() {
     const isAuthenticated = await auth0Client.isAuthenticated();
     document.getElementById("login-button").classList.toggle("hidden", isAuthenticated);
@@ -78,6 +78,7 @@ async function updateUI() {
             audience: "https://platogram.vercel.app",
         });
         console.log("Obtained token:", token);
+        console.log("User info:", user);
         try {
             await pollStatus(token);
         } catch (error) {
@@ -87,6 +88,7 @@ async function updateUI() {
     }
 }
 
+// Ensure token contains correct information
 async function reset() {
     try {
         const token = await auth0Client.getTokenSilently({
@@ -99,6 +101,7 @@ async function reset() {
             method: "GET",
             headers: {
                 Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
             },
         });
 
@@ -206,6 +209,7 @@ async function postToConvert(inputData, lang) {
         Authorization: `Bearer ${await auth0Client.getTokenSilently({
             audience: "https://platogram.vercel.app",
         })}`,
+        'Content-Type': 'application/json'
     };
 
     const formData = new FormData();
@@ -246,14 +250,17 @@ async function postToConvert(inputData, lang) {
 
 async function pollStatus(token) {
     try {
+        console.log("Polling status with token:", token);
         const response = await fetch("/status", {
             headers: {
                 Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
             },
         });
 
         if (!response.ok) {
             console.error("Polling status failed with status:", response.status);
+            console.error("Polling status failed response:", await response.text());
             throw new Error(`Polling status failed: ${response.statusText}`);
         }
 
@@ -328,6 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
     );
 });
 
+// Handle the 'Test Auth' button click
 async function testAuth() {
     try {
         const token = await auth0Client.getTokenSilently({
@@ -338,8 +346,15 @@ async function testAuth() {
         const response = await fetch("/test-auth", {
             headers: {
                 Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
             },
         });
+
+        if (!response.ok) {
+            console.error("Error in test auth response:", await response.text());
+            throw new Error(`Test auth failed: ${response.statusText}`);
+        }
+
         const data = await response.json();
         console.log("Auth test result:", data);
         alert("Auth test successful. Check console for details.");

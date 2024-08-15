@@ -94,10 +94,6 @@ async def root():
 async def web_root():
     return FileResponse(os.path.join(static_dir, "index.html"))
 
-@app.get("/test-auth")
-async def test_auth():
-    return {"message": "Auth works!"}
-
 async def get_auth0_public_key():
     current_time = time.time()
 
@@ -194,6 +190,17 @@ async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
         return {"status": "idle"}  # fallback to idle
     except Exception as e:
         return {"status": "error", "detail": str(e)}
+
+    An example function to verify the token
+async def verify_token(token: str = Depends(oauth2_scheme)):
+    # ... Implement your token verification logic here, e.g., using a JWT library ...
+    if not token or not is_token_valid(token):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return token
+
+@app.get("/test-auth")
+async def test_auth(token: str = Depends(verify_token)):
+    return {"message": "Auth test successful"}
 
 @app.get("/reset")
 @logfire.instrument()

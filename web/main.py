@@ -56,7 +56,7 @@ app.add_middleware(
 )
 
 AUTH0_DOMAIN = "dev-w0dm4z23pib7oeui.us.auth0.com"
-API_AUDIENCE = "https://platogram.vercel.app"
+API_AUDIENCE = "https://platogram.vercel.app/"
 ALGORITHMS = ["RS256"]
 JWKS_URL = f"https://{AUTH0_DOMAIN}/.well-known/jwks.json"
 

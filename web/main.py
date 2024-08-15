@@ -76,7 +76,7 @@ auth0_public_key_cache = {
 # Serve static files
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    app.mount("/web", StaticFiles(directory=static_dir), name="static")
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -87,14 +87,13 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 @app.get("/")
-@app.get("/web")
+
+async def root():
+    return RedirectResponse(url="/web/")
+
 @app.get("/web/")
-async def read_root():
-    index_path = os.path.join(static_dir, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    else:
-        raise HTTPException(status_code=404, detail="Index file not found")
+async def web_root():
+    return FileResponse(os.path.join(static_dir, "index.html"))
 
 async def get_auth0_public_key():
     current_time = time.time()

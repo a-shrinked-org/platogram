@@ -8,6 +8,10 @@
   ],
   "routes": [
     {
+      "src": "/web/(.*)",
+      "dest": "web/main.py"
+    },
+    {
       "src": "/(.*)",
       "dest": "web/main.py"
     }

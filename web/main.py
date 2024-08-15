@@ -136,7 +136,10 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
         )
         return payload["platogram:user_email"]
     except Exception as e:
-        raise HTTPException(status_code=401, detail="Couldn't verify token") from e
+        print(f"Token verification error: {str(e)}")  # Log the exact token verification error
+        raise HTTPException(
+            status_code=401, detail="Couldn't verify token"
+        ) from e
 
 @app.post("/convert")
 @logfire.instrument()
@@ -189,14 +192,21 @@ async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
             return {"status": "done"}
         return {"status": "idle"}  # fallback to idle
     except Exception as e:
+        print(f"/status endpoint error: {str(e)}")
         return {"status": "error", "detail": str(e)}
 
 # An example function to verify the token
 async def verify_token(token: str = Depends(oauth2_scheme)):
-    # ... Implement your token verification logic here, e.g., using a JWT library ...
-    if not token or not is_token_valid(token):
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    return token
+    # This function should implement your token verification logic.
+    # Here we assume `is_token_valid` is a placeholder for your actual implementation.
+    try:
+        # Placeholder for actual token validation
+        if not token or not is_token_valid(token):
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        return token
+    except Exception as e:
+        print(f"Token verification error in verify_token: {str(e)}")
+        raise HTTPException(status_code=401, detail="Unauthorized") from e
 
 @app.get("/test-auth")
 async def test_auth(token: str = Depends(verify_token)):

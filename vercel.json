@@ -6,15 +6,9 @@
       "use": "@vercel/python"
     }
   ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "web/main.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "web/main.py"
-    }
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "web/main.py" },
+    { "source": "/(.*)", "destination": "web/main.py" }
   ],
   "redirects": [
     {

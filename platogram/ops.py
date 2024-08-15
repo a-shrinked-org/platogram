@@ -14,7 +14,6 @@ match = re.match(pattern, "123")
 def remove_markers(text: str) -> str:
     return re.sub(r"(【\d+】)", r" ", text)
 
-
 def parse(text_with_markers: str, marker: str = r"(【\d+】)") -> dict[int, str]:
     """
     Parses a string containing text segments separated by numeric markers.
@@ -94,11 +93,11 @@ def render(
 
 
 def chunk_text(
-    text_with_markers: str,
-    chunk_size: int,
-    token_count_fn: Callable[[str], int],
-    marker: str = r"(【\d+】)",
-) -> list[str]:
+        text_with_markers: str,
+        chunk_size: int,
+        token_count_fn: Callable[[str], int],
+        marker: str = r"(【\d+】)",
+    ) -> list[str]:
     """
     Splits a string containing text segments separated by numeric markers into chunks of a specified size.
 

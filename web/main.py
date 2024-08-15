@@ -134,17 +134,12 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
             audience=API_AUDIENCE,
             issuer=f"https://{AUTH0_DOMAIN}/",
         )
-        return payload["sub"]
-    except jwt.ExpiredSignatureError:
-        print("Error: Token has expired")
-        raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.JWTClaimsError as e:
-        print(f"Error: Token claims verification failed: {str(e)}")
-        raise HTTPException(status_code=401, detail=f"Token claims verification failed: {str(e)}")
+        return payload["platogram:user_email"]
     except Exception as e:
-        print(f"Error: Couldn't verify token: {str(e)}")
-        raise HTTPException(status_code=401, detail=f"Couldn't verify token: {str(e)}") from e
-
+        print(f"Token verification error: {str(e)}")  # Log the exact token verification error
+        raise HTTPException(
+            status_code=401, detail="Couldn't verify token"
+        ) from e
 
 @app.post("/convert")
 @logfire.instrument()

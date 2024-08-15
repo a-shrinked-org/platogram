@@ -282,24 +282,48 @@ function updateProcessingStage() {
   currentStageIndex = (currentStageIndex + 1) % processingStages.length;
 }
 
-// ... (all the previous code remains the same)
-
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('login-button').addEventListener('click', login);
-    document.getElementById('logout-button').addEventListener('click', logout);
-    document.getElementById('convert-button').addEventListener('click', onConvertClick);
-    document.getElementById('donate-button').addEventListener('click', onDonateClick);
-    document.getElementById('donate-button-status').addEventListener('click', onDonateClick);
-    document.getElementById('reset-button').addEventListener('click', reset);
-    document.getElementById('reset-button-error').addEventListener('click', reset);
+  const loginButton = document.getElementById('login-button');
+  const logoutButton = document.getElementById('logout-button');
+  const convertButton = document.getElementById('convert-button');
+  const donateButton = document.getElementById('donate-button');
+  const donateButtonStatus = document.getElementById('donate-button-status');
+  const resetButton = document.getElementById('reset-button');
+  const resetButtonError = document.getElementById('reset-button-error');
+  const testAuthButton = document.getElementById('test-auth-button');
 
-    setInterval(updateProcessingStage, 3000);
-    updateProcessingStage(); // Initial update
+  if (loginButton) {
+    loginButton.addEventListener('click', login);
+  }
+  if (logoutButton) {
+    logoutButton.addEventListener('click', logout);
+  }
+  if (convertButton) {
+    convertButton.addEventListener('click', onConvertClick);
+  }
+  if (donateButton) {
+    donateButton.addEventListener('click', onDonateClick);
+  }
+  if (donateButtonStatus) {
+    donateButtonStatus.addEventListener('click', onDonateClick);
+  }
+  if (resetButton) {
+    resetButton.addEventListener('click', reset);
+  }
+  if (resetButtonError) {
+    resetButtonError.addEventListener('click', reset);
+  }
+  if (testAuthButton) {
+    testAuthButton.addEventListener('click', testAuth);
+  }
 
-    // Initialize the app
-    initAuth0().catch((error) =>
-        console.error("Error initializing app:", error)
-    );
+  setInterval(updateProcessingStage, 3000);
+  updateProcessingStage(); // Initial update
+
+  // Initialize the app
+  initAuth0().catch((error) =>
+    console.error("Error initializing app:", error)
+  );
 });
 
 // Test Auth function (you might want to add this if it's not already present)

@@ -35,8 +35,8 @@ logfire.configure()
 app = FastAPI()
 
 
-AUTH0_DOMAIN = "dev-df8axtz2fh7qc2n2.us.auth0.com"
-API_AUDIENCE = "https://web.platogram.ai"
+AUTH0_DOMAIN = "dev-w0dm4z23pib7oeui.us.auth0.com"
+API_AUDIENCE = "https://platogram.vercel.app"
 ALGORITHMS = ["RS256"]
 JWKS_URL = f"https://{AUTH0_DOMAIN}/.well-known/jwks.json"
 

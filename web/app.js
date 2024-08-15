@@ -24,17 +24,27 @@ async function initAuth0() {
         });
         console.log("Auth0 client initialized successfully");
 
-        // Check for the code and state parameters
+        // Handle the redirect callback
+        await handleRedirectCallback();
+
+        // Update the UI
+        await updateUI();
+    } catch (error) {
+        console.error("Error initializing Auth0:", error);
+        updateUIStatus("error", "Failed to initialize authentication. Please try refreshing the page.");
+    }
+}
+
+// Add this new function to handle the redirect callback
+async function handleRedirectCallback() {
+    try {
         const query = window.location.search;
         if (query.includes("code=") && query.includes("state=")) {
             await auth0Client.handleRedirectCallback();
             window.history.replaceState({}, document.title, "/");
         }
-
-        await updateUI();
     } catch (error) {
-        console.error("Error initializing Auth0:", error);
-        updateUIStatus("error", "Failed to initialize authentication. Please try refreshing the page.");
+        console.error("Error handling redirect callback:", error);
     }
 }
 

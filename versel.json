@@ -1,0 +1,10 @@
+// vercel.json
+{
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/web",
+      "permanent": true
+    }
+  ]
+}

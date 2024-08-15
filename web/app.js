@@ -23,45 +23,28 @@ async function initAuth0() {
         });
         console.log("Auth0 client initialized successfully");
 
-        const isAuthenticated = await auth0Client.isAuthenticated();
-        console.log("Is authenticated after initialization:", isAuthenticated);
-
         if (window.location.search.includes("code=") && window.location.search.includes("state=")) {
             console.log("Authentication code detected, handling callback...");
-            await auth0Client.handleRedirectCallback();
-            window.history.replaceState({}, document.title, window.location.pathname);
-            await updateUI();
+            try {
+                const result = await auth0Client.handleRedirectCallback();
+                console.log("Redirect callback result:", result);
+                window.history.replaceState({}, document.title, window.location.pathname);
+                console.log("URL cleaned up after callback");
+            } catch (callbackError) {
+                console.error("Error handling redirect callback:", callbackError);
+                updateUIStatus("error", "Failed to complete authentication. Please try logging in again.");
+            }
         } else {
-            await updateUI();
+            console.log("No authentication code detected in URL");
         }
+
+        await updateUI();
+        console.log("UI updated after initialization");
     } catch (error) {
         console.error("Error initializing Auth0:", error);
         updateUIStatus("error", "Failed to initialize authentication. Please try refreshing the page.");
     }
 }
-
-async function handleRedirectCallback() {
-    console.log("Handling redirect callback...");
-    try {
-        const result = await auth0Client.handleRedirectCallback();
-        console.log("Redirect callback result:", result);
-        const query = window.location.search;
-        if (query.includes("code=") && query.includes("state=")) {
-            console.log("Authentication code detected, processing...");
-            await auth0Client.handleRedirectCallback();
-            console.log("Redirect callback processed");
-            window.history.replaceState({}, document.title, window.location.pathname);
-            await updateUI();
-            console.log("UI updated after redirect callback");
-        } else {
-            console.log("No authentication code detected in URL");
-        }
-    } catch (error) {
-        console.error("Error handling redirect callback:", error);
-        updateUIStatus("error", "Failed to complete authentication. Please try logging in again.");
-    }
-}
-
 function updateUIStatus(status, errorMessage = "") {
     const sections = {
         "input-section": "idle",
@@ -87,14 +70,8 @@ async function updateUI() {
     const loginButton = document.getElementById("login-button");
     const logoutButton = document.getElementById("logout-button");
 
-    if (loginButton) {
-        loginButton.classList.toggle("hidden", isAuthenticated);
-        console.log("Login button visibility:", !isAuthenticated);
-    }
-    if (logoutButton) {
-        logoutButton.classList.toggle("hidden", !isAuthenticated);
-        console.log("Logout button visibility:", isAuthenticated);
-    }
+    if (loginButton) loginButton.style.display = isAuthenticated ? "none" : "block";
+    if (logoutButton) logoutButton.style.display = isAuthenticated ? "block" : "none";
 
     if (isAuthenticated) {
         const user = await auth0Client.getUser();
@@ -317,10 +294,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     setInterval(updateProcessingStage, 3000);
     updateProcessingStage();
 
-    try {
+     try {
         console.log("Initializing application...");
         await initAuth0();
-        // Remove the duplicate check here, as it's already handled in initAuth0
     } catch (error) {
         console.error("Error during application initialization:", error);
         updateUIStatus("error", "Failed to initialize the application. Please try refreshing the page.");

@@ -261,37 +261,27 @@ async function postToConvert(inputData, lang) {
   }
 }
 
-async function pollStatus(token) {
-    try {
-        const response = await fetch("/status", {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        });
+async function pollStatus() {
+  try {
+    const result = await apiCall("/status");
+    console.log("Polling status response:", result);
 
-        // Check if the response is ok
-        if (!response.ok) {
-            throw new Error(`Polling status failed: ${response.statusText}`);
-        }
-
-        const result = await response.json();
-
-        if (result.status === "running") {
-            updateUIStatus("running");
-            setTimeout(() => pollStatus(token), 5000); // Poll every 5 seconds
-        } else if (result.status === "idle") {
-            updateUIStatus("idle");
-        } else if (result.status === "failed") {
-            updateUIStatus("failed", result.error);
-        } else if (result.status === "done") {
-            updateUIStatus("done");
-        } else {
-            updateUIStatus("error", "Unexpected status response");
-        }
-    } catch (error) {
-        console.error("Error polling status:", error);
-        updateUIStatus("error", error.message);
+    if (result.status === "running") {
+      updateUIStatus("running", "Processing your request...");
+      setTimeout(pollStatus, 5000);  // Poll again in 5 seconds
+    } else if (result.status === "idle") {
+      updateUIStatus("idle");
+    } else if (result.status === "failed") {
+      updateUIStatus("error", result.error || "An error occurred during processing");
+    } else if (result.status === "done") {
+      updateUIStatus("done", "Your request has been processed successfully!");
+    } else {
+      updateUIStatus("error", "Unexpected status response");
     }
+  } catch (error) {
+    console.error("Error polling status:", error);
+    updateUIStatus("error", error.message || "An error occurred while checking status");
+  }
 }
 
 function updateProcessingStage() {

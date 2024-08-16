@@ -326,10 +326,10 @@ Suggested donation: $2 per hour of content converted."""
 
     except ImportError as e:
         logfire.exception(f"Import error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Import error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Import error: {str(e)}. Please contact support.")
     except Exception as e:
         logfire.exception(f"Conversion and sending failed: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to convert and send transcript")
+        raise HTTPException(status_code=500, detail=f"Failed to convert and send transcript: {str(e)}")
 def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):
     smtp_user = os.getenv("PLATOGRAM_SMTP_USER")
     smtp_server = os.getenv("PLATOGRAM_SMTP_SERVER")

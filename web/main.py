@@ -5,6 +5,7 @@ import asyncio
 import httpx
 import tempfile
 import logfire
+import time
 from pathlib import Path
 from uuid import uuid4
 from datetime import datetime
@@ -99,14 +100,17 @@ async def web_root():
     return FileResponse(os.path.join(static_dir, "index.html"))
 
 async def get_auth0_public_key():
+     logger.debug("Entering get_auth0_public_key function")
     current_time = time.time()
     if (
         auth0_public_key_cache["key"]
         and current_time - auth0_public_key_cache["last_updated"]
         < auth0_public_key_cache["expires_in"]
     ):
+        logger.debug("Returning cached Auth0 public key")
         return auth0_public_key_cache["key"]
 
+    logger.debug("Fetching new Auth0 public key")
     async with httpx.AsyncClient() as client:
         response = await client.get(JWKS_URL)
         response.raise_for_status()
@@ -124,6 +128,7 @@ async def get_auth0_public_key():
     auth0_public_key_cache["key"] = public_key
     auth0_public_key_cache["last_updated"] = current_time
 
+    logger.debug("New Auth0 public key fetched and cached")
     return public_key
 
 async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):

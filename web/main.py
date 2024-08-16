@@ -100,7 +100,7 @@ async def web_root():
     return FileResponse(os.path.join(static_dir, "index.html"))
 
 async def get_auth0_public_key():
-     logger.debug("Entering get_auth0_public_key function")
+    logger.debug("Entering get_auth0_public_key function")
     current_time = time.time()
     if (
         auth0_public_key_cache["key"]

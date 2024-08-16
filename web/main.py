@@ -6,6 +6,7 @@ import httpx
 import tempfile
 import logfire
 import time
+import logging
 from pathlib import Path
 from uuid import uuid4
 from datetime import datetime
@@ -20,7 +21,14 @@ from starlette.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer
 from concurrent.futures import ProcessPoolExecutor
 
-import platogram as plato  # Ensure this is the correct way to import your SDK
+# Setup logging
+logger = logging.getLogger("platogram")
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+logger.addHandler(ch)
 
 # Retrieve API keys from environment variables
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
@@ -37,7 +45,7 @@ else:
     try:
         logfire.configure()
     except Exception as e:
-        print(f"Logfire configuration failed: {e}")
+        logger.error(f"Logfire configuration failed: {e}")
 
 app = FastAPI()
 
@@ -86,6 +94,7 @@ if os.path.exists(static_dir):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logfire.exception(f"An error occurred: {str(exc)}")
+    logger.exception(f"An error occurred: {str(exc)}")
     return JSONResponse(
         status_code=500,
         content={"message": "An internal error occurred", "detail": str(exc)}
@@ -143,16 +152,16 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
         )
         return payload["sub"]
     except jwt.ExpiredSignatureError:
-        print("Token has expired")
+        logger.warning("Token has expired")
         raise HTTPException(status_code=401, detail="Token has expired")
     except jwt.InvalidAudienceError as e:
-        print(f"Token audience verification failed: {str(e)}")
+        logger.warning(f"Token audience verification failed: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Token audience verification failed: {str(e)}")
     except jwt.InvalidTokenError as e:
-        print(f"Invalid token: {str(e)}")
+        logger.warning(f"Invalid token: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
     except Exception as e:
-        print(f"Couldn't verify token: {str(e)}")
+        logger.error(f"Couldn't verify token: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Couldn't verify token: {str(e)}") from e
 
 @app.post("/convert")
@@ -192,6 +201,7 @@ async def convert(
         return JSONResponse(content={"message": "Conversion started"}, status_code=200)
     except Exception as e:
         logfire.exception(f"Error in convert endpoint: {str(e)}")
+        logger.exception(f"Error in convert endpoint: {str(e)}")
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 @app.get("/status")
@@ -203,6 +213,7 @@ async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
         return {"status": task.status, "error": task.error if task.status == "failed" else None}
     except Exception as e:
         logfire.exception(f"Error in status endpoint: {str(e)}")
+        logger.exception(f"Error in status endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/test-auth")
@@ -223,6 +234,7 @@ async def reset(user_id: str = Depends(verify_token_and_get_user_id)):
         return {"message": "Session reset"}
     except Exception as e:
         logfire.exception(f"Error in reset endpoint for user {user_id}: {str(e)}")
+        logger.exception(f"Error in reset endpoint for user {user_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to reset session: {str(e)}")
 
 async def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> tuple[str, str]:
@@ -262,10 +274,12 @@ async def convert_and_send_with_error_handling(request: ConversionRequest, user_
         tasks[user_id].status = "done"
     except HTTPException as e:
         logfire.exception(f"HTTP error in background task for user {user_id}: {str(e)}")
+        logger.exception(f"HTTP error in background task for user {user_id}: {str(e)}")
         tasks[user_id].error = str(e)
         tasks[user_id].status = "failed"
     except Exception as e:
         logfire.exception(f"Unexpected error in background task for user {user_id}: {str(e)}")
+        logger.exception(f"Unexpected error in background task for user {user_id}: {str(e)}")
         tasks[user_id].error = "An unexpected error occurred"
         tasks[user_id].status = "failed"
 
@@ -306,6 +320,7 @@ Suggested donation: $2 per hour of content converted."""
 
     except Exception as e:
         logfire.exception(f"Conversion and sending failed: {str(e)}")
+        logger.exception(f"Conversion and sending failed: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to convert and send transcript")
 
 def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):

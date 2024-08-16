@@ -15,6 +15,7 @@ from fastapi import FastAPI, Depends, HTTPException, UploadFile, Form, File, Bac
 from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from starlette.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer
 from concurrent.futures import ProcessPoolExecutor
 

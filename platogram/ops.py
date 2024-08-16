@@ -7,7 +7,7 @@ from platogram.llm import LanguageModel
 from platogram.types import Content, SpeechEvent
 
 # Example regular expressions with raw strings
-pattern = r'\d+'   # Use r'' for raw strings
+pattern = '\\d+'   # Use double backslash instead of raw string
 match = re.match(pattern, "123")
 
 def remove_markers(text: str) -> str:
@@ -93,7 +93,7 @@ def chunk_text(
     text_with_markers: str,
     chunk_size: int,
     token_count_fn: Callable[[str], int],
-    marker: str = r"(【\d+】)",
+    marker: str = "(【\\d+】)",
 ) -> list[str]:
     """
     Splits a string containing text segments separated by numeric markers into chunks of a specified size.

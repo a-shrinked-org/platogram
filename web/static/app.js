@@ -217,6 +217,14 @@ async function postToConvert(inputData, lang) {
   if (inputData instanceof File) {
     formData.append('file', inputData);
   } else {
+    // Validate URL
+    try {
+      new URL(inputData);
+    } catch (e) {
+      console.error("Invalid URL:", inputData);
+      updateUIStatus("error", "Invalid URL provided");
+      return;
+    }
     formData.append("payload", inputData);
   }
 
@@ -231,16 +239,19 @@ async function postToConvert(inputData, lang) {
       headers: headers,
       body: body,
     });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
     const result = await response.json();
-
     if (result.message === "Conversion started") {
       pollStatus(token);
     } else {
       updateUIStatus("error", "Unexpected response from server");
     }
   } catch (error) {
-    console.error("Error:", error);
-    updateUIStatus("error", error);
+    console.error("Error in postToConvert:", error);
+    updateUIStatus("error", error.message || "An error occurred");
   }
 }
 

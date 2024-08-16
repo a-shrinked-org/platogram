@@ -11,3 +11,4 @@ starlette==0.27.0
 aiofiles==23.2.1
 tqdm==4.64.1
 yt-dlp==2023.10.13
+platogram==0.1.0

@@ -21,6 +21,8 @@ from starlette.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer
 from concurrent.futures import ProcessPoolExecutor
 
+import platogram as plato
+
 # Setup logging
 logger = logging.getLogger("platogram")
 logger.setLevel(logging.DEBUG)
@@ -318,6 +320,9 @@ Suggested donation: $2 per hour of content converted."""
 
             await send_email(user_id, subject, body, files)
 
+            except ImportError as e:
+                    logfire.exception(f"Import error: {str(e)}")
+                    raise HTTPException(status_code=500, detail=f"Import error: {str(e)}")
     except Exception as e:
         logfire.exception(f"Conversion and sending failed: {str(e)}")
         logger.exception(f"Conversion and sending failed: {str(e)}")

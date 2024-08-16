@@ -6,6 +6,7 @@ import httpx
 import tempfile
 import logfire
 import time
+import smtplib
 import logging
 from pathlib import Path
 from uuid import uuid4
@@ -291,6 +292,7 @@ async def convert_and_send_with_error_handling(request: ConversionRequest, user_
 
 async def convert_and_send(request: ConversionRequest, user_id: str):
     try:
+        logger.info(f"Starting conversion for user {user_id}")
         # Initialize models
         llm = plato.llm.get_model("anthropic/claude-3-5-sonnet", ANTHROPIC_API_KEY)
         asr = plato.asr.get_model("assembly-ai/best", ASSEMBLYAI_API_KEY)
@@ -325,9 +327,11 @@ Suggested donation: $2 per hour of content converted."""
             await send_email(user_id, subject, body, files)
 
     except ImportError as e:
+        logger.exception(f"Import error for user {user_id}: {str(e)}")
         logfire.exception(f"Import error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Import error: {str(e)}. Please contact support.")
     except Exception as e:
+        logger.exception(f"Conversion failed for user {user_id}: {str(e)}")
         logfire.exception(f"Conversion and sending failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to convert and send transcript: {str(e)}")
 def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):

@@ -13,3 +13,4 @@ tqdm==4.64.1
 yt-dlp==2023.10.13
 anthropic==0.34.0
 tenacity==8.2.2
+assemblyai==0.32.0

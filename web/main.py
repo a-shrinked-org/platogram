@@ -8,6 +8,7 @@ import logfire
 import time
 import smtplib
 import logging
+import yt_dlp
 from pathlib import Path
 from uuid import uuid4
 from datetime import datetime
@@ -300,7 +301,14 @@ async def convert_and_send(request: ConversionRequest, user_id: str):
         url = request.payload
 
         # Process audio
-        transcript = plato.extract_transcript(url, asr)
+        try:
+            transcript = plato.extract_transcript(url, asr)
+        except yt_dlp.utils.DownloadError as e:
+            if "Sign in to confirm you're not a bot" in str(e):
+                raise HTTPException(status_code=400, detail="YouTube requires authentication for this video. Please try a different video or provide a direct audio file.")
+            else:
+                raise
+
         content = plato.index(transcript, llm)
 
         title = content.title

@@ -270,9 +270,13 @@ async function pollStatus() {
       updateUIStatus("running", "Processing your request...");
       setTimeout(pollStatus, 5000);  // Poll again in 5 seconds
     } else if (result.status === "idle") {
-      updateUIStatus("idle");
+      updateUIStatus("idle", "Ready for new conversion");
     } else if (result.status === "failed") {
-      updateUIStatus("error", result.error || "An error occurred during processing");
+      let errorMessage = result.error || "An error occurred during processing";
+      if (errorMessage.includes("YouTube requires authentication")) {
+        errorMessage = "YouTube requires authentication for this video. Please try a different video or provide a direct audio file.";
+      }
+      updateUIStatus("error", errorMessage);
     } else if (result.status === "done") {
       updateUIStatus("done", "Your request has been processed successfully!");
     } else {
@@ -283,7 +287,6 @@ async function pollStatus() {
     updateUIStatus("error", error.message || "An error occurred while checking status");
   }
 }
-
 function updateProcessingStage() {
   document.getElementById('processing-stage').textContent = processingStages[currentStageIndex];
   currentStageIndex = (currentStageIndex + 1) % processingStages.length;

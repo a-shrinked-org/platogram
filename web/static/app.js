@@ -205,12 +205,7 @@ async function logout() {
 
 async function postToConvert(inputData, lang) {
   let body;
-  let headers = {
-    Authorization: `Bearer ${await auth0Client.getTokenSilently({
-      audience: "https://platogram.vercel.app",
-    })}`,
-  };
-
+  let headers = {};
   const formData = new FormData();
   formData.append('lang', lang);
 
@@ -227,14 +222,17 @@ async function postToConvert(inputData, lang) {
       return;
     }
   }
-
   body = formData;
   
   try {
+    updateUIStatus("running", "Starting conversion process...");
+
     const token = await auth0Client.getTokenSilently({
       audience: "https://platogram.vercel.app",
     });
-    console.log("Obtained token for convert:", token);
+    console.log("Obtained token for convert");
+
+    headers.Authorization = `Bearer ${token}`;
 
     const response = await fetch("/convert", {
       method: "POST",
@@ -244,6 +242,7 @@ async function postToConvert(inputData, lang) {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error("Server error response:", errorText);
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
     }
 
@@ -251,9 +250,10 @@ async function postToConvert(inputData, lang) {
     console.log("Convert response:", result);
 
     if (result.message === "Conversion started") {
-      await pollStatus(token);
+      updateUIStatus("running", "Conversion started. Processing your request...");
+      await pollStatus();
     } else {
-      updateUIStatus("error", "Unexpected response from server");
+      throw new Error("Unexpected response from server");
     }
   } catch (error) {
     console.error("Error in postToConvert:", error);

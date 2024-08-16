@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from starlette.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer
 from concurrent.futures import ProcessPoolExecutor
+from platogram import llm, asr
 
 import platogram as plato
 

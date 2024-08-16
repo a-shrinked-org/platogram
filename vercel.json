@@ -6,18 +6,22 @@
       "use": "@vercel/python"
     },
     {
-      "src": "web/*",
+      "src": "web/**",
       "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/web/index.html",
+      "src": "/",
+      "dest": "/web/index.html"
+    },
+    {
+      "src": "/web",
       "dest": "/web/index.html"
     },
     {
       "src": "/web/(.*)",
-      "dest": "/web/main.py"
+      "dest": "/web/$1"
     },
     {
       "src": "/(.*)",

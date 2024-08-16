@@ -220,12 +220,12 @@ async function postToConvert(inputData, lang) {
     // Validate URL
     try {
       new URL(inputData);
+      formData.append("payload", inputData);
     } catch (e) {
       console.error("Invalid URL:", inputData);
-      updateUIStatus("error", "Invalid URL provided");
+      updateUIStatus("error", "Invalid URL provided. Please enter a valid URL.");
       return;
     }
-    formData.append("payload", inputData);
   }
 
   body = formData;
@@ -234,24 +234,30 @@ async function postToConvert(inputData, lang) {
     const token = await auth0Client.getTokenSilently({
       audience: "https://platogram.vercel.app",
     });
+    console.log("Obtained token for convert:", token);
+
     const response = await fetch("/convert", {
       method: "POST",
       headers: headers,
       body: body,
     });
+
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
     }
+
     const result = await response.json();
+    console.log("Convert response:", result);
+
     if (result.message === "Conversion started") {
-      pollStatus(token);
+      await pollStatus(token);
     } else {
       updateUIStatus("error", "Unexpected response from server");
     }
   } catch (error) {
     console.error("Error in postToConvert:", error);
-    updateUIStatus("error", error.message || "An error occurred");
+    updateUIStatus("error", error.message || "An error occurred during conversion");
   }
 }
 

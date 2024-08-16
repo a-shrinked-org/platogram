@@ -177,6 +177,7 @@ async def convert(
     lang: Optional[Language] = Form(None),
 ):
     try:
+        logfire.info(f"Convert request received for user {user_id}")
         if not lang:
             lang = "en"
 
@@ -187,8 +188,10 @@ async def convert(
             raise HTTPException(status_code=400, detail="Either payload or file must be provided")
 
         if payload is not None:
+            logfire.info(f"Payload received: {payload[:100]}...")  # Log first 100 chars of payload
             request = ConversionRequest(payload=payload, lang=lang)
         else:
+            logfire.info(f"File received: {file.filename}")
             tmpdir = Path(tempfile.gettempdir()) / "platogram_uploads"
             tmpdir.mkdir(parents=True, exist_ok=True)
             file_ext = file.filename.split(".")[-1]
@@ -201,10 +204,10 @@ async def convert(
 
         tasks[user_id] = Task(start_time=datetime.now(), request=request)
         background_tasks.add_task(convert_and_send_with_error_handling, request, user_id)
+        logfire.info(f"Conversion started for user {user_id}")
         return JSONResponse(content={"message": "Conversion started"}, status_code=200)
     except Exception as e:
         logfire.exception(f"Error in convert endpoint: {str(e)}")
-        logger.exception(f"Error in convert endpoint: {str(e)}")
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 @app.get("/status")

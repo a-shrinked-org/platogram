@@ -3,124 +3,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Capture</title>
+    <title>datacapture</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        .font-perfectly-nineties {
+            font-family: 'Perfectly Nineties', sans-serif;
+        }
+    </style>
 </head>
-<body class="font-subtle text-black bg-white">
-    <header class="p-4 flex justify-between items-center">
-        <div class="flex items-center">
-            <img src="/public/vector4.svg" alt="Logo" class="w-8 h-8 mr-2">
-            <h1 class="text-xl md:text-2xl font-perfectly-nineties">
-                <span class="font-extrabold">data</span> <i>capture</i>
-            </h1>
-        </div>
-        <nav>
-            <button class="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm">Log out</button>
-        </nav>
-    </header>
+<body class="font-subtle bg-white text-slate-900">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <header class="flex justify-between items-center py-4">
+            <div class="flex items-center space-x-2">
+                <div class="w-6 h-6 bg-slate-900"></div>
+                <span class="font-perfectly-nineties text-xl">datacapture</span>
+            </div>
+            <button class="bg-slate-900 text-white px-4 py-2 rounded-full text-sm">Log out</button>
+        </header>
 
-    <main class="container mx-auto px-4">
-        <section class="text-center py-8 md:py-16">
-            <h2 class="text-3xl md:text-4xl lg:text-5xl font-perfectly-nineties mb-4">
-                Transform spoken words<br>into structured knowledge.
-            </h2>
-            <p class="text-lg md:text-xl mb-4">
-                Unlock insights from audio and video --- beyond transcripts, summaries, and scattered notes.
-            </p>
-            <p class="text-xl md:text-2xl font-bold">
-                10x your content understanding.
-            </p>
-        </section>
-
-        <section class="mb-8">
-            <div class="bg-gray rounded-lg p-6">
-                <h3 class="text-xl md:text-2xl mb-4">Upload a file</h3>
-                <div class="bg-linen rounded-md p-4 mb-4 flex items-center">
-                    <img src="/public/vector.svg" alt="Upload icon" class="w-6 h-6 mr-2">
-                    <span class="font-semibold">Upload a file</span>
+        <main class="mt-16">
+            <section class="text-center mb-16">
+                <h1 class="font-perfectly-nineties text-4xl sm:text-5xl md:text-6xl mb-6">
+                    Transform spoken words<br>into structured knowledge.
+                </h1>
+                <p class="text-xl mb-6">
+                    Unlock insights from audio and video —<br>
+                    beyond transcripts, summaries, and<br>
+                    scattered notes.
+                </p>
+                <p class="text-2xl font-bold mb-12">
+                    10x your content understanding.
+                </p>
+                <div class="max-w-lg mx-auto bg-gray-100 rounded-lg p-4">
+                    <input type="text" placeholder="Paste a link to a YouTube video or Google Drive file" class="w-full p-2 mb-2 rounded border border-gray-300">
+                    <div class="flex justify-between items-center">
+                        <button class="flex items-center text-gray-600">
+                            <span class="mr-2">🔗</span> Upload a file
+                        </button>
+                        <button class="bg-slate-900 text-white px-4 py-2 rounded text-sm">Convert</button>
+                    </div>
                 </div>
-                <div class="bg-linen rounded-md p-4 flex items-center">
-                    <img src="/public/vector1.svg" alt="Folder icon" class="w-6 h-6 mr-2">
-                    <span class="font-semibold">Add a folder</span>
-                    <span class="ml-auto text-darkgray">Coming soon</span>
+                <p class="text-sm text-gray-500 mt-4">
+                    Transcription times can vary depending on the file size, length of the content, and how busy our servers are.
+                </p>
+            </section>
+
+            <section class="mb-16">
+                <div class="bg-gray-100 rounded-lg p-6">
+                    <h2 class="font-perfectly-nineties text-2xl mb-4">AI-Powered Speech-to-Text and Knowledge Extraction: Revolutionizing Content Discovery and Analysis</h2>
+                    <p class="text-gray-600 mb-4">Authors: John Doe, Jane Smith</p>
+                    <p class="text-sm">Abstract</p>
+                    <p class="text-sm text-gray-600">
+                        This paper introduces an innovative AI-driven approach to transform spoken content into structured, actionable knowledge. Our system leverages advanced speech recognition...
+                    </p>
                 </div>
-            </div>
-        </section>
+            </section>
 
-        <section class="grid md:grid-cols-3 gap-8 mb-8">
-            <div>
-                <h3 class="text-xl md:text-2xl mb-4 font-perfectly-nineties">Drop a link, get a document</h3>
-                <p class="text-slate-600">
-                    Paste any audio/video URL - we'll email you a well-organized, readable document without storing your content.
-                </p>
-            </div>
-            <div>
-                <h3 class="text-xl md:text-2xl mb-4 font-perfectly-nineties">References included</h3>
-                <p class="text-slate-600">
-                    Each response is backed by precise references to the original content, ensuring credibility and context.
-                </p>
-            </div>
-            <div>
-                <h3 class="text-xl md:text-2xl mb-4 font-perfectly-nineties">
-                    Build your dataset
-                    <span class="bg-linen text-darkgray text-xs px-2 py-1 rounded-md ml-2">Soon</span>
-                </h3>
-                <p class="text-slate-600">
-                    Select and combine audio/video links - create your own sharable, AI-ready context storage for powerful Q&A insights.
-                </p>
-            </div>
-        </section>
+            <section class="grid md:grid-cols-3 gap-8 mb-16">
+                <div>
+                    <h3 class="font-perfectly-nineties text-xl mb-4">Drop a link, get a document</h3>
+                    <p class="text-gray-600">
+                        Paste any audio/video URL - we'll email you a well-organized, readable document without storing your content.
+                    </p>
+                </div>
+                <div>
+                    <h3 class="font-perfectly-nineties text-xl mb-4">References included</h3>
+                    <p class="text-gray-600">
+                        Each response is backed by precise references to the original content, ensuring credibility and context.
+                    </p>
+                </div>
+                <div>
+                    <h3 class="font-perfectly-nineties text-xl mb-4">
+                        Build your dataset
+                        <span class="bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full ml-2">Soon</span>
+                    </h3>
+                    <p class="text-gray-600">
+                        Select and combine audio/video links - create your own sharable, AI-ready context storage for powerful Q&A insights.
+                    </p>
+                </div>
+            </section>
 
-        <section class="mb-8">
-            <h3 class="text-2xl md:text-3xl mb-4 font-perfectly-nineties">See it in action</h3>
-            <div class="bg-gray rounded-lg p-6">
-                <div class="grid md:grid-cols-2 gap-4">
-                    <div>
-                        <a href="#" class="text-blue-600 underline">John Carmack: From Gaming Pioneer to AI Visionary - A Journey of Innovation and Insight</a>
-                        <p class="mt-2">Transform a 5-hour podcast into a structured document that sparks joy</p>
+            <section class="mb-16">
+                <h2 class="font-perfectly-nineties text-3xl mb-6">See it in action</h2>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <a href="#" class="text-blue-600 hover:underline">John Carmack: From Gaming Pioneer to AI Visionary - A Journey of Innovation and Insight</a>
+                        <span class="text-gray-600">Transform a 5-hour podcast into a structured document that sparks joy</span>
                     </div>
                     <!-- Repeat this structure for other examples -->
                 </div>
-            </div>
-        </section>
+            </section>
 
-        <section class="mb-8">
-            <div class="grid md:grid-cols-2 gap-8">
-                <div>
-                    <h3 class="text-xl md:text-2xl mb-4 font-perfectly-nineties">Generic AI Summaries</h3>
-                    <p class="text-lightslategray mb-4">You're left with a condensed but often context-lacking summary that misses crucial details and nuances</p>
-                    <ul class="space-y-2">
-                        <li>Shallow summaries lacking depth</li>
-                        <li>No sources references and timestamps</li>
-                        <li>Not good for RAG - low information density</li>
-                        <li>Limited to text, struggle with audio/video</li>
-                        <li>Privacy concerns with data storage and usage</li>
+            <section class="mb-16 text-center">
+                <img src="/path-to-your-image.svg" alt="Person reading" class="mx-auto mb-6" style="max-width: 200px;">
+                <h2 class="font-perfectly-nineties text-3xl mb-4">
+                    [Name] was created by two tech enthusiasts,<br>
+                    <span class="underline">Ivan</span> & <span class="underline">Artyom</span>, who wanted to rediscover the<br>
+                    magic in spoken stories.
+                </h2>
+                <p class="text-xl mb-6">
+                    This project transforms spoken words into<br>
+                    structured data. It's a new way to know who said<br>
+                    what — unlike vague AI summaries, with privacy<br>
+                    and attribution at its core.
+                </p>
+                <p class="text-xl font-bold underline">
+                    Try it with your favorite podcast or video.
+                </p>
+            </section>
+
+            <section class="grid md:grid-cols-2 gap-8 mb-16">
+                <div class="bg-gray-100 p-6 rounded-lg">
+                    <h3 class="font-perfectly-nineties text-2xl mb-4">Generic AI Summaries</h3>
+                    <ul class="space-y-2 text-gray-600">
+                        <li>• Shallow summaries lacking depth</li>
+                        <li>• No source references and timestamps</li>
+                        <li>• Not good for RAG - low information density</li>
+                        <li>• Limited to text, struggle with audio/video</li>
+                        <li>• Privacy concerns with data storage and usage</li>
                     </ul>
                 </div>
-                <div>
-                    <h3 class="text-xl md:text-2xl mb-4 font-perfectly-nineties">Advantages of structured documents</h3>
-                    <p class="text-lightslategray mb-4">[name] transforms spoken word into comprehensive, structured documents, offering a context-preserving, easily navigable output</p>
-                    <ul class="space-y-2">
-                        <li>Original paraphrased format</li>
-                        <li>Hierarchical auto-generated chapters and sections</li>
-                        <li>RAG-optimized markup with timestamped references</li>
-                        <li>Privacy-first approach - no content storage</li>
-                        <li>Unlimited length audio/video input (in pro version)</li>
+                <div class="bg-green-100 p-6 rounded-lg">
+                    <h3 class="font-perfectly-nineties text-2xl mb-4">Advantages of structured documents</h3>
+                    <ul class="space-y-2 text-gray-600">
+                        <li>• Original paraphrased format</li>
+                        <li>• Hierarchical auto-generated chapters and sections</li>
+                        <li>• RAG-optimized markup with timestamped references</li>
+                        <li>• Privacy-first approach - no content storage</li>
+                        <li>• Unlimited length audio/video input (in pro version)</li>
                     </ul>
                 </div>
-            </div>
-        </section>
-    </main>
+            </section>
 
-    <footer class="bg-gray-100 py-8">
-        <div class="container mx-auto px-4 text-center">
-            <p class="mb-4">By © 2024 WAFFLY & CODEANYWAY, INC.</p>
-            <p class="uppercase mb-4">21 W 46th St 16th Flr, New York, NY</p>
-            <div class="space-x-4">
-                <a href="#" class="text-darkslategray-100 underline">Privacy</a>
-                <a href="#" class="text-darkslategray-100 underline">Terms</a>
+            <section class="text-center mb-16">
+                <h2 class="font-perfectly-nineties text-3xl mb-6">Book a demo</h2>
+                <p class="text-xl mb-6">
+                    If you're an organization or business who's interested in<br>
+                    learning more about how [Name] could work for your<br>
+                    data, book a live demo with us.
+                </p>
+                <button class="bg-slate-900 text-white px-6 py-3 rounded-full text-lg">Contact Us</button>
+            </section>
+        </main>
+
+        <footer class="text-center py-8">
+            <div class="mb-4">
+                <a href="#" class="text-blue-600 hover:underline mr-4">Privacy</a>
+                <a href="#" class="text-blue-600 hover:underline">Terms</a>
             </div>
-        </div>
-    </footer>
+            <p class="text-gray-600 mb-2">By © 2024 WAFFLY & CODEANYWAY, INC.</p>
+            <p class="text-gray-600 uppercase">21 W 46th St 16th Flr, New York, NY</p>
+        </footer>
+    </div>
 </body>
 </html>

@@ -1,18 +1,10 @@
 import re
-from typing import Callable
+from typing import Callable, Optional
 
 from tqdm import tqdm  # type: ignore
 
-from platogram.llm import LanguageModel  # Import LanguageModel
+from platogram.llm import LanguageModel
 from platogram.types import Content, SpeechEvent
-
-# Use raw strings for all regex patterns
-pattern = r'\d+'  # Raw string
-match = re.match(pattern, "123")
-
-# TODO: Address SyntaxWarnings for invalid escape sequences
-# pylint: disable=anomalous-backslash-in-string
-# flake8: noqa: W605
 
 def remove_markers(text: str) -> str:
     return re.sub(r"(【\d+】)", r" ", text)
@@ -66,8 +58,8 @@ def parse(text_with_markers: str, marker: str = r"(【\d+】)") -> dict[int, str
     return relevant_segment_dict
 
 def render(
-    segments: dict[int, str], marker_fn: Callable[[int], str] = lambda x: f"【{x}】"
-) -> str:
+        segments: dict[int, str], marker_fn: Callable[[int], str] = lambda x: f"【{x}】"
+    ) -> str:
     """
     Renders a dictionary of text segments into a single string with numeric markers.
 
@@ -81,11 +73,11 @@ def render(
     return "".join([f"{text}{marker_fn(value)}" for value, text in segments.items()])
 
 def chunk_text(
-    text_with_markers: str,
-    chunk_size: int,
-    token_count_fn: Callable[[str], int],
-    marker: str = r"(【\d+】)",
-) -> list[str]:
+        text_with_markers: str,
+        chunk_size: int,
+        token_count_fn: Callable[[str], int],
+        marker: str = r"(【\d+】)",
+    ) -> list[str]:
     """
     Splits a string containing text segments separated by numeric markers into chunks of a specified size.
 
@@ -127,7 +119,7 @@ def get_paragraphs(
     max_tokens: int,
     temperature: float,
     chunk_size: int,
-    lang: str | None = None,
+    lang: Optional[str] = None,
 ) -> list[str]:
     if not lang:
         lang = "en"
@@ -148,11 +140,9 @@ def get_paragraphs(
                 {marker - base_marker: text for marker, text in parse(chunk).items()}
             )
 
-            # limit the number of output tokens to chunk size
             for paragraph in llm.get_paragraphs(
                 content, examples, max_tokens=max_tokens, temperature=temperature, lang=lang,
             ):
-                # we are not parsing again, because sometimes model returns paragraphs without trailing marker
                 paragraphs.append(
                     re.sub(
                         r"【(\d+)】",
@@ -163,12 +153,10 @@ def get_paragraphs(
 
             if i < len(chunks) - 1 and paragraphs:
                 paragraphs.pop()
-                # discard paragraphs without markers
                 while paragraphs and not re.findall(r"【(\d+)】", paragraphs[-1]):
                     paragraphs.pop()
 
             if len(paragraphs) > 1:
-                # we are not parsing, because sometimes model returns paragraphs without trailing marker
                 markers = sorted(
                     [int(marker) for marker in re.findall(r"【(\d+)】", paragraphs[-1])]
                 )
@@ -195,7 +183,7 @@ def index(
     max_tokens: int = 4096,
     temperature: float = 0.5,
     chunk_size: int = 2048,
-    lang: str | None = None,
+    lang: Optional[str] = None,
 ) -> Content:
     text = render({i: event.text for i, event in enumerate(transcript)})
     paragraphs = get_paragraphs(text, llm, max_tokens, temperature, chunk_size, lang=lang)
@@ -213,10 +201,11 @@ def index(
     return Content(
         title=title,
         summary=summary,
-        passages=paragraphs,  # NOTE: we should experiment and settle on passage vs. paragraph
+        passages=paragraphs,
         transcript=transcript,
         chapters=chapters,
     )
+
 
 rewrite_examples = {
     "en": [

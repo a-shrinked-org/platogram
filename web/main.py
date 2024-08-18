@@ -192,9 +192,11 @@ async def convert(
             raise HTTPException(status_code=400, detail="Either payload or file must be provided")
 
         if payload is not None:
+            if not payload.strip():  # Check if payload is empty or just whitespace
+                raise HTTPException(status_code=400, detail="Empty URL provided")
             logfire.info(f"Payload received: {payload[:100]}...")  # Log first 100 chars of payload
             request = ConversionRequest(payload=payload, lang=lang)
-        else:
+        elif file is not None:
             logfire.info(f"File received: {file.filename}")
             tmpdir = Path(tempfile.gettempdir()) / "platogram_uploads"
             tmpdir.mkdir(parents=True, exist_ok=True)
@@ -205,6 +207,8 @@ async def convert(
                 fd.write(file_content)
 
             request = ConversionRequest(payload=f"file://{temp_file}", lang=lang)
+        else:
+            raise HTTPException(status_code=400, detail="No input provided")
 
         tasks[user_id] = Task(start_time=datetime.now(), request=request)
         background_tasks.add_task(convert_and_send_with_error_handling, request, user_id)

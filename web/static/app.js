@@ -153,12 +153,68 @@ async function onConvertClick(event) {
   }
 }
 
+// ... (previous code remains the same)
+
+async function postToConvert(inputData, lang) {
+  let body;
+  let headers = {};
+  const formData = new FormData();
+  formData.append('lang', lang);
+
+  if (inputData.file) {
+    formData.append('file', inputData.file);
+  } else if (inputData.url) {
+    formData.append("payload", inputData.url);
+  } else {
+    updateUIStatus("error", "No input provided. Please enter a URL or upload a file.");
+    return;
+  }
+
+  body = formData;
+
+  try {
+    updateUIStatus("running", "Starting conversion process...");
+
+    const token = await auth0Client.getTokenSilently({
+      audience: "https://platogram.vercel.app",
+    });
+    console.log("Obtained token for convert");
+
+    headers.Authorization = `Bearer ${token}`;
+
+    const response = await fetch("/convert", {
+      method: "POST",
+      headers: headers,
+      body: body,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Server error response:", errorText);
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log("Convert response:", result);
+
+    if (result.message === "Conversion started") {
+      updateUIStatus("running", "Conversion started. Processing your request...");
+      await pollStatus(token);
+    } else {
+      throw new Error("Unexpected response from server");
+    }
+  } catch (error) {
+    console.error("Error in postToConvert:", error);
+    updateUIStatus("error", error.message || "An error occurred during conversion");
+  }
+}
+
 function getInputData() {
   const urlInput = document.getElementById("url-input");
   const fileInput = document.getElementById("file-upload");
   return {
-    url: urlInput ? urlInput.value.trim() : '',
-    file: fileInput ? fileInput.files[0] : null
+    url: urlInput && urlInput.value.trim(),
+    file: fileInput && fileInput.files[0]
   };
 }
 
@@ -383,16 +439,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (elements.testAuthButton) elements.testAuthButton.addEventListener('click', testAuth);
 
     if (elements.fileUpload) {
-        elements.fileUpload.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                if (elements.fileName) {
-                    elements.fileName.textContent = file.name;
-                } else {
-                    console.warn("File name element not found");
-                }
-            }
-        });
+      elements.fileUpload.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file && elements.fileName) {
+          elements.fileName.textContent = file.name;
+        } else if (file) {
+          console.warn("File name element not found");
+        }
+      });
     }
 
     Object.entries(elements).forEach(([key, value]) => {

@@ -247,5 +247,56 @@
     </noscript>
     <!-- End of LiveChat code -->
     <script src="https://platogram.vercel.app/web/app.js"></script>
+    <!-- Initialize app.js functionality -->
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        // Initialize processing stage updates
+        initializeProcessingStage();
+
+        // Add event listeners to buttons
+        const convertButton = document.getElementById('convert-button');
+        if (convertButton) {
+          convertButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            onConvertClick();
+          });
+        }
+
+        const loginButton = document.getElementById('login-button');
+        if (loginButton) {
+          loginButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            login();
+          });
+        }
+
+        const logoutButton = document.getElementById('logout-button');
+        if (logoutButton) {
+          logoutButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            logout();
+          });
+        }
+
+        const donateButtons = document.querySelectorAll('[id^="donate-button"]');
+        donateButtons.forEach(button => {
+          button.addEventListener('click', (event) => {
+            event.preventDefault();
+            onDonateClick();
+          });
+        });
+
+        const resetButtons = document.querySelectorAll('[id^="reset-button"]');
+        resetButtons.forEach(button => {
+          button.addEventListener('click', (event) => {
+            event.preventDefault();
+            reset();
+          });
+        });
+
+        // Initialize Auth0
+        initAuth0().catch((error) => console.error("Error initializing app:", error));
+      });
+    </script>
   </body>
 </html>

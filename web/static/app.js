@@ -37,6 +37,7 @@ async function initAuth0() {
 }
 
 function updateUIStatus(status, errorMessage = "") {
+  console.log(`Updating UI status: ${status}`);
   const inputSection = document.getElementById("input-section");
   const statusSection = document.getElementById("status-section");
   const errorSection = document.getElementById("error-section");
@@ -54,7 +55,13 @@ function updateUIStatus(status, errorMessage = "") {
       if (statusSection) {
         statusSection.classList.remove("hidden");
         if (processingStage) {
-          processingStage.textContent = processingStages[currentStageIndex];
+          try {
+            processingStage.textContent = processingStages[currentStageIndex];
+          } catch (error) {
+            console.error("Error setting processing stage text:", error);
+          }
+        } else {
+          console.warn("Processing stage element not found");
         }
       }
       break;
@@ -69,7 +76,13 @@ function updateUIStatus(status, errorMessage = "") {
         errorSection.classList.remove("hidden");
         const errorParagraph = errorSection.querySelector("p");
         if (errorParagraph) {
-          errorParagraph.textContent = errorMessage || "An error occurred. Please try again.";
+          try {
+            errorParagraph.textContent = errorMessage || "An error occurred. Please try again.";
+          } catch (error) {
+            console.error("Error setting error message:", error);
+          }
+        } else {
+          console.warn("Error paragraph not found");
         }
       }
       break;
@@ -140,7 +153,9 @@ async function onDonateClick() {
 }
 
 // Handle the 'Convert' button click
-async function onConvertClick() {
+async function onConvertClick(event) {
+  console.log("Convert button clicked");
+  event.preventDefault(); // Prevent default form submission if it's a submit button
   try {
     if (!auth0Client) {
       throw new Error("Auth0 client not initialized");
@@ -388,8 +403,10 @@ document.addEventListener('DOMContentLoaded', () => {
     console.warn("Logout button not found");
   }
 
+  const convertButton = document.getElementById('convert-button');
   if (convertButton) {
     convertButton.addEventListener('click', onConvertClick);
+    console.log("Convert button event listener added");
   } else {
     console.warn("Convert button not found");
   }
@@ -461,5 +478,10 @@ async function testAuth() {
   }
 }
 
-// Ensure testAuth is in global scope
+// Ensure all functions are in global scope
+window.onConvertClick = onConvertClick;
+window.login = login;
+window.logout = logout;
+window.onDonateClick = onDonateClick;
+window.reset = reset;
 window.testAuth = testAuth;

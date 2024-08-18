@@ -131,29 +131,38 @@ function onDonateClick() {
 }
 
 async function onConvertClick(event) {
-  event.preventDefault();
-  console.log("Convert button clicked");
+    event.preventDefault();
+    console.log("Convert button clicked");
 
-  try {
-    if (!auth0Client) throw new Error("Auth0 client not initialized");
+    try {
+        if (!auth0Client) throw new Error("Auth0 client not initialized");
 
-    const inputData = getInputData();
-    if (!inputData.url && !inputData.file) {
-      throw new Error("Please provide a URL or upload a file");
+        const inputData = getInputData();
+        if (!inputData.url && !inputData.file) {
+            showErrorMessage("Please provide a URL or upload a file");
+            return;
+        }
+
+        if (await auth0Client.isAuthenticated()) {
+            showLanguageSelectionModal(inputData);
+        } else {
+            login();
+        }
+    } catch (error) {
+        console.error("Error in onConvertClick:", error);
+        updateUIStatus("error", error.message);
     }
-
-    if (await auth0Client.isAuthenticated()) {
-      showLanguageSelectionModal(inputData);
-    } else {
-      login();
-    }
-  } catch (error) {
-    console.error("Error in onConvertClick:", error);
-    updateUIStatus("error", error.message);
-  }
 }
 
-// ... (previous code remains the same)
+function showErrorMessage(message) {
+    const errorElement = document.getElementById('error-message'); // Assuming an element with id="error-message" exists
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.classList.remove('hidden');
+    } else {
+        console.error("Error message element not found");
+    }
+}
 
 async function postToConvert(inputData, lang) {
   let body;
@@ -210,12 +219,12 @@ async function postToConvert(inputData, lang) {
 }
 
 function getInputData() {
-  const urlInput = document.getElementById("url-input");
-  const fileInput = document.getElementById("file-upload");
-  return {
-    url: urlInput && urlInput.value.trim(),
-    file: fileInput && fileInput.files[0]
-  };
+    const urlInput = document.getElementById("url-input");
+    const fileUpload = document.getElementById("file-upload");
+    return {
+        url: urlInput ? urlInput.value.trim() : '',
+        file: fileUpload ? fileUpload.files[0] : null
+    };
 }
 
 async function login() {
@@ -427,6 +436,8 @@ document.addEventListener('DOMContentLoaded', () => {
         testAuthButton: document.getElementById('test-auth-button'),
         fileUpload: document.getElementById('file-upload'),
         fileName: document.getElementById('file-name'), // Added reference to file-name
+        urlInput: document.getElementById('url-input'), // Include a reference to the URL input
+        errorMessage: document.getElementById('error-message') // Element for displaying errors
     };
 
     if (elements.loginButton) elements.loginButton.addEventListener('click', login);
@@ -440,14 +451,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (elements.fileUpload) {
       elements.fileUpload.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (file && elements.fileName) {
-          elements.fileName.textContent = file.name;
-        } else if (file) {
-          console.warn("File name element not found");
-        }
+          const file = event.target.files[0];
+          if (file) {
+              if (elements.fileName) {
+                  elements.fileName.textContent = file.name;
+              } else {
+                  console.warn("File name element not found");
+              }
+          }
       });
-    }
+  }
 
     Object.entries(elements).forEach(([key, value]) => {
         if (!value) console.warn(`${key} not found`);

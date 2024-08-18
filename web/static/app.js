@@ -155,7 +155,7 @@ async function onConvertClick(event) {
 }
 
 function showErrorMessage(message) {
-    const errorElement = document.getElementById('error-message'); // Assuming an element with id="error-message" exists
+    const errorElement = document.getElementById('error-message');
     if (errorElement) {
         errorElement.textContent = message;
         errorElement.classList.remove('hidden');
@@ -295,6 +295,11 @@ function showLanguageSelectionModal(inputData) {
 }
 
 async function postToConvert(inputData, lang) {
+  if (!inputData.url && !inputData.file) {
+    updateUIStatus("error", "No input provided. Please enter a URL or upload a file.");
+    return;
+  }
+
   let body;
   let headers = {};
   const formData = new FormData();
@@ -317,7 +322,7 @@ async function postToConvert(inputData, lang) {
   }
 
   body = formData;
-  
+
   try {
     updateUIStatus("running", "Starting conversion process...");
 
@@ -354,6 +359,7 @@ async function postToConvert(inputData, lang) {
     updateUIStatus("error", error.message || "An error occurred during conversion");
   }
 }
+
 
 async function pollStatus(token) {
   try {
@@ -435,8 +441,8 @@ document.addEventListener('DOMContentLoaded', () => {
         resetButtonError: document.getElementById('reset-button-error'),
         testAuthButton: document.getElementById('test-auth-button'),
         fileUpload: document.getElementById('file-upload'),
-        fileName: document.getElementById('file-name'), // Added reference to file-name
-        urlInput: document.getElementById('url-input'), // Include a reference to the URL input
+        fileName: document.getElementById('file-name'),
+        urlInput: document.getElementById('url-input'),
         errorMessage: document.getElementById('error-message') // Element for displaying errors
     };
 
@@ -460,7 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
               }
           }
       });
-  }
+    }
 
     Object.entries(elements).forEach(([key, value]) => {
         if (!value) console.warn(`${key} not found`);

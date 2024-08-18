@@ -350,6 +350,14 @@ function updateProcessingStage() {
   }
 }
 
+function safeUpdateProcessingStage() {
+  if (document.readyState === 'complete') {
+    updateProcessingStage();
+  } else {
+    window.addEventListener('load', updateProcessingStage);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const loginButton = document.getElementById('login-button');
   const logoutButton = document.getElementById('logout-button');
@@ -385,8 +393,9 @@ document.addEventListener('DOMContentLoaded', () => {
     testAuthButton.addEventListener('click', testAuth);
   }
 
-  setInterval(updateProcessingStage, 3000);
-  updateProcessingStage(); // Initial update
+  // Use the safe update function
+  safeUpdateProcessingStage();
+  setInterval(safeUpdateProcessingStage, 3000);
 
   // Initialize Auth0
   initAuth0().catch((error) => console.error("Error initializing app:", error));

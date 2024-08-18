@@ -251,46 +251,22 @@ async function logout() {
 }
 
 function showLanguageSelectionModal(inputData) {
-  const modal = document.createElement('div');
-  modal.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-  `;
+  const modal = document.getElementById('language-modal');
+  if (!modal) {
+    console.error("Language modal not found");
+    return;
+  }
 
-  const modalContent = document.createElement('div');
-  modalContent.style.cssText = `
-    background-color: white;
-    padding: 20px;
-    border-radius: 5px;
-    text-align: center;
-  `;
-
-  modalContent.innerHTML = `
-    <h3>Select Language</h3>
-    <button id="en-btn">English</button>
-    <button id="es-btn">Spanish</button>
-    <button id="cancel-btn">Cancel</button>
-  `;
-
-  modal.appendChild(modalContent);
-  document.body.appendChild(modal);
+  modal.classList.remove('hidden');
 
   const handleLanguageSelection = async (lang) => {
-    document.body.removeChild(modal);
+    modal.classList.add('hidden');
     await postToConvert(inputData, lang);
   };
 
   document.getElementById('en-btn').onclick = () => handleLanguageSelection('en');
   document.getElementById('es-btn').onclick = () => handleLanguageSelection('es');
-  document.getElementById('cancel-btn').onclick = () => document.body.removeChild(modal);
+  document.getElementById('cancel-btn').onclick = () => modal.classList.add('hidden');
 }
 
 async function pollStatus(token) {

@@ -10,6 +10,10 @@ from platogram.types import Content, SpeechEvent
 pattern = r'\d+'  # Raw string
 match = re.match(pattern, "123")
 
+# TODO: Address SyntaxWarnings for invalid escape sequences
+# pylint: disable=anomalous-backslash-in-string
+# flake8: noqa: W605
+
 def remove_markers(text: str) -> str:
     return re.sub(r"(【\d+】)", r" ", text)
 

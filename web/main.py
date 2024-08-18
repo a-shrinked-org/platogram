@@ -18,13 +18,13 @@ from cryptography.x509 import load_pem_x509_certificate
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, Form, File, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.security import OAuth2PasswordBearer
 from starlette.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer
 from concurrent.futures import ProcessPoolExecutor
-from platogram import llm, asr
 
 import platogram as plato
+from platogram import llm, asr
 
 # Setup logging
 logger = logging.getLogger("platogram")
@@ -294,22 +294,21 @@ async def convert_and_send_with_error_handling(request: ConversionRequest, user_
 async def convert_and_send(request: ConversionRequest, user_id: str):
     try:
         logger.info(f"Starting conversion for user {user_id}")
-        # Initialize models
-        llm = plato.llm.get_model("anthropic/claude-3-5-sonnet", ANTHROPIC_API_KEY)
-        asr = plato.asr.get_model("assembly-ai/best", ASSEMBLYAI_API_KEY)
 
-        url = request.payload
+        # Initialize models
+        language_model = plato.llm.get_model("anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY'))
+        speech_recognition_model = plato.asr.get_model("assembly-ai/best", os.getenv('ASSEMBLYAI_API_KEY'))
 
         # Process audio
         try:
-            transcript = plato.extract_transcript(url, asr)
-        except yt_dlp.utils.DownloadError as e:
+            transcript = plato.extract_transcript(request.payload, speech_recognition_model)
+        except Exception as e:
             if "Sign in to confirm you're not a bot" in str(e):
                 raise HTTPException(status_code=400, detail="YouTube requires authentication for this video. Please try a different video or provide a direct audio file.")
             else:
                 raise
 
-        content = plato.index(transcript, llm)
+        content = plato.index(transcript, language_model)
 
         title = content.title
         summary = content.summary

@@ -50,7 +50,13 @@ function updateUIStatus(status, errorMessage = "") {
 
   switch (status) {
     case "running":
-      if (statusSection) statusSection.classList.remove("hidden");
+      if (statusSection) {
+        statusSection.classList.remove("hidden");
+        const processingStage = document.getElementById("processing-stage");
+        if (processingStage) {
+          processingStage.textContent = processingStages[currentStageIndex];
+        }
+      }
       break;
     case "done":
       if (doneSection) doneSection.classList.remove("hidden");
@@ -334,10 +340,17 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(updateProcessingStage, 3000);
   updateProcessingStage(); // Initial update
 
-  // Initialize the app
-  initAuth0().catch((error) =>
-    console.error("Error initializing app:", error)
-  );
+ // Initialize Auth0
+  initAuth0().catch((error) => console.error("Error initializing app:", error));
+
+  // Set up interval for updating processing stage
+  setInterval(() => {
+    currentStageIndex = (currentStageIndex + 1) % processingStages.length;
+    const processingStage = document.getElementById("processing-stage");
+    if (processingStage) {
+      processingStage.textContent = processingStages[currentStageIndex];
+    }
+  }, 3000);
 });
 
 // Test Auth function (you might want to add this if it's not already present)

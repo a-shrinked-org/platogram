@@ -347,18 +347,26 @@ function updateProcessingStage() {
   if (processingStage) {
     processingStage.textContent = processingStages[currentStageIndex];
     currentStageIndex = (currentStageIndex + 1) % processingStages.length;
+  } else {
+    console.warn("Processing stage element not found");
   }
 }
 
 function safeUpdateProcessingStage() {
-  if (document.readyState === 'complete') {
-    updateProcessingStage();
-  } else {
-    window.addEventListener('load', updateProcessingStage);
+  try {
+    if (document.readyState === 'complete') {
+      updateProcessingStage();
+    } else {
+      window.addEventListener('load', updateProcessingStage);
+    }
+  } catch (error) {
+    console.error("Error in safeUpdateProcessingStage:", error);
   }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  console.log("DOM Content Loaded");
+
   const loginButton = document.getElementById('login-button');
   const logoutButton = document.getElementById('logout-button');
   const convertButton = document.getElementById('convert-button');
@@ -370,30 +378,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (loginButton) {
     loginButton.addEventListener('click', login);
-  }
-  if (logoutButton) {
-    logoutButton.addEventListener('click', logout);
-  }
-  if (convertButton) {
-    convertButton.addEventListener('click', onConvertClick);
-  }
-  if (donateButton) {
-    donateButton.addEventListener('click', onDonateClick);
-  }
-  if (donateButtonStatus) {
-    donateButtonStatus.addEventListener('click', onDonateClick);
-  }
-  if (resetButton) {
-    resetButton.addEventListener('click', reset);
-  }
-  if (resetButtonError) {
-    resetButtonError.addEventListener('click', reset);
-  }
-  if (testAuthButton) {
-    testAuthButton.addEventListener('click', testAuth);
+  } else {
+    console.warn("Login button not found");
   }
 
-  // Use the safe update function
+  if (logoutButton) {
+    logoutButton.addEventListener('click', logout);
+  } else {
+    console.warn("Logout button not found");
+  }
+
+  if (convertButton) {
+    convertButton.addEventListener('click', onConvertClick);
+  } else {
+    console.warn("Convert button not found");
+  }
+
+  if (donateButton) {
+    donateButton.addEventListener('click', onDonateClick);
+  } else {
+    console.warn("Donate button not found");
+  }
+
+  if (donateButtonStatus) {
+    donateButtonStatus.addEventListener('click', onDonateClick);
+  } else {
+    console.warn("Donate button status not found");
+  }
+
+  if (resetButton) {
+    resetButton.addEventListener('click', reset);
+  } else {
+    console.warn("Reset button not found");
+  }
+
+  if (resetButtonError) {
+    resetButtonError.addEventListener('click', reset);
+  } else {
+    console.warn("Reset button error not found");
+  }
+
+  if (testAuthButton) {
+    testAuthButton.addEventListener('click', testAuth);
+    console.log("Test auth button event listener added");
+  } else {
+    console.warn("Test auth button not found");
+  }
+
   safeUpdateProcessingStage();
   setInterval(safeUpdateProcessingStage, 3000);
 
@@ -402,6 +433,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function testAuth() {
+  console.log("Test Auth function called");
   try {
     if (!auth0Client) {
       throw new Error("Auth0 client not initialized");
@@ -417,11 +449,17 @@ async function testAuth() {
         Authorization: `Bearer ${token}`,
       },
     });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     const data = await response.json();
     console.log("Auth test result:", data);
     alert("Auth test successful. Check console for details.");
   } catch (error) {
     console.error("Auth test failed:", error);
-    alert("Auth test failed. Check console for details.");
+    alert("Auth test failed. Error: " + error.message);
   }
 }
+
+// Ensure testAuth is in global scope
+window.testAuth = testAuth;

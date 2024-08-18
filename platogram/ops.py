@@ -1,8 +1,13 @@
 import re
 from typing import Callable
 
-# Use raw string for regex patterns
-pattern = r'\d+'  # Raw string, no need for double backslash
+from tqdm import tqdm  # type: ignore
+
+from platogram.llm import LanguageModel  # Import LanguageModel
+from platogram.types import Content, SpeechEvent
+
+# Use raw strings for all regex patterns
+pattern = r'\d+'  # Raw string
 match = re.match(pattern, "123")
 
 def remove_markers(text: str) -> str:
@@ -22,12 +27,6 @@ def parse(text_with_markers: str, marker: str = r"(【\d+】)") -> dict[int, str
 
     Returns:
         A dictionary where the keys are the numeric markers and the values are the text segments associated with each marker.
-
-        For example, the input string "hello【1】world【2】!【1】" would return:
-        {
-            1: "hello!",
-            2: "world"
-        }
 
     Raises:
         ValueError: If the input string is empty, does not contain any valid markers, or does not end with a valid marker.
@@ -68,34 +67,23 @@ def render(
     """
     Renders a dictionary of text segments into a single string with numeric markers.
 
-    The output string will have the format:
-    "text【number】text【number】...【number】"
-    where 【number】 is a numeric value enclosed in square brackets.
-
     Args:
         segments: A dictionary where the keys are the numeric markers and the values are the text segments associated with each marker.
         marker_fn: A function that takes an integer and returns a string representing the marker.
 
     Returns:
         A string containing text segments separated by numeric markers.
-
-        For example, the input dictionary {1: "hello!", 2: "world"} would return:
-        "hello【1】world【2】"
     """
     return "".join([f"{text}{marker_fn(value)}" for value, text in segments.items()])
 
 def chunk_text(
-        text_with_markers: str,
-        chunk_size: int,
-        token_count_fn: Callable[[str], int],
-        marker: str = r"(【\d+】)",  # Use raw string here
-    ) -> list[str]:
+    text_with_markers: str,
+    chunk_size: int,
+    token_count_fn: Callable[[str], int],
+    marker: str = r"(【\d+】)",
+) -> list[str]:
     """
     Splits a string containing text segments separated by numeric markers into chunks of a specified size.
-
-    The input string should have the format:
-    "text【number】text【number】...【number】"
-    where 【number】 is a numeric value enclosed in square brackets.
 
     Args:
         text_with_markers: The input string containing text segments and markers.
@@ -104,9 +92,7 @@ def chunk_text(
         marker: The regular expression pattern for the markers. Default is r'(【\d+】)'.
 
     Returns:
-        A list of strings, where each string represents a chunk of the input text. The chunks are created by grouping
-        the text segments such that the total number of tokens in each chunk is as close as possible to the specified
-        chunk size, without exceeding it. The markers are preserved in the output chunks.
+        A list of strings, where each string represents a chunk of the input text.
     """
     segments = parse(text_with_markers, marker)
     total_tokens = token_count_fn(render(segments))

@@ -7,6 +7,7 @@ const processingStages = [
   "Quantum Knitting"
 ];
 let currentStageIndex = 0;
+let processingStageInterval;
 
 // Initialize Auth0
 async function initAuth0() {
@@ -23,7 +24,6 @@ async function initAuth0() {
         });
         console.log("Auth0 client initialized successfully");
 
-        // Check for the code and state parameters
         const query = window.location.search;
         if (query.includes("code=") && query.includes("state=")) {
             await auth0Client.handleRedirectCallback();
@@ -44,25 +44,15 @@ function updateUIStatus(status, errorMessage = "") {
   const doneSection = document.getElementById("done-section");
   const processingStage = document.getElementById("processing-stage");
 
-  // Check if elements exist before manipulating them
-  if (inputSection) inputSection.classList.add("hidden");
-  if (statusSection) statusSection.classList.add("hidden");
-  if (errorSection) errorSection.classList.add("hidden");
-  if (doneSection) doneSection.classList.add("hidden");
+  [inputSection, statusSection, errorSection, doneSection].forEach(section => {
+    if (section) section.classList.add("hidden");
+  });
 
   switch (status) {
     case "running":
       if (statusSection) {
         statusSection.classList.remove("hidden");
-        if (processingStage) {
-          try {
-            processingStage.textContent = processingStages[currentStageIndex];
-          } catch (error) {
-            console.error("Error setting processing stage text:", error);
-          }
-        } else {
-          console.warn("Processing stage element not found");
-        }
+        updateProcessingStage();
       }
       break;
     case "done":
@@ -76,20 +66,13 @@ function updateUIStatus(status, errorMessage = "") {
         errorSection.classList.remove("hidden");
         const errorParagraph = errorSection.querySelector("p");
         if (errorParagraph) {
-          try {
-            errorParagraph.textContent = errorMessage || "An error occurred. Please try again.";
-          } catch (error) {
-            console.error("Error setting error message:", error);
-          }
-        } else {
-          console.warn("Error paragraph not found");
+          errorParagraph.textContent = errorMessage || "An error occurred. Please try again.";
         }
       }
       break;
   }
 }
 
-// Update UI based on authentication state
 async function updateUI() {
   if (!auth0Client) {
     console.error("Auth0 client not initialized");
@@ -115,31 +98,27 @@ async function updateUI() {
 
 async function reset() {
   try {
-    if (!auth0Client) {
-      throw new Error("Auth0 client not initialized");
-    }
+    if (!auth0Client) throw new Error("Auth0 client not initialized");
 
     const token = await auth0Client.getTokenSilently({
       audience: "https://platogram.vercel.app",
     });
 
-    // Call the /reset endpoint
     const response = await fetch("/reset", {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (!response.ok) {
-      throw new Error("Failed to reset");
-    }
+    if (!response.ok) throw new Error("Failed to reset");
 
-    // Clear input fields
     const urlInput = document.getElementById("url-input");
-    if (urlInput) urlInput.value = "";
+    const fileUpload = document.getElementById("file-upload");
+    const fileName = document.getElementById("file-name");
 
-    // Poll status after reset
+    if (urlInput) urlInput.value = "";
+    if (fileUpload) fileUpload.value = "";
+    if (fileName) fileName.textContent = "";
+
     pollStatus(token);
   } catch (error) {
     console.error("Error resetting:", error);
@@ -147,20 +126,16 @@ async function reset() {
   }
 }
 
-async function onDonateClick() {
-  // Open Stripe payment link in a new tab
+function onDonateClick() {
   window.open("https://buy.stripe.com/eVa29p3PK5OXbq84gl", "_blank");
 }
 
-// Handle the 'Convert' button click
 async function onConvertClick(event) {
   event.preventDefault();
   console.log("Convert button clicked");
 
   try {
-    if (!auth0Client) {
-      throw new Error("Auth0 client not initialized");
-    }
+    if (!auth0Client) throw new Error("Auth0 client not initialized");
 
     const inputData = getInputData();
     if (!inputData.url && !inputData.file) {
@@ -175,6 +150,39 @@ async function onConvertClick(event) {
   } catch (error) {
     console.error("Error in onConvertClick:", error);
     updateUIStatus("error", error.message);
+  }
+}
+
+function getInputData() {
+  const urlInput = document.getElementById("url-input");
+  const fileInput = document.getElementById("file-upload");
+  return {
+    url: urlInput ? urlInput.value.trim() : '',
+    file: fileInput ? fileInput.files[0] : null
+  };
+}
+
+async function login() {
+  try {
+    if (!auth0Client) throw new Error("Auth0 client not initialized");
+    await auth0Client.loginWithRedirect({
+      authorizationParams: { redirect_uri: window.location.origin },
+    });
+  } catch (error) {
+    console.error("Error logging in:", error);
+    updateUIStatus("error", "Failed to log in. Please try again.");
+  }
+}
+
+async function logout() {
+  try {
+    if (!auth0Client) throw new Error("Auth0 client not initialized");
+    await auth0Client.logout({
+      logoutParams: { returnTo: window.location.origin },
+    });
+  } catch (error) {
+    console.error("Error logging out:", error);
+    updateUIStatus("error", "Failed to log out. Please try again.");
   }
 }
 
@@ -211,7 +219,6 @@ function showLanguageSelectionModal(inputData) {
   modal.appendChild(modalContent);
   document.body.appendChild(modal);
 
-  // Handle language selection
   const handleLanguageSelection = async (lang) => {
     document.body.removeChild(modal);
     await postToConvert(inputData, lang);
@@ -220,49 +227,6 @@ function showLanguageSelectionModal(inputData) {
   document.getElementById('en-btn').onclick = () => handleLanguageSelection('en');
   document.getElementById('es-btn').onclick = () => handleLanguageSelection('es');
   document.getElementById('cancel-btn').onclick = () => document.body.removeChild(modal);
-}
-
-// Get input data (URL or File)
-function getInputData() {
-  const urlInput = document.getElementById("url-input");
-  const fileInput = document.getElementById("file-upload");
-  return {
-    url: urlInput ? urlInput.value.trim() : '',
-    file: fileInput ? fileInput.files[0] : null
-  };
-}
-// Login
-async function login() {
-  try {
-    if (!auth0Client) {
-      throw new Error("Auth0 client not initialized");
-    }
-    await auth0Client.loginWithRedirect({
-      authorizationParams: {
-        redirect_uri: window.location.origin,
-      },
-    });
-  } catch (error) {
-    console.error("Error logging in:", error);
-    updateUIStatus("error", "Failed to log in. Please try again.");
-  }
-}
-
-// Logout
-async function logout() {
-  try {
-    if (!auth0Client) {
-      throw new Error("Auth0 client not initialized");
-    }
-    await auth0Client.logout({
-      logoutParams: {
-        returnTo: window.location.origin,
-      },
-    });
-  } catch (error) {
-    console.error("Error logging out:", error);
-    updateUIStatus("error", "Failed to log out. Please try again.");
-  }
 }
 
 async function postToConvert(inputData, lang) {
@@ -275,7 +239,7 @@ async function postToConvert(inputData, lang) {
     formData.append('file', inputData.file);
   } else if (inputData.url) {
     try {
-      new URL(inputData.url); // This will throw an error if the URL is invalid
+      new URL(inputData.url);
       formData.append("payload", inputData.url);
     } catch (e) {
       console.error("Invalid URL:", inputData.url);
@@ -329,41 +293,40 @@ async function postToConvert(inputData, lang) {
 async function pollStatus(token) {
   try {
     const response = await fetch("/status", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
     const result = await response.json();
     console.log("Polling status response:", result);
 
-    if (result.status === "running") {
-      updateUIStatus("running", "Processing your request...");
-      setTimeout(() => pollStatus(token), 5000);  // Poll again in 5 seconds
-    } else if (result.status === "idle") {
-      updateUIStatus("idle", "Ready for new conversion");
-    } else if (result.status === "failed") {
-      let errorMessage = result.error || "An error occurred during processing";
-      if (errorMessage.includes("YouTube requires authentication")) {
-        errorMessage = "YouTube requires authentication for this video. Please try a different video or provide a direct audio file.";
-      }
-      updateUIStatus("error", errorMessage);
-    } else if (result.status === "done") {
-      updateUIStatus("done", "Your request has been processed successfully!");
-    } else {
-      updateUIStatus("error", "Unexpected status response");
+    switch (result.status) {
+      case "running":
+        updateUIStatus("running", "Processing your request...");
+        setTimeout(() => pollStatus(token), 5000);
+        break;
+      case "idle":
+        updateUIStatus("idle", "Ready for new conversion");
+        break;
+      case "failed":
+        let errorMessage = result.error || "An error occurred during processing";
+        if (errorMessage.includes("YouTube requires authentication")) {
+          errorMessage = "YouTube requires authentication for this video. Please try a different video or provide a direct audio file.";
+        }
+        updateUIStatus("error", errorMessage);
+        break;
+      case "done":
+        updateUIStatus("done", "Your request has been processed successfully!");
+        break;
+      default:
+        updateUIStatus("error", "Unexpected status response");
     }
   } catch (error) {
     console.error("Error polling status:", error);
     updateUIStatus("error", error.message || "An error occurred while checking status");
   }
 }
-
-let processingStageInterval;
 
 function updateProcessingStage() {
   const statusSection = document.getElementById('status-section');
@@ -378,8 +341,8 @@ function updateProcessingStage() {
 }
 
 function initializeProcessingStage() {
-  updateProcessingStage(); // Initial update
-  setInterval(updateProcessingStage, 3000);
+  updateProcessingStage();
+  processingStageInterval = setInterval(updateProcessingStage, 3000);
 }
 
 function safeUpdateProcessingStage() {
@@ -397,69 +360,29 @@ function safeUpdateProcessingStage() {
 document.addEventListener('DOMContentLoaded', () => {
   console.log("DOM Content Loaded");
 
-  const loginButton = document.getElementById('login-button');
-  const logoutButton = document.getElementById('logout-button');
-  const convertButton = document.getElementById('convert-button');
-  const donateButton = document.getElementById('donate-button');
-  const donateButtonStatus = document.getElementById('donate-button-status');
-  const resetButton = document.getElementById('reset-button');
-  const resetButtonError = document.getElementById('reset-button-error');
-  const testAuthButton = document.getElementById('test-auth-button');
+  const elements = {
+    loginButton: document.getElementById('login-button'),
+    logoutButton: document.getElementById('logout-button'),
+    convertButton: document.getElementById('convert-button'),
+    donateButton: document.getElementById('donate-button'),
+    donateButtonStatus: document.getElementById('donate-button-status'),
+    resetButton: document.getElementById('reset-button'),
+    resetButtonError: document.getElementById('reset-button-error'),
+    testAuthButton: document.getElementById('test-auth-button'),
+    fileUpload: document.getElementById('file-upload')
+  };
 
-  if (loginButton) {
-    loginButton.addEventListener('click', login);
-  } else {
-    console.warn("Login button not found");
-  }
+  if (elements.loginButton) elements.loginButton.addEventListener('click', login);
+  if (elements.logoutButton) elements.logoutButton.addEventListener('click', logout);
+  if (elements.convertButton) elements.convertButton.addEventListener('click', onConvertClick);
+  if (elements.donateButton) elements.donateButton.addEventListener('click', onDonateClick);
+  if (elements.donateButtonStatus) elements.donateButtonStatus.addEventListener('click', onDonateClick);
+  if (elements.resetButton) elements.resetButton.addEventListener('click', reset);
+  if (elements.resetButtonError) elements.resetButtonError.addEventListener('click', reset);
+  if (elements.testAuthButton) elements.testAuthButton.addEventListener('click', testAuth);
 
-  if (logoutButton) {
-    logoutButton.addEventListener('click', logout);
-  } else {
-    console.warn("Logout button not found");
-  }
-
-  const convertButton = document.getElementById('convert-button');
-  if (convertButton) {
-    convertButton.addEventListener('click', onConvertClick);
-    console.log("Convert button event listener added");
-  } else {
-    console.warn("Convert button not found");
-  }
-
-  if (donateButton) {
-    donateButton.addEventListener('click', onDonateClick);
-  } else {
-    console.warn("Donate button not found");
-  }
-
-  if (donateButtonStatus) {
-    donateButtonStatus.addEventListener('click', onDonateClick);
-  } else {
-    console.warn("Donate button status not found");
-  }
-
-  if (resetButton) {
-    resetButton.addEventListener('click', reset);
-  } else {
-    console.warn("Reset button not found");
-  }
-
-  if (resetButtonError) {
-    resetButtonError.addEventListener('click', reset);
-  } else {
-    console.warn("Reset button error not found");
-  }
-
-  if (testAuthButton) {
-    testAuthButton.addEventListener('click', testAuth);
-    console.log("Test auth button event listener added");
-  } else {
-    console.warn("Test auth button not found");
-  }
-
-  const fileUpload = document.getElementById('file-upload');
-  if (fileUpload) {
-    fileUpload.addEventListener('change', (event) => {
+  if (elements.fileUpload) {
+    elements.fileUpload.addEventListener('change', (event) => {
       const file = event.target.files[0];
       if (file) {
         const fileNameElement = document.getElementById('file-name');
@@ -470,23 +393,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
     });
-  } else {
-    console.warn("File upload input not found");
+  }
+
+  Object.entries(elements).forEach(([key, value]) => {
+    if (!value) console.warn(`${key} not found`);
+  });
 
   safeUpdateProcessingStage();
   initializeProcessingStage();
-  setInterval(safeUpdateProcessingStage, 3000);
 
-  // Initialize Auth0
   initAuth0().catch((error) => console.error("Error initializing app:", error));
 });
 
 async function testAuth() {
   console.log("Test Auth function called");
   try {
-    if (!auth0Client) {
-      throw new Error("Auth0 client not initialized");
-    }
+    if (!auth0Client) throw new Error("Auth0 client not initialized");
 
     const token = await auth0Client.getTokenSilently({
       audience: "https://platogram.vercel.app",
@@ -494,27 +416,10 @@ async function testAuth() {
     console.log("Token obtained:", token.substring(0, 10) + "...");
 
     const response = await fetch("/test-auth", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
     const data = await response.json();
     console.log("Auth test result:", data);
     alert("Auth test successful. Check console for details.");
-  } catch (error) {
-    console.error("Auth test failed:", error);
-    alert("Auth test failed. Error: " + error.message);
-  }
-}
-
-// Ensure all functions are in global scope
-window.onConvertClick = onConvertClick;
-window.login = login;
-window.logout = logout;
-window.onDonateClick = onDonateClick;
-window.reset = reset;
-window.testAuth = testAuth;
-window.updateProcessingStage = updateProcessingStage;

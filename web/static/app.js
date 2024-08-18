@@ -357,14 +357,23 @@ async function pollStatus(token) {
   }
 }
 
+let processingStageInterval;
+
 function updateProcessingStage() {
+  const statusSection = document.getElementById('status-section');
   const processingStage = document.getElementById('processing-stage');
-  if (processingStage) {
+
+  if (statusSection && !statusSection.classList.contains('hidden') && processingStage) {
     processingStage.textContent = processingStages[currentStageIndex];
     currentStageIndex = (currentStageIndex + 1) % processingStages.length;
   } else {
-    console.warn("Processing stage element not found");
+    console.warn("Status section is hidden or processing stage element not found. Skipping update.");
   }
+}
+
+function initializeProcessingStage() {
+  updateProcessingStage(); // Initial update
+  setInterval(updateProcessingStage, 3000);
 }
 
 function safeUpdateProcessingStage() {
@@ -443,6 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   safeUpdateProcessingStage();
+  initializeProcessingStage();
   setInterval(safeUpdateProcessingStage, 3000);
 
   // Initialize Auth0
@@ -485,3 +495,4 @@ window.logout = logout;
 window.onDonateClick = onDonateClick;
 window.reset = reset;
 window.testAuth = testAuth;
+window.updateProcessingStage = updateProcessingStage;

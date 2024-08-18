@@ -154,14 +154,19 @@ async function onDonateClick() {
 
 // Handle the 'Convert' button click
 async function onConvertClick(event) {
+  event.preventDefault();
   console.log("Convert button clicked");
-  event.preventDefault(); // Prevent default form submission if it's a submit button
+
   try {
     if (!auth0Client) {
       throw new Error("Auth0 client not initialized");
     }
 
     const inputData = getInputData();
+    if (!inputData.url && !inputData.file) {
+      throw new Error("Please provide a URL or upload a file");
+    }
+
     if (await auth0Client.isAuthenticated()) {
       showLanguageSelectionModal(inputData);
     } else {
@@ -169,7 +174,7 @@ async function onConvertClick(event) {
     }
   } catch (error) {
     console.error("Error in onConvertClick:", error);
-    updateUIStatus("error", "An error occurred. Please try again.");
+    updateUIStatus("error", error.message);
   }
 }
 
@@ -221,9 +226,11 @@ function showLanguageSelectionModal(inputData) {
 function getInputData() {
   const urlInput = document.getElementById("url-input");
   const fileInput = document.getElementById("file-upload");
-  return (urlInput && urlInput.value) || (fileInput && fileInput.files[0]);
+  return {
+    url: urlInput ? urlInput.value.trim() : '',
+    file: fileInput ? fileInput.files[0] : null
+  };
 }
-
 // Login
 async function login() {
   try {
@@ -264,27 +271,26 @@ async function postToConvert(inputData, lang) {
   const formData = new FormData();
   formData.append('lang', lang);
 
-  if (inputData instanceof File) {
-    formData.append('file', inputData);
-  } else {
-    // Validate URL
+  if (inputData.file) {
+    formData.append('file', inputData.file);
+  } else if (inputData.url) {
     try {
-      new URL(inputData);
-      formData.append("payload", inputData);
+      new URL(inputData.url); // This will throw an error if the URL is invalid
+      formData.append("payload", inputData.url);
     } catch (e) {
-      console.error("Invalid URL:", inputData);
+      console.error("Invalid URL:", inputData.url);
       updateUIStatus("error", "Invalid URL provided. Please enter a valid URL.");
       return;
     }
+  } else {
+    updateUIStatus("error", "No input provided. Please enter a URL or upload a file.");
+    return;
   }
+
   body = formData;
   
   try {
     updateUIStatus("running", "Starting conversion process...");
-
-    if (!auth0Client) {
-      throw new Error("Auth0 client not initialized");
-    }
 
     const token = await auth0Client.getTokenSilently({
       audience: "https://platogram.vercel.app",
@@ -450,6 +456,22 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     console.warn("Test auth button not found");
   }
+
+  const fileUpload = document.getElementById('file-upload');
+  if (fileUpload) {
+    fileUpload.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const fileNameElement = document.getElementById('file-name');
+        if (fileNameElement) {
+          fileNameElement.textContent = file.name;
+        } else {
+          console.warn("File name element not found");
+        }
+      }
+    });
+  } else {
+    console.warn("File upload input not found");
 
   safeUpdateProcessingStage();
   initializeProcessingStage();

@@ -275,7 +275,9 @@ async function pollStatus(token) {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
     const result = await response.json();
     console.log("Polling status response:", result);
@@ -293,17 +295,19 @@ async function pollStatus(token) {
         if (errorMessage.includes("YouTube requires authentication")) {
           errorMessage = "YouTube requires authentication for this video. Please try a different video or provide a direct audio file.";
         }
+        console.error("Conversion failed:", errorMessage);
         updateUIStatus("error", errorMessage);
         break;
       case "done":
         updateUIStatus("done", "Your request has been processed successfully!");
         break;
       default:
+        console.error("Unexpected status:", result.status);
         updateUIStatus("error", "Unexpected status response");
     }
   } catch (error) {
     console.error("Error polling status:", error);
-    updateUIStatus("error", error.message || "An error occurred while checking status");
+    updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
   }
 }
 

@@ -239,11 +239,15 @@ async def send_email(user_id: str, subj: str, body: str, files: list[Path]):
 
 async def convert_and_send_with_error_handling(request: ConversionRequest, user_id: str):
     try:
+        logfire.info(f"Starting conversion for user {user_id[:5]}...")  # Log only first 5 chars of user_id
         await convert_and_send(request, user_id)
+        logfire.info(f"Conversion completed successfully for user {user_id[:5]}")
         tasks[user_id].status = "done"
     except Exception as e:
-        logfire.exception(f"Error in background task for user {user_id}: {str(e)}")
-        tasks[user_id].error = str(e)
+        logfire.error(f"Error in background task for user {user_id[:5]}: {type(e).__name__}")
+        logfire.error(f"Error details: {str(e)}")
+        logfire.exception("Full traceback:")
+        tasks[user_id].error = f"{type(e).__name__}: {str(e)}"
         tasks[user_id].status = "failed"
 
 async def convert_and_send(request: ConversionRequest, user_id: str):

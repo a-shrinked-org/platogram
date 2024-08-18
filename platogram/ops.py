@@ -1,13 +1,8 @@
 import re
 from typing import Callable
 
-from tqdm import tqdm  # type: ignore
-
-from platogram.llm import LanguageModel
-from platogram.types import Content, SpeechEvent
-
-# Example regular expressions with raw strings
-pattern = '\\d+'   # Use double backslash instead of raw string
+# Use raw string for regex patterns
+pattern = r'\d+'  # Raw string, no need for double backslash
 match = re.match(pattern, "123")
 
 def remove_markers(text: str) -> str:
@@ -90,11 +85,11 @@ def render(
     return "".join([f"{text}{marker_fn(value)}" for value, text in segments.items()])
 
 def chunk_text(
-    text_with_markers: str,
-    chunk_size: int,
-    token_count_fn: Callable[[str], int],
-    marker: str = "(【\\d+】)",
-) -> list[str]:
+        text_with_markers: str,
+        chunk_size: int,
+        token_count_fn: Callable[[str], int],
+        marker: str = r"(【\d+】)",  # Use raw string here
+    ) -> list[str]:
     """
     Splits a string containing text segments separated by numeric markers into chunks of a specified size.
 

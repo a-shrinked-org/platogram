@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Platogram - Transform Audio into Actionable Knowledge</title>
@@ -8,44 +8,46 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css">
-  </head>
-  <body>
-    <div class="container">
-      <header>
-        <a href="#" class="cta" id="login-button">Log In</a>
-        <a href="#" class="cta" id="logout-button">Log Out</a>
-      </header>
-
-      <main>
-        <h1>Transform Speech into Knowledge</h1>
-
-        <div id="input-section" class="cta-container">
-          <p>
-            Convert hours of audio into structured, readable documents
-          </p>
-          <div class="input-wrapper">
-            <input type="text" id="url-input" placeholder="Link to YouTube, Google Drive, audio, transcript, or upload" />
-            <label for="file-upload" class="upload-button">
-              <span class="upload-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="17 8 12 3 7 8"></polyline>
-                  <line x1="12" y1="3" x2="12" y2="15"></line>
-                </svg>
-              </span>
-              <input
-                type="file"
-                id="file-upload"
-                accept=".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a"
-                style="display: none"
-              />
-            </label>
-          </div>
-          <span id="file-name"></span>
-          <div id="error-message" class="hidden"></div>
-          <a href="#" class="cta" id="convert-button">Convert</a>
-          <a href="#" class="cta donate" id="donate-button">Donate</a>
+</head>
+<body>
+    <div id="language-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Select Language</h3>
+            <button id="en-btn" class="lang-btn">English</button>
+            <button id="es-btn" class="lang-btn">Spanish</button>
+            <button id="cancel-btn" class="lang-btn">Cancel</button>
         </div>
+    </div>
+
+    <div class="container">
+        <header>
+            <a href="#" class="cta" id="login-button">Log In</a>
+            <a href="#" class="cta" id="logout-button">Log Out</a>
+        </header>
+
+        <main>
+            <h1>Transform Speech into Knowledge</h1>
+
+            <div id="input-section" class="cta-container">
+                <p>Convert hours of audio into structured, readable documents</p>
+                <div class="input-wrapper">
+                    <input type="text" id="url-input" placeholder="Link to YouTube, Google Drive, audio, transcript, or upload" />
+                    <label for="file-upload" class="upload-button">
+                        <span class="upload-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                        </span>
+                        <input type="file" id="file-upload" accept=".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a" style="display: none" />
+                    </label>
+                </div>
+                <span id="file-name"></span>
+                <div id="error-message" class="hidden"></div>
+                <a href="#" class="cta" id="convert-button">Convert</a>
+                <a href="#" class="cta donate" id="donate-button">Donate</a>
+            </div>
 
         <div id="done-section" class="cta-container hidden">
           <div class="success-icon">&#10004;</div>
@@ -194,11 +196,55 @@
       </footer>
     </div>
     <script src="app.js"></script>
-    <script>
-      document.addEventListener('DOMContentLoaded', () => {
-        initializeProcessingStage();
-        initAuth0().catch((error) => console.error("Error initializing app:", error));
-      });
+   <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeProcessingStage();
+            initAuth0().catch((error) => console.error("Error initializing app:", error));
+        });
     </script>
-  </body>
+
+    <!-- Start of LiveChat (www.livechat.com) code -->
+    <script>
+        window.__lc = window.__lc || {};
+        window.__lc.license = 18397149;
+        window.__lc.integration_name = "manual_onboarding";
+        window.__lc.product_name = "livechat";
+        (function(n, t, c) {
+            function i(n) {
+                return e._h ? e._h.apply(null, n) : e._q.push(n);
+            }
+            var e = {
+                _q: [],
+                _h: null,
+                _v: "2.0",
+                on: function() {
+                    i(["on", c.call(arguments)]);
+                },
+                once: function() {
+                    i(["once", c.call(arguments)]);
+                },
+                off: function() {
+                    i(["off", c.call(arguments)]);
+                },
+                get: function() {
+                    if (!e._h) throw new Error("[LiveChatWidget] You can't use getters before load.");
+                    return i(["get", c.call(arguments)]);
+                },
+                call: function() {
+                    i(["call", c.call(arguments)]);
+                },
+                init: function() {
+                    var n = t.createElement("script");
+                    n.async = !0, n.type = "text/javascript", n.src = "https://cdn.livechatinc.com/tracking.js", t.head.appendChild(n);
+                },
+            };
+            !n.__lc.asyncInit && e.init(), (n.LiveChatWidget = n.LiveChatWidget || e);
+        })(window, document, [].slice);
+    </script>
+    <noscript>
+        <a href="https://www.livechat.com/chat-with/18397149/" rel="nofollow">Chat with us</a>, powered by
+        <a href="https://www.livechat.com/?welcome" rel="noopener nofollow" target="_blank">LiveChat</a>
+    </noscript>
+    <!-- End of LiveChat code -->
+</body>
 </html>

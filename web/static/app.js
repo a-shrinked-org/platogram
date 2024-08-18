@@ -339,12 +339,26 @@ function safeUpdateProcessingStage() {
 document.addEventListener('DOMContentLoaded', () => {
   console.log("DOM Content Loaded");
 
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type === 'childList') {
+        const fileNameElement = document.getElementById('file-name');
+        if (fileNameElement) {
+          // Add the event listener here
+          observer.disconnect();
+          break;
+        }
+      }
+    }
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true })
+
   const elements = {
     loginButton: document.getElementById('login-button'),
     logoutButton: document.getElementById('logout-button'),
     convertButton: document.getElementById('convert-button'),
     donateButton: document.getElementById('donate-button'),
-    donateButtonStatus: document.getElementById('donate-button-status'),
     resetButton: document.getElementById('reset-button'),
     resetButtonError: document.getElementById('reset-button-error'),
     fileUpload: document.getElementById('file-upload'),
@@ -357,17 +371,26 @@ document.addEventListener('DOMContentLoaded', () => {
   if (elements.logoutButton) elements.logoutButton.addEventListener('click', logout);
   if (elements.convertButton) elements.convertButton.addEventListener('click', onConvertClick);
   if (elements.donateButton) elements.donateButton.addEventListener('click', onDonateClick);
-  if (elements.donateButtonStatus) elements.donateButtonStatus.addEventListener('click', onDonateClick);
   if (elements.resetButton) elements.resetButton.addEventListener('click', reset);
   if (elements.resetButtonError) elements.resetButtonError.addEventListener('click', reset);
 
-  if (elements.fileUpload) {
+  console.log("File upload element:", elements.fileUpload);
+  console.log("File name element:", elements.fileName);
+
+   if (elements.fileUpload && elements.fileName) {
     elements.fileUpload.addEventListener('change', (event) => {
+      console.log("File upload changed");
       const file = event.target.files[0];
-      if (file && elements.fileName) {
+      console.log("File:", file);
+      if (file) {
         elements.fileName.textContent = file.name;
+        console.log("File name set to:", file.name);
+      } else {
+        console.error("No file selected");
       }
     });
+  } else {
+    console.error("File upload or file name elements not found");
   }
 
   Object.entries(elements).forEach(([key, value]) => {

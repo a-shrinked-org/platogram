@@ -41,6 +41,7 @@ function updateUIStatus(status, errorMessage = "") {
   const statusSection = document.getElementById("status-section");
   const errorSection = document.getElementById("error-section");
   const doneSection = document.getElementById("done-section");
+  const processingStage = document.getElementById("processing-stage");
 
   [inputSection, statusSection, errorSection, doneSection].forEach(section => {
     if (section) {
@@ -50,7 +51,7 @@ function updateUIStatus(status, errorMessage = "") {
     }
   });
 
- switch (status) {
+  switch (status) {
     case "running":
       if (statusSection && processingStage) {
         statusSection.classList.remove("hidden");
@@ -349,7 +350,6 @@ function updateProcessingStage() {
   const statusSection = document.getElementById('status-section');
   const processingStage = document.getElementById('processing-stage');
 
-  // Add null checks and logging
   if (!statusSection) {
     console.warn("Status section not found");
     return;
@@ -361,6 +361,10 @@ function updateProcessingStage() {
   if (!Array.isArray(processingStages) || processingStages.length === 0) {
     console.error("processingStages is not properly defined");
     return;
+  }
+  if (currentStageIndex < 0 || currentStageIndex >= processingStages.length) {
+    console.error("Invalid currentStageIndex:", currentStageIndex);
+    currentStageIndex = 0;  // Reset to a valid index
   }
 
   if (!statusSection.classList.contains('hidden')) {
@@ -378,7 +382,6 @@ function initializeProcessingStage() {
   processingStageInterval = setInterval(updateProcessingStage, 3000);
 }
 
-
 function safeUpdateProcessingStage() {
   try {
     if (document.readyState === 'complete') {
@@ -391,75 +394,3 @@ function safeUpdateProcessingStage() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  console.log("DOM Content Loaded");
-
-  const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      if (mutation.type === 'childList') {
-        const fileNameElement = document.getElementById('file-name');
-        if (fileNameElement) {
-          // Add the event listener here
-          observer.disconnect();
-          break;
-        }
-      }
-    }
-  });
-
-  observer.observe(document.body, { childList: true, subtree: true })
-
-  const elements = {
-    loginButton: document.querySelector('#login-button'),
-    logoutButton: document.querySelector('#logout-button'),
-    convertButton: document.querySelector('#convert-button'),
-    donateButton: document.querySelector('#donate-button'),
-    resetButton: document.querySelector('#reset-button'),
-    resetButtonError: document.querySelector('#reset-button-error'),
-    fileUpload: document.querySelector('#file-upload'),
-    fileName: document.querySelector('#file-name'),
-    urlInput: document.querySelector('#url-input'),
-    errorMessage: document.querySelector('#error-message')
-  };
-
-  if (elements.loginButton) elements.loginButton.addEventListener('click', login);
-  if (elements.logoutButton) elements.logoutButton.addEventListener('click', logout);
-  if (elements.convertButton) elements.convertButton.addEventListener('click', onConvertClick);
-  if (elements.donateButton) elements.donateButton.addEventListener('click', onDonateClick);
-  if (elements.resetButton) elements.resetButton.addEventListener('click', reset);
-  if (elements.resetButtonError) elements.resetButtonError.addEventListener('click', reset);
-
-  console.log("File upload element:", elements.fileUpload);
-  console.log("File name element:", elements.fileName);
-
-  Object.entries(elements).forEach(([key, value]) => {
-    console.log(`${key}: ${value ? "Found" : "Not found"}`);
-  });
-
-  if (elements.fileUpload && elements.fileName) {
-    console.log("Adding event listener to file upload");
-    elements.fileUpload.addEventListener('change', (event) => {
-      console.log("File upload changed");
-      const file = event.target.files[0];
-      console.log("File:", file);
-      if (file && elements.fileName) {
-        console.log("Attempting to set fileName.textContent");
-        elements.fileName.textContent = file.name;
-        console.log("File name set to:", file.name);
-      } else {
-        console.error("No file selected or fileName element not found");
-      }
-    });
-  } else {
-    console.error("File upload or file name elements not found");
-  }
-
-  Object.entries(elements).forEach(([key, value]) => {
-    if (!value) console.warn(`${key} not found`);
-  });
-
-  safeUpdateProcessingStage();
-  initializeProcessingStage();
-
-  initAuth0().catch((error) => console.error("Error initializing app:", error));
-});

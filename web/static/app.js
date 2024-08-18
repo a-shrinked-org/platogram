@@ -41,34 +41,68 @@ function updateUIStatus(status, errorMessage = "") {
   const statusSection = document.getElementById("status-section");
   const errorSection = document.getElementById("error-section");
   const doneSection = document.getElementById("done-section");
-  const processingStage = document.getElementById("processing-stage");
 
   [inputSection, statusSection, errorSection, doneSection].forEach(section => {
-    if (section) section.classList.add("hidden");
+    if (section) {
+      section.classList.add("hidden");
+    } else {
+      console.warn(`Section not found: ${section}`);
+    }
   });
 
-  switch (status) {
+ switch (status) {
     case "running":
-      if (statusSection) {
+      if (statusSection && processingStage) {
         statusSection.classList.remove("hidden");
         updateProcessingStage();
+        if (!processingStageInterval) {
+          processingStageInterval = setInterval(updateProcessingStage, 3000);
+        }
+      } else {
+        console.error("Status section or processing stage element not found");
       }
       break;
     case "done":
-      if (doneSection) doneSection.classList.remove("hidden");
+      clearProcessingStageInterval();
+      if (doneSection) {
+        doneSection.classList.remove("hidden");
+      } else {
+        console.error("Done section not found");
+      }
       break;
     case "idle":
-      if (inputSection) inputSection.classList.remove("hidden");
+      clearProcessingStageInterval();
+      if (inputSection) {
+        inputSection.classList.remove("hidden");
+      } else {
+        console.error("Input section not found");
+      }
       break;
     case "error":
+      clearProcessingStageInterval();
       if (errorSection) {
         errorSection.classList.remove("hidden");
         const errorParagraph = errorSection.querySelector("p");
         if (errorParagraph) {
           errorParagraph.textContent = errorMessage || "An error occurred. Please try again.";
+        } else {
+          console.error("Error paragraph not found in error section");
         }
+      } else {
+        console.error("Error section not found");
       }
       break;
+    default:
+      clearProcessingStageInterval();
+      console.error(`Unknown status: ${status}`);
+  }
+}
+
+function clearProcessingStageInterval() {
+  if (processingStageInterval) {
+    console.log("Clearing processing stage interval");
+    clearInterval(processingStageInterval);
+    processingStageInterval = null;
   }
 }
 
@@ -315,18 +349,35 @@ function updateProcessingStage() {
   const statusSection = document.getElementById('status-section');
   const processingStage = document.getElementById('processing-stage');
 
-  if (statusSection && !statusSection.classList.contains('hidden') && processingStage) {
+  // Add null checks and logging
+  if (!statusSection) {
+    console.warn("Status section not found");
+    return;
+  }
+  if (!processingStage) {
+    console.warn("Processing stage element not found");
+    return;
+  }
+  if (!Array.isArray(processingStages) || processingStages.length === 0) {
+    console.error("processingStages is not properly defined");
+    return;
+  }
+
+  if (!statusSection.classList.contains('hidden')) {
     processingStage.textContent = processingStages[currentStageIndex];
     currentStageIndex = (currentStageIndex + 1) % processingStages.length;
+    console.log("Updated processing stage to:", processingStages[currentStageIndex]);
   } else {
-    console.warn("Status section is hidden or processing stage element not found. Skipping update.");
+    console.warn("Status section is hidden. Skipping update.");
   }
 }
 
 function initializeProcessingStage() {
+  console.log("Initializing processing stage");
   updateProcessingStage();
   processingStageInterval = setInterval(updateProcessingStage, 3000);
 }
+
 
 function safeUpdateProcessingStage() {
   try {
@@ -359,16 +410,16 @@ document.addEventListener('DOMContentLoaded', () => {
   observer.observe(document.body, { childList: true, subtree: true })
 
   const elements = {
-    loginButton: document.getElementById('login-button'),
-    logoutButton: document.getElementById('logout-button'),
-    convertButton: document.getElementById('convert-button'),
-    donateButton: document.getElementById('donate-button'),
-    resetButton: document.getElementById('reset-button'),
-    resetButtonError: document.getElementById('reset-button-error'),
-    fileUpload: document.getElementById('file-upload'),
-    fileName: document.getElementById('file-name'),
-    urlInput: document.getElementById('url-input'),
-    errorMessage: document.getElementById('error-message')
+    loginButton: document.querySelector('#login-button'),
+    logoutButton: document.querySelector('#logout-button'),
+    convertButton: document.querySelector('#convert-button'),
+    donateButton: document.querySelector('#donate-button'),
+    resetButton: document.querySelector('#reset-button'),
+    resetButtonError: document.querySelector('#reset-button-error'),
+    fileUpload: document.querySelector('#file-upload'),
+    fileName: document.querySelector('#file-name'),
+    urlInput: document.querySelector('#url-input'),
+    errorMessage: document.querySelector('#error-message')
   };
 
   if (elements.loginButton) elements.loginButton.addEventListener('click', login);
@@ -381,16 +432,22 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log("File upload element:", elements.fileUpload);
   console.log("File name element:", elements.fileName);
 
-   if (elements.fileUpload && elements.fileName) {
+  Object.entries(elements).forEach(([key, value]) => {
+    console.log(`${key}: ${value ? "Found" : "Not found"}`);
+  });
+
+  if (elements.fileUpload && elements.fileName) {
+    console.log("Adding event listener to file upload");
     elements.fileUpload.addEventListener('change', (event) => {
       console.log("File upload changed");
       const file = event.target.files[0];
       console.log("File:", file);
-      if (file) {
+      if (file && elements.fileName) {
+        console.log("Attempting to set fileName.textContent");
         elements.fileName.textContent = file.name;
         console.log("File name set to:", file.name);
       } else {
-        console.error("No file selected");
+        console.error("No file selected or fileName element not found");
       }
     });
   } else {

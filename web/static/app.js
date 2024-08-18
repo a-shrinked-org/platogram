@@ -42,25 +42,30 @@ function updateUIStatus(status, errorMessage = "") {
   const errorSection = document.getElementById("error-section");
   const doneSection = document.getElementById("done-section");
 
-  inputSection.classList.add("hidden");
-  statusSection.classList.add("hidden");
-  errorSection.classList.add("hidden");
-  doneSection.classList.add("hidden");
+  // Check if elements exist before manipulating them
+  if (inputSection) inputSection.classList.add("hidden");
+  if (statusSection) statusSection.classList.add("hidden");
+  if (errorSection) errorSection.classList.add("hidden");
+  if (doneSection) doneSection.classList.add("hidden");
 
   switch (status) {
     case "running":
-      statusSection.classList.remove("hidden");
+      if (statusSection) statusSection.classList.remove("hidden");
       break;
     case "done":
-      doneSection.classList.remove("hidden");
+      if (doneSection) doneSection.classList.remove("hidden");
       break;
     case "idle":
-      inputSection.classList.remove("hidden");
+      if (inputSection) inputSection.classList.remove("hidden");
       break;
     case "error":
-      errorSection.classList.remove("hidden");
-      errorSection.querySelector("p").textContent =
-        errorMessage || "An error occurred. Please try again.";
+      if (errorSection) {
+        errorSection.classList.remove("hidden");
+        const errorParagraph = errorSection.querySelector("p");
+        if (errorParagraph) {
+          errorParagraph.textContent = errorMessage || "An error occurred. Please try again.";
+        }
+      }
       break;
   }
 }
@@ -68,12 +73,11 @@ function updateUIStatus(status, errorMessage = "") {
 // Update UI based on authentication state
 async function updateUI() {
   const isAuthenticated = await auth0Client.isAuthenticated();
-  document
-    .getElementById("login-button")
-    .classList.toggle("hidden", isAuthenticated);
-  document
-    .getElementById("logout-button")
-    .classList.toggle("hidden", !isAuthenticated);
+  const loginButton = document.getElementById("login-button");
+  const logoutButton = document.getElementById("logout-button");
+
+  if (loginButton) loginButton.classList.toggle("hidden", isAuthenticated);
+  if (logoutButton) logoutButton.classList.toggle("hidden", !isAuthenticated);
 
   if (isAuthenticated) {
     const user = await auth0Client.getUser();

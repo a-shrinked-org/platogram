@@ -41,6 +41,7 @@ function updateUIStatus(status, errorMessage = "") {
   const statusSection = document.getElementById("status-section");
   const errorSection = document.getElementById("error-section");
   const doneSection = document.getElementById("done-section");
+  const processingStage = document.getElementById("processing-stage");
 
   // Check if elements exist before manipulating them
   if (inputSection) inputSection.classList.add("hidden");
@@ -52,7 +53,6 @@ function updateUIStatus(status, errorMessage = "") {
     case "running":
       if (statusSection) {
         statusSection.classList.remove("hidden");
-        const processingStage = document.getElementById("processing-stage");
         if (processingStage) {
           processingStage.textContent = processingStages[currentStageIndex];
         }
@@ -78,6 +78,11 @@ function updateUIStatus(status, errorMessage = "") {
 
 // Update UI based on authentication state
 async function updateUI() {
+  if (!auth0Client) {
+    console.error("Auth0 client not initialized");
+    return;
+  }
+
   const isAuthenticated = await auth0Client.isAuthenticated();
   const loginButton = document.getElementById("login-button");
   const logoutButton = document.getElementById("logout-button");
@@ -97,6 +102,10 @@ async function updateUI() {
 
 async function reset() {
   try {
+    if (!auth0Client) {
+      throw new Error("Auth0 client not initialized");
+    }
+
     const token = await auth0Client.getTokenSilently({
       audience: "https://platogram.vercel.app",
     });
@@ -114,7 +123,8 @@ async function reset() {
     }
 
     // Clear input fields
-    document.getElementById("url-input").value = "";
+    const urlInput = document.getElementById("url-input");
+    if (urlInput) urlInput.value = "";
 
     // Poll status after reset
     pollStatus(token);
@@ -131,65 +141,80 @@ async function onDonateClick() {
 
 // Handle the 'Convert' button click
 async function onConvertClick() {
-  const inputData = getInputData();
-  if (await auth0Client.isAuthenticated()) {
-    // Create and show the language selection modal
-    const modal = document.createElement('div');
-    modal.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    `;
+  try {
+    if (!auth0Client) {
+      throw new Error("Auth0 client not initialized");
+    }
 
-    const modalContent = document.createElement('div');
-    modalContent.style.cssText = `
-      background-color: white;
-      padding: 20px;
-      border-radius: 5px;
-      text-align: center;
-    `;
-
-    modalContent.innerHTML = `
-      <h3>Select Language</h3>
-      <button id="en-btn">English</button>
-      <button id="es-btn">Spanish</button>
-      <button id="cancel-btn">Cancel</button>
-    `;
-
-    modal.appendChild(modalContent);
-    document.body.appendChild(modal);
-
-    // Handle language selection
-    const handleLanguageSelection = async (lang) => {
-      document.body.removeChild(modal);
-      await postToConvert(inputData, lang);
-    };
-
-    document.getElementById('en-btn').onclick = () => handleLanguageSelection('en');
-    document.getElementById('es-btn').onclick = () => handleLanguageSelection('es');
-    document.getElementById('cancel-btn').onclick = () => document.body.removeChild(modal);
-  } else {
-    login();
+    const inputData = getInputData();
+    if (await auth0Client.isAuthenticated()) {
+      showLanguageSelectionModal(inputData);
+    } else {
+      login();
+    }
+  } catch (error) {
+    console.error("Error in onConvertClick:", error);
+    updateUIStatus("error", "An error occurred. Please try again.");
   }
+}
+
+function showLanguageSelectionModal(inputData) {
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  `;
+
+  const modalContent = document.createElement('div');
+  modalContent.style.cssText = `
+    background-color: white;
+    padding: 20px;
+    border-radius: 5px;
+    text-align: center;
+  `;
+
+  modalContent.innerHTML = `
+    <h3>Select Language</h3>
+    <button id="en-btn">English</button>
+    <button id="es-btn">Spanish</button>
+    <button id="cancel-btn">Cancel</button>
+  `;
+
+  modal.appendChild(modalContent);
+  document.body.appendChild(modal);
+
+  // Handle language selection
+  const handleLanguageSelection = async (lang) => {
+    document.body.removeChild(modal);
+    await postToConvert(inputData, lang);
+  };
+
+  document.getElementById('en-btn').onclick = () => handleLanguageSelection('en');
+  document.getElementById('es-btn').onclick = () => handleLanguageSelection('es');
+  document.getElementById('cancel-btn').onclick = () => document.body.removeChild(modal);
 }
 
 // Get input data (URL or File)
 function getInputData() {
-  const urlInput = document.getElementById("url-input").value;
-  const fileInput = document.getElementById("file-upload").files[0];
-  return urlInput || fileInput;
+  const urlInput = document.getElementById("url-input");
+  const fileInput = document.getElementById("file-upload");
+  return (urlInput && urlInput.value) || (fileInput && fileInput.files[0]);
 }
 
 // Login
 async function login() {
   try {
+    if (!auth0Client) {
+      throw new Error("Auth0 client not initialized");
+    }
     await auth0Client.loginWithRedirect({
       authorizationParams: {
         redirect_uri: window.location.origin,
@@ -197,12 +222,16 @@ async function login() {
     });
   } catch (error) {
     console.error("Error logging in:", error);
+    updateUIStatus("error", "Failed to log in. Please try again.");
   }
 }
 
 // Logout
 async function logout() {
   try {
+    if (!auth0Client) {
+      throw new Error("Auth0 client not initialized");
+    }
     await auth0Client.logout({
       logoutParams: {
         returnTo: window.location.origin,
@@ -210,6 +239,7 @@ async function logout() {
     });
   } catch (error) {
     console.error("Error logging out:", error);
+    updateUIStatus("error", "Failed to log out. Please try again.");
   }
 }
 
@@ -237,6 +267,10 @@ async function postToConvert(inputData, lang) {
   try {
     updateUIStatus("running", "Starting conversion process...");
 
+    if (!auth0Client) {
+      throw new Error("Auth0 client not initialized");
+    }
+
     const token = await auth0Client.getTokenSilently({
       audience: "https://platogram.vercel.app",
     });
@@ -261,7 +295,7 @@ async function postToConvert(inputData, lang) {
 
     if (result.message === "Conversion started") {
       updateUIStatus("running", "Conversion started. Processing your request...");
-      await pollStatus();
+      await pollStatus(token);
     } else {
       throw new Error("Unexpected response from server");
     }
@@ -271,14 +305,24 @@ async function postToConvert(inputData, lang) {
   }
 }
 
-async function pollStatus() {
+async function pollStatus(token) {
   try {
-    const result = await apiCall("/status");
+    const response = await fetch("/status", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
     console.log("Polling status response:", result);
 
     if (result.status === "running") {
       updateUIStatus("running", "Processing your request...");
-      setTimeout(pollStatus, 5000);  // Poll again in 5 seconds
+      setTimeout(() => pollStatus(token), 5000);  // Poll again in 5 seconds
     } else if (result.status === "idle") {
       updateUIStatus("idle", "Ready for new conversion");
     } else if (result.status === "failed") {
@@ -297,9 +341,13 @@ async function pollStatus() {
     updateUIStatus("error", error.message || "An error occurred while checking status");
   }
 }
+
 function updateProcessingStage() {
-  document.getElementById('processing-stage').textContent = processingStages[currentStageIndex];
-  currentStageIndex = (currentStageIndex + 1) % processingStages.length;
+  const processingStage = document.getElementById('processing-stage');
+  if (processingStage) {
+    processingStage.textContent = processingStages[currentStageIndex];
+    currentStageIndex = (currentStageIndex + 1) % processingStages.length;
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -340,22 +388,16 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(updateProcessingStage, 3000);
   updateProcessingStage(); // Initial update
 
- // Initialize Auth0
+  // Initialize Auth0
   initAuth0().catch((error) => console.error("Error initializing app:", error));
-
-  // Set up interval for updating processing stage
-  setInterval(() => {
-    currentStageIndex = (currentStageIndex + 1) % processingStages.length;
-    const processingStage = document.getElementById("processing-stage");
-    if (processingStage) {
-      processingStage.textContent = processingStages[currentStageIndex];
-    }
-  }, 3000);
 });
 
-// Test Auth function (you might want to add this if it's not already present)
 async function testAuth() {
   try {
+    if (!auth0Client) {
+      throw new Error("Auth0 client not initialized");
+    }
+
     const token = await auth0Client.getTokenSilently({
       audience: "https://platogram.vercel.app",
     });
@@ -374,6 +416,3 @@ async function testAuth() {
     alert("Auth test failed. Check console for details.");
   }
 }
-
-// Add event listener for the test auth button
-document.getElementById('test-auth-button').addEventListener('click', testAuth);

@@ -15,11 +15,13 @@ from datetime import datetime
 from typing import Literal, Optional
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
+
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, Form, File, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from starlette.staticfiles import StaticFiles
+from pydantic import BaseModel
 from fastapi.security import OAuth2PasswordBearer
 from concurrent.futures import ProcessPoolExecutor
 
@@ -74,7 +76,7 @@ Language = Literal["en", "es"]
 
 class ConversionRequest(BaseModel):
     payload: str
-    lang: Language = "en"
+    lang: str = "en"
 
 class Task(BaseModel):
     start_time: datetime

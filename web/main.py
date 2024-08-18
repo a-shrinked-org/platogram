@@ -1,68 +1,51 @@
+import asyncio
+import base64
 import os
 import re
-import jwt
-import asyncio
-import httpx
 import tempfile
-import logfire
 import time
-import smtplib
-import logging
-import yt_dlp
-from pathlib import Path
-from uuid import uuid4
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
+from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from pathlib import Path
 from typing import Literal, Optional
+from uuid import uuid4
+
+import httpx
+import jwt
+import logfire
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
-
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, Form, File, BackgroundTasks, Request
-from fastapi.responses import JSONResponse, RedirectResponse, FileResponse
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+)
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordBearer
-from starlette.staticfiles import StaticFiles
 from pydantic import BaseModel
-from fastapi.security import OAuth2PasswordBearer
-from concurrent.futures import ProcessPoolExecutor
+from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 import platogram as plato
-from platogram import llm, asr
 
-# Setup logging
-logger = logging.getLogger("platogram")
-logger.setLevel(logging.DEBUG)
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-ch.setFormatter(formatter)
-logger.addHandler(ch)
-
-# Retrieve API keys from environment variables
-ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
-ASSEMBLYAI_API_KEY = os.getenv('ASSEMBLYAI_API_KEY')
-
-if not ANTHROPIC_API_KEY or not ASSEMBLYAI_API_KEY:
-    raise RuntimeError("API keys not set in environment variables.")
-
-# Logfire configuration
-logfire_token = os.getenv('LOGFIRE_TOKEN')
-if logfire_token:
-    logfire.configure(token=logfire_token)
-else:
-    try:
-        logfire.configure()
-    except Exception as e:
-        logger.error(f"Logfire configuration failed: {e}")
-
+logfire.configure()
 app = FastAPI()
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 AUTH0_DOMAIN = "dev-w0dm4z23pib7oeui.us.auth0.com"
@@ -76,7 +59,7 @@ Language = Literal["en", "es"]
 
 class ConversionRequest(BaseModel):
     payload: str
-    lang: str = "en"
+    lang: Language = "en"
 
 class Task(BaseModel):
     start_time: datetime
@@ -93,46 +76,27 @@ auth0_public_key_cache = {
     "expires_in": 3600,  # Cache expiration time in seconds (1 hour)
 }
 
-# Serve static files
-static_dir = os.path.join(os.path.dirname(__file__), "static")
-if os.path.exists(static_dir):
-    app.mount("/web", StaticFiles(directory=static_dir), name="static")
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logfire.exception(f"An error occurred: {str(exc)}")
-    logger.exception(f"An error occurred: {str(exc)}")
-    return JSONResponse(
-        status_code=500,
-        content={"message": "An internal error occurred", "detail": str(exc)}
-    )
-
 @app.get("/")
-async def root():
-    return RedirectResponse(url="/web/index.html")
-
-@app.get("/web/")
-async def web_root():
-    return FileResponse(os.path.join(static_dir, "index.html"))
+async def index():
+    return FileResponse("web/index.html")
 
 async def get_auth0_public_key():
-    logger.debug("Entering get_auth0_public_key function")
     current_time = time.time()
+
     if (
         auth0_public_key_cache["key"]
         and current_time - auth0_public_key_cache["last_updated"]
         < auth0_public_key_cache["expires_in"]
     ):
-        logger.debug("Returning cached Auth0 public key")
         return auth0_public_key_cache["key"]
 
-    logger.debug("Fetching new Auth0 public key")
     async with httpx.AsyncClient() as client:
         response = await client.get(JWKS_URL)
         response.raise_for_status()
         jwks = response.json()
 
     x5c = jwks["keys"][0]["x5c"][0]
+
     cert = load_pem_x509_certificate(
         f"-----BEGIN CERTIFICATE-----\n{x5c}\n-----END CERTIFICATE-----".encode()
     )
@@ -144,7 +108,6 @@ async def get_auth0_public_key():
     auth0_public_key_cache["key"] = public_key
     auth0_public_key_cache["last_updated"] = current_time
 
-    logger.debug("New Auth0 public key fetched and cached")
     return public_key
 
 async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
@@ -159,16 +122,14 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
         )
         return payload["sub"]
     except jwt.ExpiredSignatureError:
-        logger.warning("Token has expired")
         raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.InvalidAudienceError as e:
-        logger.warning(f"Token audience verification failed: {str(e)}")
-        raise HTTPException(status_code=401, detail=f"Token audience verification failed: {str(e)}")
-    except jwt.InvalidTokenError as e:
-        logger.warning(f"Invalid token: {str(e)}")
-        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+    except jwt.InvalidAudienceError:
+        raise HTTPException(status_code=401, detail="Invalid audience")
+    except jwt.InvalidIssuerError:
+        raise HTTPException(status_code=401, detail="Invalid issuer")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
     except Exception as e:
-        logger.error(f"Couldn't verify token: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Couldn't verify token: {str(e)}") from e
 
 @app.post("/convert")
@@ -192,9 +153,9 @@ async def convert(
             raise HTTPException(status_code=400, detail="Either payload or file must be provided")
 
         if payload is not None:
-            if not payload.strip():  # Check if payload is empty or just whitespace
+            if not payload.strip():
                 raise HTTPException(status_code=400, detail="Empty URL provided")
-            logfire.info(f"Payload received: {payload[:100]}...")  # Log first 100 chars of payload
+            logfire.info(f"Payload received: {payload[:100]}...")
             request = ConversionRequest(payload=payload, lang=lang)
         elif file is not None:
             logfire.info(f"File received: {file.filename}")
@@ -213,10 +174,10 @@ async def convert(
         tasks[user_id] = Task(start_time=datetime.now(), request=request)
         background_tasks.add_task(convert_and_send_with_error_handling, request, user_id)
         logfire.info(f"Conversion started for user {user_id}")
-        return JSONResponse(content={"message": "Conversion started"}, status_code=200)
+        return {"message": "Conversion started"}
     except Exception as e:
         logfire.exception(f"Error in convert endpoint: {str(e)}")
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/status")
 async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
@@ -227,12 +188,7 @@ async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
         return {"status": task.status, "error": task.error if task.status == "failed" else None}
     except Exception as e:
         logfire.exception(f"Error in status endpoint: {str(e)}")
-        logger.exception(f"Error in status endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/test-auth")
-async def test_auth(user_id: str = Depends(verify_token_and_get_user_id)):
-    return {"message": "Auth test successful", "user_id": user_id}
 
 @app.get("/reset")
 @logfire.instrument()
@@ -248,7 +204,6 @@ async def reset(user_id: str = Depends(verify_token_and_get_user_id)):
         return {"message": "Session reset"}
     except Exception as e:
         logfire.exception(f"Error in reset endpoint for user {user_id}: {str(e)}")
-        logger.exception(f"Error in reset endpoint for user {user_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to reset session: {str(e)}")
 
 async def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> tuple[str, str]:
@@ -286,26 +241,18 @@ async def convert_and_send_with_error_handling(request: ConversionRequest, user_
     try:
         await convert_and_send(request, user_id)
         tasks[user_id].status = "done"
-    except HTTPException as e:
-        logfire.exception(f"HTTP error in background task for user {user_id}: {str(e)}")
-        logger.exception(f"HTTP error in background task for user {user_id}: {str(e)}")
-        tasks[user_id].error = str(e)
-        tasks[user_id].status = "failed"
     except Exception as e:
-        logfire.exception(f"Unexpected error in background task for user {user_id}: {str(e)}")
-        logger.exception(f"Unexpected error in background task for user {user_id}: {str(e)}")
-        tasks[user_id].error = "An unexpected error occurred"
+        logfire.exception(f"Error in background task for user {user_id}: {str(e)}")
+        tasks[user_id].error = str(e)
         tasks[user_id].status = "failed"
 
 async def convert_and_send(request: ConversionRequest, user_id: str):
     try:
-        logger.info(f"Starting conversion for user {user_id}")
+        logfire.info(f"Starting conversion for user {user_id}")
 
-        # Initialize models
         language_model = plato.llm.get_model("anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY'))
         speech_recognition_model = plato.asr.get_model("assembly-ai/best", os.getenv('ASSEMBLYAI_API_KEY'))
 
-        # Process audio
         try:
             transcript = plato.extract_transcript(request.payload, speech_recognition_model)
         except Exception as e:
@@ -339,14 +286,10 @@ Suggested donation: $2 per hour of content converted."""
 
             await send_email(user_id, subject, body, files)
 
-    except ImportError as e:
-        logger.exception(f"Import error for user {user_id}: {str(e)}")
-        logfire.exception(f"Import error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Import error: {str(e)}. Please contact support.")
     except Exception as e:
-        logger.exception(f"Conversion failed for user {user_id}: {str(e)}")
-        logfire.exception(f"Conversion and sending failed: {str(e)}")
+        logfire.exception(f"Conversion failed for user {user_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to convert and send transcript: {str(e)}")
+
 def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):
     smtp_user = os.getenv("PLATOGRAM_SMTP_USER")
     smtp_server = os.getenv("PLATOGRAM_SMTP_SERVER")

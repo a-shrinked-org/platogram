@@ -361,43 +361,43 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log("DOM Content Loaded");
 
   const elements = {
-    loginButton: document.getElementById('login-button'),
-    logoutButton: document.getElementById('logout-button'),
-    convertButton: document.getElementById('convert-button'),
-    donateButton: document.getElementById('donate-button'),
-    donateButtonStatus: document.getElementById('donate-button-status'),
-    resetButton: document.getElementById('reset-button'),
-    resetButtonError: document.getElementById('reset-button-error'),
-    testAuthButton: document.getElementById('test-auth-button'),
-    fileUpload: document.getElementById('file-upload')
-  };
+        loginButton: document.getElementById('login-button'),
+        logoutButton: document.getElementById('logout-button'),
+        convertButton: document.getElementById('convert-button'),
+        donateButton: document.getElementById('donate-button'),
+        donateButtonStatus: document.getElementById('donate-button-status'),
+        resetButton: document.getElementById('reset-button'),
+        resetButtonError: document.getElementById('reset-button-error'),
+        testAuthButton: document.getElementById('test-auth-button'),
+        fileUpload: document.getElementById('file-upload'),
+        fileName: document.getElementById('file-name'), // Added reference to file-name
+    };
 
-  if (elements.loginButton) elements.loginButton.addEventListener('click', login);
-  if (elements.logoutButton) elements.logoutButton.addEventListener('click', logout);
-  if (elements.convertButton) elements.convertButton.addEventListener('click', onConvertClick);
-  if (elements.donateButton) elements.donateButton.addEventListener('click', onDonateClick);
-  if (elements.donateButtonStatus) elements.donateButtonStatus.addEventListener('click', onDonateClick);
-  if (elements.resetButton) elements.resetButton.addEventListener('click', reset);
-  if (elements.resetButtonError) elements.resetButtonError.addEventListener('click', reset);
-  if (elements.testAuthButton) elements.testAuthButton.addEventListener('click', testAuth);
+    if (elements.loginButton) elements.loginButton.addEventListener('click', login);
+    if (elements.logoutButton) elements.logoutButton.addEventListener('click', logout);
+    if (elements.convertButton) elements.convertButton.addEventListener('click', onConvertClick);
+    if (elements.donateButton) elements.donateButton.addEventListener('click', onDonateClick);
+    if (elements.donateButtonStatus) elements.donateButtonStatus.addEventListener('click', onDonateClick);
+    if (elements.resetButton) elements.resetButton.addEventListener('click', reset);
+    if (elements.resetButtonError) elements.resetButtonError.addEventListener('click', reset);
+    if (elements.testAuthButton) elements.testAuthButton.addEventListener('click', testAuth);
 
-  if (elements.fileUpload) {
-    elements.fileUpload.addEventListener('change', (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        const fileNameElement = document.getElementById('file-name');
-        if (fileNameElement) {
-          fileNameElement.textContent = file.name;
-        } else {
-          console.warn("File name element not found");
-        }
-      }
+    if (elements.fileUpload) {
+        elements.fileUpload.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                if (elements.fileName) {
+                    elements.fileName.textContent = file.name;
+                } else {
+                    console.warn("File name element not found");
+                }
+            }
+        });
+    }
+
+    Object.entries(elements).forEach(([key, value]) => {
+        if (!value) console.warn(`${key} not found`);
     });
-  }
-
-  Object.entries(elements).forEach(([key, value]) => {
-    if (!value) console.warn(`${key} not found`);
-  });
 
   safeUpdateProcessingStage();
   initializeProcessingStage();

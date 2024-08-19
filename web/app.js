@@ -206,7 +206,14 @@ async function postToConvert(inputData, lang) {
   const formData = new FormData();
   formData.append('lang', lang);
 
+  const maxSizeMB = 10; // Adjust based on server limit
+
   if (inputData.file) {
+    const fileSizeMB = inputData.file.size / (1024 * 1024);
+    if (fileSizeMB > maxSizeMB) {
+      updateUIStatus("error", `File size exceeds ${maxSizeMB}MB limit. Please choose a smaller file.`);
+      return;
+    }
     formData.append('file', inputData.file);
   } else if (inputData.url) {
     formData.append("payload", inputData.url);
@@ -236,6 +243,9 @@ async function postToConvert(inputData, lang) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Server error response:", errorText);
+      if (response.status === 413) {
+        throw new Error("File size too large. Please choose a smaller file or use a URL for large audio files.");
+      }
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
     }
 
@@ -257,6 +267,15 @@ async function postToConvert(inputData, lang) {
 function getInputData() {
   const urlInput = document.getElementById("url-input");
   const fileNameElement = document.getElementById("file-name");
+  const maxSizeMB = 10; // Adjust based on server limit
+
+  if (fileNameElement && fileNameElement.file) {
+    const fileSizeMB = fileNameElement.file.size / (1024 * 1024);
+    if (fileSizeMB > maxSizeMB) {
+      throw new Error(`File size exceeds ${maxSizeMB}MB limit. Please choose a smaller file.`);
+    }
+  }
+
   return {
     url: urlInput ? urlInput.value.trim() : '',
     file: fileNameElement && fileNameElement.file ? fileNameElement.file : null
@@ -288,7 +307,6 @@ async function logout() {
 }
 
 function showLanguageSelectionModal(inputData) {
-  debugLog("Showing language selection modal");
   const modal = document.getElementById('language-modal');
   if (!modal) {
     console.error("Language modal not found in the DOM");
@@ -296,6 +314,7 @@ function showLanguageSelectionModal(inputData) {
   }
 
   modal.classList.remove('hidden');
+  modal.style.display = 'block'; // or 'flex', depending on your layout
 
   const handleLanguageSelection = async (lang) => {
     debugLog(`Language selected: ${lang}`);

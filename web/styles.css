@@ -434,3 +434,8 @@ footer a:hover {
 .modal.hidden {
   display: none;
 }
+
+/* When visible */
+.modal:not(.hidden) {
+  display: block; /* or flex, depending on your layout needs */
+}

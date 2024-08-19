@@ -288,33 +288,27 @@ async function logout() {
 }
 
 function showLanguageSelectionModal(inputData) {
-  let modal = document.getElementById('language-modal');
+  debugLog("Showing language selection modal");
+  const modal = document.getElementById('language-modal');
   if (!modal) {
-    // Create the modal if it doesn't exist
-    modal = document.createElement('div');
-    modal.id = 'language-modal';
-    modal.className = 'modal hidden';
-    modal.innerHTML = `
-      <div class="modal-content">
-        <h3>Select Language</h3>
-        <button id="en-btn">English</button>
-        <button id="es-btn">Spanish</button>
-        <button id="cancel-btn">Cancel</button>
-      </div>
-    `;
-    document.body.appendChild(modal);
+    console.error("Language modal not found in the DOM");
+    return;
   }
 
   modal.classList.remove('hidden');
 
   const handleLanguageSelection = async (lang) => {
+    debugLog(`Language selected: ${lang}`);
     modal.classList.add('hidden');
     await postToConvert(inputData, lang);
   };
 
   document.getElementById('en-btn').onclick = () => handleLanguageSelection('en');
   document.getElementById('es-btn').onclick = () => handleLanguageSelection('es');
-  document.getElementById('cancel-btn').onclick = () => modal.classList.add('hidden');
+  document.getElementById('cancel-btn').onclick = () => {
+    debugLog("Language selection cancelled");
+    modal.classList.add('hidden');
+  };
 }
 
 async function pollStatus(token) {

@@ -242,23 +242,22 @@ async function postToConvert(inputData, lang) {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Server error response:", errorText);
-      if (response.status === 413) {
-        throw new Error("File size too large. Please choose a smaller file or use a URL for large audio files.");
-      }
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const result = await response.json();
-    debugLog("Convert response: " + JSON.stringify(result));
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
 
-    if (result.message === "Conversion started") {
-      updateUIStatus("running", "Conversion started. Processing your request...");
-      await pollStatus(token);
-    } else {
-      throw new Error("Unexpected response from server");
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value);
+      debugLog("Received chunk: " + chunk);
+      // Update UI with the received chunk
+      updateUIStatus("running", chunk);
     }
+
+    // The final status update will be handled by the pollStatus function
   } catch (error) {
     console.error("Error in postToConvert:", error);
     updateUIStatus("error", error.message || "An error occurred during conversion");

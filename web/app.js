@@ -556,39 +556,34 @@ document.addEventListener('DOMContentLoaded', () => {
   initAuth0().catch((error) => console.error("Error initializing app:", error));
 });
 
+let fileInput; // Объявляем переменную для хранения элемента fileInput
 function handleFileUpload() {
   const fileNameElement = document.getElementById('file-name');
   const urlInput = document.getElementById('url-input');
-
-  // Create a new file input element
-  const fileInput = document.createElement('input');
-  fileInput.type = 'file';
-  fileInput.accept = '.srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a';
-  fileInput.style.display = 'none';
-
-  // Add the file input to the document body
-  document.body.appendChild(fileInput);
-
-  // Trigger the file selection dialog
+  if (!fileInput) {
+    // Создаем элемент fileInput только один раз
+    fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a';
+    fileInput.style.display = 'none';
+    // Добавляем элемент в body
+    document.body.appendChild(fileInput);
+    // Добавляем обработчик изменения только один раз
+    fileInput.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        fileNameElement.textContent = file.name;
+        fileNameElement.file = file; // Сохраняем объект File
+        urlInput.value = ''; // Очищаем URL input при выборе файла
+        debugLog("File selected: " + file.name);
+      } else {
+        fileNameElement.textContent = '';
+        fileNameElement.file = null; // Очищаем сохраненный объект File
+        debugLog("No file selected");
+      }
+    }, { once: true }); // Обработчик с опцией { once: true } для удаления после первого вызова
+  }
   fileInput.click();
-
-  // Handle the file selection
-  fileInput.addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      fileNameElement.textContent = file.name;
-      fileNameElement.file = file; // Store the File object
-      urlInput.value = ''; // Clear URL input when file is selected
-      debugLog("File selected: " + file.name);
-    } else {
-      fileNameElement.textContent = '';
-      fileNameElement.file = null; // Clear the stored File object
-      debugLog("No file selected");
-    }
-
-    // Remove the temporary file input
-    fileInput.remove();
-  }, { once: true });
 }
 
 // Ensure all functions are in global scope

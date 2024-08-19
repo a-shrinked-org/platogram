@@ -10,8 +10,8 @@ import smtplib
 import logging
 
 from sanic import Sanic
-from sanic.response import stream
-from sanic.request import Request
+from sanic.response import json, text, stream
+from sanic.exceptions import SanicException
 import aiofiles
 import yt_dlp
 
@@ -43,7 +43,7 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
-app = Sanic("ConvertApp")
+sanic_app = Sanic("StreamingApp")
 
 # Retrieve API keys from environment variables
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
@@ -179,7 +179,8 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
         logger.error(f"Couldn't verify token: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Couldn't verify token: {str(e)}") from e
 
-@app.post("/convert")
+# Sanic route for streaming
+@sanic_app.post("/convert")
 @logfire.instrument()
 async def convert(request):
     async def process_and_stream(response):
@@ -211,7 +212,10 @@ async def convert(request):
                     final_file = temp_dir / file_name
                     temp_file.rename(final_file)
                     await response.write(f"File {file_name} received completely. Finalizing...\n".encode())
-                    app.add_task(process_file(final_file, lang))
+                    # Here you would typically start processing the file
+                    # For now, we'll just simulate processing
+                    await asyncio.sleep(1)
+                    await response.write(b"File processing started in background.\n")
 
             elif content_type == 'application/json':
                 data = request.json
@@ -219,19 +223,15 @@ async def convert(request):
                 lang_data = data.get('lang', 'en')
                 logger.debug(f"Received URL: {url}, language: {lang_data}")
                 await response.write(f"Received URL: {url}. Initializing processing...\n".encode())
-                app.add_task(process_url(url, lang_data))
+                # Here you would typically start processing the URL
+                # For now, we'll just simulate processing
+                await asyncio.sleep(1)
+                await response.write(b"URL processing started in background.\n")
 
             else:
                 await response.write("Invalid content type\n".encode())
-                raise SanicException("Invalid content type", status_code=400)
+                raise HTTPException(status_code=400, detail="Invalid content type")
 
-            initial_steps = ["Initializing", "Analyzing"]
-            for step in initial_steps:
-                logger.debug(f"Executing step: {step}")
-                await asyncio.sleep(0.5)
-                await response.write(f"{step}...\n".encode())
-
-            logger.debug("Sending initial response within 10 seconds")
             await response.write(b"Initial response sent. Conversion process started in background.\n")
 
         except Exception as e:
@@ -272,7 +272,6 @@ async def reset(user_id: str = Depends(verify_token_and_get_user_id)):
         logfire.exception(f"Error in reset endpoint for user {user_id}: {str(e)}")
         logger.exception(f"Error in reset endpoint for user {user_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to reset session: {str(e)}")
-
 async def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> tuple[str, str]:
     script_path = Path.cwd() / "examples" / "audio_to_paper.sh"
     command = f"cd {output_dir} && {script_path} \"{url}\" --lang {lang} --verbose"

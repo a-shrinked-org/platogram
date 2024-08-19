@@ -14,7 +14,7 @@ from sanic.response import stream
 from sanic.request import Request
 import aiofiles
 import yt_dlp
-from flask import Flask, request
+
 from pathlib import Path
 from uuid import uuid4
 from datetime import datetime
@@ -42,9 +42,6 @@ ch.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 logger.addHandler(ch)
-
-app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB
 
 app = Sanic("ConvertApp")
 
@@ -184,69 +181,64 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
 
 @app.post("/convert")
 @logfire.instrument()
-async def convert(request: Request, background_tasks: BackgroundTasks):
-    async def process_and_stream():
+async def convert(request):
+    async def process_and_stream(response):
         try:
             logger.debug("Starting process_and_stream")
 
-            # Step 1: Quick initialization steps
-            headers = request.headers
-            content_type = headers.get('content-type', '')
+            content_type = request.headers.get('content-type', '')
             logger.debug(f"Content type: {content_type}")
 
             if content_type == 'application/octet-stream':
-                file_name = headers.get('X-File-Name')
-                chunk_index = int(headers.get('X-Chunk-Index', 0))
-                total_chunks = int(headers.get('X-Total-Chunks', 1))
-                lang = headers.get('X-Language', 'en')
+                file_name = request.headers.get('X-File-Name')
+                chunk_index = int(request.headers.get('X-Chunk-Index', 0))
+                total_chunks = int(request.headers.get('X-Total-Chunks', 1))
+                lang = request.headers.get('X-Language', 'en')
                 logger.debug(f"Received file upload - {file_name}, chunk {chunk_index + 1} of {total_chunks}, language {lang}")
-                yield f"Received chunk {chunk_index + 1} of {total_chunks}\n".encode()
+                await response.write(f"Received chunk {chunk_index + 1} of {total_chunks}\n".encode())
 
-                # File upload handling
                 temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
                 temp_dir.mkdir(parents=True, exist_ok=True)
                 temp_file = temp_dir / f"{file_name}.part"
 
-                chunk = await request.body()
+                chunk = request.body
                 with open(temp_file, 'ab') as f:
                     f.write(chunk)
 
-                yield f"Chunk {chunk_index + 1} written to temp storage\n".encode()
+                await response.write(f"Chunk {chunk_index + 1} written to temp storage\n".encode())
 
                 if chunk_index == total_chunks - 1:
-                    # All chunks received, process the file
                     final_file = temp_dir / file_name
                     temp_file.rename(final_file)
-                    yield f"File {file_name} received completely. Finalizing...\n".encode()
-                    background_tasks.add_task(process_file, final_file, lang)
+                    await response.write(f"File {file_name} received completely. Finalizing...\n".encode())
+                    app.add_task(process_file(final_file, lang))
 
             elif content_type == 'application/json':
-                data = await request.json()
+                data = request.json
                 url = data.get('url')
                 lang_data = data.get('lang', 'en')
                 logger.debug(f"Received URL: {url}, language: {lang_data}")
-                yield f"Received URL: {url}. Initializing processing...\n".encode()
-                background_tasks.add_task(process_url, url, lang_data)
+                await response.write(f"Received URL: {url}. Initializing processing...\n".encode())
+                app.add_task(process_url(url, lang_data))
 
             else:
-                yield "Invalid content type\n".encode()
-                raise HTTPException(status_code=400, detail="Invalid content type")
+                await response.write("Invalid content type\n".encode())
+                raise SanicException("Invalid content type", status_code=400)
 
-            # Step 2: Quick initial steps
             initial_steps = ["Initializing", "Analyzing"]
             for step in initial_steps:
                 logger.debug(f"Executing step: {step}")
-                await asyncio.sleep(0.5)  # Reduced sleep time
-                yield f"{step}...\n".encode()
+                await asyncio.sleep(0.5)
+                await response.write(f"{step}...\n".encode())
 
             logger.debug("Sending initial response within 10 seconds")
-            yield b"Initial response sent. Conversion process started in background.\n"
+            await response.write(b"Initial response sent. Conversion process started in background.\n")
 
         except Exception as e:
             logger.error(f"Error in process_and_stream: {str(e)}")
-            yield f"Error: {str(e)}\n".encode()
+            await response.write(f"Error: {str(e)}\n".encode())
 
-    return StreamingResponse(process_and_stream(), media_type="text/plain")
+    return stream(process_and_stream, content_type='text/plain')
 
 @app.get("/status")
 async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:

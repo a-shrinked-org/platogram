@@ -8,6 +8,11 @@ import logfire
 import time
 import smtplib
 import logging
+
+from sanic import Sanic
+from sanic.response import stream
+from sanic.request import Request
+import aiofiles
 import yt_dlp
 from flask import Flask, request
 from pathlib import Path
@@ -40,6 +45,8 @@ logger.addHandler(ch)
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB
+
+app = Sanic("ConvertApp")
 
 # Retrieve API keys from environment variables
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
@@ -193,7 +200,6 @@ async def convert(request: Request, background_tasks: BackgroundTasks):
                 total_chunks = int(headers.get('X-Total-Chunks', 1))
                 lang = headers.get('X-Language', 'en')
                 logger.debug(f"Received file upload - {file_name}, chunk {chunk_index + 1} of {total_chunks}, language {lang}")
-
                 yield f"Received chunk {chunk_index + 1} of {total_chunks}\n".encode()
 
                 # File upload handling
@@ -221,6 +227,7 @@ async def convert(request: Request, background_tasks: BackgroundTasks):
                 logger.debug(f"Received URL: {url}, language: {lang_data}")
                 yield f"Received URL: {url}. Initializing processing...\n".encode()
                 background_tasks.add_task(process_url, url, lang_data)
+
             else:
                 yield "Invalid content type\n".encode()
                 raise HTTPException(status_code=400, detail="Invalid content type")
@@ -303,18 +310,20 @@ async def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: st
     return stdout.decode(), stderr.decode()
 
 async def process_file(file_path: Path, lang: str):
-    logger.debug(f"Processing file: {file_path}, language: {lang}")
-    # Implement your file processing logic here
-    # Simulate a delay to mock long processing
-    await asyncio.sleep(2)
-    logger.debug(f"File processed: {file_path}")
+    # Simulating file processing
+    steps = ["Initializing", "Processing", "Finalizing"]
+    for step in steps:
+        yield f"{step}...\n"
+        await asyncio.sleep(1)  # Simulate work
+    yield f"File {file_path} processed with language {lang}\n"
 
 async def process_url(url: str, lang: str):
-    logger.debug(f"Processing URL: {url}, language: {lang}")
-    # Implement your URL processing logic here
-    # Simulate a delay to mock long processing
-    await asyncio.sleep(2)
-    logger.debug(f"URL processed: {url}")
+    # Simulating URL processing
+    steps = ["Fetching URL", "Analyzing Content", "Converting"]
+    for step in steps:
+        yield f"{step}...\n"
+        await asyncio.sleep(1)  # Simulate work
+    yield f"URL {url} processed with language {lang}\n"
 
 async def send_email(user_id: str, subj: str, body: str, files: list[Path]):
     loop = asyncio.get_running_loop()

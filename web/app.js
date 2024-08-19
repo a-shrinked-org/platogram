@@ -436,6 +436,38 @@ document.addEventListener('DOMContentLoaded', () => {
   initAuth0().catch((error) => console.error("Error initializing app:", error));
 });
 
+let fileUploadListenerAdded = false;
+
+document.addEventListener('DOMContentLoaded', () => {
+  debugLog("DOM Content Loaded");
+
+  const uploadIcon = document.querySelector('.upload-icon');
+  const fileNameElement = document.getElementById('file-name');
+  const urlInput = document.getElementById('url-input');
+
+  if (uploadIcon && fileNameElement && urlInput && !fileUploadListenerAdded) {
+    // Remove any existing listeners
+    uploadIcon.replaceWith(uploadIcon.cloneNode(true));
+    const newUploadIcon = document.querySelector('.upload-icon');
+
+    // Add the event listener
+    newUploadIcon.addEventListener('click', handleFileUpload, { once: true });
+    fileUploadListenerAdded = true;
+
+    urlInput.addEventListener('input', () => {
+      if (urlInput.value.trim() !== '') {
+        fileNameElement.textContent = ''; // Clear file name when URL is entered
+        fileNameElement.file = null; // Clear the stored File object
+      }
+    });
+  } else {
+    console.error("One or more elements for file upload not found or listener already added");
+  }
+
+  // Initialize other parts of your application
+  initAuth0().catch((error) => console.error("Error initializing app:", error));
+});
+
 function handleFileUpload() {
   const fileNameElement = document.getElementById('file-name');
   const urlInput = document.getElementById('url-input');
@@ -443,7 +475,7 @@ function handleFileUpload() {
   // Remove any existing file input
   const existingFileInput = document.getElementById('temp-file-input');
   if (existingFileInput) {
-    document.body.removeChild(existingFileInput);
+    existingFileInput.remove();
   }
 
   const fileInput = document.createElement('input');
@@ -467,8 +499,14 @@ function handleFileUpload() {
       fileNameElement.file = null; // Clear the stored File object
       debugLog("No file selected");
     }
-    document.body.removeChild(fileInput);
-  });
+    fileInput.remove();
+  }, { once: true });
+
+  // Re-add the event listener for future uploads
+  const uploadIcon = document.querySelector('.upload-icon');
+  if (uploadIcon) {
+    uploadIcon.addEventListener('click', handleFileUpload, { once: true });
+  }
 }
 
 // Ensure all functions are in global scope

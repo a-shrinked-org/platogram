@@ -1,9 +1,5 @@
 let auth0Client = null;
 
-function debugLog(message) {
-  console.log(`[DEBUG] ${message}`);
-}
-
 const processingStages = [
   "Byte Whispering", "Qubit Juggling", "Syntax Gymnastics",
   "Pixel Wrangling", "Neuron Tickling", "Algorithm Disco",
@@ -12,6 +8,10 @@ const processingStages = [
 ];
 let currentStageIndex = 0;
 let processingStageInterval;
+
+function debugLog(message) {
+  console.log(`[DEBUG] ${message}`);
+}
 
 async function initAuth0() {
     try {
@@ -25,7 +25,7 @@ async function initAuth0() {
             },
             cacheLocation: "localstorage",
         });
-        console.log("Auth0 client initialized successfully");
+        debugLog("Auth0 client initialized successfully");
 
         const query = window.location.search;
         if (query.includes("code=") && query.includes("state=")) {
@@ -40,7 +40,7 @@ async function initAuth0() {
 }
 
 function updateUIStatus(status, errorMessage = "") {
-  console.log(`Updating UI status: ${status}`);
+  debugLog(`Updating UI status: ${status}`);
   const inputSection = document.getElementById("input-section");
   const statusSection = document.getElementById("status-section");
   const errorSection = document.getElementById("error-section");
@@ -105,7 +105,7 @@ function updateUIStatus(status, errorMessage = "") {
 
 function clearProcessingStageInterval() {
   if (processingStageInterval) {
-    console.log("Clearing processing stage interval");
+    debugLog("Clearing processing stage interval");
     clearInterval(processingStageInterval);
     processingStageInterval = null;
   }
@@ -130,7 +130,7 @@ async function updateUI() {
       audience: "https://platogram.vercel.app",
     });
     pollStatus(token);
-    console.log("Logged in as:", user.email);
+    debugLog("Logged in as: " + user.email);
   }
 }
 
@@ -150,12 +150,10 @@ async function reset() {
     if (!response.ok) throw new Error("Failed to reset");
 
     const urlInput = document.getElementById("url-input");
-    const fileUpload = document.getElementById("file-upload");
-    const fileName = document.getElementById("file-name");
+    const fileNameElement = document.getElementById("file-name");
 
     if (urlInput) urlInput.value = "";
-    if (fileUpload) fileUpload.value = "";
-    if (fileName) fileName.textContent = "";
+    if (fileNameElement) fileNameElement.textContent = "";
 
     pollStatus(token);
   } catch (error) {
@@ -169,8 +167,8 @@ function onDonateClick() {
 }
 
 async function onConvertClick(event) {
-    event.preventDefault();
-    console.log("Convert button clicked");
+    if (event) event.preventDefault();
+    debugLog("Convert button clicked");
 
     try {
         if (!auth0Client) throw new Error("Auth0 client not initialized");
@@ -208,7 +206,15 @@ async function postToConvert(inputData, lang) {
   const formData = new FormData();
   formData.append('lang', lang);
 
+  const maxSizeMB = 50; // Adjust based on server limit
+
   if (inputData.file) {
+    const fileSizeMB = inputData.file.size / (1024 * 1024);
+    console.log(`File size: ${fileSizeMB.toFixed(2)} MB`); // Add this line for debugging
+    if (fileSizeMB > maxSizeMB) {
+      updateUIStatus("error", `File size exceeds ${maxSizeMB}MB limit. Please choose a smaller file.`);
+      return;
+    }
     formData.append('file', inputData.file);
   } else if (inputData.url) {
     formData.append("payload", inputData.url);
@@ -225,7 +231,7 @@ async function postToConvert(inputData, lang) {
     const token = await auth0Client.getTokenSilently({
       audience: "https://platogram.vercel.app",
     });
-    console.log("Obtained token for convert");
+    debugLog("Obtained token for convert");
 
     headers.Authorization = `Bearer ${token}`;
 
@@ -238,11 +244,14 @@ async function postToConvert(inputData, lang) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Server error response:", errorText);
+      if (response.status === 413) {
+        throw new Error("File size too large. Please choose a smaller file or use a URL for large audio files.");
+      }
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
     }
 
     const result = await response.json();
-    console.log("Convert response:", result);
+    debugLog("Convert response: " + JSON.stringify(result));
 
     if (result.message === "Conversion started") {
       updateUIStatus("running", "Conversion started. Processing your request...");
@@ -257,14 +266,12 @@ async function postToConvert(inputData, lang) {
 }
 
 function getInputData() {
-    const urlInput = document.getElementById("url-input");
-    const fileNameElement = document.getElementById("file-name");
-    // We need to store the File object when it's selected
-    const fileObject = fileNameElement.file; // This line assumes we're storing the File object on the element
-    return {
-        url: urlInput ? urlInput.value.trim() : '',
-        file: fileObject || null
-    };
+  const urlInput = document.getElementById("url-input");
+  const fileNameElement = document.getElementById("file-name");
+  return {
+    url: urlInput ? urlInput.value.trim() : '',
+    file: fileNameElement && fileNameElement.file ? fileNameElement.file : null
+  };
 }
 
 async function login() {
@@ -294,20 +301,25 @@ async function logout() {
 function showLanguageSelectionModal(inputData) {
   const modal = document.getElementById('language-modal');
   if (!modal) {
-    console.error("Language modal not found");
+    console.error("Language modal not found in the DOM");
     return;
   }
 
   modal.classList.remove('hidden');
+  modal.style.display = 'block'; // or 'flex', depending on your layout
 
   const handleLanguageSelection = async (lang) => {
+    debugLog(`Language selected: ${lang}`);
     modal.classList.add('hidden');
     await postToConvert(inputData, lang);
   };
 
   document.getElementById('en-btn').onclick = () => handleLanguageSelection('en');
   document.getElementById('es-btn').onclick = () => handleLanguageSelection('es');
-  document.getElementById('cancel-btn').onclick = () => modal.classList.add('hidden');
+  document.getElementById('cancel-btn').onclick = () => {
+    debugLog("Language selection cancelled");
+    modal.classList.add('hidden');
+  };
 }
 
 async function pollStatus(token) {
@@ -321,7 +333,7 @@ async function pollStatus(token) {
     }
 
     const result = await response.json();
-    console.log("Polling status response:", result);
+    debugLog("Polling status response: " + JSON.stringify(result));
 
     switch (result.status) {
       case "running":
@@ -376,14 +388,14 @@ function updateProcessingStage() {
   if (!statusSection.classList.contains('hidden')) {
     processingStage.textContent = processingStages[currentStageIndex];
     currentStageIndex = (currentStageIndex + 1) % processingStages.length;
-    console.log("Updated processing stage to:", processingStages[currentStageIndex]);
+    debugLog("Updated processing stage to: " + processingStages[currentStageIndex]);
   } else {
     console.warn("Status section is hidden. Skipping update.");
   }
 }
 
 function initializeProcessingStage() {
-  console.log("Initializing processing stage");
+  debugLog("Initializing processing stage");
   updateProcessingStage();
   processingStageInterval = setInterval(updateProcessingStage, 3000);
 }
@@ -401,37 +413,14 @@ function safeUpdateProcessingStage() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  console.log("DOM Content Loaded");
+  debugLog("DOM Content Loaded");
 
   const uploadIcon = document.querySelector('.upload-icon');
   const fileNameElement = document.getElementById('file-name');
   const urlInput = document.getElementById('url-input');
 
   if (uploadIcon && fileNameElement && urlInput) {
-    uploadIcon.addEventListener('click', () => {
-      const fileInput = document.createElement('input');
-      fileInput.type = 'file';
-      fileInput.accept = '.srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a';
-      fileInput.style.display = 'none';
-      document.body.appendChild(fileInput);
-
-      fileInput.click();
-
-      fileInput.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (file) {
-          fileNameElement.textContent = file.name;
-          fileNameElement.file = file; // Store the File object
-          urlInput.value = ''; // Clear URL input when file is selected
-          console.log("File selected:", file.name);
-        } else {
-          fileNameElement.textContent = '';
-          fileNameElement.file = null; // Clear the stored File object
-          console.log("No file selected");
-        }
-        document.body.removeChild(fileInput);
-      });
-    });
+    uploadIcon.addEventListener('click', handleFileUpload);
 
     urlInput.addEventListener('input', () => {
       if (urlInput.value.trim() !== '') {
@@ -447,15 +436,46 @@ document.addEventListener('DOMContentLoaded', () => {
   initAuth0().catch((error) => console.error("Error initializing app:", error));
 });
 
-function getInputData() {
-  const urlInput = document.getElementById("url-input");
-  const fileNameElement = document.getElementById("file-name");
-  return {
-    url: urlInput ? urlInput.value.trim() : '',
-    file: fileNameElement && fileNameElement.file ? fileNameElement.file : null
-  };
+function handleFileUpload() {
+  const fileNameElement = document.getElementById('file-name');
+  const urlInput = document.getElementById('url-input');
+
+  // Remove any existing file input
+  const existingFileInput = document.getElementById('temp-file-input');
+  if (existingFileInput) {
+    document.body.removeChild(existingFileInput);
+  }
+
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.id = 'temp-file-input';
+  fileInput.accept = '.srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a';
+  fileInput.style.display = 'none';
+  document.body.appendChild(fileInput);
+
+  fileInput.click();
+
+  fileInput.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      fileNameElement.textContent = file.name;
+      fileNameElement.file = file; // Store the File object
+      urlInput.value = ''; // Clear URL input when file is selected
+      debugLog("File selected: " + file.name);
+    } else {
+      fileNameElement.textContent = '';
+      fileNameElement.file = null; // Clear the stored File object
+      debugLog("No file selected");
+    }
+    document.body.removeChild(fileInput);
+  });
 }
 
-  // Initialize other parts of your application
-  initAuth0().catch((error) => console.error("Error initializing app:", error));
-});
+// Ensure all functions are in global scope
+window.onConvertClick = onConvertClick;
+window.login = login;
+window.logout = logout;
+window.onDonateClick = onDonateClick;
+window.reset = reset;
+window.updateProcessingStage = updateProcessingStage;
+window.initializeProcessingStage = initializeProcessingStage;

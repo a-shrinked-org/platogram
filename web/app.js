@@ -268,15 +268,6 @@ async function postToConvert(inputData, lang) {
 function getInputData() {
   const urlInput = document.getElementById("url-input");
   const fileNameElement = document.getElementById("file-name");
-  const maxSizeMB = 10; // Adjust based on server limit
-
-  if (fileNameElement && fileNameElement.file) {
-    const fileSizeMB = fileNameElement.file.size / (1024 * 1024);
-    if (fileSizeMB > maxSizeMB) {
-      throw new Error(`File size exceeds ${maxSizeMB}MB limit. Please choose a smaller file.`);
-    }
-  }
-
   return {
     url: urlInput ? urlInput.value.trim() : '',
     file: fileNameElement && fileNameElement.file ? fileNameElement.file : null
@@ -429,12 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const urlInput = document.getElementById('url-input');
 
   if (uploadIcon && fileNameElement && urlInput) {
-    // Remove any existing click event listeners
-    uploadIcon.replaceWith(uploadIcon.cloneNode(true));
-    // Get the new uploadIcon reference after replacing
-    const newUploadIcon = document.querySelector('.upload-icon');
-
-    newUploadIcon.addEventListener('click', handleFileUpload);
+    uploadIcon.addEventListener('click', handleFileUpload);
 
     urlInput.addEventListener('input', () => {
       if (urlInput.value.trim() !== '') {
@@ -485,21 +471,6 @@ function handleFileUpload() {
   });
 }
 
-// SYNTAX ERROR: The following block is duplicated and should be removed
-urlInput.addEventListener('input', () => {
-  if (urlInput.value.trim() !== '') {
-    fileNameElement.textContent = ''; // Clear file name when URL is entered
-    fileNameElement.file = null; // Clear the stored File object
-  }
-});
-} else {
-console.error("One or more elements for file upload not found");
-}
-
-// Initialize other parts of your application
-initAuth0().catch((error) => console.error("Error initializing app:", error));
-});
-
 // Ensure all functions are in global scope
 window.onConvertClick = onConvertClick;
 window.login = login;
@@ -507,3 +478,4 @@ window.logout = logout;
 window.onDonateClick = onDonateClick;
 window.reset = reset;
 window.updateProcessingStage = updateProcessingStage;
+window.initializeProcessingStage = initializeProcessingStage;

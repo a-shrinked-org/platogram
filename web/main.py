@@ -1,268 +1,240 @@
-from sanic import Sanic
-from sanic.response import json, text, stream, file, redirect
 import os
-import logging
+import json
 import asyncio
+import tempfile
+import logfire
+import time
 from pathlib import Path
+from typing import Optional, Literal
+from datetime import datetime
+import httpx
+import jwt
+from cryptography.hazmat.primitives import serialization
+from cryptography.x509 import load_pem_x509_certificate
 
 # Setup logging
-logger = logging.getLogger("platogram")
-logger.setLevel(logging.DEBUG)
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-ch.setFormatter(formatter)
-logger.addHandler(ch)
+logfire.configure()
 
-app = Sanic.get_app("PlatogramApp") 
+# Constants and environment variables
+AUTH0_DOMAIN = os.getenv('AUTH0_DOMAIN', "dev-w0dm4z23pib7oeui.us.auth0.com")
+API_AUDIENCE = os.getenv('API_AUDIENCE', "https://platogram.vercel.app/")
+ALGORITHMS = ["RS256"]
+JWKS_URL = f"https://{AUTH0_DOMAIN}/.well-known/jwks.json"
 
-# Retrieve API keys from environment variables
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
 ASSEMBLYAI_API_KEY = os.getenv('ASSEMBLYAI_API_KEY')
 
 if not ANTHROPIC_API_KEY or not ASSEMBLYAI_API_KEY:
     raise RuntimeError("API keys not set in environment variables.")
 
-# Simplified task storage
+# In-memory storage (Note: This will reset on each function invocation)
 tasks = {}
 
-@app.route('/')
-async def root(request):
-    return redirect('/index.html')
+# Cache for the Auth0 public key
+auth0_public_key_cache = {
+    "key": None,
+    "last_updated": 0,
+    "expires_in": 3600,  # Cache expiration time in seconds (1 hour)
+}
 
-@app.route('/<path:path>')
-async def static(request, path):
-    return await file(f'./static/{path}')
+Language = Literal["en", "es"]
 
-@app.post("/convert")
-async def convert(request):
-    async def process_and_stream(response):
-        try:
-            logger.debug("Starting process_and_stream")
-            content_type = request.headers.get('content-type', '')
-            logger.debug(f"Content type: {content_type}")
+async def get_auth0_public_key():
+    current_time = time.time()
+    if (
+        auth0_public_key_cache["key"]
+        and current_time - auth0_public_key_cache["last_updated"]
+        < auth0_public_key_cache["expires_in"]
+    ):
+        return auth0_public_key_cache["key"]
 
-            if content_type == 'application/octet-stream':
-                file_name = request.headers.get('X-File-Name')
-                chunk_index = int(request.headers.get('X-Chunk-Index', 0))
-                total_chunks = int(request.headers.get('X-Total-Chunks', 1))
-                lang = request.headers.get('X-Language', 'en')
-                logger.debug(f"Received file upload - {file_name}, chunk {chunk_index + 1} of {total_chunks}, language {lang}")
-                await response.write(f"Received chunk {chunk_index + 1} of {total_chunks}\n".encode())
+    async with httpx.AsyncClient() as client:
+        response = await client.get(JWKS_URL)
+        response.raise_for_status()
+        jwks = response.json()
 
-                # Here, instead of writing to a local file, you might want to use a blob store
-                # or a database to store the chunks temporarily
-
-                if chunk_index == total_chunks - 1:
-                    await response.write(f"File {file_name} received completely. Finalizing...\n".encode())
-                    # Start processing the file
-                    await response.write(b"File processing started in background.\n")
-
-            elif content_type == 'application/json':
-                data = request.json
-                url = data.get('url')
-                lang_data = data.get('lang', 'en')
-                logger.debug(f"Received URL: {url}, language: {lang_data}")
-                await response.write(f"Received URL: {url}. Initializing processing...\n".encode())
-                # Start processing the URL
-                await response.write(b"URL processing started in background.\n")
-
-            else:
-                await response.write("Invalid content type\n".encode())
-                return
-
-            await response.write(b"Initial response sent. Conversion process started in background.\n")
-
-        except Exception as e:
-            logger.error(f"Error in process_and_stream: {str(e)}")
-            await response.write(f"Error: {str(e)}\n".encode())
-
-    return stream(process_and_stream, content_type='text/plain')
-
-@app.get("/status")
-async def status(request):
-    user_id = request.args.get('user_id', 'unknown')
-    status = tasks.get(user_id, {'status': 'idle'})
-    return json(status)
-
-@app.get("/test-auth")
-async def test_auth(request):
-    return json({"message": "Auth test successful", "user_id": "test_user"})
-
-@app.get("/reset")
-async def reset(request):
-    user_id = request.args.get('user_id', 'unknown')
-    if user_id in tasks:
-        del tasks[user_id]
-    return json({"message": "Session reset"})
-
-# This is the handler that Vercel will use
-app = app.asgi_app
-async def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> tuple[str, str]:
-    script_path = Path.cwd() / "examples" / "audio_to_paper.sh"
-    command = f"cd {output_dir} && {script_path} \"{url}\" --lang {lang} --verbose"
-
-    if user_id in processes:
-        raise RuntimeError("Conversion already in progress.")
-
-    process = await asyncio.create_subprocess_shell(
-        command,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        shell=True
+    x5c = jwks["keys"][0]["x5c"][0]
+    cert = load_pem_x509_certificate(
+        f"-----BEGIN CERTIFICATE-----\n{x5c}\n-----END CERTIFICATE-----".encode()
     )
-    processes[user_id] = process
+    public_key = cert.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
 
+    auth0_public_key_cache["key"] = public_key
+    auth0_public_key_cache["last_updated"] = current_time
+
+    return public_key
+
+async def verify_token_and_get_user_id(token: str):
     try:
-        stdout, stderr = await process.communicate()
-        logger.debug(f"Process stdout: {stdout.decode()}")
-        logger.debug(f"Process stderr: {stderr.decode()}")
-    finally:
-        if user_id in processes:
-            del processes[user_id]
-
-    if process.returncode != 0:
-        raise RuntimeError(f"Failed to execute {command} with return code {process.returncode}.\n\nstdout:\n{stdout.decode()}\n\nstderr:\n{stderr.decode()}")
-
-    return stdout.decode(), stderr.decode()
-
-async def process_file(file_path: Path, lang: str):
-    # Simulating file processing
-    steps = ["Initializing", "Processing", "Finalizing"]
-    for step in steps:
-        yield f"{step}...\n"
-        await asyncio.sleep(1)  # Simulate work
-    yield f"File {file_path} processed with language {lang}\n"
-
-async def process_url(url: str, lang: str):
-    # Simulating URL processing
-    steps = ["Fetching URL", "Analyzing Content", "Converting"]
-    for step in steps:
-        yield f"{step}...\n"
-        await asyncio.sleep(1)  # Simulate work
-    yield f"URL {url} processed with language {lang}\n"
-
-async def send_email(user_id: str, subj: str, body: str, files: list[Path]):
-    loop = asyncio.get_running_loop()
-    with ProcessPoolExecutor() as pool:
-        await loop.run_in_executor(pool, _send_email_sync, user_id, subj, body, files)
-
-async def convert_and_send_with_error_handling(request: ConversionRequest, user_id: str):
-    try:
-        await convert_and_send(request, user_id)
-        tasks[user_id].status = "done"
-    except HTTPException as e:
-        logfire.exception(f"HTTP error in background task for user {user_id}: {str(e)}")
-        logger.exception(f"HTTP error in background task for user {user_id}: {str(e)}")
-        tasks[user_id].error = str(e)
-        tasks[user_id].status = "failed"
+        public_key = await get_auth0_public_key()
+        payload = jwt.decode(
+            token,
+            key=public_key,
+            algorithms=ALGORITHMS,
+            audience=API_AUDIENCE,
+            issuer=f"https://{AUTH0_DOMAIN}/",
+        )
+        return payload["platogram:user_email"]
     except Exception as e:
-        logfire.exception(f"Unexpected error in background task for user {user_id}: {str(e)}")
-        logger.exception(f"Unexpected error in background task for user {user_id}: {str(e)}")
-        tasks[user_id].error = "An unexpected error occurred"
-        tasks[user_id].status = "failed"
+        raise ValueError(f"Couldn't verify token: {str(e)}")
 
-async def convert_and_send(request: ConversionRequest, user_id: str):
+async def handle_convert(scope, receive, send):
     try:
-        logger.info(f"Starting conversion for user {user_id}")
+        body = await receive_body(receive)
+        content_type = next((v.decode() for k, v in scope['headers'] if k.decode().lower() == 'content-type'), None)
+        token = next((v.decode().split(' ')[1] for k, v in scope['headers'] if k.decode().lower() == 'authorization'), None)
 
-        # Initialize models
-        language_model = plato.llm.get_model("anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY'))
-        speech_recognition_model = plato.asr.get_model("assembly-ai/best", os.getenv('ASSEMBLYAI_API_KEY'))
+        if not token:
+            return await send_json_response(send, {"error": "No authorization token provided"}, status=401)
 
-        # Process audio
-        try:
-            transcript = plato.extract_transcript(request.payload, speech_recognition_model)
-        except Exception as e:
-            if "Sign in to confirm you're not a bot" in str(e):
-                raise HTTPException(status_code=400, detail="YouTube requires authentication for this video. Please try a different video or provide a direct audio file.")
-            else:
-                raise
+        user_id = await verify_token_and_get_user_id(token)
 
-        content = plato.index(transcript, language_model)
+        if user_id in tasks and tasks[user_id]['status'] == "running":
+            return await send_json_response(send, {"error": "Conversion already in progress"}, status=400)
 
-        title = content.title
-        summary = content.summary
+        if content_type == 'application/octet-stream':
+            file_name = next((v.decode() for k, v in scope['headers'] if k.decode().lower() == 'x-file-name'), None)
+            lang = next((v.decode() for k, v in scope['headers'] if k.decode().lower() == 'x-language'), 'en')
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            files = [f for f in Path(tmpdir).glob('*') if f.is_file()]
+            temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_file = temp_dir / f"{file_name}.part"
 
-            subject = f"[Platogram] {title}"
-            body = f"""Hi there!
+            with open(temp_file, 'wb') as f:
+                f.write(body)
 
-Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
+            tasks[user_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang}
+        elif content_type == 'application/json':
+            data = json.loads(body)
+            url = data.get('url')
+            lang = data.get('lang', 'en')
+            tasks[user_id] = {'status': 'running', 'url': url, 'lang': lang}
+        else:
+            return await send_json_response(send, {"error": "Invalid content type"}, status=400)
 
-You'll find a PDF and a Word file attached. The Word file includes the original transcript with timestamp references. I hope this helps!
+        # Start background processing here
+        asyncio.create_task(process_conversion(user_id))
 
-{summary}
+        return await send_json_response(send, {"message": "Conversion started"})
 
-Please reply to this e-mail if any suggestions, feedback, or questions.
-
----
-Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
-Suggested donation: $2 per hour of content converted."""
-
-            await send_email(user_id, subject, body, files)
-
-    except ImportError as e:
-        logger.exception(f"Import error for user {user_id}: {str(e)}")
-        logfire.exception(f"Import error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Import error: {str(e)}. Please contact support.")
     except Exception as e:
-        logger.exception(f"Conversion failed for user {user_id}: {str(e)}")
-        logfire.exception(f"Conversion and sending failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to convert and send transcript: {str(e)}")
+        logfire.exception(f"Error in convert: {str(e)}")
+        return await send_json_response(send, {"error": str(e)}, status=500)
 
-def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):
-    logger.debug("Starting _send_email_sync function")
-
-    smtp_user = os.getenv("PLATOGRAM_SMTP_USER")
-    smtp_server = os.getenv("PLATOGRAM_SMTP_SERVER")
-    smtp_port = 587
-    sender_password = os.getenv("PLATOGRAM_SMTP_PASSWORD")
-
-    logger.debug(f"SMTP User: {smtp_user}, Server: {smtp_server}, Port: {smtp_port}")
-
-    msg = MIMEMultipart()
-    msg['From'] = os.getenv("PLATOGRAM_SMTP_FROM")
-    msg['To'] = user_id
-    msg['Subject'] = subj
-
-    msg.attach(MIMEText(body, 'plain'))
-    logger.debug(f"Prepared email body: {body}")
-
-    for file in files:
-        logger.debug(f"Attaching file: {file}")
-        try:
-            with open(file, "rb") as f:
-                file_name = file.name.split("/")[-1]
-                part = MIMEApplication(f.read(), Name=file_name)
-                part['Content-Disposition'] = f'attachment; filename="{file_name}"'
-                msg.attach(part)
-            logger.debug(f"Successfully attached file: {file_name}")
-        except Exception as e:
-            logger.error(f"Error attaching file {file}: {str(e)}")
-
+async def handle_status(scope, receive, send):
     try:
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            logger.debug("Started TLS connection")
-            server.login(smtp_user, sender_password)
-            logger.debug("Logged into SMTP server")
-            server.send_message(msg)
-            logger.debug(f"Email sent to {user_id} with subject {subj}")
+        token = next((v.decode().split(' ')[1] for k, v in scope['headers'] if k.decode().lower() == 'authorization'), None)
+
+        if not token:
+            return await send_json_response(send, {"error": "No authorization token provided"}, status=401)
+
+        user_id = await verify_token_and_get_user_id(token)
+
+        if user_id not in tasks:
+            return await send_json_response(send, {"status": "idle"})
+
+        task = tasks[user_id]
+        return await send_json_response(send, {
+            "status": task['status'],
+            "error": task.get('error') if task['status'] == "failed" else None
+        })
+
     except Exception as e:
-        logger.error(f"Failed to send email to {user_id}: {str(e)}")
+        logfire.exception(f"Error in status: {str(e)}")
+        return await send_json_response(send, {"error": str(e)}, status=500)
 
-    logger.debug("Ending _send_email_sync function")
+async def handle_reset(scope, receive, send):
+    try:
+        token = next((v.decode().split(' ')[1] for k, v in scope['headers'] if k.decode().lower() == 'authorization'), None)
 
-    # Vercel handler
-def handler(request, response):
-    if request.path.startswith('/convert'):
-        return sanic_app.handle_request(request)
+        if not token:
+            return await send_json_response(send, {"error": "No authorization token provided"}, status=401)
+
+        user_id = await verify_token_and_get_user_id(token)
+
+        if user_id in tasks:
+            del tasks[user_id]
+
+        return await send_json_response(send, {"message": "Session reset"})
+
+    except Exception as e:
+        logfire.exception(f"Error in reset: {str(e)}")
+        return await send_json_response(send, {"error": str(e)}, status=500)
+
+async def process_conversion(user_id: str):
+    try:
+        task = tasks[user_id]
+
+        # Here you would implement your actual conversion logic
+        # For now, we'll just simulate processing
+        await asyncio.sleep(10)
+
+        # Simulating successful conversion
+        tasks[user_id]['status'] = 'done'
+
+        # Here you would typically send an email with the results
+        # await send_email(user_id, "Conversion complete", "Your conversion is complete.")
+
+    except Exception as e:
+        logfire.exception(f"Error in conversion for user {user_id}: {str(e)}")
+        tasks[user_id]['status'] = 'failed'
+        tasks[user_id]['error'] = str(e)
+
+async def app(scope, receive, send):
+    assert scope['type'] == 'http'
+
+    if scope['method'] == 'GET':
+        if scope['path'] == '/status':
+            await handle_status(scope, receive, send)
+        elif scope['path'] == '/reset':
+            await handle_reset(scope, receive, send)
+        else:
+            await send_not_found(send)
+    elif scope['method'] == 'POST' and scope['path'] == '/convert':
+        await handle_convert(scope, receive, send)
     else:
-        return app(request.environ, response.start_response)
+        await send_not_found(send)
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, timeout_keep_alive=60)  # Set timeout to Vercel Hobby Plan max 60 seconds
+async def receive_body(receive):
+    body = b''
+    more_body = True
+    while more_body:
+        message = await receive()
+        body += message.get('body', b'')
+        more_body = message.get('more_body', False)
+    return body
+
+async def send_json_response(send, data, status=200):
+    await send({
+        'type': 'http.response.start',
+        'status': status,
+        'headers': [
+            [b'content-type', b'application/json'],
+        ],
+    })
+    await send({
+        'type': 'http.response.body',
+        'body': json.dumps(data).encode(),
+    })
+
+async def send_not_found(send):
+    await send({
+        'type': 'http.response.start',
+        'status': 404,
+        'headers': [
+            [b'content-type', b'text/plain'],
+        ],
+    })
+    await send({
+        'type': 'http.response.body',
+        'body': b'Not Found',
+    })
+
+# Vercel handler
+def handler(request, response):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(app(request, lambda: None, response))

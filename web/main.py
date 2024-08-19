@@ -8,28 +8,17 @@ import logfire
 import time
 import smtplib
 import logging
-
 from sanic import Sanic
-from sanic.response import json, text, stream
+from sanic.response import json, text, stream, file, redirect
 from sanic.exceptions import SanicException
 import aiofiles
 import yt_dlp
-
 from pathlib import Path
 from uuid import uuid4
 from datetime import datetime
 from typing import Literal, Optional
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
-
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, Form, File, BackgroundTasks, Request
-from fastapi.responses import JSONResponse, RedirectResponse, FileResponse, StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer
-from starlette.staticfiles import StaticFiles
-from pydantic import BaseModel
-from fastapi.security import OAuth2PasswordBearer
-from concurrent.futures import ProcessPoolExecutor
 
 import platogram as plato
 from platogram import llm, asr
@@ -43,7 +32,7 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
-sanic_app = Sanic("StreamingApp")
+app = Sanic("PlatogramApp")
 
 # Retrieve API keys from environment variables
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
@@ -62,17 +51,6 @@ else:
     except Exception as e:
         logger.error(f"Logfire configuration failed: {e}")
 
-app = FastAPI()
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
-)
-
 AUTH0_DOMAIN = "dev-w0dm4z23pib7oeui.us.auth0.com"
 API_AUDIENCE = "https://platogram.vercel.app/"
 ALGORITHMS = ["RS256"]
@@ -82,18 +60,6 @@ tasks = {}
 processes = {}
 Language = Literal["en", "es"]
 
-class ConversionRequest(BaseModel):
-    payload: str
-    lang: str = "en"
-
-class Task(BaseModel):
-    start_time: datetime
-    request: ConversionRequest
-    status: Literal["running", "done", "failed"] = "running"
-    error: Optional[str] = None
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
 # Cache for the Auth0 public key
 auth0_public_key_cache = {
     "key": None,
@@ -101,27 +67,19 @@ auth0_public_key_cache = {
     "expires_in": 3600,  # Cache expiration time in seconds (1 hour)
 }
 
-# Serve static files
-static_dir = os.path.join(os.path.dirname(__file__), "static")
-if os.path.exists(static_dir):
-    app.mount("/web", StaticFiles(directory=static_dir), name="static")
+@app.exception(Exception)
+async def global_exception_handler(request, exception):
+    logfire.exception(f"An error occurred: {str(exception)}")
+    logger.exception(f"An error occurred: {str(exception)}")
+    return json({"message": "An internal error occurred", "detail": str(exception)}, status=500)
 
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    logfire.exception(f"An error occurred: {str(exc)}")
-    logger.exception(f"An error occurred: {str(exc)}")
-    return JSONResponse(
-        status_code=500,
-        content={"message": "An internal error occurred", "detail": str(exc)}
-    )
+@app.route('/')
+async def root(request):
+    return redirect('/web/index.html')
 
-@app.get("/")
-async def root():
-    return RedirectResponse(url="/web/index.html")
-
-@app.get("/web/")
-async def web_root():
-    return FileResponse(os.path.join(static_dir, "index.html"))
+@app.route('/web/')
+async def web_root(request):
+    return await file('static/index.html')
 
 async def get_auth0_public_key():
     logger.debug("Entering get_auth0_public_key function")
@@ -155,7 +113,10 @@ async def get_auth0_public_key():
     logger.debug("New Auth0 public key fetched and cached")
     return public_key
 
-async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
+async def verify_token_and_get_user_id(request):
+    token = request.token
+    if not token:
+        raise SanicException("No token provided", status_code=401)
     try:
         public_key = await get_auth0_public_key()
         payload = jwt.decode(
@@ -168,19 +129,18 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
         return payload["sub"]
     except jwt.ExpiredSignatureError:
         logger.warning("Token has expired")
-        raise HTTPException(status_code=401, detail="Token has expired")
+        raise SanicException("Token has expired", status_code=401)
     except jwt.InvalidAudienceError as e:
         logger.warning(f"Token audience verification failed: {str(e)}")
-        raise HTTPException(status_code=401, detail=f"Token audience verification failed: {str(e)}")
+        raise SanicException(f"Token audience verification failed: {str(e)}", status_code=401)
     except jwt.InvalidTokenError as e:
         logger.warning(f"Invalid token: {str(e)}")
-        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+        raise SanicException(f"Invalid token: {str(e)}", status_code=401)
     except Exception as e:
         logger.error(f"Couldn't verify token: {str(e)}")
-        raise HTTPException(status_code=401, detail=f"Couldn't verify token: {str(e)}") from e
+        raise SanicException(f"Couldn't verify token: {str(e)}", status_code=401)
 
-# Sanic route for streaming
-@sanic_app.post("/convert")
+@app.post("/convert")
 @logfire.instrument()
 async def convert(request):
     async def process_and_stream(response):
@@ -230,7 +190,7 @@ async def convert(request):
 
             else:
                 await response.write("Invalid content type\n".encode())
-                raise HTTPException(status_code=400, detail="Invalid content type")
+                raise SanicException("Invalid content type", status_code=400)
 
             await response.write(b"Initial response sent. Conversion process started in background.\n")
 
@@ -241,24 +201,27 @@ async def convert(request):
     return stream(process_and_stream, content_type='text/plain')
 
 @app.get("/status")
-async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:
+async def status(request):
+    user_id = await verify_token_and_get_user_id(request)
     try:
         if user_id not in tasks:
-            return {"status": "idle"}
+            return json({"status": "idle"})
         task = tasks[user_id]
-        return {"status": task.status, "error": task.error if task.status == "failed" else None}
+        return json({"status": task['status'], "error": task['error'] if task['status'] == "failed" else None})
     except Exception as e:
         logfire.exception(f"Error in status endpoint: {str(e)}")
         logger.exception(f"Error in status endpoint: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise SanicException(str(e), status_code=500)
 
 @app.get("/test-auth")
-async def test_auth(user_id: str = Depends(verify_token_and_get_user_id)):
-    return {"message": "Auth test successful", "user_id": user_id}
+async def test_auth(request):
+    user_id = await verify_token_and_get_user_id(request)
+    return json({"message": "Auth test successful", "user_id": user_id})
 
 @app.get("/reset")
 @logfire.instrument()
-async def reset(user_id: str = Depends(verify_token_and_get_user_id)):
+async def reset(request):
+    user_id = await verify_token_and_get_user_id(request)
     try:
         if user_id in processes:
             processes[user_id].terminate()
@@ -267,11 +230,11 @@ async def reset(user_id: str = Depends(verify_token_and_get_user_id)):
         if user_id in tasks:
             del tasks[user_id]
 
-        return {"message": "Session reset"}
+        return json({"message": "Session reset"})
     except Exception as e:
         logfire.exception(f"Error in reset endpoint for user {user_id}: {str(e)}")
         logger.exception(f"Error in reset endpoint for user {user_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to reset session: {str(e)}")
+        raise SanicException(f"Failed to reset session: {str(e)}", status_code=500)
 async def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> tuple[str, str]:
     script_path = Path.cwd() / "examples" / "audio_to_paper.sh"
     command = f"cd {output_dir} && {script_path} \"{url}\" --lang {lang} --verbose"

@@ -288,10 +288,21 @@ async function logout() {
 }
 
 function showLanguageSelectionModal(inputData) {
-  const modal = document.getElementById('language-modal');
+  let modal = document.getElementById('language-modal');
   if (!modal) {
-    console.error("Language modal not found");
-    return;
+    // Create the modal if it doesn't exist
+    modal = document.createElement('div');
+    modal.id = 'language-modal';
+    modal.className = 'modal hidden';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <h3>Select Language</h3>
+        <button id="en-btn">English</button>
+        <button id="es-btn">Spanish</button>
+        <button id="cancel-btn">Cancel</button>
+      </div>
+    `;
+    document.body.appendChild(modal);
   }
 
   modal.classList.remove('hidden');
@@ -405,8 +416,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (uploadIcon && fileNameElement && urlInput) {
     uploadIcon.addEventListener('click', () => {
+      // Remove any existing file input
+      const existingFileInput = document.getElementById('temp-file-input');
+      if (existingFileInput) {
+        document.body.removeChild(existingFileInput);
+      }
+
       const fileInput = document.createElement('input');
       fileInput.type = 'file';
+      fileInput.id = 'temp-file-input';
       fileInput.accept = '.srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a';
       fileInput.style.display = 'none';
       document.body.appendChild(fileInput);
@@ -427,7 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         document.body.removeChild(fileInput);
       });
-    });
+    }, { once: true }); // Ensure the event listener is only added once
 
     urlInput.addEventListener('input', () => {
       if (urlInput.value.trim() !== '') {

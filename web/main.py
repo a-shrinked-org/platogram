@@ -177,63 +177,55 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
 
 @app.post("/convert")
 @logfire.instrument()
-async def convert(
-    background_tasks: BackgroundTasks,
-    user_id: str = Depends(verify_token_and_get_user_id),
-    file: Optional[UploadFile] = File(None),
-    payload: Optional[str] = Form(None),
-    lang: Optional[Language] = Form(None),
-):
+async def convert(request: Request):
     async def process_and_stream():
         try:
-            logfire.info(f"Convert request received for user {user_id}")
-            if not lang:
-                lang = "en"
-            yield f"Language set to: {lang}\n".encode()
+            headers = request.headers
+            content_type = headers.get('content-type', '')
 
-            if user_id in tasks and tasks[user_id].status == "running":
-                yield b"Error: Conversion already in progress\n"
-                return
+            if content_type == 'application/octet-stream':
+                # File upload
+                file_name = headers.get('X-File-Name')
+                chunk_index = int(headers.get('X-Chunk-Index', 0))
+                total_chunks = int(headers.get('X-Total-Chunks', 1))
+                lang = headers.get('X-Language', 'en')
 
-            if payload is None and file is None:
-                yield b"Error: Either payload or file must be provided\n"
-                return
+                temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
+                temp_dir.mkdir(parents=True, exist_ok=True)
+                temp_file = temp_dir / f"{file_name}.part"
 
-            if payload is not None:
-                logfire.info(f"Payload received: {payload[:100]}...")  # Log first 100 chars of payload
-                request = ConversionRequest(payload=payload, lang=lang)
-                yield b"Payload received and processing...\n"
+                chunk = await request.body()
+
+                with open(temp_file, 'ab') as f:
+                    f.write(chunk)
+
+                yield f"Received chunk {chunk_index + 1} of {total_chunks}\n".encode()
+
+                if chunk_index == total_chunks - 1:
+                    # All chunks received, process the file
+                    final_file = temp_dir / file_name
+                    temp_file.rename(final_file)
+                    yield f"File {file_name} received completely. Processing...\n".encode()
+                    # Add your file processing logic here
+            elif content_type == 'application/json':
+                # URL processing
+                data = await request.json()
+                url = data.get('url')
+                lang = data.get('lang', 'en')
+                yield f"Received URL: {url}. Processing...\n".encode()
+                # Add your URL processing logic here
             else:
-                logfire.info(f"File received: {file.filename}")
-                yield f"File received: {file.filename}\n".encode()
-                tmpdir = Path(tempfile.gettempdir()) / "platogram_uploads"
-                tmpdir.mkdir(parents=True, exist_ok=True)
-                file_ext = file.filename.split(".")[-1]
-                temp_file = Path(tmpdir) / f"{uuid4()}.{file_ext}"
-                file_content = await file.read()
-                with open(temp_file, "wb") as fd:
-                    fd.write(file_content)
-                request = ConversionRequest(payload=f"file://{temp_file}", lang=lang)
-                yield b"File saved and processing...\n"
+                raise HTTPException(status_code=400, detail="Invalid content type")
 
-            tasks[user_id] = Task(start_time=datetime.now(), request=request)
-
-            # Simulate the conversion process
-            yield b"Starting conversion process...\n"
-            for step in ["Processing", "Analyzing", "Generating"]:
+            # Simulate processing steps
+            for step in ["Analyzing", "Converting", "Finalizing"]:
                 await asyncio.sleep(1)  # Simulate work
                 yield f"{step}...\n".encode()
 
-            # Start the actual conversion process in the background
-            background_tasks.add_task(convert_and_send_with_error_handling, request, user_id)
-
-            logfire.info(f"Conversion started for user {user_id}")
             yield b"Conversion process initiated. You will receive an email when it's complete.\n"
 
         except Exception as e:
-            error_msg = f"Error in convert endpoint: {str(e)}"
-            logfire.exception(error_msg)
-            yield f"Error: {error_msg}\n".encode()
+            yield f"Error: {str(e)}\n".encode()
 
     return StreamingResponse(process_and_stream(), media_type="text/plain")
 

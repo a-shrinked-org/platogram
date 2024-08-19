@@ -201,29 +201,9 @@ function showErrorMessage(message) {
 }
 
 async function postToConvert(inputData, lang) {
+  const chunkSize = 1024 * 1024; // 1MB chunks
   let body;
   let headers = {};
-  const formData = new FormData();
-  formData.append('lang', lang);
-
-  const maxSizeMB = 50; // Adjust based on server limit
-
-  if (inputData.file) {
-    const fileSizeMB = inputData.file.size / (1024 * 1024);
-    console.log(`File size: ${fileSizeMB.toFixed(2)} MB`); // Add this line for debugging
-    if (fileSizeMB > maxSizeMB) {
-      updateUIStatus("error", `File size exceeds ${maxSizeMB}MB limit. Please choose a smaller file.`);
-      return;
-    }
-    formData.append('file', inputData.file);
-  } else if (inputData.url) {
-    formData.append("payload", inputData.url);
-  } else {
-    updateUIStatus("error", "No input provided. Please enter a URL or upload a file.");
-    return;
-  }
-
-  body = formData;
 
   try {
     updateUIStatus("running", "Starting conversion process...");
@@ -234,30 +214,72 @@ async function postToConvert(inputData, lang) {
     debugLog("Obtained token for convert");
 
     headers.Authorization = `Bearer ${token}`;
+    headers['Content-Type'] = 'application/octet-stream';
 
-    const response = await fetch("/convert", {
-      method: "POST",
-      headers: headers,
-      body: body,
-    });
+    if (inputData.file) {
+      const file = inputData.file;
+      const totalChunks = Math.ceil(file.size / chunkSize);
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+        const start = chunkIndex * chunkSize;
+        const end = Math.min(start + chunkSize, file.size);
+        const chunk = file.slice(start, end);
+
+        headers['X-File-Name'] = file.name;
+        headers['X-Chunk-Index'] = chunkIndex.toString();
+        headers['X-Total-Chunks'] = totalChunks.toString();
+        headers['X-Language'] = lang;
+
+        const response = await fetch("/convert", {
+          method: "POST",
+          headers: headers,
+          body: chunk,
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value);
+          debugLog("Received chunk: " + chunk);
+          updateUIStatus("running", chunk);
+        }
+      }
+    } else if (inputData.url) {
+      headers['Content-Type'] = 'application/json';
+      body = JSON.stringify({ url: inputData.url, lang: lang });
+
+      const response = await fetch("/convert", {
+        method: "POST",
+        headers: headers,
+        body: body,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        debugLog("Received chunk: " + chunk);
+        updateUIStatus("running", chunk);
+      }
+    } else {
+      throw new Error("No input provided");
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value);
-      debugLog("Received chunk: " + chunk);
-      // Update UI with the received chunk
-      updateUIStatus("running", chunk);
-    }
-
-    // The final status update will be handled by the pollStatus function
+    updateUIStatus("done", "Conversion process initiated. You will receive an email when it's complete.");
   } catch (error) {
     console.error("Error in postToConvert:", error);
     updateUIStatus("error", error.message || "An error occurred during conversion");

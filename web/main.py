@@ -177,7 +177,7 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
 
 @app.post("/convert")
 @logfire.instrument()
-async def convert(request: Request):
+async def convert(request: Request, background_tasks: BackgroundTasks):
     async def process_and_stream():
         try:
             logger.debug("Starting process_and_stream")

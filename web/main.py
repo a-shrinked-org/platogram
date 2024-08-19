@@ -179,68 +179,63 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
 @logfire.instrument()
 async def convert(request: Request):
     async def process_and_stream():
-        logger.debug("Starting process_and_stream")
         try:
+            logger.debug("Starting process_and_stream")
+
+            # Step 1: Quick initialization steps
             headers = request.headers
             content_type = headers.get('content-type', '')
             logger.debug(f"Content type: {content_type}")
 
             if content_type == 'application/octet-stream':
-                # File upload
                 file_name = headers.get('X-File-Name')
                 chunk_index = int(headers.get('X-Chunk-Index', 0))
                 total_chunks = int(headers.get('X-Total-Chunks', 1))
                 lang = headers.get('X-Language', 'en')
                 logger.debug(f"Received file upload - {file_name}, chunk {chunk_index + 1} of {total_chunks}, language {lang}")
 
+                yield f"Received chunk {chunk_index + 1} of {total_chunks}\n".encode()
+
+                # Rest of the file upload handling
                 temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
                 temp_dir.mkdir(parents=True, exist_ok=True)
                 temp_file = temp_dir / f"{file_name}.part"
 
                 chunk = await request.body()
-
                 with open(temp_file, 'ab') as f:
                     f.write(chunk)
 
-                yield f"Received chunk {chunk_index + 1} of {total_chunks}\n".encode()
+                yield f"Chunk {chunk_index + 1} written to temp storage\n".encode()
 
                 if chunk_index == total_chunks - 1:
                     # All chunks received, process the file
                     final_file = temp_dir / file_name
                     temp_file.rename(final_file)
-                    yield f"File {file_name} received completely. Processing...\n".encode()
-                    logger.debug(f"All chunks for {file_name} received")
-                    # Add your file processing logic here
-                    # Call the long-running task in the background
+                    yield f"File {file_name} received completely. Finalizing...\n".encode()
                     await process_file(final_file, lang)
 
             elif content_type == 'application/json':
-                # URL processing
                 data = await request.json()
                 url = data.get('url')
                 lang_data = data.get('lang', 'en')
-                yield f"Received URL: {url}. Processing...\n".encode()
                 logger.debug(f"Received URL: {url}, language: {lang_data}")
-                # Add your URL processing logic here
-                # Call the long-running task in the background
+                yield f"Received URL: {url}. Initializing processing...\n".encode()
                 await process_url(url, lang_data)
-
             else:
                 yield "Invalid content type\n".encode()
                 raise HTTPException(status_code=400, detail="Invalid content type")
 
-            # Ensure initial response within 10 seconds
+            # Step 2: Simulate quick initial steps to ensure response within 10 seconds
             initial_steps = ["Initializing", "Analyzing"]
             for step in initial_steps:
                 logger.debug(f"Executing step: {step}")
                 await asyncio.sleep(1)  # Simulate work
                 yield f"{step}...\n".encode()
 
-            # Send initial response within 10 seconds
-            logger.debug("Sending initial response")
+            logger.debug("Sending initial response within 10 seconds")
             yield b"Initial response sent within 10 seconds. Conversion process started.\n"
 
-            # Continue with further steps beyond initial response to prevent timeout
+            # Step 3: Continue longer processing steps
             further_steps = ["Converting", "Finalizing"]
             for step in further_steps:
                 logger.debug(f"Executing step: {step}")
@@ -248,8 +243,8 @@ async def convert(request: Request):
                 yield f"{step}...\n".encode()
 
         except Exception as e:
-            yield f"Error: {str(e)}\n".encode()
             logger.error(f"Error in process_and_stream: {str(e)}")
+            yield f"Error: {str(e)}\n".encode()
 
     return StreamingResponse(process_and_stream(), media_type="text/plain")
 

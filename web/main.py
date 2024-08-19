@@ -223,12 +223,17 @@ async def convert(request: Request):
             else:
                 raise HTTPException(status_code=400, detail="Invalid content type")
 
-            # Simulate processing steps
-            for step in ["Analyzing", "Converting", "Finalizing"]:
-                await asyncio.sleep(1)  # Simulate work with regular updates
+            # Ensure initial response within 10 seconds
+            for step in ["Initializing", "Analyzing"]:
+                await asyncio.sleep(1)  # Simulate work
                 yield f"{step}...\n".encode()
 
-            yield b"Conversion process initiated. You will receive an email when it's complete.\n"
+            yield b"Conversion process started. You will receive updates as it progresses.\n"
+
+            # Continue with further steps beyond the 10 second initial response time
+            for step in ["Converting", "Finalizing"]:
+                await asyncio.sleep(1)  # Simulate work
+                yield f"{step}...\n".encode()
 
         except Exception as e:
             yield f"Error: {str(e)}\n".encode()
@@ -426,4 +431,4 @@ def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, timeout_keep_alive=29)  # Set timeout to Vercel Hobby Plan max 60 seconds
+    uvicorn.run(app, host="0.0.0.0", port=8000, timeout_keep_alive=60)  # Set timeout to Vercel Hobby Plan max 60 seconds

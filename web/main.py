@@ -224,19 +224,23 @@ async def convert(request: Request):
                 raise HTTPException(status_code=400, detail="Invalid content type")
 
             # Ensure initial response within 10 seconds
-            for step in ["Initializing", "Analyzing"]:
+            initial_steps = ["Initializing", "Analyzing"]
+            for step in initial_steps:
                 await asyncio.sleep(1)  # Simulate work
                 yield f"{step}...\n".encode()
 
-            yield b"Conversion process started. You will receive updates as it progresses.\n"
+            # Send initial response within 10 seconds
+            yield b"Conversion process started. Further updates will be provided.\n"
 
-            # Continue with further steps beyond the 10 second initial response time
-            for step in ["Converting", "Finalizing"]:
-                await asyncio.sleep(1)  # Simulate work
+            # Continue with further steps beyond initial response to prevent timeout
+            further_steps = ["Converting", "Finalizing"]
+            for step in further_steps:
+                await asyncio.sleep(1)  # Simulate additional work
                 yield f"{step}...\n".encode()
 
         except Exception as e:
             yield f"Error: {str(e)}\n".encode()
+            logger.error(f"Error in process_and_stream: {str(e)}")
 
     return StreamingResponse(process_and_stream(), media_type="text/plain")
 

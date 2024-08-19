@@ -430,6 +430,13 @@ def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):
 
     logger.debug("Ending _send_email_sync function")
 
+    # Vercel handler
+def handler(request, response):
+    if request.path.startswith('/convert'):
+        return sanic_app.handle_request(request)
+    else:
+        return app(request.environ, response.start_response)
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000, timeout_keep_alive=60)  # Set timeout to Vercel Hobby Plan max 60 seconds

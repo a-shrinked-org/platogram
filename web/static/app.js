@@ -258,10 +258,12 @@ async function postToConvert(inputData, lang) {
 
 function getInputData() {
     const urlInput = document.getElementById("url-input");
-    const fileUpload = document.getElementById("file-upload");
+    const fileNameElement = document.getElementById("file-name");
+    // We need to store the File object when it's selected
+    const fileObject = fileNameElement.file; // This line assumes we're storing the File object on the element
     return {
         url: urlInput ? urlInput.value.trim() : '',
-        file: fileUpload ? fileUpload.files[0] : null
+        file: fileObject || null
     };
 }
 
@@ -398,13 +400,14 @@ function safeUpdateProcessingStage() {
   }
 }
 
-ocument.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
   console.log("DOM Content Loaded");
 
   const uploadIcon = document.querySelector('.upload-icon');
   const fileNameElement = document.getElementById('file-name');
+  const urlInput = document.getElementById('url-input');
 
-  if (uploadIcon) {
+  if (uploadIcon && fileNameElement && urlInput) {
     uploadIcon.addEventListener('click', () => {
       const fileInput = document.createElement('input');
       fileInput.type = 'file';
@@ -417,32 +420,27 @@ ocument.addEventListener('DOMContentLoaded', () => {
       fileInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
         if (file) {
-          console.log("File selected:", file.name);
-          if (fileNameElement) {
             fileNameElement.textContent = file.name;
-          } else {
-            console.warn("Element with id 'file-name' not found");
-          }
+            fileNameElement.file = file; // Store the File object
+            urlInput.value = ''; // Clear URL input when file is selected
+            console.log("File selected:", file.name);
         } else {
-          console.log("No file selected");
+            fileNameElement.textContent = '';
+            fileNameElement.file = null; // Clear the stored File object
+            console.log("No file selected");
         }
         document.body.removeChild(fileInput);
-      });
+    });
+
+    urlInput.addEventListener('input', () => {
+      if (urlInput.value.trim() !== '') {
+        fileNameElement.textContent = ''; // Clear file name when URL is entered
+      }
     });
   } else {
-    console.warn("Upload icon element not found");
+    console.error("One or more elements for file upload not found");
   }
 
   // Initialize other parts of your application
   initAuth0().catch((error) => console.error("Error initializing app:", error));
 });
-
-// Update getInputData function to match the new structure
-function getInputData() {
-  const urlInput = document.getElementById("url-input");
-  const fileNameElement = document.getElementById("file-name");
-  return {
-    url: urlInput ? urlInput.value.trim() : '',
-    file: fileNameElement && fileNameElement.textContent ? { name: fileNameElement.textContent } : null
-  };
-}

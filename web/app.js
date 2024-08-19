@@ -539,7 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const urlInput = document.getElementById('url-input');
 
   if (uploadIcon && fileNameElement && urlInput) {
-
+    uploadIcon.addEventListener('click', handleFileUpload);
 
     urlInput.addEventListener('input', () => {
       if (urlInput.value.trim() !== '') {
@@ -590,10 +590,10 @@ function handleFileUpload() {
   }, { once: true });
 
   // Re-add the event listener for future uploads
-  const uploadIcon = document.querySelector('.upload-icon');
-  if (uploadIcon) {
-    uploadIcon.addEventListener('click', handleFileUpload, { once: true });
-  }
+  //const uploadIcon = document.querySelector('.upload-icon');
+  //if (uploadIcon) {
+ //   uploadIcon.addEventListener('click', handleFileUpload, { once: true });
+  //}
 }
 
 // Ensure all functions are in global scope

@@ -420,26 +420,41 @@ document.addEventListener('DOMContentLoaded', () => {
       fileInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
         if (file) {
-            fileNameElement.textContent = file.name;
-            fileNameElement.file = file; // Store the File object
-            urlInput.value = ''; // Clear URL input when file is selected
-            console.log("File selected:", file.name);
+          fileNameElement.textContent = file.name;
+          fileNameElement.file = file; // Store the File object
+          urlInput.value = ''; // Clear URL input when file is selected
+          console.log("File selected:", file.name);
         } else {
-            fileNameElement.textContent = '';
-            fileNameElement.file = null; // Clear the stored File object
-            console.log("No file selected");
+          fileNameElement.textContent = '';
+          fileNameElement.file = null; // Clear the stored File object
+          console.log("No file selected");
         }
         document.body.removeChild(fileInput);
+      });
     });
 
     urlInput.addEventListener('input', () => {
       if (urlInput.value.trim() !== '') {
         fileNameElement.textContent = ''; // Clear file name when URL is entered
+        fileNameElement.file = null; // Clear the stored File object
       }
     });
   } else {
     console.error("One or more elements for file upload not found");
   }
+
+  // Initialize other parts of your application
+  initAuth0().catch((error) => console.error("Error initializing app:", error));
+});
+
+function getInputData() {
+  const urlInput = document.getElementById("url-input");
+  const fileNameElement = document.getElementById("file-name");
+  return {
+    url: urlInput ? urlInput.value.trim() : '',
+    file: fileNameElement && fileNameElement.file ? fileNameElement.file : null
+  };
+}
 
   // Initialize other parts of your application
   initAuth0().catch((error) => console.error("Error initializing app:", error));

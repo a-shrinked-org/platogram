@@ -167,7 +167,7 @@ function onDonateClick() {
 }
 
 async function onConvertClick(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
     debugLog("Convert button clicked");
 
     try {

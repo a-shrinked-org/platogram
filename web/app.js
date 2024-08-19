@@ -210,6 +210,7 @@ async function postToConvert(inputData, lang) {
 
   if (inputData.file) {
     const fileSizeMB = inputData.file.size / (1024 * 1024);
+    console.log(`File size: ${fileSizeMB.toFixed(2)} MB`); // Add this line for debugging
     if (fileSizeMB > maxSizeMB) {
       updateUIStatus("error", `File size exceeds ${maxSizeMB}MB limit. Please choose a smaller file.`);
       return;
@@ -423,42 +424,66 @@ function safeUpdateProcessingStage() {
 document.addEventListener('DOMContentLoaded', () => {
   debugLog("DOM Content Loaded");
 
-  const uploadIcon = document.querySelector('.upload-icon');
+   const uploadIcon = document.querySelector('.upload-icon');
   const fileNameElement = document.getElementById('file-name');
   const urlInput = document.getElementById('url-input');
 
   if (uploadIcon && fileNameElement && urlInput) {
-    uploadIcon.addEventListener('click', () => {
-      // Remove any existing file input
-      const existingFileInput = document.getElementById('temp-file-input');
-      if (existingFileInput) {
-        document.body.removeChild(existingFileInput);
+    // Remove any existing click event listeners
+    uploadIcon.replaceWith(uploadIcon.cloneNode(true));
+    // Get the new uploadIcon reference after replacing
+    const newUploadIcon = document.querySelector('.upload-icon');
+
+    newUploadIcon.addEventListener('click', handleFileUpload);
+
+    urlInput.addEventListener('input', () => {
+      if (urlInput.value.trim() !== '') {
+        fileNameElement.textContent = ''; // Clear file name when URL is entered
+        fileNameElement.file = null; // Clear the stored File object
       }
+    });
+  } else {
+    console.error("One or more elements for file upload not found");
+  }
 
-      const fileInput = document.createElement('input');
-      fileInput.type = 'file';
-      fileInput.id = 'temp-file-input';
-      fileInput.accept = '.srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a';
-      fileInput.style.display = 'none';
-      document.body.appendChild(fileInput);
+  // Initialize other parts of your application
+  initAuth0().catch((error) => console.error("Error initializing app:", error));
+});
 
-      fileInput.click();
+function handleFileUpload() {
+  const fileNameElement = document.getElementById('file-name');
+  const urlInput = document.getElementById('url-input');
 
-      fileInput.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (file) {
-          fileNameElement.textContent = file.name;
-          fileNameElement.file = file; // Store the File object
-          urlInput.value = ''; // Clear URL input when file is selected
-          debugLog("File selected: " + file.name);
-        } else {
-          fileNameElement.textContent = '';
-          fileNameElement.file = null; // Clear the stored File object
-          debugLog("No file selected");
-        }
-        document.body.removeChild(fileInput);
-      });
-    }, { once: true }); // Ensure the event listener is only added once
+  // Remove any existing file input
+  const existingFileInput = document.getElementById('temp-file-input');
+  if (existingFileInput) {
+    document.body.removeChild(existingFileInput);
+  }
+
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.id = 'temp-file-input';
+  fileInput.accept = '.srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a';
+  fileInput.style.display = 'none';
+  document.body.appendChild(fileInput);
+
+  fileInput.click();
+
+  fileInput.addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      fileNameElement.textContent = file.name;
+      fileNameElement.file = file; // Store the File object
+      urlInput.value = ''; // Clear URL input when file is selected
+      debugLog("File selected: " + file.name);
+    } else {
+      fileNameElement.textContent = '';
+      fileNameElement.file = null; // Clear the stored File object
+      debugLog("No file selected");
+    }
+    document.body.removeChild(fileInput);
+  });
+}
 
     urlInput.addEventListener('input', () => {
       if (urlInput.value.trim() !== '') {

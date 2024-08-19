@@ -539,7 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const urlInput = document.getElementById('url-input');
 
   if (uploadIcon && fileNameElement && urlInput) {
-    uploadIcon.addEventListener('click', handleFileUpload);
+
 
     urlInput.addEventListener('input', () => {
       if (urlInput.value.trim() !== '') {

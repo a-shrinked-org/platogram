@@ -35,9 +35,7 @@
   "buildCommand": "pip install -r requirements.txt && pip install -e .",
   "functions": {
     "web/main.py": {
-      "maxDuration": 60,
-      "memory": 1024,
-      "maxPayloadSize": "50mb"
+      "memory": 1024
     }
   }
 }

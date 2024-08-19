@@ -9,6 +9,7 @@ import time
 import smtplib
 import logging
 import yt_dlp
+from flask import Flask, request
 from pathlib import Path
 from uuid import uuid4
 from datetime import datetime
@@ -36,6 +37,9 @@ ch.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 logger.addHandler(ch)
+
+app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB
 
 # Retrieve API keys from environment variables
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')

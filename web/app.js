@@ -206,7 +206,7 @@ async function postToConvert(inputData, lang) {
   const formData = new FormData();
   formData.append('lang', lang);
 
-  const maxSizeMB = 10; // Adjust based on server limit
+  const maxSizeMB = 50; // Adjust based on server limit
 
   if (inputData.file) {
     const fileSizeMB = inputData.file.size / (1024 * 1024);

@@ -1,9 +1,5 @@
 let auth0Client = null;
 
-function debugLog(message) {
-  console.log(`[DEBUG] ${message}`);
-}
-
 const processingStages = [
   "Byte Whispering", "Qubit Juggling", "Syntax Gymnastics",
   "Pixel Wrangling", "Neuron Tickling", "Algorithm Disco",
@@ -150,11 +146,9 @@ async function reset() {
     if (!response.ok) throw new Error("Failed to reset");
 
     const urlInput = document.getElementById("url-input");
-    const fileUpload = document.getElementById("file-upload");
     const fileName = document.getElementById("file-name");
 
     if (urlInput) urlInput.value = "";
-    if (fileUpload) fileUpload.value = "";
     if (fileName) fileName.textContent = "";
 
     pollStatus(token);
@@ -257,14 +251,12 @@ async function postToConvert(inputData, lang) {
 }
 
 function getInputData() {
-    const urlInput = document.getElementById("url-input");
-    const fileNameElement = document.getElementById("file-name");
-    // We need to store the File object when it's selected
-    const fileObject = fileNameElement.file; // This line assumes we're storing the File object on the element
-    return {
-        url: urlInput ? urlInput.value.trim() : '',
-        file: fileObject || null
-    };
+  const urlInput = document.getElementById("url-input");
+  const fileNameElement = document.getElementById("file-name");
+  return {
+    url: urlInput ? urlInput.value.trim() : '',
+    file: fileNameElement && fileNameElement.file ? fileNameElement.file : null
+  };
 }
 
 async function login() {
@@ -442,19 +434,6 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     console.error("One or more elements for file upload not found");
   }
-
-  // Initialize other parts of your application
-  initAuth0().catch((error) => console.error("Error initializing app:", error));
-});
-
-function getInputData() {
-  const urlInput = document.getElementById("url-input");
-  const fileNameElement = document.getElementById("file-name");
-  return {
-    url: urlInput ? urlInput.value.trim() : '',
-    file: fileNameElement && fileNameElement.file ? fileNameElement.file : null
-  };
-}
 
   // Initialize other parts of your application
   initAuth0().catch((error) => console.error("Error initializing app:", error));

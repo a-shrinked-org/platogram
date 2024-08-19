@@ -1,287 +1,136 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Platogram - Transform Audio into Actionable Knowledge</title>
-    <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
-    <style>
-      /* ... your existing styles ... */
-    </style>
-  </head>
-  <body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platogram - Transform Speech into Knowledge</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
     <div id="language-modal" class="modal hidden">
-      <div class="modal-content">
-        <h3>Select Language</h3>
-        <button id="en-btn" class="lang-btn">English</button>
-        <button id="es-btn" class="lang-btn">Spanish</button>
-        <button id="cancel-btn" class="lang-btn">Cancel</button>
-      </div>
+        <div class="modal-content">
+            <h3>Select Language</h3>
+            <button id="en-btn" class="lang-btn">English</button>
+            <button id="es-btn" class="lang-btn">Spanish</button>
+            <button id="cancel-btn" class="lang-btn">Cancel</button>
+        </div>
     </div>
 
     <div class="container">
-      <header>
-        <a href="#" class="cta" id="login-button">Log In</a>
-        <a href="#" class="cta" id="logout-button">Log Out</a>
-      </header>
+        <header>
+            <a href="#" id="login-button" class="cta">Log In</a>
+            <a href="#" id="logout-button" class="cta">Log Out</a>
+        </header>
 
-      <main>
-        <h1>Transform Speech into Knowledge</h1>
+        <main role="main">
+            <h1>Transform Speech into Knowledge</h1>
 
-        <div id="input-section" class="cta-container">
-          <p>
-            Convert hours of audio into structured, readable documents
-          </p>
-          <div class="input-wrapper">
-            <input type="text" id="url-input" placeholder="Link to YouTube, Google Drive, audio, transcript, or upload" /><label for="file-upload" class="upload-button">
-              <span class="upload-icon">
-                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="17 8 12 3 7 8"></polyline>
-                  <line x1="12" y1="3" x2="12" y2="15"></line>
-                </svg>
-              </span>
-              <input type="file" id="file-upload" accept=".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a" style="display: none" />
-            </label>
-          </div>
-          <span id="file-name"></span>
-          <div id="error-message" class="hidden"></div> <!-- Ensure this element exists -->
-          <a href="#" class="cta" id="convert-button">Convert</a>
-          <a href="#" class="cta donate" id="donate-button">Donate</a>
-        </div>
-
-        <div id="done-section" class="cta-container hidden">
-          <div class="success-icon">&#10004;</div>
-          <p>
-            Done! Please check your e-mail inbox in a few minutes.
-          </p>
-          <button id="reset-button" class="cta">Got it!</button>
-        </div>
-
-        <div id="status-section" class="cta-container hidden">
-          <p>
-            Working on it. You will receive an email from Artyom Astafurov with
-            PDF, Word, and Markdown documents once ready.
-          </p>
-          <p>
-            Processing time is quick - about 5 mins for each hour of content. Hang tight!
-          </p>
-          <div id="animation-container">
-            <div id="runner"></div>
-            <p id="processing-stage"></p>
-          </div>
-          <button class="cta donate" id="donate-button-status">Donate</button>
-        </div>
-
-        <div id="error-section" class="cta-container hidden">
-          <p>An error occurred. Please try again.</p>
-          <button id="reset-button-error" class="cta">Reset</button>
-        </div>
-
-        <section class="features-section">
-          <div class="features-grid">
-            <div class="feature-card">
-              <h3>Sparks Joy</h3>
-              <p>
-                Platogram doesn't just transcribe - it transforms speech into
-                high-quality, readable documents optimized for knowledge retrieval.
-              </p>
-            </div>
-            <div class="feature-card">
-              <h3>Privacy First</h3>
-              <p>
-                Your data stays yours. We process without storing, ensuring your
-                sensitive information remains confidential.
-              </p>
-            </div>
-            <div class="feature-card">
-              <h3>Just Works</h3>
-              <p>
-                Drop a link or a file with audio or transcript and we will e-mail you a well-organized, readable document.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section class="examples-section">
-          <h2>Examples</h2>
-          <div class="examples-grid">
-            <div class="example-card">
-              <h3>John Carmack: From Gaming Pioneer to AI Visionary</h3>
-              <a href="https://drive.google.com/file/d/1_w9mv4_mBVSwK4NSnybGXtRysaT7ROFT/view?usp=drive_link" target="_blank" class="sample-link">View sample output</a>
-              <p class="example-description">Transform a 5-hour podcast into a structured document that sparks joy.</p>
+            <div id="input-section" class="cta-container">
+                <p>Convert hours of audio into structured, readable documents</p>
+                <div class="input-wrapper">
+                    <input type="text" id="url-input" placeholder="Link to YouTube, Google Drive, audio, transcript, or upload" />
+                    <label for="file-upload" class="upload-button">
+                        <span class="upload-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                        </span>
+                    </label>
+                </div>
+                <span id="file-name"></span>
+                <div id="error-message" class="hidden"></div>
+                <a href="#" id="convert-button" class="cta">Convert</a>
+                <a href="#" id="donate-button" class="cta donate">Donate</a>
             </div>
 
-            <!-- Additional example cards -->
-
-          </div>
-        </section>
-
-        <section class="use-cases-section">
-          <h2>Use Cases</h2>
-          <div class="use-cases-grid">
-            <div class="use-case-card">
-              <h3>Learning</h3>
-              <p>
-                Turn podcasts, lectures, and interviews into readable, searchable, shareable documents.
-              </p>
+            <div id="done-section" class="cta-container hidden">
+                <div class="success-icon">✔</div>
+                <p>Done! Please check your e-mail inbox in a few minutes.</p>
+                <button id="reset-button" class="cta">Got it!</button>
             </div>
-            <!-- Additional use case cards -->
-          </div>
-        </section>
 
-        <section>
-          <h2>Pricing: Support Our Mission</h2>
-          <p>
-            We believe in making knowledge accessible. That's why Platogram operates on a donation-based model.
-          </p>
-          <div class="pricing">
-            <h3>Suggested Donation: $2 per hour of audio processed</h3>
-            <p>Your donation supports:</p>
-            <ul>
-              <li>AI inference costs</li>
-              <li>Making Platogram accessible for all users</li>
-              <li>Building fully-offline version of Platogram</li>
-            </ul>
-            <div class="donate-button-container">
-              <a href="#" class="cta donate" id="donate-button-pricing">Donate Now</a>
+            <div id="status-section" class="cta-container hidden">
+                <p>Working on it. You will receive an email from Artyom Astafurov with PDF, Word, and Markdown documents once ready.</p>
+                <p>Processing time is quick - about 5 mins for each hour of content. Hang tight!</p>
+                <div id="animation-container">
+                    <div id="runner"></div>
+                    <p id="processing-stage"></p>
+                </div>
+                <button id="donate-button-status" class="cta donate">Donate</button>
             </div>
-          </div>
-        </section>
-      </main>
-      <footer>
-        <p>
-          Platogram is built with 💜 in New York and Boston by
-          <a href="https://codeanyway.com" target="_blank" rel="noopener noreferrer">Code Anyway, Inc</a>
-          in 2023-2024.
-        </p>
-      </footer>
+
+            <div id="error-section" class="cta-container hidden">
+                <p>An error occurred. Please try again.</p>
+                <button id="reset-button-error" class="cta">Reset</button>
+            </div>
+
+            <section class="features-section">
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <h3>Sparks Joy</h3>
+                        <p>Platogram doesn't just transcribe - it transforms speech into high-quality, readable documents optimized for knowledge retrieval.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>Privacy First</h3>
+                        <p>Your data stays yours. We process without storing, ensuring your sensitive information remains confidential.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>Just Works</h3>
+                        <p>Drop a link or a file with audio or transcript and we will e-mail you a well-organized, readable document.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="examples-section">
+                <h2>Examples</h2>
+                <div class="examples-grid">
+                    <div class="example-card">
+                        <h3>John Carmack: From Gaming Pioneer to AI Visionary</h3>
+                        <a href="https://drive.google.com/file/d/1_w9mv4_mBVSwK4NSnybGXtRysaT7ROFT/view?usp=drive_link" target="_blank" class="sample-link">View sample output</a>
+                        <p class="example-description">Transform a 5-hour podcast into a structured document that sparks joy.</p>
+                    </div>
+                    <!-- Add more example cards as needed -->
+                </div>
+            </section>
+
+            <section class="use-cases-section">
+                <h2>Use Cases</h2>
+                <div class="use-cases-grid">
+                    <div class="use-case-card">
+                        <h3>Learning</h3>
+                        <p>Turn podcasts, lectures, and interviews into readable, searchable, shareable documents.</p>
+                    </div>
+                    <!-- Add more use case cards as needed -->
+                </div>
+            </section>
+
+            <section>
+                <h2>Pricing: Support Our Mission</h2>
+                <p>We believe in making knowledge accessible. That's why Platogram operates on a donation-based model.</p>
+                <div class="pricing">
+                    <h3>Suggested Donation: $2 per hour of audio processed</h3>
+                    <p>Your donation supports:</p>
+                    <ul>
+                        <li>AI inference costs</li>
+                        <li>Making Platogram accessible for all users</li>
+                        <li>Building fully-offline version of Platogram</li>
+                    </ul>
+                    <div class="donate-button-container">
+                        <a href="#" id="donate-button-pricing" class="cta donate">Donate Now</a>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Platogram is built with 💜 in New York and Boston by <a href="https://codeanyway.com" target="_blank" rel="noopener noreferrer">Code Anyway, Inc</a> in 2023-2024.</p>
+            <p><a href="https://github.com/code-anyway/platogram" target="_blank">View Source Code on GitHub</a></p>
+        </footer>
     </div>
+
+    <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
     <script src="app.js"></script>
-    <!-- Start of LiveChat (www.livechat.com) code -->
-    <script>
-      window.__lc = window.__lc || {};
-      window.__lc.license = 18397149;
-      window.__lc.integration_name = "manual_onboarding";
-      window.__lc.product_name = "livechat";
-      (function (n, t, c) {
-        function i(n) {
-          return e._h ? e._h.apply(null, n) : e._q.push(n);
-        }
-        var e = {
-          _q: [],
-          _h: null,
-          _v: "2.0",
-          on: function () {
-            i(["on", c.call(arguments)]);
-          },
-          once: function () {
-            i(["once", c.call(arguments)]);
-          },
-          off: function () {
-            i(["off", c.call(arguments)]);
-          },
-          get: function () {
-            if (!e._h)
-              throw new Error(
-                "[LiveChatWidget] You can't use getters before load."
-              );
-            return i(["get", c.call(arguments)]);
-          },
-          call: function () {
-            i(["call", c.call(arguments)]);
-          },
-          init: function () {
-            var n = t.createElement("script");
-            (n.async = !0),
-              (n.type = "text/javascript"),
-              (n.src = "https://cdn.livechatinc.com/tracking.js"),
-              t.head.appendChild(n);
-          },
-        };
-        !n.__lc.asyncInit && e.init(),
-          (n.LiveChatWidget = n.LiveChatWidget || e);
-      })(window, document, [].slice);
-    </script>
-    <noscript>
-      <a href="https://www.livechat.com/chat-with/18397149/" rel="nofollow">Chat with us</a>, powered by
-      <a href="https://www.livechat.com/?welcome" rel="noopener nofollow" target="_blank">LiveChat</a>
-    </noscript>
-    <!-- End of LiveChat code -->
-    <script>
-     document.addEventListener('DOMContentLoaded', () => {
-  console.log("DOM Content Loaded");
-
-       const observer = new MutationObserver((mutations) => {
-         for (const mutation of mutations) {
-           if (mutation.type === 'childList') {
-             const fileNameElement = document.getElementById('file-name');
-             if (fileNameElement) {
-               // Add the event listener here
-               const fileUpload = document.getElementById('file-upload');
-               if (fileUpload) {
-                 fileUpload.addEventListener('change', (event) => {
-                   const file = event.target.files[0];
-                   if (file) {
-                     document.getElementById('file-name').textContent = file.name;
-                   }
-                 });
-               }
-               observer.disconnect();
-               break;
-             }
-           }
-         }
-       });
-
-       observer.observe(document.body, { childList: true, subtree: true });
-  const elements = {
-    loginButton: document.querySelector('#login-button'),
-    logoutButton: document.querySelector('#logout-button'),
-    convertButton: document.querySelector('#convert-button'),
-    donateButton: document.querySelector('#donate-button'),
-    resetButton: document.querySelector('#reset-button'),
-    resetButtonError: document.querySelector('#reset-button-error'),
-    fileUpload: document.querySelector('#file-upload'),
-    fileName: document.querySelector('#file-name'),
-    urlInput: document.querySelector('#url-input'),
-    errorMessage: document.querySelector('#error-message')
-  };
-
-  // Log which elements were found or not found
-  Object.entries(elements).forEach(([key, value]) => {
-    console.log(`${key}: ${value ? "Found" : "Not found"}`);
-  });
-
-  if (elements.loginButton) elements.loginButton.addEventListener('click', login);
-  if (elements.logoutButton) elements.logoutButton.addEventListener('click', logout);
-  if (elements.convertButton) elements.convertButton.addEventListener('click', onConvertClick);
-  if (elements.donateButton) elements.donateButton.addEventListener('click', onDonateClick);
-  if (elements.resetButton) elements.resetButton.addEventListener('click', reset);
-  if (elements.resetButtonError) elements.resetButtonError.addEventListener('click', reset);
-
-  // Add file upload handling
-  if (elements.fileUpload) {
-    elements.fileUpload.addEventListener('change', (event) => {
-      const file = event.target.files[0];
-      if (file && elements.fileName) {
-        elements.fileName.textContent = file.name;
-        console.log("File selected:", file.name);
-      } else {
-        console.log("No file selected or fileName element not found");
-      }
-    });
-  } else {
-    console.warn("File upload element not found");
-  }
-
-  safeUpdateProcessingStage();
-  initializeProcessingStage();
-
-  initAuth0().catch((error) => console.error("Error initializing app:", error));
-});
-    </script>
-  </body>
+</body>
 </html>

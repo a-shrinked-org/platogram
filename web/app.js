@@ -201,9 +201,12 @@ function showErrorMessage(message) {
 }
 
 async function postToConvert(inputData, lang) {
-  const chunkSize = 1024 * 1024; // 1MB chunks
+  const chunkSize = 4 * 1024 * 1024; // 4MB chunks
   let body;
   let headers = {};
+
+  const maxRetries = 3;   // Number of retries
+  const retryDelay = 2000; // Delay between retries
 
   try {
     updateUIStatus("running", "Starting conversion process...");
@@ -214,7 +217,7 @@ async function postToConvert(inputData, lang) {
     debugLog("Obtained token for convert");
 
     headers.Authorization = `Bearer ${token}`;
-    headers['Content-Type'] = 'application/octet-stream';
+    headers['Content-Type'] = inputData.file ? 'application/octet-stream' : 'application/json';
 
     if (inputData.file) {
       const file = inputData.file;
@@ -230,16 +233,63 @@ async function postToConvert(inputData, lang) {
         headers['X-Total-Chunks'] = totalChunks.toString();
         headers['X-Language'] = lang;
 
-        const response = await fetch("/convert", {
-          method: "POST",
-          headers: headers,
-          body: chunk,
-        });
+        let response;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          try {
+            response = await fetch("/convert", {
+              method: "POST",
+              headers: headers,
+              body: chunk,
+            });
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+            if (response.ok) break; // Exit loop if request was successful
+
+          } catch (error) {
+            if (attempt < maxRetries - 1) {
+              await new Promise(resolve => setTimeout(resolve, retryDelay)); // Wait before retrying
+            } else {
+              throw error; // Throw error if all retries fail
+            }
+          }
         }
 
+        if (response) {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            debugLog("Received chunk: " + chunk);
+            updateUIStatus("running", chunk);
+          }
+        }
+      }
+    } else if (inputData.url) {
+      body = JSON.stringify({ url: inputData.url, lang: lang });
+
+      let response;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          response = await fetch("/convert", {
+            method: "POST",
+            headers: headers,
+            body: body,
+          });
+
+          if (response.ok) break; // Exit loop if request was successful
+
+        } catch (error) {
+          if (attempt < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, retryDelay)); // Wait before retrying
+          } else {
+            throw error; // Throw error if all retries fail
+          }
+        }
+      }
+
+      if (response) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
 
@@ -250,30 +300,6 @@ async function postToConvert(inputData, lang) {
           debugLog("Received chunk: " + chunk);
           updateUIStatus("running", chunk);
         }
-      }
-    } else if (inputData.url) {
-      headers['Content-Type'] = 'application/json';
-      body = JSON.stringify({ url: inputData.url, lang: lang });
-
-      const response = await fetch("/convert", {
-        method: "POST",
-        headers: headers,
-        body: body,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        debugLog("Received chunk: " + chunk);
-        updateUIStatus("running", chunk);
       }
     } else {
       throw new Error("No input provided");

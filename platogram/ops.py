@@ -8,14 +8,14 @@ from platogram.types import Content, SpeechEvent
 
 def remove_markers(text: str) -> str:
     # Correct escape sequence
-    return re.sub(r"(【\d+】)", " ", text)
+    return re.sub(r"(【\\d+】)", " ", text)
 
-def parse(text_with_markers: str, marker: str = r"(【\d+】)") -> dict[int, str]:
+def parse(text_with_markers: str, marker: str = r"(【\\d+】)") -> dict[int, str]:
     """
     Parses a string containing text segments separated by numeric markers.
     Args:
         text_with_markers: The input string containing text segments and markers.
-        marker: The regular expression pattern for the markers. Default is r'(【\d+】)'.
+        marker: The regular expression pattern for the markers. Default is r'(【\\d+】)'.
     Returns:
         A dictionary where the keys are the numeric markers and the values are the text segments associated with each marker.
     Raises:
@@ -31,14 +31,10 @@ def parse(text_with_markers: str, marker: str = r"(【\d+】)") -> dict[int, str
     segments = re.split(marker, text_with_markers)
 
     if not any(is_marker(segment) for segment in segments):
-        raise ValueError(
-            f"Input string does not contain any valid markers. {text_with_markers}"
-        )
+        raise ValueError(f"Input string does not contain any valid markers. {text_with_markers}")
 
     if segments[-1]:
-        raise ValueError(
-            f"Input string must end with a valid marker. {text_with_markers}"
-        )
+        raise ValueError(f"Input string must end with a valid marker. {text_with_markers}")
 
     relevant_segment_dict: dict[int, str] = {}
     text = ""
@@ -51,9 +47,7 @@ def parse(text_with_markers: str, marker: str = r"(【\d+】)") -> dict[int, str
             text += segment
     return relevant_segment_dict
 
-def render(
-        segments: dict[int, str], marker_fn: Callable[[int], str] = lambda x: f"【{x}】"
-    ) -> str:
+def render(segments: dict[int, str], marker_fn: Callable[[int], str] = lambda x: f"【{x}】") -> str:
     """
     Renders a dictionary of text segments into a single string with numeric markers.
     Args:
@@ -68,7 +62,7 @@ def chunk_text(
         text_with_markers: str,
         chunk_size: int,
         token_count_fn: Callable[[str], int],
-        marker: str = r"(【\d+】)",
+        marker: str = r"(【\\d+】)"
     ) -> list[str]:
     """
     Splits a string containing text segments separated by numeric markers into chunks of a specified size.
@@ -76,7 +70,7 @@ def chunk_text(
         text_with_markers: The input string containing text segments and markers.
         chunk_size: The desired maximum size of each chunk, in terms of the number of tokens.
         token_count_fn: A function that takes a string and returns the number of tokens in it.
-        marker: The regular expression pattern for the markers. Default is r'(【\d+】)'.
+        marker: The regular expression pattern for the markers. Default is r'(【\\d+】)'.
     Returns:
         A list of strings, where each string represents a chunk of the input text.
     """
@@ -89,10 +83,7 @@ def chunk_text(
     chunk_segments: dict[int, str] = {}
     for key, segment in segments.items():
         updated_chunk_segments = {**chunk_segments, key: segment}
-        if (
-            token_count_fn(render(updated_chunk_segments)) > target_chunk_size
-            and chunk_segments
-        ):
+        if token_count_fn(render(updated_chunk_segments)) > target_chunk_size and chunk_segments:
             chunks.append(chunk_segments)
             chunk_segments = {key: segment}
         else:
@@ -109,7 +100,7 @@ def get_paragraphs(
     max_tokens: int,
     temperature: float,
     chunk_size: int,
-    lang: Optional[str] = None,
+    lang: Optional[str] = None
 ) -> list[str]:
     if not lang:
         lang = "en"
@@ -126,39 +117,25 @@ def get_paragraphs(
             chunk = tail + chunk
 
             base_marker = sorted(parse(chunk).keys())[0]
-            content = render(
-                {marker - base_marker: text for marker, text in parse(chunk).items()}
-            )
+            content = render({marker - base_marker: text for marker, text in parse(chunk).items()})
 
             for paragraph in llm.get_paragraphs(
-                content, examples, max_tokens=max_tokens, temperature=temperature, lang=lang,
+                content, examples, max_tokens=max_tokens, temperature=temperature, lang=lang
             ):
                 paragraphs.append(
-                    re.sub(
-                        r"【(\d+)】",
-                        lambda match: f"【{int(match.group(1)) + base_marker}】",
-                        paragraph,
-                    )
+                    re.sub(r"【(\\d+)】", lambda match: f"【{int(match.group(1)) + base_marker}】", paragraph)
                 )
 
             if i < len(chunks) - 1 and paragraphs:
                 paragraphs.pop()
-                while paragraphs and not re.findall(r"【(\d+)】", paragraphs[-1]):
+                while paragraphs and not re.findall(r"【(\\d+)】", paragraphs[-1]):
                     paragraphs.pop()
 
             if len(paragraphs) > 1:
-                markers = sorted(
-                    [int(marker) for marker in re.findall(r"【(\d+)】", paragraphs[-1])]
-                )
+                markers = sorted([int(marker) for marker in re.findall(r"【(\\d+)】", paragraphs[-1])])
                 if markers:
                     last_marker = markers[-1]
-                    tail = render(
-                        {
-                            marker: text
-                            for marker, text in parse(chunk).items()
-                            if marker >= last_marker
-                        }
-                    )
+                    tail = render({marker: text for marker, text in parse(chunk).items() if marker >= last_marker})
                 else:
                     tail = chunk
             else:
@@ -173,7 +150,7 @@ def index(
     max_tokens: int = 4096,
     temperature: float = 0.5,
     chunk_size: int = 2048,
-    lang: Optional[str] = None,
+    lang: Optional[str] = None
 ) -> Content:
     text = render({i: event.text for i, event in enumerate(transcript)})
     paragraphs = get_paragraphs(text, llm, max_tokens, temperature, chunk_size, lang=lang)

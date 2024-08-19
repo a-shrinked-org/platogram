@@ -263,13 +263,13 @@
         initializeProcessingStage();
 
         // Add event listeners to buttons
-       // const convertButton = document.getElementById('convert-button');
-       // if (convertButton) {
-       //   convertButton.addEventListener('click', (event) => {
-         //   event.preventDefault();
-        //    onConvertClick();
-        //  });
-       // }
+        const convertButton = document.getElementById('convert-button');
+        if (convertButton) {
+          convertButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            onConvertClick();
+          });
+        }
 
         const loginButton = document.getElementById('login-button');
         if (loginButton) {
@@ -302,6 +302,7 @@
             reset();
           });
         });
+
       });
     </script>
   </body>

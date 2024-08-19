@@ -1,5 +1,9 @@
 let auth0Client = null;
 
+function debugLog(message) {
+  console.log(`[DEBUG] ${message}`);
+}
+
 const processingStages = [
   "Byte Whispering", "Qubit Juggling", "Syntax Gymnastics",
   "Pixel Wrangling", "Neuron Tickling", "Algorithm Disco",
@@ -394,3 +398,37 @@ function safeUpdateProcessingStage() {
   }
 }
 
+document.addEventListener('DOMContentLoaded', () => {
+  console.log("DOM Content Loaded");
+
+  const fileUpload = document.getElementById('file-upload');
+  const fileName = document.getElementById('file-name');
+  const urlInput = document.getElementById('url-input');
+
+  if (fileUpload && fileName && urlInput) {
+    fileUpload.addEventListener('change', (event) => {
+      console.log("File upload changed");
+      const file = event.target.files[0];
+      if (file) {
+        fileName.textContent = file.name;
+        urlInput.value = ''; // Clear URL input when file is selected
+        console.log("File selected:", file.name);
+      } else {
+        fileName.textContent = '';
+        console.log("No file selected");
+      }
+    });
+
+    urlInput.addEventListener('input', () => {
+      if (urlInput.value.trim() !== '') {
+        fileUpload.value = ''; // Clear file input when URL is entered
+        fileName.textContent = '';
+      }
+    });
+  } else {
+    console.error("One or more elements for file upload not found");
+  }
+
+  // Initialize other parts of your application
+  initAuth0().catch((error) => console.error("Error initializing app:", error));
+});

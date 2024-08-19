@@ -398,37 +398,51 @@ function safeUpdateProcessingStage() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+ocument.addEventListener('DOMContentLoaded', () => {
   console.log("DOM Content Loaded");
 
-  const fileUpload = document.getElementById('file-upload');
-  const fileName = document.getElementById('file-name');
-  const urlInput = document.getElementById('url-input');
+  const uploadIcon = document.querySelector('.upload-icon');
+  const fileNameElement = document.getElementById('file-name');
 
-  if (fileUpload && fileName && urlInput) {
-    fileUpload.addEventListener('change', (event) => {
-      console.log("File upload changed");
-      const file = event.target.files[0];
-      if (file) {
-        fileName.textContent = file.name;
-        urlInput.value = ''; // Clear URL input when file is selected
-        console.log("File selected:", file.name);
-      } else {
-        fileName.textContent = '';
-        console.log("No file selected");
-      }
-    });
+  if (uploadIcon) {
+    uploadIcon.addEventListener('click', () => {
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = '.srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a';
+      fileInput.style.display = 'none';
+      document.body.appendChild(fileInput);
 
-    urlInput.addEventListener('input', () => {
-      if (urlInput.value.trim() !== '') {
-        fileUpload.value = ''; // Clear file input when URL is entered
-        fileName.textContent = '';
-      }
+      fileInput.click();
+
+      fileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+          console.log("File selected:", file.name);
+          if (fileNameElement) {
+            fileNameElement.textContent = file.name;
+          } else {
+            console.warn("Element with id 'file-name' not found");
+          }
+        } else {
+          console.log("No file selected");
+        }
+        document.body.removeChild(fileInput);
+      });
     });
   } else {
-    console.error("One or more elements for file upload not found");
+    console.warn("Upload icon element not found");
   }
 
   // Initialize other parts of your application
   initAuth0().catch((error) => console.error("Error initializing app:", error));
 });
+
+// Update getInputData function to match the new structure
+function getInputData() {
+  const urlInput = document.getElementById("url-input");
+  const fileNameElement = document.getElementById("file-name");
+  return {
+    url: urlInput ? urlInput.value.trim() : '',
+    file: fileNameElement && fileNameElement.textContent ? { name: fileNameElement.textContent } : null
+  };
+}

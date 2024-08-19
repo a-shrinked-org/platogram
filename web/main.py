@@ -225,7 +225,7 @@ async def convert(request: Request):
 
             # Simulate processing steps
             for step in ["Analyzing", "Converting", "Finalizing"]:
-                await asyncio.sleep(1)  # Simulate work
+                await asyncio.sleep(1)  # Simulate work with regular updates
                 yield f"{step}...\n".encode()
 
             yield b"Conversion process initiated. You will receive an email when it's complete.\n"
@@ -426,4 +426,4 @@ def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, timeout_keep_alive=120)  # Increased timeout
+    uvicorn.run(app, host="0.0.0.0", port=8000, timeout_keep_alive=60)  # Set timeout to Vercel Hobby Plan max 60 seconds

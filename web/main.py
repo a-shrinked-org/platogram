@@ -237,8 +237,8 @@ async def convert(request: Request):
                 yield f"{step}...\n".encode()
 
             # Send initial response within 10 seconds
-            yield b"Conversion process started. Further updates will be provided.\n"
-            logger.debug("Initial response within 10 seconds sent")
+            logger.debug("Sending initial response")
+            yield b"Initial response sent within 10 seconds. Conversion process started.\n"
 
             # Continue with further steps beyond initial response to prevent timeout
             further_steps = ["Converting", "Finalizing"]
@@ -252,7 +252,6 @@ async def convert(request: Request):
             logger.error(f"Error in process_and_stream: {str(e)}")
 
     return StreamingResponse(process_and_stream(), media_type="text/plain")
-
 
 @app.get("/status")
 async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:

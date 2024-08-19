@@ -411,6 +411,78 @@ async function pollStatus(token) {
   }
 }
 
+function updateUIStatus(status, message = "") {
+  debugLog(`Updating UI status: ${status}`);
+  const inputSection = document.getElementById("input-section");
+  const statusSection = document.getElementById("status-section");
+  const errorSection = document.getElementById("error-section");
+  const doneSection = document.getElementById("done-section");
+  const processingStage = document.getElementById("processing-stage");
+
+  [inputSection, statusSection, errorSection, doneSection].forEach(section => {
+    if (section) {
+      section.classList.add("hidden");
+    } else {
+      console.warn(`Section not found: ${section}`);
+    }
+  });
+
+  switch (status) {
+    case "running":
+      if (statusSection && processingStage) {
+        statusSection.classList.remove("hidden");
+        updateProcessingStage();
+        if (!processingStageInterval) {
+          processingStageInterval = setInterval(updateProcessingStage, 3000);
+        }
+      } else {
+        console.error("Status section or processing stage element not found");
+      }
+      break;
+    case "done":
+      clearProcessingStageInterval();
+      if (doneSection) {
+        doneSection.classList.remove("hidden");
+      } else {
+        console.error("Done section not found");
+      }
+      break;
+    case "idle":
+      clearProcessingStageInterval();
+      if (inputSection) {
+        inputSection.classList.remove("hidden");
+      } else {
+        console.error("Input section not found");
+      }
+      break;
+    case "error":
+      clearProcessingStageInterval();
+      if (errorSection) {
+        errorSection.classList.remove("hidden");
+        const errorParagraph = errorSection.querySelector("p");
+        if (errorParagraph) {
+          errorParagraph.textContent = message || "An error occurred. Please try again.";
+        } else {
+          console.error("Error paragraph not found in error section");
+        }
+      } else {
+        console.error("Error section not found");
+      }
+      break;
+    default:
+      clearProcessingStageInterval();
+      console.error(`Unknown status: ${status}`);
+  }
+}
+
+function clearProcessingStageInterval() {
+  if (processingStageInterval) {
+    debugLog("Clearing processing stage interval");
+    clearInterval(processingStageInterval);
+    processingStageInterval = null;
+  }
+}
+
 function updateProcessingStage() {
   const statusSection = document.getElementById('status-section');
   const processingStage = document.getElementById('processing-stage');
@@ -441,24 +513,6 @@ function updateProcessingStage() {
   }
 }
 
-function initializeProcessingStage() {
-  debugLog("Initializing processing stage");
-  updateProcessingStage();
-  processingStageInterval = setInterval(updateProcessingStage, 3000);
-}
-
-function safeUpdateProcessingStage() {
-  try {
-    if (document.readyState === 'complete') {
-      updateProcessingStage();
-    } else {
-      window.addEventListener('load', updateProcessingStage);
-    }
-  } catch (error) {
-    console.error("Error in safeUpdateProcessingStage:", error);
-  }
-}
-
 document.addEventListener('DOMContentLoaded', () => {
   debugLog("DOM Content Loaded");
 
@@ -482,8 +536,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize other parts of your application
   initAuth0().catch((error) => console.error("Error initializing app:", error));
 });
-
-let fileUploadListenerAdded = false;
 
 function handleFileUpload() {
   const fileNameElement = document.getElementById('file-name');

@@ -207,6 +207,9 @@ async def convert(request: Request):
                     temp_file.rename(final_file)
                     yield f"File {file_name} received completely. Processing...\n".encode()
                     # Add your file processing logic here
+                    # Call the long-running task in the background
+                    await process_file(final_file, lang)
+
             elif content_type == 'application/json':
                 # URL processing
                 data = await request.json()
@@ -214,6 +217,9 @@ async def convert(request: Request):
                 lang = data.get('lang', 'en')
                 yield f"Received URL: {url}. Processing...\n".encode()
                 # Add your URL processing logic here
+                # Call the long-running task in the background
+                await process_url(url, lang)
+
             else:
                 raise HTTPException(status_code=400, detail="Invalid content type")
 
@@ -279,6 +285,8 @@ async def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: st
 
     try:
         stdout, stderr = await process.communicate()
+        logger.debug(f"Process stdout: {stdout.decode()}")
+        logger.debug(f"Process stderr: {stderr.decode()}")
     finally:
         if user_id in processes:
             del processes[user_id]
@@ -287,6 +295,20 @@ async def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: st
         raise RuntimeError(f"Failed to execute {command} with return code {process.returncode}.\n\nstdout:\n{stdout.decode()}\n\nstderr:\n{stderr.decode()}")
 
     return stdout.decode(), stderr.decode()
+
+async def process_file(file_path: Path, lang: str):
+    logger.debug(f"Processing file: {file_path}, language: {lang}")
+    # Implement your file processing logic here
+    # Simulate a delay to mock long processing
+    await asyncio.sleep(2)
+    logger.debug(f"File processed: {file_path}")
+
+async def process_url(url: str, lang: str):
+    logger.debug(f"Processing URL: {url}, language: {lang}")
+    # Implement your URL processing logic here
+    # Simulate a delay to mock long processing
+    await asyncio.sleep(2)
+    logger.debug(f"URL processed: {url}")
 
 async def send_email(user_id: str, subj: str, body: str, files: list[Path]):
     loop = asyncio.get_running_loop()
@@ -358,31 +380,50 @@ Suggested donation: $2 per hour of content converted."""
         logger.exception(f"Conversion failed for user {user_id}: {str(e)}")
         logfire.exception(f"Conversion and sending failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to convert and send transcript: {str(e)}")
+
 def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):
+    logger.debug("Starting _send_email_sync function")
+
     smtp_user = os.getenv("PLATOGRAM_SMTP_USER")
     smtp_server = os.getenv("PLATOGRAM_SMTP_SERVER")
     smtp_port = 587
     sender_password = os.getenv("PLATOGRAM_SMTP_PASSWORD")
     
+    logger.debug(f"SMTP User: {smtp_user}, Server: {smtp_server}, Port: {smtp_port}")
+
     msg = MIMEMultipart()
     msg['From'] = os.getenv("PLATOGRAM_SMTP_FROM")
     msg['To'] = user_id
     msg['Subject'] = subj
     
     msg.attach(MIMEText(body, 'plain'))
+    logger.debug(f"Prepared email body: {body}")
     
     for file in files:
-        with open(file, "rb") as f:
-            file_name = file.name.split("/")[-1]
-            part = MIMEApplication(f.read(), Name=file_name)
-            part['Content-Disposition'] = f'attachment; filename="{file_name}"'
-            msg.attach(part)
+        logger.debug(f"Attaching file: {file}")
+        try:
+            with open(file, "rb") as f:
+                file_name = file.name.split("/")[-1]
+                part = MIMEApplication(f.read(), Name=file_name)
+                part['Content-Disposition'] = f'attachment; filename="{file_name}"'
+                msg.attach(part)
+            logger.debug(f"Successfully attached file: {file_name}")
+        except Exception as e:
+            logger.error(f"Error attaching file {file}: {str(e)}")
     
-    with smtplib.SMTP(smtp_server, smtp_port) as server:
-        server.starttls()
-        server.login(smtp_user, sender_password)
-        server.send_message(msg)
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            logger.debug("Started TLS connection")
+            server.login(smtp_user, sender_password)
+            logger.debug("Logged into SMTP server")
+            server.send_message(msg)
+            logger.debug(f"Email sent to {user_id} with subject {subj}")
+    except Exception as e:
+        logger.error(f"Failed to send email to {user_id}: {str(e)}")
+
+    logger.debug("Ending _send_email_sync function")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, timeout_keep_alive=120)  # Increased timeout

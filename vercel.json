@@ -32,10 +32,5 @@
       "dest": "/web/main.py"
     }
   ],
-  "buildCommand": "pip install -r requirements.txt && pip install -e .",
-  "functions": {
-    "web/main.py": {
-      "memory": 1024
-    }
-  }
+  "buildCommand": "pip install -r requirements.txt && pip install -e ."
 }

@@ -179,9 +179,11 @@ async def verify_token_and_get_user_id(token: str = Depends(oauth2_scheme)):
 @logfire.instrument()
 async def convert(request: Request):
     async def process_and_stream():
+        logger.debug("Starting process_and_stream")
         try:
             headers = request.headers
             content_type = headers.get('content-type', '')
+            logger.debug(f"Content type: {content_type}")
 
             if content_type == 'application/octet-stream':
                 # File upload
@@ -189,6 +191,7 @@ async def convert(request: Request):
                 chunk_index = int(headers.get('X-Chunk-Index', 0))
                 total_chunks = int(headers.get('X-Total-Chunks', 1))
                 lang = headers.get('X-Language', 'en')
+                logger.debug(f"Received file upload - {file_name}, chunk {chunk_index + 1} of {total_chunks}, language {lang}")
 
                 temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
                 temp_dir.mkdir(parents=True, exist_ok=True)
@@ -206,6 +209,7 @@ async def convert(request: Request):
                     final_file = temp_dir / file_name
                     temp_file.rename(final_file)
                     yield f"File {file_name} received completely. Processing...\n".encode()
+                    logger.debug(f"All chunks for {file_name} received")
                     # Add your file processing logic here
                     # Call the long-running task in the background
                     await process_file(final_file, lang)
@@ -214,27 +218,32 @@ async def convert(request: Request):
                 # URL processing
                 data = await request.json()
                 url = data.get('url')
-                lang = data.get('lang', 'en')
+                lang_data = data.get('lang', 'en')
                 yield f"Received URL: {url}. Processing...\n".encode()
+                logger.debug(f"Received URL: {url}, language: {lang_data}")
                 # Add your URL processing logic here
                 # Call the long-running task in the background
-                await process_url(url, lang)
+                await process_url(url, lang_data)
 
             else:
+                yield "Invalid content type\n".encode()
                 raise HTTPException(status_code=400, detail="Invalid content type")
 
             # Ensure initial response within 10 seconds
             initial_steps = ["Initializing", "Analyzing"]
             for step in initial_steps:
+                logger.debug(f"Executing step: {step}")
                 await asyncio.sleep(1)  # Simulate work
                 yield f"{step}...\n".encode()
 
             # Send initial response within 10 seconds
             yield b"Conversion process started. Further updates will be provided.\n"
+            logger.debug("Initial response within 10 seconds sent")
 
             # Continue with further steps beyond initial response to prevent timeout
             further_steps = ["Converting", "Finalizing"]
             for step in further_steps:
+                logger.debug(f"Executing step: {step}")
                 await asyncio.sleep(1)  # Simulate additional work
                 yield f"{step}...\n".encode()
 
@@ -243,6 +252,7 @@ async def convert(request: Request):
             logger.error(f"Error in process_and_stream: {str(e)}")
 
     return StreamingResponse(process_and_stream(), media_type="text/plain")
+
 
 @app.get("/status")
 async def status(user_id: str = Depends(verify_token_and_get_user_id)) -> dict:

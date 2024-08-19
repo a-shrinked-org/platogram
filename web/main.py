@@ -113,11 +113,9 @@ async def handle_convert(body, headers):
             return {"statusCode": 400, "body": json.dumps({"error": "Invalid content type"})}
 
         # Start background processing here
-        # Note: In a serverless environment, you might need to use a separate service for long-running tasks
         asyncio.create_task(process_conversion(user_id))
 
         return {"statusCode": 200, "body": json.dumps({"message": "Conversion started"})}
-
     except Exception as e:
         logfire.exception(f"Error in convert: {str(e)}")
         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
@@ -171,7 +169,6 @@ async def process_conversion(user_id: str):
 
         # Here you would typically send an email with the results
         # await send_email(user_id, "Conversion complete", "Your conversion is complete.")
-
     except Exception as e:
         logfire.exception(f"Error in conversion for user {user_id}: {str(e)}")
         tasks[user_id]['status'] = 'failed'

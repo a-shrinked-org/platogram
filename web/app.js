@@ -539,6 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const urlInput = document.getElementById('url-input');
 
   if (uploadIcon && fileNameElement && urlInput) {
+    // Add the event listener to the upload icon only once
     uploadIcon.addEventListener('click', handleFileUpload);
 
     urlInput.addEventListener('input', () => {
@@ -559,21 +560,19 @@ function handleFileUpload() {
   const fileNameElement = document.getElementById('file-name');
   const urlInput = document.getElementById('url-input');
 
-  // Remove any existing file input
-  const existingFileInput = document.getElementById('temp-file-input');
-  if (existingFileInput) {
-    existingFileInput.remove();
-  }
-
+  // Create a new file input element
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
-  fileInput.id = 'temp-file-input';
   fileInput.accept = '.srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a';
   fileInput.style.display = 'none';
+
+  // Add the file input to the document body
   document.body.appendChild(fileInput);
 
+  // Trigger the file selection dialog
   fileInput.click();
 
+  // Handle the file selection
   fileInput.addEventListener('change', (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -586,14 +585,10 @@ function handleFileUpload() {
       fileNameElement.file = null; // Clear the stored File object
       debugLog("No file selected");
     }
+
+    // Remove the temporary file input
     fileInput.remove();
   }, { once: true });
-
-  // Re-add the event listener for future uploads
-  //const uploadIcon = document.querySelector('.upload-icon');
-  //if (uploadIcon) {
- //   uploadIcon.addEventListener('click', handleFileUpload, { once: true });
-  //}
 }
 
 // Ensure all functions are in global scope

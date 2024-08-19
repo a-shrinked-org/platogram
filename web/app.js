@@ -154,28 +154,28 @@ async function onDonateClick() {
 
 // Handle the 'Convert' button click
 async function onConvertClick(event) {
-  event.preventDefault();
-  console.log("Convert button clicked");
+    event.preventDefault();
+    console.log("Convert button clicked");
 
-  try {
-    if (!auth0Client) {
-      throw new Error("Auth0 client not initialized");
-    }
+    try {
+        if (!auth0Client) {
+            throw new Error("Auth0 client not initialized");
+        }
 
-    const inputData = getInputData();
-    if (!inputData.url && !inputData.file) {
-      throw new Error("Please provide a URL or upload a file");
-    }
+        const inputData = getInputData();
+        if (!inputData.url && !inputData.file) {
+            throw new Error("Please provide a URL or upload a file");
+        }
 
-    if (await auth0Client.isAuthenticated()) {
-      showLanguageSelectionModal(inputData);
-    } else {
-      login();
+        if (await auth0Client.isAuthenticated()) {
+            showLanguageSelectionModal(inputData);
+        } else {
+            login();
+        }
+    } catch (error) {
+        console.error("Error in onConvertClick:", error);
+        updateUIStatus("error", error.message);
     }
-  } catch (error) {
-    console.error("Error in onConvertClick:", error);
-    updateUIStatus("error", error.message);
-  }
 }
 
 function showLanguageSelectionModal(inputData) {
@@ -482,32 +482,32 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function testAuth() {
-  console.log("Test Auth function called");
-  try {
-    if (!auth0Client) {
-      throw new Error("Auth0 client not initialized");
-    }
+    console.log("Test Auth function called");
+    try {
+        if (!auth0Client) {
+            throw new Error("Auth0 client not initialized");
+        }
 
-    const token = await auth0Client.getTokenSilently({
-      audience: "https://platogram.vercel.app",
-    });
-    console.log("Token obtained:", token.substring(0, 10) + "...");
+        const token = await auth0Client.getTokenSilently({
+            audience: "https://platogram.vercel.app",
+        });
+        console.log("Token obtained:", token.substring(0, 10) + "...");
 
-    const response = await fetch("/test-auth", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+        const response = await fetch("/test-auth", {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log("Auth test result:", data);
+        alert("Auth test successful. Check console for details.");
+    } catch (error) {
+        console.error("Auth test failed:", error);
+        alert("Auth test failed. Error: " + error.message);
     }
-    const data = await response.json();
-    console.log("Auth test result:", data);
-    alert("Auth test successful. Check console for details.");
-  } catch (error) {
-    console.error("Auth test failed:", error);
-    alert("Auth test failed. Error: " + error.message);
-  }
 }
 
 // Ensure all functions are in global scope

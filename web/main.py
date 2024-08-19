@@ -426,4 +426,4 @@ def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, timeout_keep_alive=60)  # Set timeout to Vercel Hobby Plan max 60 seconds
+    uvicorn.run(app, host="0.0.0.0", port=8000, timeout_keep_alive=29)  # Set timeout to Vercel Hobby Plan max 60 seconds

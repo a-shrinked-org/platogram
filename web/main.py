@@ -40,111 +40,123 @@ auth0_public_key_cache = {
 
 Language = Literal["en", "es"]
 
-# ... [Keep all the helper functions like get_auth0_public_key, verify_token_and_get_user_id, etc.]
+async def get_auth0_public_key():
+    current_time = time.time()
+    if (
+        auth0_public_key_cache["key"]
+        and current_time - auth0_public_key_cache["last_updated"]
+        < auth0_public_key_cache["expires_in"]
+    ):
+        return auth0_public_key_cache["key"]
 
-class handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path == '/status':
-            self.handle_status()
-        elif self.path == '/reset':
-            self.handle_reset()
+    async with httpx.AsyncClient() as client:
+        response = await client.get(JWKS_URL)
+        response.raise_for_status()
+        jwks = response.json()
+
+    x5c = jwks["keys"][0]["x5c"][0]
+    cert = load_pem_x509_certificate(
+        f"-----BEGIN CERTIFICATE-----\n{x5c}\n-----END CERTIFICATE-----".encode()
+    )
+    public_key = cert.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+
+    auth0_public_key_cache["key"] = public_key
+    auth0_public_key_cache["last_updated"] = current_time
+
+    return public_key
+
+async def verify_token_and_get_user_id(token: str):
+    try:
+        public_key = await get_auth0_public_key()
+        payload = jwt.decode(
+            token,
+            key=public_key,
+            algorithms=ALGORITHMS,
+            audience=API_AUDIENCE,
+            issuer=f"https://{AUTH0_DOMAIN}/",
+        )
+        return payload["platogram:user_email"]
+    except Exception as e:
+        raise ValueError(f"Couldn't verify token: {str(e)}")
+
+async def handle_convert(body, headers):
+    content_type = headers.get('Content-Type')
+    token = headers.get('Authorization', '').split(' ')[1]
+
+    try:
+        user_id = await verify_token_and_get_user_id(token)
+
+        if user_id in tasks and tasks[user_id]['status'] == "running":
+            return {"statusCode": 400, "body": json.dumps({"error": "Conversion already in progress"})}
+
+        if content_type == 'application/octet-stream':
+            file_name = headers.get('X-File-Name')
+            lang = headers.get('X-Language', 'en')
+
+            temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_file = temp_dir / f"{file_name}.part"
+
+            with open(temp_file, 'wb') as f:
+                f.write(body)
+
+            tasks[user_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang}
+        elif content_type == 'application/json':
+            data = json.loads(body)
+            url = data.get('url')
+            lang = data.get('lang', 'en')
+            tasks[user_id] = {'status': 'running', 'url': url, 'lang': lang}
         else:
-            self.send_error(404, "Not Found")
+            return {"statusCode": 400, "body": json.dumps({"error": "Invalid content type"})}
 
-    def do_POST(self):
-        if self.path == '/convert':
-            self.handle_convert()
+        # Start background processing here
+        # Note: In a serverless environment, you might need to use a separate service for long-running tasks
+        asyncio.create_task(process_conversion(user_id))
+
+        return {"statusCode": 200, "body": json.dumps({"message": "Conversion started"})}
+
+    except Exception as e:
+        logfire.exception(f"Error in convert: {str(e)}")
+        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+
+async def handle_status(headers):
+    token = headers.get('Authorization', '').split(' ')[1]
+
+    try:
+        user_id = await verify_token_and_get_user_id(token)
+
+        if user_id not in tasks:
+            response = {"status": "idle"}
         else:
-            self.send_error(404, "Not Found")
+            task = tasks[user_id]
+            response = {
+                "status": task['status'],
+                "error": task.get('error') if task['status'] == "failed" else None
+            }
 
-    def handle_convert(self):
-        content_length = int(self.headers['Content-Length'])
-        body = self.rfile.read(content_length)
-        content_type = self.headers.get('Content-Type')
-        token = self.headers.get('Authorization', '').split(' ')[1]
+        return {"statusCode": 200, "body": json.dumps(response)}
 
-        try:
-            user_id = asyncio.run(verify_token_and_get_user_id(token))
+    except Exception as e:
+        logfire.exception(f"Error in status: {str(e)}")
+        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
 
-            if user_id in tasks and tasks[user_id]['status'] == "running":
-                self.send_error(400, "Conversion already in progress")
-                return
+async def handle_reset(headers):
+    token = headers.get('Authorization', '').split(' ')[1]
 
-            if content_type == 'application/octet-stream':
-                file_name = self.headers.get('X-File-Name')
-                lang = self.headers.get('X-Language', 'en')
+    try:
+        user_id = await verify_token_and_get_user_id(token)
 
-                temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
-                temp_dir.mkdir(parents=True, exist_ok=True)
-                temp_file = temp_dir / f"{file_name}.part"
+        if user_id in tasks:
+            del tasks[user_id]
 
-                with open(temp_file, 'wb') as f:
-                    f.write(body)
+        return {"statusCode": 200, "body": json.dumps({"message": "Session reset"})}
 
-                tasks[user_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang}
-            elif content_type == 'application/json':
-                data = json.loads(body)
-                url = data.get('url')
-                lang = data.get('lang', 'en')
-                tasks[user_id] = {'status': 'running', 'url': url, 'lang': lang}
-            else:
-                self.send_error(400, "Invalid content type")
-                return
-
-            # Start background processing here
-            # Note: In a serverless environment, you might need to use a separate service for long-running tasks
-            asyncio.run(process_conversion(user_id))
-
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"message": "Conversion started"}).encode())
-
-        except Exception as e:
-            logfire.exception(f"Error in convert: {str(e)}")
-            self.send_error(500, str(e))
-
-    def handle_status(self):
-        token = self.headers.get('Authorization', '').split(' ')[1]
-
-        try:
-            user_id = asyncio.run(verify_token_and_get_user_id(token))
-
-            if user_id not in tasks:
-                response = {"status": "idle"}
-            else:
-                task = tasks[user_id]
-                response = {
-                    "status": task['status'],
-                    "error": task.get('error') if task['status'] == "failed" else None
-                }
-
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps(response).encode())
-
-        except Exception as e:
-            logfire.exception(f"Error in status: {str(e)}")
-            self.send_error(500, str(e))
-
-    def handle_reset(self):
-        token = self.headers.get('Authorization', '').split(' ')[1]
-
-        try:
-            user_id = asyncio.run(verify_token_and_get_user_id(token))
-
-            if user_id in tasks:
-                del tasks[user_id]
-
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"message": "Session reset"}).encode())
-
-        except Exception as e:
-            logfire.exception(f"Error in reset: {str(e)}")
-            self.send_error(500, str(e))
+    except Exception as e:
+        logfire.exception(f"Error in reset: {str(e)}")
+        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
 
 async def process_conversion(user_id: str):
     try:
@@ -165,58 +177,18 @@ async def process_conversion(user_id: str):
         tasks[user_id]['status'] = 'failed'
         tasks[user_id]['error'] = str(e)
 
-async def app(scope, receive, send):
-    assert scope['type'] == 'http'
+def handler(event, context):
+    path = event['path']
+    http_method = event['httpMethod']
+    headers = event['headers']
+    body = event.get('body', '')
 
-    if scope['method'] == 'GET':
-        if scope['path'] == '/status':
-            await handle_status(scope, receive, send)
-        elif scope['path'] == '/reset':
-            await handle_reset(scope, receive, send)
-        else:
-            await send_not_found(send)
-    elif scope['method'] == 'POST' and scope['path'] == '/convert':
-        await handle_convert(scope, receive, send)
-    else:
-        await send_not_found(send)
+    if http_method == 'GET':
+        if path == '/status':
+            return asyncio.run(handle_status(headers))
+        elif path == '/reset':
+            return asyncio.run(handle_reset(headers))
+    elif http_method == 'POST' and path == '/convert':
+        return asyncio.run(handle_convert(body, headers))
 
-async def receive_body(receive):
-    body = b''
-    more_body = True
-    while more_body:
-        message = await receive()
-        body += message.get('body', b'')
-        more_body = message.get('more_body', False)
-    return body
-
-async def send_json_response(send, data, status=200):
-    await send({
-        'type': 'http.response.start',
-        'status': status,
-        'headers': [
-            [b'content-type', b'application/json'],
-        ],
-    })
-    await send({
-        'type': 'http.response.body',
-        'body': json.dumps(data).encode(),
-    })
-
-async def send_not_found(send):
-    await send({
-        'type': 'http.response.start',
-        'status': 404,
-        'headers': [
-            [b'content-type', b'text/plain'],
-        ],
-    })
-    await send({
-        'type': 'http.response.body',
-        'body': b'Not Found',
-    })
-
-# Vercel handler
-def handler(request, response):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(app(request, lambda: None, response))
+    return {"statusCode": 404, "body": json.dumps({"error": "Not Found"})}

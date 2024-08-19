@@ -196,7 +196,7 @@ async def convert(request: Request):
 
                 yield f"Received chunk {chunk_index + 1} of {total_chunks}\n".encode()
 
-                # Rest of the file upload handling
+                # File upload handling
                 temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
                 temp_dir.mkdir(parents=True, exist_ok=True)
                 temp_file = temp_dir / f"{file_name}.part"
@@ -212,7 +212,7 @@ async def convert(request: Request):
                     final_file = temp_dir / file_name
                     temp_file.rename(final_file)
                     yield f"File {file_name} received completely. Finalizing...\n".encode()
-                    await process_file(final_file, lang)
+                    background_tasks.add_task(process_file, final_file, lang)
 
             elif content_type == 'application/json':
                 data = await request.json()
@@ -220,27 +220,20 @@ async def convert(request: Request):
                 lang_data = data.get('lang', 'en')
                 logger.debug(f"Received URL: {url}, language: {lang_data}")
                 yield f"Received URL: {url}. Initializing processing...\n".encode()
-                await process_url(url, lang_data)
+                background_tasks.add_task(process_url, url, lang_data)
             else:
                 yield "Invalid content type\n".encode()
                 raise HTTPException(status_code=400, detail="Invalid content type")
 
-            # Step 2: Simulate quick initial steps to ensure response within 10 seconds
+            # Step 2: Quick initial steps
             initial_steps = ["Initializing", "Analyzing"]
             for step in initial_steps:
                 logger.debug(f"Executing step: {step}")
-                await asyncio.sleep(1)  # Simulate work
+                await asyncio.sleep(0.5)  # Reduced sleep time
                 yield f"{step}...\n".encode()
 
             logger.debug("Sending initial response within 10 seconds")
-            yield b"Initial response sent within 10 seconds. Conversion process started.\n"
-
-            # Step 3: Continue longer processing steps
-            further_steps = ["Converting", "Finalizing"]
-            for step in further_steps:
-                logger.debug(f"Executing step: {step}")
-                await asyncio.sleep(1)  # Simulate additional work
-                yield f"{step}...\n".encode()
+            yield b"Initial response sent. Conversion process started in background.\n"
 
         except Exception as e:
             logger.error(f"Error in process_and_stream: {str(e)}")

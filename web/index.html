@@ -7,23 +7,12 @@
     <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="https://platogram.vercel.app/web/styles.css">
+    <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <!-- Add this modal at the beginning of the body -->
-    <div id="language-modal" class="modal hidden">
-        <div class="modal-content">
-            <h3>Select Language</h3>
-            <button id="en-btn">English</button>
-            <button id="es-btn">Spanish</button>
-            <button id="cancel-btn">Cancel</button>
-        </div>
-    </div>
-
     <div class="container">
       <header>
         <a href="#" class="cta" id="login-button">Log In</a>
-        <button id="test-auth-button" class="cta">Test Auth</button>
         <a href="#" class="cta" id="logout-button">Log Out</a>
       </header>
 
@@ -54,7 +43,7 @@
           </div>
             <input type="file" id="file-upload" />
             <span id="file-name"></span> <!-- Ensure this element exists -->
-            <button id="convert-button" class="cta">Convert</button>
+          <a href="#" class="cta" id="convert-button">Convert</a>
           <a href="#" class="cta donate" id="donate-button">Donate</a>
         </div>
 
@@ -208,6 +197,7 @@
         </p>
       </footer>
     </div>
+    <script src="app.js"></script>
     <!-- Start of LiveChat (www.livechat.com) code -->
     <script>
       window.__lc = window.__lc || {};

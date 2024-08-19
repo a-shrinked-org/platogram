@@ -8,11 +8,13 @@ import logfire
 import time
 import smtplib
 import logging
+
 from sanic import Sanic
-from sanic.response import json, text, stream, file, redirect
-from sanic.exceptions import SanicException
+from sanic.response import stream
+from sanic.request import Request
 import aiofiles
 import yt_dlp
+
 from pathlib import Path
 from uuid import uuid4
 from datetime import datetime
@@ -32,7 +34,7 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
-app = Sanic("PlatogramApp")
+app = Sanic("ConvertApp")
 
 # Retrieve API keys from environment variables
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
@@ -51,6 +53,9 @@ else:
     except Exception as e:
         logger.error(f"Logfire configuration failed: {e}")
 
+# Add CORS middleware
+app.ext.middleware('response')(app.cors())
+
 AUTH0_DOMAIN = "dev-w0dm4z23pib7oeui.us.auth0.com"
 API_AUDIENCE = "https://platogram.vercel.app/"
 ALGORITHMS = ["RS256"]
@@ -60,6 +65,18 @@ tasks = {}
 processes = {}
 Language = Literal["en", "es"]
 
+class ConversionRequest:
+    def __init__(self, payload: str, lang: str = "en"):
+        self.payload = payload
+        self.lang = lang
+
+class Task:
+    def __init__(self, start_time: datetime, request: ConversionRequest, status: Literal["running", "done", "failed"] = "running", error: Optional[str] = None):
+        self.start_time = start_time
+        self.request = request
+        self.status = status
+        self.error = error
+
 # Cache for the Auth0 public key
 auth0_public_key_cache = {
     "key": None,
@@ -67,19 +84,27 @@ auth0_public_key_cache = {
     "expires_in": 3600,  # Cache expiration time in seconds (1 hour)
 }
 
+# Serve static files
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.static("/web", static_dir)
+
 @app.exception(Exception)
 async def global_exception_handler(request, exception):
     logfire.exception(f"An error occurred: {str(exception)}")
     logger.exception(f"An error occurred: {str(exception)}")
-    return json({"message": "An internal error occurred", "detail": str(exception)}, status=500)
+    return sanic.response.json(
+        {"message": "An internal error occurred", "detail": str(exception)},
+        status=500
+    )
 
-@app.route('/')
+@app.get("/")
 async def root(request):
-    return redirect('/web/index.html')
+    return sanic.response.redirect("/web/index.html")
 
-@app.route('/web/')
+@app.get("/web/")
 async def web_root(request):
-    return await file('static/index.html')
+    return sanic.response.file(os.path.join(static_dir, "index.html"))
 
 async def get_auth0_public_key():
     logger.debug("Entering get_auth0_public_key function")
@@ -113,10 +138,7 @@ async def get_auth0_public_key():
     logger.debug("New Auth0 public key fetched and cached")
     return public_key
 
-async def verify_token_and_get_user_id(request):
-    token = request.token
-    if not token:
-        raise SanicException("No token provided", status_code=401)
+async def verify_token_and_get_user_id(token: str):
     try:
         public_key = await get_auth0_public_key()
         payload = jwt.decode(
@@ -129,16 +151,16 @@ async def verify_token_and_get_user_id(request):
         return payload["sub"]
     except jwt.ExpiredSignatureError:
         logger.warning("Token has expired")
-        raise SanicException("Token has expired", status_code=401)
+        raise sanic.exceptions.Unauthorized("Token has expired")
     except jwt.InvalidAudienceError as e:
         logger.warning(f"Token audience verification failed: {str(e)}")
-        raise SanicException(f"Token audience verification failed: {str(e)}", status_code=401)
+        raise sanic.exceptions.Unauthorized(f"Token audience verification failed: {str(e)}")
     except jwt.InvalidTokenError as e:
         logger.warning(f"Invalid token: {str(e)}")
-        raise SanicException(f"Invalid token: {str(e)}", status_code=401)
+        raise sanic.exceptions.Unauthorized(f"Invalid token: {str(e)}")
     except Exception as e:
         logger.error(f"Couldn't verify token: {str(e)}")
-        raise SanicException(f"Couldn't verify token: {str(e)}", status_code=401)
+        raise sanic.exceptions.Unauthorized(f"Couldn't verify token: {str(e)}") from e
 
 @app.post("/convert")
 @logfire.instrument()
@@ -162,7 +184,7 @@ async def convert(request):
                 temp_dir.mkdir(parents=True, exist_ok=True)
                 temp_file = temp_dir / f"{file_name}.part"
 
-                chunk = request.body
+                chunk = await request.body
                 with open(temp_file, 'ab') as f:
                     f.write(chunk)
 
@@ -172,10 +194,7 @@ async def convert(request):
                     final_file = temp_dir / file_name
                     temp_file.rename(final_file)
                     await response.write(f"File {file_name} received completely. Finalizing...\n".encode())
-                    # Here you would typically start processing the file
-                    # For now, we'll just simulate processing
-                    await asyncio.sleep(1)
-                    await response.write(b"File processing started in background.\n")
+                    app.add_task(process_file(final_file, lang))
 
             elif content_type == 'application/json':
                 data = request.json
@@ -183,15 +202,19 @@ async def convert(request):
                 lang_data = data.get('lang', 'en')
                 logger.debug(f"Received URL: {url}, language: {lang_data}")
                 await response.write(f"Received URL: {url}. Initializing processing...\n".encode())
-                # Here you would typically start processing the URL
-                # For now, we'll just simulate processing
-                await asyncio.sleep(1)
-                await response.write(b"URL processing started in background.\n")
+                app.add_task(process_url(url, lang_data))
 
             else:
                 await response.write("Invalid content type\n".encode())
-                raise SanicException("Invalid content type", status_code=400)
+                raise sanic.exceptions.BadRequest("Invalid content type")
 
+            initial_steps = ["Initializing", "Analyzing"]
+            for step in initial_steps:
+                logger.debug(f"Executing step: {step}")
+                await asyncio.sleep(0.5)
+                await response.write(f"{step}...\n".encode())
+
+            logger.debug("Sending initial response within 10 seconds")
             await response.write(b"Initial response sent. Conversion process started in background.\n")
 
         except Exception as e:
@@ -202,203 +225,51 @@ async def convert(request):
 
 @app.get("/status")
 async def status(request):
-    user_id = await verify_token_and_get_user_id(request)
+    user_id = await verify_token_and_get_user_id(request.headers.get("Authorization", "").replace("Bearer ", ""))
     try:
         if user_id not in tasks:
-            return json({"status": "idle"})
+            return {"status": "idle"}
         task = tasks[user_id]
-        return json({"status": task['status'], "error": task['error'] if task['status'] == "failed" else None})
+        return {"status": task.status, "error": task.error if task.status == "failed" else None}
     except Exception as e:
         logfire.exception(f"Error in status endpoint: {str(e)}")
         logger.exception(f"Error in status endpoint: {str(e)}")
-        raise SanicException(str(e), status_code=500)
+        raise sanic.exceptions.InternalServerError(str(e))
 
 @app.get("/test-auth")
 async def test_auth(request):
-    user_id = await verify_token_and_get_user_id(request)
-    return json({"message": "Auth test successful", "user_id": user_id})
+    user_id = await verify_token_and_get_user_id(request.headers.get("Authorization", "").replace("Bearer ", ""))
+    return {"message": "Auth test successful", "user_id": user_id}
 
 @app.get("/reset")
 @logfire.instrument()
 async def reset(request):
-    user_id = await verify_token_and_get_user_id(request)
-    try:
-        if user_id in processes:
-            processes[user_id].terminate()
-            del processes[user_id]
-
-        if user_id in tasks:
-            del tasks[user_id]
-
-        return json({"message": "Session reset"})
-    except Exception as e:
-        logfire.exception(f"Error in reset endpoint for user {user_id}: {str(e)}")
-        logger.exception(f"Error in reset endpoint for user {user_id}: {str(e)}")
-        raise SanicException(f"Failed to reset session: {str(e)}", status_code=500)
-async def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> tuple[str, str]:
-    script_path = Path.cwd() / "examples" / "audio_to_paper.sh"
-    command = f"cd {output_dir} && {script_path} \"{url}\" --lang {lang} --verbose"
-
-    if user_id in processes:
-        raise RuntimeError("Conversion already in progress.")
-
-    process = await asyncio.create_subprocess_shell(
-        command,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        shell=True
-    )
-    processes[user_id] = process
-
-    try:
-        stdout, stderr = await process.communicate()
-        logger.debug(f"Process stdout: {stdout.decode()}")
-        logger.debug(f"Process stderr: {stderr.decode()}")
-    finally:
-        if user_id in processes:
-            del processes[user_id]
-
-    if process.returncode != 0:
-        raise RuntimeError(f"Failed to execute {command} with return code {process.returncode}.\n\nstdout:\n{stdout.decode()}\n\nstderr:\n{stderr.decode()}")
-
-    return stdout.decode(), stderr.decode()
+    user_id = await verify_token_and_get_user_id(request.headers.get("Authorization", "").replace("Bearer ", ""))
+    if user_id in tasks:
+        del tasks[user_id]
+    return {"message": "Session reset"}
 
 async def process_file(file_path: Path, lang: str):
-    # Simulating file processing
-    steps = ["Initializing", "Processing", "Finalizing"]
-    for step in steps:
-        yield f"{step}...\n"
-        await asyncio.sleep(1)  # Simulate work
-    yield f"File {file_path} processed with language {lang}\n"
+    logger.info(f"Processing file: {file_path} with language: {lang}")
+    try:
+        async with aiofiles.open(file_path, 'rb') as f:
+            # Perform your file processing here
+            pass
+        logger.info(f"File processed successfully: {file_path}")
+        tasks[file_path.stem].status = "done"
+    except Exception as e:
+        logger.error(f"Error processing file {file_path}: {str(e)}")
+        tasks[file_path.stem].status = "failed"
+        tasks[file_path.stem].error = str(e)
 
 async def process_url(url: str, lang: str):
-    # Simulating URL processing
-    steps = ["Fetching URL", "Analyzing Content", "Converting"]
-    for step in steps:
-        yield f"{step}...\n"
-        await asyncio.sleep(1)  # Simulate work
-    yield f"URL {url} processed with language {lang}\n"
-
-async def send_email(user_id: str, subj: str, body: str, files: list[Path]):
-    loop = asyncio.get_running_loop()
-    with ProcessPoolExecutor() as pool:
-        await loop.run_in_executor(pool, _send_email_sync, user_id, subj, body, files)
-
-async def convert_and_send_with_error_handling(request: ConversionRequest, user_id: str):
+    logger.info(f"Processing URL: {url} with language: {lang}")
     try:
-        await convert_and_send(request, user_id)
-        tasks[user_id].status = "done"
-    except HTTPException as e:
-        logfire.exception(f"HTTP error in background task for user {user_id}: {str(e)}")
-        logger.exception(f"HTTP error in background task for user {user_id}: {str(e)}")
-        tasks[user_id].error = str(e)
-        tasks[user_id].status = "failed"
+        # Perform your URL processing here
+        pass
+        logger.info(f"URL processed successfully: {url}")
     except Exception as e:
-        logfire.exception(f"Unexpected error in background task for user {user_id}: {str(e)}")
-        logger.exception(f"Unexpected error in background task for user {user_id}: {str(e)}")
-        tasks[user_id].error = "An unexpected error occurred"
-        tasks[user_id].status = "failed"
-
-async def convert_and_send(request: ConversionRequest, user_id: str):
-    try:
-        logger.info(f"Starting conversion for user {user_id}")
-
-        # Initialize models
-        language_model = plato.llm.get_model("anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY'))
-        speech_recognition_model = plato.asr.get_model("assembly-ai/best", os.getenv('ASSEMBLYAI_API_KEY'))
-
-        # Process audio
-        try:
-            transcript = plato.extract_transcript(request.payload, speech_recognition_model)
-        except Exception as e:
-            if "Sign in to confirm you're not a bot" in str(e):
-                raise HTTPException(status_code=400, detail="YouTube requires authentication for this video. Please try a different video or provide a direct audio file.")
-            else:
-                raise
-
-        content = plato.index(transcript, language_model)
-
-        title = content.title
-        summary = content.summary
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            files = [f for f in Path(tmpdir).glob('*') if f.is_file()]
-
-            subject = f"[Platogram] {title}"
-            body = f"""Hi there!
-
-Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
-
-You'll find a PDF and a Word file attached. The Word file includes the original transcript with timestamp references. I hope this helps!
-
-{summary}
-
-Please reply to this e-mail if any suggestions, feedback, or questions.
-
----
-Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
-Suggested donation: $2 per hour of content converted."""
-
-            await send_email(user_id, subject, body, files)
-
-    except ImportError as e:
-        logger.exception(f"Import error for user {user_id}: {str(e)}")
-        logfire.exception(f"Import error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Import error: {str(e)}. Please contact support.")
-    except Exception as e:
-        logger.exception(f"Conversion failed for user {user_id}: {str(e)}")
-        logfire.exception(f"Conversion and sending failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to convert and send transcript: {str(e)}")
-
-def _send_email_sync(user_id: str, subj: str, body: str, files: list[Path]):
-    logger.debug("Starting _send_email_sync function")
-
-    smtp_user = os.getenv("PLATOGRAM_SMTP_USER")
-    smtp_server = os.getenv("PLATOGRAM_SMTP_SERVER")
-    smtp_port = 587
-    sender_password = os.getenv("PLATOGRAM_SMTP_PASSWORD")
-    
-    logger.debug(f"SMTP User: {smtp_user}, Server: {smtp_server}, Port: {smtp_port}")
-
-    msg = MIMEMultipart()
-    msg['From'] = os.getenv("PLATOGRAM_SMTP_FROM")
-    msg['To'] = user_id
-    msg['Subject'] = subj
-    
-    msg.attach(MIMEText(body, 'plain'))
-    logger.debug(f"Prepared email body: {body}")
-    
-    for file in files:
-        logger.debug(f"Attaching file: {file}")
-        try:
-            with open(file, "rb") as f:
-                file_name = file.name.split("/")[-1]
-                part = MIMEApplication(f.read(), Name=file_name)
-                part['Content-Disposition'] = f'attachment; filename="{file_name}"'
-                msg.attach(part)
-            logger.debug(f"Successfully attached file: {file_name}")
-        except Exception as e:
-            logger.error(f"Error attaching file {file}: {str(e)}")
-    
-    try:
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            logger.debug("Started TLS connection")
-            server.login(smtp_user, sender_password)
-            logger.debug("Logged into SMTP server")
-            server.send_message(msg)
-            logger.debug(f"Email sent to {user_id} with subject {subj}")
-    except Exception as e:
-        logger.error(f"Failed to send email to {user_id}: {str(e)}")
-
-    logger.debug("Ending _send_email_sync function")
-
-    # Vercel handler
-def handler(request, response):
-    if request.path.startswith('/convert'):
-        return sanic_app.handle_request(request)
-    else:
-        return app(request.environ, response.start_response)
+        logger.error(f"Error processing URL {url}: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

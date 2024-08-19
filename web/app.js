@@ -513,6 +513,24 @@ function updateProcessingStage() {
   }
 }
 
+function initializeProcessingStage() {
+  debugLog("Initializing processing stage");
+  updateProcessingStage();
+  processingStageInterval = setInterval(updateProcessingStage, 3000);
+}
+
+function safeUpdateProcessingStage() {
+  try {
+    if (document.readyState === 'complete') {
+      updateProcessingStage();
+    } else {
+      window.addEventListener('load', updateProcessingStage);
+    }
+  } catch (error) {
+    console.error("Error in safeUpdateProcessingStage:", error);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   debugLog("DOM Content Loaded");
 

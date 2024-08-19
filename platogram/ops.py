@@ -1,29 +1,23 @@
+# platogram/ops.py
+
 import re
 from typing import Callable, Optional
-
 from tqdm import tqdm  # type: ignore
-
 from platogram.llm import LanguageModel
 from platogram.types import Content, SpeechEvent
 
 def remove_markers(text: str) -> str:
-    return re.sub(r"(【\d+】)", r" ", text)
+    # Correct escape sequence
+    return re.sub(r"(【\d+】)", " ", text)
 
 def parse(text_with_markers: str, marker: str = r"(【\d+】)") -> dict[int, str]:
     """
     Parses a string containing text segments separated by numeric markers.
-
-    The input string should have the format:
-    "text【number】text【number】...【number】"
-    where 【number】 is a numeric value enclosed in square brackets.
-
     Args:
         text_with_markers: The input string containing text segments and markers.
         marker: The regular expression pattern for the markers. Default is r'(【\d+】)'.
-
     Returns:
         A dictionary where the keys are the numeric markers and the values are the text segments associated with each marker.
-
     Raises:
         ValueError: If the input string is empty, does not contain any valid markers, or does not end with a valid marker.
     """
@@ -62,11 +56,9 @@ def render(
     ) -> str:
     """
     Renders a dictionary of text segments into a single string with numeric markers.
-
     Args:
         segments: A dictionary where the keys are the numeric markers and the values are the text segments associated with each marker.
         marker_fn: A function that takes an integer and returns a string representing the marker.
-
     Returns:
         A string containing text segments separated by numeric markers.
     """
@@ -80,13 +72,11 @@ def chunk_text(
     ) -> list[str]:
     """
     Splits a string containing text segments separated by numeric markers into chunks of a specified size.
-
     Args:
         text_with_markers: The input string containing text segments and markers.
         chunk_size: The desired maximum size of each chunk, in terms of the number of tokens.
         token_count_fn: A function that takes a string and returns the number of tokens in it.
         marker: The regular expression pattern for the markers. Default is r'(【\d+】)'.
-
     Returns:
         A list of strings, where each string represents a chunk of the input text.
     """
@@ -205,7 +195,6 @@ def index(
         transcript=transcript,
         chapters=chapters,
     )
-
 
 rewrite_examples = {
     "en": [

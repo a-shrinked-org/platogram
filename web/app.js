@@ -466,32 +466,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const fileNameElement = document.getElementById('file-name');
   const urlInput = document.getElementById('url-input');
 
-  if (uploadIcon && fileNameElement && urlInput) {
-    uploadIcon.addEventListener('click', handleFileUpload);
-
-    urlInput.addEventListener('input', () => {
-      if (urlInput.value.trim() !== '') {
-        fileNameElement.textContent = ''; // Clear file name when URL is entered
-        fileNameElement.file = null; // Clear the stored File object
-      }
-    });
-  } else {
-    console.error("One or more elements for file upload not found");
-  }
-
-  // Initialize other parts of your application
-  initAuth0().catch((error) => console.error("Error initializing app:", error));
-});
-
-let fileUploadListenerAdded = false;
-
-document.addEventListener('DOMContentLoaded', () => {
-  debugLog("DOM Content Loaded");
-
-  const uploadIcon = document.querySelector('.upload-icon');
-  const fileNameElement = document.getElementById('file-name');
-  const urlInput = document.getElementById('url-input');
-
   if (uploadIcon && fileNameElement && urlInput && !fileUploadListenerAdded) {
     // Remove any existing listeners
     uploadIcon.replaceWith(uploadIcon.cloneNode(true));

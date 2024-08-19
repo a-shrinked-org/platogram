@@ -466,14 +466,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const fileNameElement = document.getElementById('file-name');
   const urlInput = document.getElementById('url-input');
 
-  if (uploadIcon && fileNameElement && urlInput && !fileUploadListenerAdded) {
-    // Remove any existing listeners
-    uploadIcon.replaceWith(uploadIcon.cloneNode(true));
-    const newUploadIcon = document.querySelector('.upload-icon');
-
-    // Add the event listener
-    newUploadIcon.addEventListener('click', handleFileUpload, { once: true });
-    fileUploadListenerAdded = true;
+  if (uploadIcon && fileNameElement && urlInput) {
+    uploadIcon.addEventListener('click', handleFileUpload);
 
     urlInput.addEventListener('input', () => {
       if (urlInput.value.trim() !== '') {
@@ -482,12 +476,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   } else {
-    console.error("One or more elements for file upload not found or listener already added");
+    console.error("One or more elements for file upload not found");
   }
 
   // Initialize other parts of your application
   initAuth0().catch((error) => console.error("Error initializing app:", error));
 });
+
+let fileUploadListenerAdded = false;
 
 function handleFileUpload() {
   const fileNameElement = document.getElementById('file-name');

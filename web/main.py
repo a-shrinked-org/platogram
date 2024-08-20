@@ -47,13 +47,90 @@ def json_response(handler, status_code, data):
     handler.wfile.write(json.dumps(data).encode())
 
 def get_auth0_public_key():
-    # ... [keep the existing implementation] ...
+    current_time = time.time()
+    if (
+        auth0_public_key_cache["key"]
+        and current_time - auth0_public_key_cache["last_updated"]
+        < auth0_public_key_cache["expires_in"]
+    ):
+        return auth0_public_key_cache["key"]
+
+    logger.debug("Fetching new Auth0 public key")
+    response = requests.get(JWKS_URL)
+    response.raise_for_status()
+    jwks = response.json()
+
+    x5c = jwks["keys"][0]["x5c"][0]
+    cert = load_pem_x509_certificate(
+        f"-----BEGIN CERTIFICATE-----\n{x5c}\n-----END CERTIFICATE-----".encode()
+    )
+    public_key = cert.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+
+    auth0_public_key_cache["key"] = public_key
+    auth0_public_key_cache["last_updated"] = current_time
+
+    return public_key
 
 def verify_token_and_get_email(token):
-    # ... [keep the existing implementation] ...
+    if not token:
+        logger.debug("No token provided")
+        return None
+    try:
+        logger.debug(f"Verifying token: {token[:10]}...{token[-10:]}")
+        public_key = get_auth0_public_key()
+        payload = jwt.decode(
+            token,
+            key=public_key,
+            algorithms=ALGORITHMS,
+            audience=API_AUDIENCE,
+            issuer=f"https://{AUTH0_DOMAIN}/",
+        )
+        logger.debug(f"Token payload: {payload}")
+        email = payload.get("platogram:user_email") or payload.get("email") or payload.get("https://platogram.com/user_email")
+        logger.debug(f"Extracted email: {email}")
+        return email
+    except jwt.ExpiredSignatureError:
+        logger.error("Token has expired")
+    except jwt.InvalidAudienceError:
+        logger.error(f"Invalid audience. Expected: {API_AUDIENCE}")
+    except jwt.InvalidIssuerError:
+        logger.error(f"Invalid issuer. Expected: https://{AUTH0_DOMAIN}/")
+    except Exception as e:
+        logger.error(f"Couldn't verify token: {str(e)}")
+    return None
 
 def send_email_with_resend(to_email, subject, body, attachments):
-    # ... [keep the existing implementation] ...
+    url = "https://api.resend.com/emails"
+    headers = {
+        "Authorization": f"Bearer {RESEND_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "from": "Platogram <onboarding@resend.dev>",
+        "to": to_email,
+        "subject": subject,
+        "text": body,
+        "attachments": []
+    }
+
+    for attachment in attachments:
+        with open(attachment, "rb") as file:
+            content = file.read()
+            encoded_content = base64.b64encode(content).decode()
+            payload["attachments"].append({
+                "filename": Path(attachment).name,
+                "content": encoded_content
+            })
+
+    response = requests.post(url, headers=headers, json=payload)
+    if response.status_code == 200:
+        logger.info(f"Email sent successfully to {to_email}")
+    else:
+        logger.error(f"Failed to send email. Status: {response.status_code}, Error: {response.text}")
 
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -192,14 +269,14 @@ Suggested donation: $2 per hour of content converted."""
             json_response(self, 400, {"error": "Task ID required"})
             return
 
-        try:
-            if task_id in tasks:
-                del tasks[task_id]
-            json_response(self, 200, {"message": "Task reset"})
-        except Exception as e:
-            logger.error(f"Error in handle_reset for task {task_id}: {str(e)}")
-            json_response(self, 500, {"error": str(e)})
+                try:
+                    if task_id in tasks:
+                        del tasks[task_id]
+                    json_response(self, 200, {"message": "Task reset"})
+                except Exception as e:
+                    logger.error(f"Error in handle_reset for task {task_id}: {str(e)}")
+                    json_response(self, 500, {"error": str(e)})
 
-# Vercel handler
-def vercel_handler(event, context):
-    return handler.handle_request(event, context)
+        # Vercel handler
+        def vercel_handler(event, context):
+            return handler.handle_request(event, context)

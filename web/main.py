@@ -224,7 +224,7 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    def process_and_send_email(self, task_id):
+   def process_and_send_email(task_id):
     try:
         task = tasks[task_id]
         user_email = task.get('email')
@@ -234,8 +234,9 @@ class handler(BaseHTTPRequestHandler):
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
 
-            # Initialize models
-            language_model = plato.llm.get_model("anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY'))
+            # Initialize Platogram models
+            language_model = plato.llm.get_model(
+                "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY'))
 
             # Create the Transcriber object
             speech_recognition_model = aai.Transcriber()
@@ -264,8 +265,8 @@ class handler(BaseHTTPRequestHandler):
             plato.generate_output_files(content, output_dir)
             files = [f for f in output_dir.glob('*') if f.is_file()]
 
-           subject = f"[Platogram] {content.title}"
-                body = f"""Hi there!
+            subject = f"[Platogram] {content.title}"
+            body = f"""Hi there!...
 
 Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
 
@@ -296,7 +297,6 @@ Suggested donation: $2 per hour of content converted."""
         logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}")
         tasks[task_id]['status'] = 'failed'
         tasks[task_id]['error'] = str(e)
-
 
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')

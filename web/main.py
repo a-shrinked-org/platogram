@@ -39,6 +39,9 @@ auth0_public_key_cache = {
 def json_response(handler, status_code, data):
     handler.send_response(status_code)
     handler.send_header('Content-type', 'application/json')
+    handler.send_header('Access-Control-Allow-Origin', '*')
+    handler.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    handler.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type')
     handler.end_headers()
     handler.wfile.write(json.dumps(data).encode())
 
@@ -70,6 +73,8 @@ def get_auth0_public_key():
     return public_key
 
 def verify_token_and_get_email(token):
+    if not token:
+        return None
     try:
         public_key = get_auth0_public_key()
         payload = jwt.decode(
@@ -115,6 +120,13 @@ def send_email_with_resend(to_email, subject, body, attachments):
         logger.error(f"Failed to send email. Status: {response.status_code}, Error: {response.text}")
 
 class handler(BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+        self.end_headers()
+
     def do_GET(self):
         if self.path == '/status':
             self.handle_status()
@@ -214,7 +226,8 @@ Suggested donation: $2 per hour of content converted."""
         user_email = self.get_user_email()
 
         if not user_email:
-            json_response(self, 401, {"error": "Authentication required"})
+            # Return a generic status for unauthenticated requests
+            json_response(self, 200, {"status": "idle"})
             return
 
         try:

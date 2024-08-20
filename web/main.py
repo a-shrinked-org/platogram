@@ -5,8 +5,7 @@ import logging
 import tempfile
 from pathlib import Path
 import base64
-import aiohttp
-import asyncio
+import requests
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +23,7 @@ def json_response(handler, status_code, data):
     handler.end_headers()
     handler.wfile.write(json.dumps(data).encode())
 
-async def send_email_with_resend(to_email, subject, body, attachments):
+def send_email_with_resend(to_email, subject, body, attachments):
     url = "https://api.resend.com/emails"
     headers = {
         "Authorization": f"Bearer {RESEND_API_KEY}",
@@ -48,13 +47,11 @@ async def send_email_with_resend(to_email, subject, body, attachments):
                 "content": encoded_content
             })
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, headers=headers, json=payload) as response:
-            if response.status == 200:
-                logger.info(f"Email sent successfully to {to_email}")
-            else:
-                error_text = await response.text()
-                logger.error(f"Failed to send email. Status: {response.status}, Error: {error_text}")
+    response = requests.post(url, headers=headers, json=payload)
+    if response.status_code == 200:
+        logger.info(f"Email sent successfully to {to_email}")
+    else:
+        logger.error(f"Failed to send email. Status: {response.status_code}, Error: {response.text}")
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -98,18 +95,22 @@ class handler(BaseHTTPRequestHandler):
                 json_response(self, 400, {"error": "Invalid content type"})
                 return
 
-            # Start processing in the background
-            asyncio.create_task(self.process_conversion(user_id))
+            # Simulate starting background processing
+            tasks[user_id]['status'] = 'processing'
+
+            # Simulate processing and send email
+            self.process_and_send_email(user_id)
 
             json_response(self, 200, {"message": "Conversion started"})
         except Exception as e:
             logger.error(f"Error in handle_convert for user {user_id}: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    async def process_conversion(self, user_id):
+    def process_and_send_email(self, user_id):
         try:
             # Simulate processing
-            await asyncio.sleep(5)  # Simulate work
+            import time
+            time.sleep(5)  # Simulate work
 
             # Generate sample output files
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -132,12 +133,12 @@ Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
 Suggested donation: $2 per hour of content converted."""
 
                 # Send email with attachment
-                await send_email_with_resend(user_id, subject, body, [sample_file])
+                send_email_with_resend(user_id, subject, body, [sample_file])
 
             tasks[user_id]['status'] = 'done'
             logger.info(f"Conversion completed for user {user_id}")
         except Exception as e:
-            logger.error(f"Error in process_conversion for user {user_id}: {str(e)}")
+            logger.error(f"Error in process_and_send_email for user {user_id}: {str(e)}")
             tasks[user_id]['status'] = 'failed'
             tasks[user_id]['error'] = str(e)
 

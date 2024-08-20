@@ -6,8 +6,9 @@ import tempfile
 from pathlib import Path
 import base64
 import requests
-from jose import jwt, JWTError
-import httpx
+import jwt
+from cryptography.hazmat.primitives import serialization
+from cryptography.x509 import load_pem_x509_certificate
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -25,26 +26,51 @@ if not RESEND_API_KEY:
 AUTH0_DOMAIN = os.getenv('AUTH0_DOMAIN')
 API_AUDIENCE = os.getenv('API_AUDIENCE')
 ALGORITHMS = ["RS256"]
+JWKS_URL = f"https://{AUTH0_DOMAIN}/.well-known/jwks.json"
 
-async def get_auth0_public_keys():
-    async with httpx.AsyncClient() as client:
-        url = f'https://{AUTH0_DOMAIN}/.well-known/jwks.json'
-        response = await client.get(url)
-        jwks = response.json()
-    return {key['kid']: key for key in jwks['keys']}
+# Cache for the Auth0 public key
+auth0_public_key_cache = {
+    "key": None,
+    "last_updated": 0,
+    "expires_in": 3600,  # Cache expiration time in seconds (1 hour)
+}
 
-async def get_public_key(token):
-    unverified_header = jwt.get_unverified_header(token)
-    jwk = (await get_auth0_public_keys()).get(unverified_header["kid"])
+def get_auth0_public_key():
+    current_time = time.time()
 
-    if not jwk:
-        raise ValueError("Public key not found.")
+    # Check if the cached key is still valid
+    if (
+        auth0_public_key_cache["key"]
+        and current_time - auth0_public_key_cache["last_updated"]
+        < auth0_public_key_cache["expires_in"]
+    ):
+        return auth0_public_key_cache["key"]
 
-    return jwt.algorithms.RSAAlgorithm.from_jwk(jwk)
+    # If not, fetch the JWKS from Auth0
+    response = requests.get(JWKS_URL)
+    response.raise_for_status()
+    jwks = response.json()
 
-async def get_email_from_token(token):
+    x5c = jwks["keys"][0]["x5c"][0]
+
+    # Convert the X.509 certificate to a public key
+    cert = load_pem_x509_certificate(
+        f"-----BEGIN CERTIFICATE-----\n{x5c}\n-----END CERTIFICATE-----".encode()
+    )
+    public_key = cert.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+
+    # Update the cache
+    auth0_public_key_cache["key"] = public_key
+    auth0_public_key_cache["last_updated"] = current_time
+
+    return public_key
+
+def verify_token_and_get_email(token):
     try:
-        public_key = await get_public_key(token)
+        public_key = get_auth0_public_key()
         payload = jwt.decode(
             token,
             key=public_key,
@@ -53,8 +79,8 @@ async def get_email_from_token(token):
             issuer=f"https://{AUTH0_DOMAIN}/",
         )
         return payload["platogram:user_email"]
-    except JWTError as e:
-        logger.error(f"Error decoding token: {str(e)}")
+    except Exception as e:
+        logger.error(f"Couldn't verify token: {str(e)}")
         return None
 
 def json_response(handler, status_code, data):
@@ -108,14 +134,14 @@ class handler(BaseHTTPRequestHandler):
         else:
             json_response(self, 404, {"error": "Not Found"})
 
-    async def handle_convert(self):
+    def handle_convert(self):
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
         authorization_header = self.headers.get('Authorization', '')
         token = authorization_header.split(' ')[1]  # Simplified auth
 
         try:
-            email = await get_email_from_token(token)
+            email = verify_token_and_get_email(token)
             if not email:
                 json_response(self, 400, {"error": "Invalid token"})
                 return
@@ -145,14 +171,14 @@ class handler(BaseHTTPRequestHandler):
             tasks[email]['status'] = 'processing'
 
             # Simulate processing and send email
-            await self.process_and_send_email(email)
+            self.process_and_send_email(email)
 
             json_response(self, 200, {"message": "Conversion started"})
         except Exception as e:
             logger.error(f"Error in handle_convert for user {email}: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    async def process_and_send_email(self, email):
+    def process_and_send_email(self, email):
         try:
             # Simulate processing
             import time
@@ -188,10 +214,10 @@ Suggested donation: $2 per hour of content converted."""
             tasks[email]['status'] = 'failed'
             tasks[email]['error'] = str(e)
 
-    async def handle_status(self):
+    def handle_status(self):
         authorization_header = self.headers.get('Authorization', '')
         token = authorization_header.split(' ')[1]  # Simplified auth
-        email = await get_email_from_token(token)
+        email = verify_token_and_get_email(token)
         try:
             if email not in tasks:
                 response = {"status": "idle"}
@@ -206,10 +232,10 @@ Suggested donation: $2 per hour of content converted."""
             logger.error(f"Error in handle_status for user {email}: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    async def handle_reset(self):
+    def handle_reset(self):
         authorization_header = self.headers.get('Authorization', '')
         token = authorization_header.split(' ')[1]  # Simplified auth
-        email = await get_email_from_token(token)
+        email = verify_token_and_get_email(token)
         try:
             if email in tasks:
                 del tasks[email]

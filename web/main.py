@@ -6,7 +6,8 @@ import tempfile
 from pathlib import Path
 import base64
 import requests
-from jose import jwt  # For decoding the JWT token
+from jose import jwt, JWTError
+import httpx
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -22,22 +23,45 @@ if not RESEND_API_KEY:
 
 # Auth0 Configuration
 AUTH0_DOMAIN = os.getenv('AUTH0_DOMAIN')
-AUTH0_CLIENT_ID = os.getenv('AUTH0_CLIENT_ID')
+API_AUDIENCE = os.getenv('API_AUDIENCE')
+ALGORITHMS = ["RS256"]
+
+async def get_auth0_public_keys():
+    async with httpx.AsyncClient() as client:
+        url = f'https://{AUTH0_DOMAIN}/.well-known/jwks.json'
+        response = await client.get(url)
+        jwks = response.json()
+    return {key['kid']: key for key in jwks['keys']}
+
+async def get_public_key(token):
+    unverified_header = jwt.get_unverified_header(token)
+    jwk = (await get_auth0_public_keys()).get(unverified_header["kid"])
+
+    if not jwk:
+        raise ValueError("Public key not found.")
+
+    return jwt.algorithms.RSAAlgorithm.from_jwk(jwk)
+
+async def get_email_from_token(token):
+    try:
+        public_key = await get_public_key(token)
+        payload = jwt.decode(
+            token,
+            key=public_key,
+            algorithms=ALGORITHMS,
+            audience=API_AUDIENCE,
+            issuer=f"https://{AUTH0_DOMAIN}/",
+        )
+        return payload["platogram:user_email"]
+    except JWTError as e:
+        logger.error(f"Error decoding token: {str(e)}")
+        return None
 
 def json_response(handler, status_code, data):
     handler.send_response(status_code)
     handler.send_header('Content-type', 'application/json')
     handler.end_headers()
     handler.wfile.write(json.dumps(data).encode())
-
-def get_email_from_token(token):
-    try:
-        # Decode the token
-        decoded_token = jwt.decode(token, options={"verify_signature": False})  # Typically, you should verify the signature
-        return decoded_token.get('email')
-    except Exception as e:
-        logger.error(f"Error decoding token: {str(e)}")
-        return None
 
 def send_email_with_resend(to_email, subject, body, attachments):
     url = "https://api.resend.com/emails"
@@ -84,14 +108,14 @@ class handler(BaseHTTPRequestHandler):
         else:
             json_response(self, 404, {"error": "Not Found"})
 
-    def handle_convert(self):
+    async def handle_convert(self):
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
         authorization_header = self.headers.get('Authorization', '')
         token = authorization_header.split(' ')[1]  # Simplified auth
 
         try:
-            email = get_email_from_token(token)
+            email = await get_email_from_token(token)
             if not email:
                 json_response(self, 400, {"error": "Invalid token"})
                 return
@@ -121,14 +145,14 @@ class handler(BaseHTTPRequestHandler):
             tasks[email]['status'] = 'processing'
 
             # Simulate processing and send email
-            self.process_and_send_email(email)
+            await self.process_and_send_email(email)
 
             json_response(self, 200, {"message": "Conversion started"})
         except Exception as e:
             logger.error(f"Error in handle_convert for user {email}: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    def process_and_send_email(self, email):
+    async def process_and_send_email(self, email):
         try:
             # Simulate processing
             import time
@@ -164,10 +188,10 @@ Suggested donation: $2 per hour of content converted."""
             tasks[email]['status'] = 'failed'
             tasks[email]['error'] = str(e)
 
-    def handle_status(self):
+    async def handle_status(self):
         authorization_header = self.headers.get('Authorization', '')
         token = authorization_header.split(' ')[1]  # Simplified auth
-        email = get_email_from_token(token)
+        email = await get_email_from_token(token)
         try:
             if email not in tasks:
                 response = {"status": "idle"}
@@ -182,10 +206,10 @@ Suggested donation: $2 per hour of content converted."""
             logger.error(f"Error in handle_status for user {email}: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    def handle_reset(self):
+    async def handle_reset(self):
         authorization_header = self.headers.get('Authorization', '')
         token = authorization_header.split(' ')[1]  # Simplified auth
-        email = get_email_from_token(token)
+        email = await get_email_from_token(token)
         try:
             if email in tasks:
                 del tasks[email]

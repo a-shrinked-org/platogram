@@ -14,6 +14,9 @@ from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
 
 import platogram as plato
+from anthropic import Anthropic
+from anthropic import AnthropicError
+import assemblyai
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)

@@ -1,5 +1,5 @@
 logfire==0.50.1
-anthropic==0.3.7
+anthropic==0.34.1
 assemblyai==0.17.0
 httpx==0.23.3
 pyjwt==2.6.0

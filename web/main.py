@@ -269,14 +269,14 @@ Suggested donation: $2 per hour of content converted."""
             json_response(self, 400, {"error": "Task ID required"})
             return
 
-                try:
-                    if task_id in tasks:
-                        del tasks[task_id]
-                    json_response(self, 200, {"message": "Task reset"})
-                except Exception as e:
-                    logger.error(f"Error in handle_reset for task {task_id}: {str(e)}")
-                    json_response(self, 500, {"error": str(e)})
+        try:
+            if task_id in tasks:
+                del tasks[task_id]
+            json_response(self, 200, {"message": "Task reset"})
+        except Exception as e:
+            logger.error(f"Error in handle_reset for task {task_id}: {str(e)}")
+            json_response(self, 500, {"error": str(e)})
 
-        # Vercel handler
-        def vercel_handler(event, context):
-            return handler.handle_request(event, context)
+# Vercel handler
+def vercel_handler(event, context):
+    return handler.handle_request(event, context)

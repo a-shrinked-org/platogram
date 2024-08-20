@@ -54,7 +54,6 @@ def get_auth0_public_key():
     ):
         return auth0_public_key_cache["key"]
 
-    logger.debug("Fetching new Auth0 public key")
     response = requests.get(JWKS_URL)
     response.raise_for_status()
     jwks = response.json()
@@ -78,7 +77,6 @@ def verify_token_and_get_email(token):
         logger.debug("No token provided")
         return None
     try:
-        logger.debug(f"Verifying token: {token[:10]}...{token[-10:]}")
         public_key = get_auth0_public_key()
         payload = jwt.decode(
             token,
@@ -87,9 +85,8 @@ def verify_token_and_get_email(token):
             audience=API_AUDIENCE,
             issuer=f"https://{AUTH0_DOMAIN}/",
         )
-        logger.debug(f"Token payload: {payload}")
         email = payload.get("platogram:user_email") or payload.get("email") or payload.get("https://platogram.com/user_email")
-        logger.debug(f"Extracted email: {email}")
+        logger.debug(f"Token verified successfully. Email: {email}")
         return email
     except jwt.ExpiredSignatureError:
         logger.error("Token has expired")
@@ -136,7 +133,7 @@ class handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+        self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Task-ID')
         self.end_headers()
 
     def do_GET(self):
@@ -171,44 +168,45 @@ class handler(BaseHTTPRequestHandler):
         content_type = self.headers.get('Content-Type')
         user_email = self.get_user_email()
 
-        logger.debug(f"User email from token: {user_email}")
+        if not user_email:
+            logger.error("Authentication required for /convert")
+            json_response(self, 401, {"error": "Authentication required"})
+            return
 
-        # For now, let's allow conversion even without authentication
-        # We'll use the email for task tracking and email sending later
         try:
+            if user_email in tasks and tasks[user_email]['status'] == "running":
+                json_response(self, 400, {"error": "Conversion already in progress"})
+                return
+
             if content_type == 'application/octet-stream':
                 body = self.rfile.read(content_length)  # Read raw bytes
                 file_name = self.headers.get('X-File-Name')
                 lang = self.headers.get('X-Language', 'en')
-                task_id = f"{user_email or 'anonymous'}_{int(time.time())}"
-                tasks[task_id] = {'status': 'running', 'file': file_name, 'lang': lang, 'email': user_email}
-                logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}")
+                tasks[user_email] = {'status': 'running', 'file': file_name, 'lang': lang}
+                logger.debug(f"File upload received: {file_name}, Language: {lang}")
             elif content_type == 'application/json':
                 body = self.rfile.read(content_length).decode('utf-8')  # JSON should be UTF-8
                 data = json.loads(body)
                 url = data.get('url')
                 lang = data.get('lang', 'en')
-                task_id = f"{user_email or 'anonymous'}_{int(time.time())}"
-                tasks[task_id] = {'status': 'running', 'url': url, 'lang': lang, 'email': user_email}
-                logger.debug(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}")
+                tasks[user_email] = {'status': 'running', 'url': url, 'lang': lang}
+                logger.debug(f"URL conversion request received: {url}, Language: {lang}")
             else:
                 logger.error(f"Invalid content type: {content_type}")
                 json_response(self, 400, {"error": "Invalid content type"})
                 return
 
             # Start processing
-            self.process_and_send_email(task_id)
+            tasks[user_email]['status'] = 'processing'
+            self.process_and_send_email(user_email)
 
-            json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
+            json_response(self, 200, {"message": "Conversion started"})
         except Exception as e:
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    def process_and_send_email(self, task_id):
+    def process_and_send_email(self, user_email):
         try:
-            task = tasks[task_id]
-            user_email = task['email']
-
             # Simulate processing
             time.sleep(5)  # Simulate work
 
@@ -231,53 +229,69 @@ Thank you for using Platogram!
 Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
 Suggested donation: $2 per hour of content converted."""
 
-                if user_email:
-                    send_email_with_resend(user_email, subject, body, [sample_file])
-                else:
-                    logger.warning(f"No email available for task {task_id}. Skipping email send.")
+                send_email_with_resend(user_email, subject, body, [sample_file])
 
-            tasks[task_id]['status'] = 'done'
-            logger.info(f"Conversion completed for task {task_id}")
+            tasks[user_email]['status'] = 'done'
+            logger.info(f"Conversion completed for user {user_email}")
         except Exception as e:
-            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}")
-            tasks[task_id]['status'] = 'failed'
-            tasks[task_id]['error'] = str(e)
+            logger.error(f"Error in process_and_send_email for user {user_email}: {str(e)}")
+            tasks[user_email]['status'] = 'failed'
+            tasks[user_email]['error'] = str(e)
 
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')
+        user_email = self.get_user_email()
 
-        if not task_id:
-            json_response(self, 400, {"error": "Task ID required"})
-            return
+        logger.debug(f"Handling status request. Task ID: {task_id}, User email: {user_email}")
 
-        try:
+        if task_id:
+            # If a task ID is provided, return status for that specific task
             if task_id not in tasks:
-                response = {"status": "not_found"}
+                json_response(self, 404, {"status": "not_found"})
             else:
                 task = tasks[task_id]
                 response = {
                     "status": task['status'],
                     "error": task.get('error') if task['status'] == "failed" else None
                 }
+                json_response(self, 200, response)
+        else:
+            # If no task ID is provided, return a general status or the status of the latest task for the user
+            if user_email:
+                user_tasks = [task for task in tasks.values() if task.get('email') == user_email]
+                if user_tasks:
+                    latest_task = max(user_tasks, key=lambda t: t.get('start_time', 0))
+                    response = {
+                        "status": latest_task['status'],
+                        "error": latest_task.get('error') if latest_task['status'] == "failed" else None
+                    }
+                else:
+                    response = {"status": "idle"}
+            else:
+                response = {"status": "idle"}
+
             json_response(self, 200, response)
-        except Exception as e:
-            logger.error(f"Error in handle_status for task {task_id}: {str(e)}")
-            json_response(self, 500, {"error": str(e)})
 
     def handle_reset(self):
         task_id = self.headers.get('X-Task-ID')
+        user_email = self.get_user_email()
 
-        if not task_id:
-            json_response(self, 400, {"error": "Task ID required"})
-            return
+        logger.debug(f"Handling reset request. Task ID: {task_id}, User email: {user_email}")
 
-        try:
+        if task_id:
             if task_id in tasks:
                 del tasks[task_id]
-            json_response(self, 200, {"message": "Task reset"})
-        except Exception as e:
-            logger.error(f"Error in handle_reset for task {task_id}: {str(e)}")
-            json_response(self, 500, {"error": str(e)})
+                json_response(self, 200, {"message": "Task reset"})
+            else:
+                json_response(self, 404, {"error": "Task not found"})
+        elif user_email:
+            # Remove all tasks associated with the user
+            tasks_to_remove = [tid for tid, task in tasks.items() if task.get('email') == user_email]
+            for tid in tasks_to_remove:
+                del tasks[tid]
+            json_response(self, 200, {"message": "All user tasks reset"})
+        else:
+            json_response(self, 400, {"error": "Either Task ID or user authentication required"})
 
 # Vercel handler
 def vercel_handler(event, context):

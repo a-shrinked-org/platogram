@@ -12,9 +12,9 @@ import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
+import io
 
 import platogram as plato
-from anthropic import Anthropic
 from anthropic import AnthropicError
 import assemblyai as aai
 
@@ -43,6 +43,9 @@ auth0_public_key_cache = {
     "expires_in": 3600,  # Cache expiration time in seconds (1 hour)
 }
 
+# Configure AssemblyAI
+aai.settings.api_key = os.getenv('ASSEMBLYAI_API_KEY')
+
 def json_response(handler, status_code, data):
     handler.send_response(status_code)
     handler.send_header('Content-type', 'application/json')
@@ -50,7 +53,7 @@ def json_response(handler, status_code, data):
     handler.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     handler.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language')
     handler.end_headers()
-    handler.wfile.write(json.dumps(data).encode('utf-8'))  # Ensure utf-8 encoding
+    handler.wfile.write(json.dumps(data).encode('utf-8'))
 
 def get_auth0_public_key():
     current_time = time.time()
@@ -139,6 +142,7 @@ def send_email_with_resend(to_email, subject, body, attachments):
         logger.info(f"Email sent successfully to {to_email}")
     else:
         logger.error(f"Failed to send email. Status: {response.status_code}, Error: {response.text}")
+
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
@@ -155,7 +159,7 @@ class handler(BaseHTTPRequestHandler):
         else:
             json_response(self, 404, {"error": "Not Found"})
 
-    def do_POST(self):  # Corrected indentation
+    def do_POST(self):
         if self.path == '/convert':
             self.handle_convert()
         else:
@@ -194,7 +198,7 @@ class handler(BaseHTTPRequestHandler):
                 temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
                 temp_dir.mkdir(parents=True, exist_ok=True)
                 temp_file = temp_dir / f"{task_id}_{file_name}"
-                with open(temp_file, 'wb') as f:
+                with io.open(temp_file, 'wb') as f:
                     f.write(body)
 
                 tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
@@ -232,8 +236,9 @@ class handler(BaseHTTPRequestHandler):
 
                 # Initialize Platogram models
                 language_model = plato.llm.get_model("anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY'))
+
+                # Create the Transcriber object
                 speech_recognition_model = aai.Transcriber()
-                aai.settings.api_key = os.getenv('ASSEMBLYAI_API_KEY')
 
                 # Process audio
                 if 'url' in task:
@@ -245,7 +250,7 @@ class handler(BaseHTTPRequestHandler):
                 if url.startswith("file://"):
                     with open(task['file'], 'rb') as audio_file:
                         audio_content = audio_file.read()
-                        logger.debug(f"Read binary data, length: {len(audio_content)} bytes")  # Debug log for binary data length
+                    logger.debug(f"Read binary data, length: {len(audio_content)} bytes")
                     transcribe_response = speech_recognition_model.transcribe(audio_content)
                 else:
                     try:
@@ -256,7 +261,7 @@ class handler(BaseHTTPRequestHandler):
                         else:
                             raise
 
-
+                transcript = transcribe_response['text']
                 content = plato.index(transcript, language_model)
 
                 # Generate output files
@@ -293,12 +298,9 @@ Suggested donation: $2 per hour of content converted."""
             tasks[task_id]['status'] = 'failed'
             tasks[task_id]['error'] = str(e)
 
-
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')
-
         if not task_id:
-            # If no task ID is provided, return a general status
             json_response(self, 200, {"status": "idle"})
             return
 
@@ -318,7 +320,6 @@ Suggested donation: $2 per hour of content converted."""
 
     def handle_reset(self):
         task_id = self.headers.get('X-Task-ID')
-
         if not task_id:
             json_response(self, 400, {"error": "Task ID required"})
             return

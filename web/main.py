@@ -5,8 +5,8 @@ import logging
 import tempfile
 from pathlib import Path
 import base64
-import time
 import requests
+import time
 import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
@@ -38,8 +38,6 @@ auth0_public_key_cache = {
 
 def get_auth0_public_key():
     current_time = time.time()
-
-    # Check if the cached key is still valid
     if (
         auth0_public_key_cache["key"]
         and current_time - auth0_public_key_cache["last_updated"]
@@ -47,14 +45,11 @@ def get_auth0_public_key():
     ):
         return auth0_public_key_cache["key"]
 
-    # If not, fetch the JWKS from Auth0
     response = requests.get(JWKS_URL)
     response.raise_for_status()
     jwks = response.json()
 
     x5c = jwks["keys"][0]["x5c"][0]
-
-    # Convert the X.509 certificate to a public key
     cert = load_pem_x509_certificate(
         f"-----BEGIN CERTIFICATE-----\n{x5c}\n-----END CERTIFICATE-----".encode()
     )
@@ -63,7 +58,6 @@ def get_auth0_public_key():
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
 
-    # Update the cache
     auth0_public_key_cache["key"] = public_key
     auth0_public_key_cache["last_updated"] = current_time
 
@@ -79,7 +73,7 @@ def verify_token_and_get_email(token):
             audience=API_AUDIENCE,
             issuer=f"https://{AUTH0_DOMAIN}/",
         )
-        return payload["platogram:user_email"]
+        return payload.get("platogram:user_email") or payload.get("email") or payload.get("https://platogram.com/user_email")
     except Exception as e:
         logger.error(f"Couldn't verify token: {str(e)}")
         return None
@@ -139,12 +133,12 @@ class handler(BaseHTTPRequestHandler):
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
         authorization_header = self.headers.get('Authorization', '')
-        token = authorization_header.split(' ')[1]  # Simplified auth
+        token = authorization_header.split(' ')[1] if authorization_header else ''
 
         try:
             email = verify_token_and_get_email(token)
             if not email:
-                json_response(self, 400, {"error": "Invalid token"})
+                json_response(self, 401, {"error": "Invalid or expired token"})
                 return
 
             if email in tasks and tasks[email]['status'] == "running":
@@ -152,13 +146,13 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             if content_type == 'application/octet-stream':
-                body = self.rfile.read(content_length)  # Read raw bytes
+                body = self.rfile.read(content_length)
                 file_name = self.headers.get('X-File-Name')
                 lang = self.headers.get('X-Language', 'en')
                 tasks[email] = {'status': 'running', 'file': file_name, 'lang': lang}
                 logger.info(f"File upload received for user {email}: {file_name}")
             elif content_type == 'application/json':
-                body = self.rfile.read(content_length).decode('utf-8')  # JSON should be UTF-8
+                body = self.rfile.read(content_length).decode('utf-8')
                 data = json.loads(body)
                 url = data.get('url')
                 lang = data.get('lang', 'en')
@@ -168,15 +162,13 @@ class handler(BaseHTTPRequestHandler):
                 json_response(self, 400, {"error": "Invalid content type"})
                 return
 
-            # Simulate starting background processing
+            # Start processing
             tasks[email]['status'] = 'processing'
-
-            # Simulate processing and send email
             self.process_and_send_email(email)
 
             json_response(self, 200, {"message": "Conversion started"})
         except Exception as e:
-            logger.error(f"Error in handle_convert for user {email}: {str(e)}")
+            logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
     def process_and_send_email(self, email):
@@ -191,7 +183,6 @@ class handler(BaseHTTPRequestHandler):
                 with open(sample_file, 'w') as f:
                     f.write("This is a sample output file.")
 
-                # Prepare email content
                 subject = "[Platogram] Your Converted Document"
                 body = """Hi there!
 
@@ -205,7 +196,6 @@ Thank you for using Platogram!
 Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
 Suggested donation: $2 per hour of content converted."""
 
-                # Send email with attachment
                 send_email_with_resend(email, subject, body, [sample_file])
 
             tasks[email]['status'] = 'done'
@@ -217,8 +207,11 @@ Suggested donation: $2 per hour of content converted."""
 
     def handle_status(self):
         authorization_header = self.headers.get('Authorization', '')
-        token = authorization_header.split(' ')[1]  # Simplified auth
+        token = authorization_header.split(' ')[1] if authorization_header else ''
         email = verify_token_and_get_email(token)
+        if not email:
+            json_response(self, 401, {"error": "Invalid or expired token"})
+            return
         try:
             if email not in tasks:
                 response = {"status": "idle"}
@@ -235,8 +228,11 @@ Suggested donation: $2 per hour of content converted."""
 
     def handle_reset(self):
         authorization_header = self.headers.get('Authorization', '')
-        token = authorization_header.split(' ')[1]  # Simplified auth
+        token = authorization_header.split(' ')[1] if authorization_header else ''
         email = verify_token_and_get_email(token)
+        if not email:
+            json_response(self, 401, {"error": "Invalid or expired token"})
+            return
         try:
             if email in tasks:
                 del tasks[email]

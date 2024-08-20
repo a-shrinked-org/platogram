@@ -2,6 +2,11 @@ from http.server import BaseHTTPRequestHandler
 import json
 import os
 import logging
+import tempfile
+from pathlib import Path
+import base64
+import aiohttp
+import asyncio
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -10,11 +15,46 @@ logger = logging.getLogger(__name__)
 # In-memory storage (Note: This will reset on each function invocation)
 tasks = {}
 
+# Resend API key
+RESEND_API_KEY = os.getenv('RESEND_API_KEY', 're_WJRjz8cY_CPFnyEbJyUHHXwsd48785L5d')
+
 def json_response(handler, status_code, data):
     handler.send_response(status_code)
     handler.send_header('Content-type', 'application/json')
     handler.end_headers()
     handler.wfile.write(json.dumps(data).encode())
+
+async def send_email_with_resend(to_email, subject, body, attachments):
+    url = "https://api.resend.com/emails"
+    headers = {
+        "Authorization": f"Bearer {RESEND_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "from": "Platogram <onboarding@resend.dev>",
+        "to": to_email,
+        "subject": subject,
+        "text": body,
+        "attachments": []
+    }
+
+    for attachment in attachments:
+        with open(attachment, "rb") as file:
+            content = file.read()
+            encoded_content = base64.b64encode(content).decode()
+            payload["attachments"].append({
+                "filename": Path(attachment).name,
+                "content": encoded_content
+            })
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers, json=payload) as response:
+            if response.status == 200:
+                logger.info(f"Email sent successfully to {to_email}")
+            else:
+                error_text = await response.text()
+                logger.error(f"Failed to send email. Status: {response.status}, Error: {error_text}")
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -58,12 +98,48 @@ class handler(BaseHTTPRequestHandler):
                 json_response(self, 400, {"error": "Invalid content type"})
                 return
 
-            # Simulate starting background processing
-            tasks[user_id]['status'] = 'processing'
+            # Start processing in the background
+            asyncio.create_task(self.process_conversion(user_id))
+
             json_response(self, 200, {"message": "Conversion started"})
         except Exception as e:
             logger.error(f"Error in handle_convert for user {user_id}: {str(e)}")
             json_response(self, 500, {"error": str(e)})
+
+    async def process_conversion(self, user_id):
+        try:
+            # Simulate processing
+            await asyncio.sleep(5)  # Simulate work
+
+            # Generate sample output files
+            with tempfile.TemporaryDirectory() as tmpdir:
+                sample_file = Path(tmpdir) / "sample_output.txt"
+                with open(sample_file, 'w') as f:
+                    f.write("This is a sample output file.")
+
+                # Prepare email content
+                subject = "[Platogram] Your Converted Document"
+                body = """Hi there!
+
+Platogram has transformed spoken words into documents you can read and enjoy!
+
+Please find the converted document attached to this email.
+
+Thank you for using Platogram!
+
+---
+Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
+Suggested donation: $2 per hour of content converted."""
+
+                # Send email with attachment
+                await send_email_with_resend(user_id, subject, body, [sample_file])
+
+            tasks[user_id]['status'] = 'done'
+            logger.info(f"Conversion completed for user {user_id}")
+        except Exception as e:
+            logger.error(f"Error in process_conversion for user {user_id}: {str(e)}")
+            tasks[user_id]['status'] = 'failed'
+            tasks[user_id]['error'] = str(e)
 
     def handle_status(self):
         user_id = self.headers.get('Authorization', '').split(' ')[1]  # Simplified auth

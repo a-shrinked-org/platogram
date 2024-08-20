@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 import base64
 import requests
+from jose import jwt  # For decoding the JWT token
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -19,11 +20,24 @@ RESEND_API_KEY = os.getenv('RESEND_API_KEY')
 if not RESEND_API_KEY:
     raise EnvironmentError("RESEND_API_KEY not set in environment")
 
+# Auth0 Configuration
+AUTH0_DOMAIN = os.getenv('AUTH0_DOMAIN')
+AUTH0_CLIENT_ID = os.getenv('AUTH0_CLIENT_ID')
+
 def json_response(handler, status_code, data):
     handler.send_response(status_code)
     handler.send_header('Content-type', 'application/json')
     handler.end_headers()
     handler.wfile.write(json.dumps(data).encode())
+
+def get_email_from_token(token):
+    try:
+        # Decode the token
+        decoded_token = jwt.decode(token, options={"verify_signature": False})  # Typically, you should verify the signature
+        return decoded_token.get('email')
+    except Exception as e:
+        logger.error(f"Error decoding token: {str(e)}")
+        return None
 
 def send_email_with_resend(to_email, subject, body, attachments):
     url = "https://api.resend.com/emails"
@@ -73,10 +87,16 @@ class handler(BaseHTTPRequestHandler):
     def handle_convert(self):
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
-        user_id = self.headers.get('Authorization', '').split(' ')[1]  # Simplified auth
+        authorization_header = self.headers.get('Authorization', '')
+        token = authorization_header.split(' ')[1]  # Simplified auth
 
         try:
-            if user_id in tasks and tasks[user_id]['status'] == "running":
+            email = get_email_from_token(token)
+            if not email:
+                json_response(self, 400, {"error": "Invalid token"})
+                return
+
+            if email in tasks and tasks[email]['status'] == "running":
                 json_response(self, 400, {"error": "Conversion already in progress"})
                 return
 
@@ -84,31 +104,31 @@ class handler(BaseHTTPRequestHandler):
                 body = self.rfile.read(content_length)  # Read raw bytes
                 file_name = self.headers.get('X-File-Name')
                 lang = self.headers.get('X-Language', 'en')
-                tasks[user_id] = {'status': 'running', 'file': file_name, 'lang': lang}
-                logger.info(f"File upload received for user {user_id}: {file_name}")
+                tasks[email] = {'status': 'running', 'file': file_name, 'lang': lang}
+                logger.info(f"File upload received for user {email}: {file_name}")
             elif content_type == 'application/json':
                 body = self.rfile.read(content_length).decode('utf-8')  # JSON should be UTF-8
                 data = json.loads(body)
                 url = data.get('url')
                 lang = data.get('lang', 'en')
-                tasks[user_id] = {'status': 'running', 'url': url, 'lang': lang}
-                logger.info(f"URL conversion request received for user {user_id}: {url}")
+                tasks[email] = {'status': 'running', 'url': url, 'lang': lang}
+                logger.info(f"URL conversion request received for user {email}: {url}")
             else:
                 json_response(self, 400, {"error": "Invalid content type"})
                 return
 
             # Simulate starting background processing
-            tasks[user_id]['status'] = 'processing'
+            tasks[email]['status'] = 'processing'
 
             # Simulate processing and send email
-            self.process_and_send_email(user_id)
+            self.process_and_send_email(email)
 
             json_response(self, 200, {"message": "Conversion started"})
         except Exception as e:
-            logger.error(f"Error in handle_convert for user {user_id}: {str(e)}")
+            logger.error(f"Error in handle_convert for user {email}: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    def process_and_send_email(self, user_id):
+    def process_and_send_email(self, email):
         try:
             # Simulate processing
             import time
@@ -135,39 +155,43 @@ Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
 Suggested donation: $2 per hour of content converted."""
 
                 # Send email with attachment
-                send_email_with_resend(user_id, subject, body, [sample_file])
+                send_email_with_resend(email, subject, body, [sample_file])
 
-            tasks[user_id]['status'] = 'done'
-            logger.info(f"Conversion completed for user {user_id}")
+            tasks[email]['status'] = 'done'
+            logger.info(f"Conversion completed for user {email}")
         except Exception as e:
-            logger.error(f"Error in process_and_send_email for user {user_id}: {str(e)}")
-            tasks[user_id]['status'] = 'failed'
-            tasks[user_id]['error'] = str(e)
+            logger.error(f"Error in process_and_send_email for user {email}: {str(e)}")
+            tasks[email]['status'] = 'failed'
+            tasks[email]['error'] = str(e)
 
     def handle_status(self):
-        user_id = self.headers.get('Authorization', '').split(' ')[1]  # Simplified auth
+        authorization_header = self.headers.get('Authorization', '')
+        token = authorization_header.split(' ')[1]  # Simplified auth
+        email = get_email_from_token(token)
         try:
-            if user_id not in tasks:
+            if email not in tasks:
                 response = {"status": "idle"}
             else:
-                task = tasks[user_id]
+                task = tasks[email]
                 response = {
                     "status": task['status'],
                     "error": task.get('error') if task['status'] == "failed" else None
                 }
             json_response(self, 200, response)
         except Exception as e:
-            logger.error(f"Error in handle_status for user {user_id}: {str(e)}")
+            logger.error(f"Error in handle_status for user {email}: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
     def handle_reset(self):
-        user_id = self.headers.get('Authorization', '').split(' ')[1]  # Simplified auth
+        authorization_header = self.headers.get('Authorization', '')
+        token = authorization_header.split(' ')[1]  # Simplified auth
+        email = get_email_from_token(token)
         try:
-            if user_id in tasks:
-                del tasks[user_id]
+            if email in tasks:
+                del tasks[email]
             json_response(self, 200, {"message": "Session reset"})
         except Exception as e:
-            logger.error(f"Error in handle_reset for user {user_id}: {str(e)}")
+            logger.error(f"Error in handle_reset for user {email}: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
 # Vercel handler

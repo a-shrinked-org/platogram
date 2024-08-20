@@ -8,10 +8,11 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
+import logging
+from concurrent.futures import ThreadPoolExecutor
 
 # Setup logging
-import logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # In-memory storage (Note: This will reset on each function invocation)
@@ -29,8 +30,8 @@ def json_response(handler, status_code, data):
     handler.end_headers()
     handler.wfile.write(json.dumps(data).encode())
 
-async def send_email(user_id: str, subj: str, body: str, files: list[Path]):
-    logger.debug(f"Sending email to {user_id}")
+def send_email(user_id: str, subj: str, body: str, files: list[Path]):
+    logger.info(f"Sending email to {user_id}")
     msg = MIMEMultipart()
     msg['From'] = SMTP_USER
     msg['To'] = user_id
@@ -49,27 +50,73 @@ async def send_email(user_id: str, subj: str, body: str, files: list[Path]):
             server.starttls()
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.send_message(msg)
-        logger.debug(f"Email sent to {user_id}")
+        logger.info(f"Email sent to {user_id}")
     except Exception as e:
         logger.error(f"Failed to send email to {user_id}: {str(e)}")
         raise
 
+def process_conversion(user_id):
+    try:
+        task = tasks[user_id]
+
+        # Simulate processing steps
+        steps = ["Initializing", "Processing", "Finalizing"]
+        for step in steps:
+            logger.info(f"Processing step: {step}")
+            # Simulate work
+            time.sleep(1)
+
+        # Simulate result
+        result = {
+            "title": "Sample Conversion",
+            "summary": "This is a sample summary of the converted content."
+        }
+
+        # Create sample output files
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sample_file = Path(tmpdir) / "sample_output.txt"
+            with open(sample_file, 'w') as f:
+                f.write("This is a sample output file.")
+
+            # Send email with the result
+            subject = f"[Platogram] {result['title']}"
+            body = f"""Hi there!
+
+Platogram transformed spoken words into documents you can read and enjoy!
+
+{result['summary']}
+
+Please reply to this email if you have any suggestions, feedback, or questions.
+
+---
+Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
+Suggested donation: $2 per hour of content converted."""
+
+            send_email(user_id, subject, body, [sample_file])
+
+        tasks[user_id]['status'] = 'done'
+
+    except Exception as e:
+        logger.exception(f"Error in conversion for user {user_id}: {str(e)}")
+        tasks[user_id]['status'] = 'failed'
+        tasks[user_id]['error'] = str(e)
+
 class handler(BaseHTTPRequestHandler):
-    async def do_POST(self):
+    def do_POST(self):
         if self.path == '/convert':
-            await self.handle_convert()
+            self.handle_convert()
         else:
             self.send_error(404, "Not Found")
 
-    async def do_GET(self):
+    def do_GET(self):
         if self.path == '/status':
-            await self.handle_status()
+            self.handle_status()
         elif self.path == '/reset':
-            await self.handle_reset()
+            self.handle_reset()
         else:
             self.send_error(404, "Not Found")
 
-    async def handle_convert(self):
+    def handle_convert(self):
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
         user_id = self.headers.get('Authorization', '').split(' ')[1]  # Simplified auth
@@ -103,66 +150,15 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             # Start background processing
-            asyncio.create_task(self.process_conversion(user_id))
+            with ThreadPoolExecutor() as executor:
+                executor.submit(process_conversion, user_id)
 
             json_response(self, 200, {"message": "Conversion started"})
         except Exception as e:
             logger.exception(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    async def process_conversion(self, user_id):
-        try:
-            task = tasks[user_id]
-
-            # Simulate processing steps
-            steps = ["Initializing", "Processing", "Finalizing"]
-            for step in steps:
-                await asyncio.sleep(1)  # Simulate work
-                logger.debug(f"Processing step: {step}")
-
-            # Here you would implement your actual conversion logic
-            # For example:
-            # if 'file' in task:
-            #     result = await process_file(task['file'], task['lang'])
-            # elif 'url' in task:
-            #     result = await process_url(task['url'], task['lang'])
-
-            # Simulate result
-            result = {
-                "title": "Sample Conversion",
-                "summary": "This is a sample summary of the converted content."
-            }
-
-            # Create sample output files
-            with tempfile.TemporaryDirectory() as tmpdir:
-                sample_file = Path(tmpdir) / "sample_output.txt"
-                with open(sample_file, 'w') as f:
-                    f.write("This is a sample output file.")
-
-                # Send email with the result
-                subject = f"[Platogram] {result['title']}"
-                body = f"""Hi there!
-
-Platogram transformed spoken words into documents you can read and enjoy!
-
-{result['summary']}
-
-Please reply to this email if you have any suggestions, feedback, or questions.
-
----
-Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
-Suggested donation: $2 per hour of content converted."""
-
-                await send_email(user_id, subject, body, [sample_file])
-
-            tasks[user_id]['status'] = 'done'
-
-        except Exception as e:
-            logger.exception(f"Error in conversion for user {user_id}: {str(e)}")
-            tasks[user_id]['status'] = 'failed'
-            tasks[user_id]['error'] = str(e)
-
-    async def handle_status(self):
+    def handle_status(self):
         user_id = self.headers.get('Authorization', '').split(' ')[1]  # Simplified auth
         try:
             if user_id not in tasks:
@@ -178,7 +174,7 @@ Suggested donation: $2 per hour of content converted."""
             logger.exception(f"Error in handle_status: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    async def handle_reset(self):
+    def handle_reset(self):
         user_id = self.headers.get('Authorization', '').split(' ')[1]  # Simplified auth
         try:
             if user_id in tasks:

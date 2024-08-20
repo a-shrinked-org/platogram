@@ -241,13 +241,20 @@ class handler(BaseHTTPRequestHandler):
                 else:
                     url = f"file://{task['file']}"
 
-                try:
-                    transcript = plato.extract_transcript(url, speech_recognition_model)
-                except Exception as e:
-                    if "Sign in to confirm you're not a bot" in str(e):
-                        raise Exception("YouTube requires authentication for this video. Please try a different video or provide a direct audio file.")
-                    else:
-                        raise
+                # Check if it's a local file
+                if url.startswith("file://"):
+                    with open(task['file'], 'rb') as audio_file:
+                        audio_content = audio_file.read()
+                    transcribe_response = speech_recognition_model.transcribe(audio_content)
+                else:
+                    try:
+                        transcribe_response = speech_recognition_model.transcribe(url)
+                    except Exception as e:
+                        if "Sign in to confirm you're not a bot" in str(e):
+                            raise Exception("YouTube requires authentication for this video. Please try a different video or provide a direct audio file.")
+                        else:
+                            raise
+
 
                 content = plato.index(transcript, language_model)
 

@@ -252,7 +252,12 @@ class handler(BaseHTTPRequestHandler):
                     with open(task['file'], 'rb') as audio_file:
                         audio_content = audio_file.read()
                     logger.debug(f"Read binary data, length: {len(audio_content)} bytes")
-                    transcribe_response = speech_recognition_model.transcribe(audio_content)
+
+                    try:
+                        transcribe_response = speech_recognition_model.transcribe(audio_content)
+                    except UnicodeDecodeError as e:
+                        logger.error(f"UnicodeDecodeError during transcription for task {task_id}: {str(e)}")
+                        raise
                 else:
                     try:
                         transcribe_response = speech_recognition_model.transcribe(url)
@@ -274,17 +279,17 @@ class handler(BaseHTTPRequestHandler):
                 subject = f"[Platogram] {content.title}"
                 body = f"""Hi there!
 
-Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
+    Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
 
-You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
+    You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
 
-{content.summary}
+    {content.summary}
 
-Please reply to this e-mail if any suggestions, feedback, or questions.
+    Please reply to this e-mail if any suggestions, feedback, or questions.
 
----
-Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
-Suggested donation: $2 per hour of content converted."""
+    ---
+    Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
+    Suggested donation: $2 per hour of content converted."""
 
                 if user_email:
                     logger.debug(f"Sending email to {user_email}")

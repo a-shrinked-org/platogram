@@ -14,7 +14,7 @@ def json_response(status_code, data):
         "body": json.dumps(data)
     }
 
-def handle_request(event):
+def handle_request(event, context):
     method = event['httpMethod']
     path = event['path']
     headers = event['headers']
@@ -28,11 +28,11 @@ def handle_request(event):
         else:
             return json_response(404, {"error": "Not Found"})
     elif method == 'POST' and path == '/convert':
-        return handle_convert(headers, body)
+        return handle_convert(headers, body, event.get('isBase64Encoded', False))
     else:
         return json_response(404, {"error": "Not Found"})
 
-def handle_convert(headers, body):
+def handle_convert(headers, body, is_base64_encoded):
     content_type = headers.get('Content-Type')
     user_id = headers.get('Authorization', '').split(' ')[1]  # Simplified auth
 
@@ -44,7 +44,11 @@ def handle_convert(headers, body):
             file_name = headers.get('X-File-Name')
             lang = headers.get('X-Language', 'en')
             tasks[user_id] = {'status': 'running', 'file': file_name, 'lang': lang}
+            # Handle file content here if needed
         elif content_type == 'application/json':
+            if is_base64_encoded:
+                import base64
+                body = base64.b64decode(body).decode('utf-8')
             data = json.loads(body)
             url = data.get('url')
             lang = data.get('lang', 'en')
@@ -82,5 +86,6 @@ def handle_reset(headers):
     except Exception as e:
         return json_response(500, {"error": str(e)})
 
+# Vercel handler
 def handler(event, context):
-    return handle_request(event)
+    return handle_request(event, context)

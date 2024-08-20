@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 tasks = {}
 
 # Resend API key
-RESEND_API_KEY = os.getenv('RESEND_API_KEY', 're_WJRjz8cY_CPFnyEbJyUHHXwsd48785L5d')
+RESEND_API_KEY = os.getenv('RESEND_API_KEY')
+if not RESEND_API_KEY:
+    raise EnvironmentError("RESEND_API_KEY not set in environment")
 
 def json_response(handler, status_code, data):
     handler.send_response(status_code)

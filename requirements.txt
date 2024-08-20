@@ -8,3 +8,4 @@ aiofiles==22.1.0
 yt-dlp==2023.3.4
 aiohttp==3.10.5
 requests==2.26.0
+python-jose==3.3.0

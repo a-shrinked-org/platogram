@@ -127,7 +127,7 @@ def send_email_with_resend(to_email, subject, body, attachments):
     for attachment in attachments:
         with open(attachment, "rb") as file:
             content = file.read()
-            encoded_content = base64.b64encode(content).decode('utf-8')  # Ensure utf-8 encoding
+            encoded_content = base64.b64encode(content).decode('utf-8')
             payload["attachments"].append({
                 "filename": Path(attachment).name,
                 "content": encoded_content
@@ -245,6 +245,7 @@ class handler(BaseHTTPRequestHandler):
                 if url.startswith("file://"):
                     with open(task['file'], 'rb') as audio_file:
                         audio_content = audio_file.read()
+                        logger.debug(f"Read binary data, length: {len(audio_content)} bytes")  # Debug log for binary data length
                     transcribe_response = speech_recognition_model.transcribe(audio_content)
                 else:
                     try:

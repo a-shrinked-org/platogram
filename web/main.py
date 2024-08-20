@@ -50,7 +50,7 @@ def json_response(handler, status_code, data):
     handler.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     handler.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language')
     handler.end_headers()
-    handler.wfile.write(json.dumps(data).encode())
+    handler.wfile.write(json.dumps(data).encode('utf-8'))  # Ensure utf-8 encoding
 
 def get_auth0_public_key():
     current_time = time.time()
@@ -127,7 +127,7 @@ def send_email_with_resend(to_email, subject, body, attachments):
     for attachment in attachments:
         with open(attachment, "rb") as file:
             content = file.read()
-            encoded_content = base64.b64encode(content).decode()
+            encoded_content = base64.b64encode(content).decode('utf-8')  # Ensure utf-8 encoding
             payload["attachments"].append({
                 "filename": Path(attachment).name,
                 "content": encoded_content

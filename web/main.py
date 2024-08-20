@@ -1,83 +1,86 @@
+from http.server import BaseHTTPRequestHandler
 import json
 import os
 
 # In-memory storage (Note: This will reset on each function invocation)
 tasks = {}
 
-def handler(event, context):
-    path = event['path']
-    http_method = event['httpMethod']
-    headers = event['headers']
-    body = event.get('body', '')
+def json_response(handler, status_code, data):
+    handler.send_response(status_code)
+    handler.send_header('Content-type', 'application/json')
+    handler.end_headers()
+    handler.wfile.write(json.dumps(data).encode())
 
-    if http_method == 'GET':
-        if path == '/status':
-            return handle_status(headers)
-        elif path == '/reset':
-            return handle_reset(headers)
-    elif http_method == 'POST' and path == '/convert':
-        return handle_convert(body, headers)
-
-    return {"statusCode": 404, "body": json.dumps({"error": "Not Found"})}
-
-def handle_convert(body, headers):
-    try:
-        content_type = headers.get('Content-Type')
-        user_id = headers.get('Authorization', '').split(' ')[1]  # Simplified auth
-
-        if user_id in tasks and tasks[user_id]['status'] == "running":
-            return {"statusCode": 400, "body": json.dumps({"error": "Conversion already in progress"})}
-
-        if content_type == 'application/octet-stream':
-            file_name = headers.get('X-File-Name')
-            lang = headers.get('X-Language', 'en')
-            tasks[user_id] = {'status': 'running', 'file': file_name, 'lang': lang}
-        elif content_type == 'application/json':
-            data = json.loads(body)
-            url = data.get('url')
-            lang = data.get('lang', 'en')
-            tasks[user_id] = {'status': 'running', 'url': url, 'lang': lang}
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/status':
+            self.handle_status()
+        elif self.path == '/reset':
+            self.handle_reset()
         else:
-            return {"statusCode": 400, "body": json.dumps({"error": "Invalid content type"})}
+            json_response(self, 404, {"error": "Not Found"})
 
-        # Simulate starting background processing
-        tasks[user_id]['status'] = 'processing'
-
-        return {"statusCode": 200, "body": json.dumps({"message": "Conversion started"})}
-
-    except Exception as e:
-        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
-
-def handle_status(headers):
-    try:
-        user_id = headers.get('Authorization', '').split(' ')[1]  # Simplified auth
-
-        if user_id not in tasks:
-            response = {"status": "idle"}
+    def do_POST(self):
+        if self.path == '/convert':
+            self.handle_convert()
         else:
-            task = tasks[user_id]
-            response = {
-                "status": task['status'],
-                "error": task.get('error') if task['status'] == "failed" else None
-            }
+            json_response(self, 404, {"error": "Not Found"})
 
-        return {"statusCode": 200, "body": json.dumps(response)}
+    def handle_convert(self):
+        content_length = int(self.headers['Content-Length'])
+        body = self.rfile.read(content_length).decode('utf-8')
+        content_type = self.headers.get('Content-Type')
+        user_id = self.headers.get('Authorization', '').split(' ')[1]  # Simplified auth
 
-    except Exception as e:
-        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+        try:
+            if user_id in tasks and tasks[user_id]['status'] == "running":
+                json_response(self, 400, {"error": "Conversion already in progress"})
+                return
 
-def handle_reset(headers):
-    try:
-        user_id = headers.get('Authorization', '').split(' ')[1]  # Simplified auth
+            if content_type == 'application/octet-stream':
+                file_name = self.headers.get('X-File-Name')
+                lang = self.headers.get('X-Language', 'en')
+                tasks[user_id] = {'status': 'running', 'file': file_name, 'lang': lang}
+            elif content_type == 'application/json':
+                data = json.loads(body)
+                url = data.get('url')
+                lang = data.get('lang', 'en')
+                tasks[user_id] = {'status': 'running', 'url': url, 'lang': lang}
+            else:
+                json_response(self, 400, {"error": "Invalid content type"})
+                return
 
-        if user_id in tasks:
-            del tasks[user_id]
+            # Simulate starting background processing
+            tasks[user_id]['status'] = 'processing'
 
-        return {"statusCode": 200, "body": json.dumps({"message": "Session reset"})}
+            json_response(self, 200, {"message": "Conversion started"})
+        except Exception as e:
+            json_response(self, 500, {"error": str(e)})
 
-    except Exception as e:
-        return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
+    def handle_status(self):
+        user_id = self.headers.get('Authorization', '').split(' ')[1]  # Simplified auth
 
-# Vercel requires a module-level handler function
-def vercel_handler(event, context):
-    return handler(event, context)
+        try:
+            if user_id not in tasks:
+                response = {"status": "idle"}
+            else:
+                task = tasks[user_id]
+                response = {
+                    "status": task['status'],
+                    "error": task.get('error') if task['status'] == "failed" else None
+                }
+
+            json_response(self, 200, response)
+        except Exception as e:
+            json_response(self, 500, {"error": str(e)})
+
+    def handle_reset(self):
+        user_id = self.headers.get('Authorization', '').split(' ')[1]  # Simplified auth
+
+        try:
+            if user_id in tasks:
+                del tasks[user_id]
+
+            json_response(self, 200, {"message": "Session reset"})
+        except Exception as e:
+            json_response(self, 500, {"error": str(e)})

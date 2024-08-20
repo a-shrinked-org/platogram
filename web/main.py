@@ -224,80 +224,98 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-   def process_and_send_email(task_id):
-    try:
-        task = tasks[task_id]
-        user_email = task.get('email')
-        logger.debug(f"Processing task {task_id}. Task data: {task}")
-        logger.debug(f"User email for task {task_id}: {user_email}")
+    def process_and_send_email(self, task_id):
+        try:
+            task = tasks[task_id]
+            user_email = task.get('email')
+            logger.debug(f"Processing task {task_id}. Task data: {task}")
+            logger.debug(f"User email for task {task_id}: {user_email}")
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_dir = Path(tmpdir)
+            with tempfile.TemporaryDirectory() as tmpdir:
+                output_dir = Path(tmpdir)
 
-            # Initialize Platogram models
-            language_model = plato.llm.get_model(
-                "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY'))
+                # Initialize Platogram models
+                language_model = plato.llm.get_model(
+                    "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
+                )
 
-            # Create the Transcriber object
-            speech_recognition_model = aai.Transcriber()
+                # Create the Transcriber object
+                speech_recognition_model = aai.Transcriber()
 
-            # Process audio
-            if 'url' in task:
-                url = task['url']
-            else:
-                url = f"file://{task['file']}"
+                # Process audio
+                if 'url' in task:
+                    url = task['url']
+                else:
+                    url = f"file://{task['file']}"
 
-            # Handle local file processing
-            if url.startswith("file://"):
-                with open(task['file'], 'rb') as audio_file:
-                    audio_content = audio_file.read()
-                logger.debug(f"Read binary data, length: {len(audio_content)} bytes")
+                # Check if it's a local file
+                if url.startswith("file://"):
+                    with open(task['file'], 'rb') as audio_file:
+                        audio_content = audio_file.read()
+                    logger.debug(f"Read binary data, length: {len(audio_content)} bytes")
 
-                # Transcribe with error handling for non-UTF-8 content
-                transcribe_response = speech_recognition_model.transcribe(audio_content)
-            else:
-                transcribe_response = speech_recognition_model.transcribe(url)
+                    try:
+                        transcribe_response = speech_recognition_model.transcribe(audio_content)
+                    except UnicodeDecodeError as e:
+                        logger.error(f"UnicodeDecodeError during transcription for task {task_id}: {str(e)}")
+                        tasks[task_id]['status'] = 'failed'
+                        tasks[task_id]['error'] = "Failed to decode byte data - potential encoding issue."
+                        return
+                else:
+                    try:
+                        transcribe_response = speech_recognition_model.transcribe(url)
+                    except Exception as e:
+                        if "Sign in to confirm you're not a bot" in str(e):
+                            logger.error(f"Authentication required for task {task_id}: {str(e)}")
+                            tasks[task_id]['status'] = 'failed'
+                            tasks[task_id]['error'] = "YouTube requires authentication for this video. Please try a different video or provide a direct audio file."
+                            return
+                        else:
+                            logger.error(f"Error during transcription for task {task_id}: {str(e)}")
+                            raise
 
-            transcript = transcribe_response['text']
-            content = plato.index(transcript, language_model)
+                transcript = transcribe_response['text']
+                content = plato.index(transcript, language_model)
 
-            # Generate output files
-            plato.generate_output_files(content, output_dir)
-            files = [f for f in output_dir.glob('*') if f.is_file()]
+                # Generate output files
+                plato.generate_output_files(content, output_dir)
 
-            subject = f"[Platogram] {content.title}"
-            body = f"""Hi there!...
+                files = [f for f in output_dir.glob('*') if f.is_file()]
 
-Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
+                subject = f"[Platogram] {content.title}"
+                body = f"""Hi there!
 
-You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
+    Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
 
-{content.summary}
+    You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
 
-Please reply to this e-mail if any suggestions, feedback, or questions.
+    {content.summary}
 
----
-Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
-Suggested donation: $2 per hour of content converted."""
+    Please reply to this e-mail if any suggestions, feedback, or questions.
 
-            if user_email:
-                logger.debug(f"Sending email to {user_email}")
-                send_email_with_resend(user_email, subject, body, files)
-                logger.debug("Email sent successfully")
-            else:
-                logger.warning(f"No email available for task {task_id}. Skipping email send.")
+    ---
+    Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
+    Suggested donation: $2 per hour of content converted."""
 
-        tasks[task_id]['status'] = 'done'
-        logger.debug(f"Conversion completed for task {task_id}")
-    except UnicodeDecodeError as e:
-        logger.error(f"UnicodeDecodeError for task {task_id}: {str(e)}")
-        tasks[task_id]['status'] = 'failed'
-        tasks[task_id]['error'] = "Failed to decode byte data - potential encoding issue."
-    except Exception as e:
-        logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}")
-        tasks[task_id]['status'] = 'failed'
-        tasks[task_id]['error'] = str(e)
+                if user_email:
+                    logger.debug(f"Sending email to {user_email}")
+                    send_email_with_resend(user_email, subject, body, files)
+                    logger.debug("Email sent successfully")
+                else:
+                    logger.warning(f"No email available for task {task_id}. Skipping email send.")
 
+            tasks[task_id]['status'] = 'done'
+            logger.debug(f"Conversion completed for task {task_id}")
+
+        except UnicodeDecodeError as e:
+            logger.error(f"UnicodeDecodeError for task {task_id}: {str(e)}")
+            tasks[task_id]['status'] = 'failed'
+            tasks[task_id]['error'] = "Failed to decode byte data - potential encoding issue."
+        except Exception as e:
+            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}")
+            tasks[task_id]['status'] = 'failed'
+            tasks[task_id]['error'] = str(e)
+    
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')
         if not task_id:

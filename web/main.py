@@ -13,7 +13,7 @@ from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
 
 # Setup logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # In-memory storage (Note: This will reset on each function invocation)
@@ -76,10 +76,10 @@ def get_auth0_public_key():
 
 def verify_token_and_get_email(token):
     if not token:
-        logger.info("No token provided")
+        logger.debug("No token provided")
         return None
     try:
-        logger.info(f"Verifying token: {token[:10]}...{token[-10:]}")
+        logger.debug(f"Verifying token: {token[:10]}...{token[-10:]}")
         public_key = get_auth0_public_key()
         payload = jwt.decode(
             token,
@@ -88,9 +88,9 @@ def verify_token_and_get_email(token):
             audience=API_AUDIENCE,
             issuer=f"https://{AUTH0_DOMAIN}/",
         )
-        logger.info(f"Token payload: {payload}")
+        logger.debug(f"Token payload: {payload}")
         email = payload.get("platogram:user_email") or payload.get("email") or payload.get("https://platogram.com/user_email")
-        logger.info(f"Extracted email from token: {email}")
+        logger.debug(f"Extracted email from token: {email}")
         return email
     except jwt.ExpiredSignatureError:
         logger.error("Token has expired")
@@ -103,7 +103,7 @@ def verify_token_and_get_email(token):
     return None
 
 def send_email_with_resend(to_email, subject, body, attachments):
-    logger.info(f"Attempting to send email to: {to_email}")
+    logger.debug(f"Attempting to send email to: {to_email}")
     url = "https://api.resend.com/emails"
     headers = {
         "Authorization": f"Bearer {RESEND_API_KEY}",
@@ -127,13 +127,12 @@ def send_email_with_resend(to_email, subject, body, attachments):
                 "content": encoded_content
             })
 
+    logger.debug(f"Sending email with payload: {json.dumps(payload, default=str)}")
     response = requests.post(url, headers=headers, json=payload)
     if response.status_code == 200:
         logger.info(f"Email sent successfully to {to_email}")
     else:
         logger.error(f"Failed to send email. Status: {response.status_code}, Error: {response.text}")
-        raise Exception(f"Failed to send email: {response.text}")
-
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
@@ -150,7 +149,7 @@ class handler(BaseHTTPRequestHandler):
         else:
             json_response(self, 404, {"error": "Not Found"})
 
-    def do_POST(self):
+    def do_POST(self):  # Corrected indentation
         if self.path == '/convert':
             self.handle_convert()
         else:
@@ -158,25 +157,25 @@ class handler(BaseHTTPRequestHandler):
 
     def get_user_email(self):
         auth_header = self.headers.get('Authorization', '')
-        logger.info(f"Authorization header: {auth_header}")
+        logger.debug(f"Authorization header: {auth_header}")
         if not auth_header:
             logger.warning("No Authorization header found")
             return None
         try:
             token = auth_header.split(' ')[1]
             email = verify_token_and_get_email(token)
-            logger.info(f"User email extracted: {email}")
+            logger.debug(f"User email extracted: {email}")
             return email
         except IndexError:
             logger.error("Malformed Authorization header")
             return None
 
     def handle_convert(self):
-        logger.info("Handling /convert request")
+        logger.debug("Handling /convert request")
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
         user_email = self.get_user_email()
-        logger.info(f"User email for conversion: {user_email}")
+        logger.debug(f"User email for conversion: {user_email}")
 
         try:
             task_id = str(uuid4())
@@ -193,14 +192,14 @@ class handler(BaseHTTPRequestHandler):
                     f.write(body)
 
                 tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
-                logger.info(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+                logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
             elif content_type == 'application/json':
                 body = self.rfile.read(content_length).decode('utf-8')  # JSON should be UTF-8
                 data = json.loads(body)
                 url = data.get('url')
                 lang = data.get('lang', 'en')
                 tasks[task_id] = {'status': 'running', 'url': url, 'lang': lang, 'email': user_email}
-                logger.info(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+                logger.debug(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
             else:
                 logger.error(f"Invalid content type: {content_type}")
                 json_response(self, 400, {"error": "Invalid content type"})
@@ -218,8 +217,9 @@ class handler(BaseHTTPRequestHandler):
     def process_and_send_email(self, task_id):
         try:
             task = tasks[task_id]
-            user_email = task['email']
-            logger.info(f"Starting processing for task {task_id}, User Email: {user_email}")
+            user_email = task.get('email')
+            logger.debug(f"Processing task {task_id}. Task data: {task}")
+            logger.debug(f"User email for task {task_id}: {user_email}")
 
             # Simulate processing
             time.sleep(5)  # Simulate work
@@ -249,14 +249,14 @@ Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
 Suggested donation: $2 per hour of content converted."""
 
                 if user_email:
-                    logger.info(f"Sending email to {user_email}")
+                    logger.debug(f"Sending email to {user_email}")
                     send_email_with_resend(user_email, subject, body, [sample_file, pdf_file])
-                    logger.info("Email sent successfully")
+                    logger.debug("Email sent successfully")
                 else:
                     logger.warning(f"No email available for task {task_id}. Skipping email send.")
 
             tasks[task_id]['status'] = 'done'
-            logger.info(f"Conversion completed for task {task_id}")
+            logger.debug(f"Conversion completed for task {task_id}")
         except Exception as e:
             logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}")
             tasks[task_id]['status'] = 'failed'

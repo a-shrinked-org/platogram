@@ -4,17 +4,13 @@ import os
 import asyncio
 import tempfile
 from pathlib import Path
-import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 
-import jwt
-from cryptography.hazmat.primitives import serialization
-from cryptography.x509 import load_pem_x509_certificate
-
 # Setup logging
+import logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -22,29 +18,10 @@ logger = logging.getLogger(__name__)
 tasks = {}
 
 # Environment variables
-AUTH0_DOMAIN = os.getenv('AUTH0_DOMAIN', "dev-w0dm4z23pib7oeui.us.auth0.com")
-API_AUDIENCE = os.getenv('API_AUDIENCE', "https://platogram.vercel.app/")
-ALGORITHMS = ["RS256"]
-JWKS_URL = f"https://{AUTH0_DOMAIN}/.well-known/jwks.json"
-
-ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
-ASSEMBLYAI_API_KEY = os.getenv('ASSEMBLYAI_API_KEY')
-
-SMTP_USER = os.getenv("PLATOGRAM_SMTP_USER")
-SMTP_SERVER = os.getenv("PLATOGRAM_SMTP_SERVER")
+SMTP_USER = os.getenv("GMAIL_USER")
+SMTP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-SMTP_PASSWORD = os.getenv("PLATOGRAM_SMTP_PASSWORD")
-SMTP_FROM = os.getenv("PLATOGRAM_SMTP_FROM")
-
-if not all([ANTHROPIC_API_KEY, ASSEMBLYAI_API_KEY, SMTP_USER, SMTP_SERVER, SMTP_PASSWORD, SMTP_FROM]):
-    raise RuntimeError("Required environment variables are not set.")
-
-# Auth0 public key cache
-auth0_public_key_cache = {
-    "key": None,
-    "last_updated": 0,
-    "expires_in": 3600,
-}
 
 def json_response(handler, status_code, data):
     handler.send_response(status_code)
@@ -55,7 +32,7 @@ def json_response(handler, status_code, data):
 async def send_email(user_id: str, subj: str, body: str, files: list[Path]):
     logger.debug(f"Sending email to {user_id}")
     msg = MIMEMultipart()
-    msg['From'] = SMTP_FROM
+    msg['From'] = SMTP_USER
     msg['To'] = user_id
     msg['Subject'] = subj
 

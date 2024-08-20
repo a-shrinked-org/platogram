@@ -1,4 +1,3 @@
-from http.server import BaseHTTPRequestHandler
 import os
 import json
 import asyncio
@@ -6,8 +5,7 @@ import tempfile
 import logfire
 import time
 from pathlib import Path
-from typing import Optional, Literal
-from datetime import datetime
+from typing import Dict, Any
 import httpx
 import jwt
 from cryptography.hazmat.primitives import serialization
@@ -37,8 +35,6 @@ auth0_public_key_cache = {
     "last_updated": 0,
     "expires_in": 3600,  # Cache expiration time in seconds (1 hour)
 }
-
-Language = Literal["en", "es"]
 
 async def get_auth0_public_key():
     current_time = time.time()
@@ -82,7 +78,7 @@ async def verify_token_and_get_user_id(token: str):
     except Exception as e:
         raise ValueError(f"Couldn't verify token: {str(e)}")
 
-async def handle_convert(body, headers):
+async def handle_convert(body: str, headers: Dict[str, str]):
     content_type = headers.get('Content-Type')
     token = headers.get('Authorization', '').split(' ')[1]
 
@@ -101,7 +97,7 @@ async def handle_convert(body, headers):
             temp_file = temp_dir / f"{file_name}.part"
 
             with open(temp_file, 'wb') as f:
-                f.write(body)
+                f.write(body.encode())
 
             tasks[user_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang}
         elif content_type == 'application/json':
@@ -113,14 +109,16 @@ async def handle_convert(body, headers):
             return {"statusCode": 400, "body": json.dumps({"error": "Invalid content type"})}
 
         # Start background processing here
+        # Note: In a serverless environment, you might need to use a separate service for long-running tasks
         asyncio.create_task(process_conversion(user_id))
 
         return {"statusCode": 200, "body": json.dumps({"message": "Conversion started"})}
+
     except Exception as e:
         logfire.exception(f"Error in convert: {str(e)}")
         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
 
-async def handle_status(headers):
+async def handle_status(headers: Dict[str, str]):
     token = headers.get('Authorization', '').split(' ')[1]
 
     try:
@@ -141,7 +139,7 @@ async def handle_status(headers):
         logfire.exception(f"Error in status: {str(e)}")
         return {"statusCode": 500, "body": json.dumps({"error": str(e)})}
 
-async def handle_reset(headers):
+async def handle_reset(headers: Dict[str, str]):
     token = headers.get('Authorization', '').split(' ')[1]
 
     try:
@@ -169,23 +167,27 @@ async def process_conversion(user_id: str):
 
         # Here you would typically send an email with the results
         # await send_email(user_id, "Conversion complete", "Your conversion is complete.")
+
     except Exception as e:
         logfire.exception(f"Error in conversion for user {user_id}: {str(e)}")
         tasks[user_id]['status'] = 'failed'
         tasks[user_id]['error'] = str(e)
 
-def handler(event, context):
+def handler(event: Dict[str, Any], context: Any):
     path = event['path']
     http_method = event['httpMethod']
     headers = event['headers']
     body = event.get('body', '')
 
-    if http_method == 'GET':
-        if path == '/status':
-            return asyncio.run(handle_status(headers))
-        elif path == '/reset':
-            return asyncio.run(handle_reset(headers))
-    elif http_method == 'POST' and path == '/convert':
-        return asyncio.run(handle_convert(body, headers))
+    async def async_handler():
+        if http_method == 'GET':
+            if path == '/status':
+                return await handle_status(headers)
+            elif path == '/reset':
+                return await handle_reset(headers)
+        elif http_method == 'POST' and path == '/convert':
+            return await handle_convert(body, headers)
 
-    return {"statusCode": 404, "body": json.dumps({"error": "Not Found"})}
+        return {"statusCode": 404, "body": json.dumps({"error": "Not Found"})}
+
+    return asyncio.run(async_handler())

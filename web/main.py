@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler
 import json
 import os
 import logging
+import re
 import tempfile
 from pathlib import Path
 import base64
@@ -11,6 +12,8 @@ import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
+
+import platogram as plato
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
@@ -221,28 +224,44 @@ class handler(BaseHTTPRequestHandler):
             logger.debug(f"Processing task {task_id}. Task data: {task}")
             logger.debug(f"User email for task {task_id}: {user_email}")
 
-            # Simulate processing
-            time.sleep(5)  # Simulate work
-
-            # Generate sample output files
             with tempfile.TemporaryDirectory() as tmpdir:
-                sample_file = Path(tmpdir) / "sample_output.txt"
-                with open(sample_file, 'w') as f:
-                    f.write("This is a sample output file.")
+                output_dir = Path(tmpdir)
 
-                # Generate a simple PDF for testing
-                pdf_file = Path(tmpdir) / "output.pdf"
-                with open(pdf_file, 'w') as f:
-                    f.write("%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>\nendobj\n4 0 obj\n<< /Length 55 >>\nstream\nBT\n/F1 12 Tf\n100 700 Td\n(Hello, this is a sample PDF.) Tj\nET\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f\n0000000009 00000 n\n0000000058 00000 n\n0000000115 00000 n\n0000000212 00000 n\ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n316\n%%EOF")
+                # Initialize Platogram models
+                language_model = plato.llm.get_model("anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY'))
+                speech_recognition_model = plato.asr.get_model("assembly-ai/best", os.getenv('ASSEMBLYAI_API_KEY'))
 
-                subject = "[Platogram] Your Converted Document"
-                body = """Hi there!
+                # Process audio
+                if 'url' in task:
+                    url = task['url']
+                else:
+                    url = f"file://{task['file']}"
 
-Platogram has transformed spoken words into documents you can read and enjoy!
+                try:
+                    transcript = plato.extract_transcript(url, speech_recognition_model)
+                except Exception as e:
+                    if "Sign in to confirm you're not a bot" in str(e):
+                        raise Exception("YouTube requires authentication for this video. Please try a different video or provide a direct audio file.")
+                    else:
+                        raise
 
-Please find the converted document attached to this email.
+                content = plato.index(transcript, language_model)
 
-Thank you for using Platogram!
+                # Generate output files
+                plato.generate_output_files(content, output_dir)
+
+                files = [f for f in output_dir.glob('*') if f.is_file()]
+
+                subject = f"[Platogram] {content.title}"
+                body = f"""Hi there!
+
+Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
+
+You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
+
+{content.summary}
+
+Please reply to this e-mail if any suggestions, feedback, or questions.
 
 ---
 Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
@@ -250,7 +269,7 @@ Suggested donation: $2 per hour of content converted."""
 
                 if user_email:
                     logger.debug(f"Sending email to {user_email}")
-                    send_email_with_resend(user_email, subject, body, [sample_file, pdf_file])
+                    send_email_with_resend(user_email, subject, body, files)
                     logger.debug("Email sent successfully")
                 else:
                     logger.warning(f"No email available for task {task_id}. Skipping email send.")
@@ -261,6 +280,7 @@ Suggested donation: $2 per hour of content converted."""
             logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}")
             tasks[task_id]['status'] = 'failed'
             tasks[task_id]['error'] = str(e)
+
 
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')

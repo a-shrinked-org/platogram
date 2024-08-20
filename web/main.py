@@ -16,7 +16,7 @@ from uuid import uuid4
 import platogram as plato
 from anthropic import Anthropic
 from anthropic import AnthropicError
-import assemblyai
+import assemblyai as aai
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
@@ -232,7 +232,7 @@ class handler(BaseHTTPRequestHandler):
 
                 # Initialize Platogram models
                 language_model = plato.llm.get_model("anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY'))
-                speech_recognition_model = plato.asr.get_model("assembly-ai/best", os.getenv('ASSEMBLYAI_API_KEY'))
+                speech_recognition_model = aai.Transcriber(api_key=os.getenv('ASSEMBLYAI_API_KEY'))
 
                 # Process audio
                 if 'url' in task:

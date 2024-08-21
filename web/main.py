@@ -314,7 +314,7 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-     def process_and_send_email(self, task_id):
+    def process_and_send_email(self, task_id):
         try:
             task = tasks[task_id]
             user_email = task.get('email')
@@ -370,6 +370,40 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}")
             tasks[task_id]['status'] = 'failed'
             tasks[task_id]['error'] = str(e)
+
+    def handle_status(self):
+        task_id = self.headers.get('X-Task-ID')
+        if not task_id:
+            json_response(self, 200, {"status": "idle"})
+            return
+
+        try:
+            if task_id not in tasks:
+                response = {"status": "not_found"}
+            else:
+                task = tasks[task_id]
+                response = {
+                    "status": task['status'],
+                    "error": task.get('error') if task['status'] == "failed" else None
+                }
+            json_response(self, 200, response)
+        except Exception as e:
+            logger.error(f"Error in handle_status for task {task_id}: {str(e)}")
+            json_response(self, 500, {"error": str(e)})
+
+    def handle_reset(self):
+        task_id = self.headers.get('X-Task-ID')
+        if not task_id:
+            json_response(self, 400, {"error": "Task ID required"})
+            return
+
+        try:
+            if task_id in tasks:
+                del tasks[task_id]
+            json_response(self, 200, {"message": "Task reset"})
+        except Exception as e:
+            logger.error(f"Error in handle_reset for task {task_id}: {str(e)}")
+            json_response(self, 500, {"error": str(e)})
 
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')

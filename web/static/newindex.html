@@ -69,36 +69,32 @@
                 <button onclick="hideFileUpload()" class="text-gray-600 hover:text-gray-800 mb-4">
                     ← Paste a link
                 </button>
-                <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                    <p id="file-name" class="text-gray-700"></p>
+                <div id="file-drop-area" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                    <p id="file-name" class="text-gray-700 mb-2"></p>
                     <p class="text-gray-500 mb-2">Drag a file here or choose a file to upload</p>
                     <label class="cursor-pointer text-blue-500 hover:underline">
                         choose a file to upload
                         <input type="file" class="hidden" onchange="handleFileSelect(event)">
                     </label>
                 </div>
+                <a id="cancel-file" href="#" class="text-blue-500 hover:underline hidden mt-2 inline-block">cancel</a>
                 <button onclick="onConvertClick()" class="w-full mt-4 bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300">
                     Convert
                 </button>
             </div>
 
-            <div id="done-section" class="max-w-lg mx-auto bg-green-100 rounded-lg p-4 mb-8 hidden">
+            <div id="status-section" class="max-w-2xl mx-auto bg-blue-100 rounded-lg p-6 mb-8 hidden">
+                <p>Working on it. You will receive an email once ready.</p>
+                <div id="processing-stage" class="font-semibold text-blue-800 mt-4"></div>
+            </div>
+
+            <div id="done-section" class="max-w-2xl mx-auto bg-green-100 rounded-lg p-6 mb-8 hidden">
                 <div class="text-4xl text-green-500 mb-4 text-center">✔</div>
-                <p>Done! Please check your e-mail inbox in a few minutes.</p>
-                <button class="mt-4 bg-blue-500 text-white px-4 py-2 rounded">Got it!</button>
+                <p class="text-center">Done! Please check your e-mail inbox in a few minutes.</p>
+                <button onclick="hideFileUpload()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded mx-auto block">Got it!</button>
             </div>
 
-            <div id="status-section" class="max-w-lg mx-auto bg-blue-100 rounded-lg p-4 mb-8 hidden">
-                <p>Working on it. You will receive an email from Artyom Astafurov with PDF, Word, and Markdown documents once ready.</p>
-                <p>Processing time is quick - about 5 mins for each hour of content. Hang tight!</p>
-                <div id="animation-container" class="w-48 h-48 border-2 border-blue-300 rounded-lg relative mx-auto mb-4">
-                    <div id="runner" class="w-4 h-4 bg-blue-500 rounded-full absolute"></div>
-                </div>
-                <div id="processing-stage" class="text-center font-semibold text-blue-800 mb-4"></div>
-                <button onclick="onDonateClick()" class="bg-green-500 text-white px-4 py-2 rounded">Donate</button>
-            </div>
-
-            <div id="error-section" class="max-w-lg mx-auto bg-red-100 rounded-lg p-4 mb-8 hidden">
+            <div id="error-section" class="max-w-2xl mx-auto bg-red-100 rounded-lg p-6 mb-8 hidden">
                 <p>An error occurred. Please try again.</p>
                 <button onclick="reset()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded">Reset</button>
             </div>
@@ -214,88 +210,113 @@
     <script src="https://platogram.vercel.app/web/app.js"></script>
     <!-- Initialize app.js functionality -->
     <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    // Initialize processing stage updates
-    initializeProcessingStage();
+    document.addEventListener('DOMContentLoaded', () => {
+        const fileInput = document.querySelector('input[type="file"]');
+        const cancelFile = document.getElementById('cancel-file');
 
-    // Add event listeners to buttons
-    const convertButton = document.getElementById('convert-button');
-    if (convertButton) {
-      convertButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        onConvertClick();
-      });
-    }
+        if (fileInput) {
+            fileInput.addEventListener('change', handleFileSelect);
+        }
 
-    const loginButton = document.getElementById('login-button');
-    if (loginButton) {
-      loginButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        login();
-      });
-    }
-
-    const logoutButton = document.getElementById('logout-button');
-    if (logoutButton) {
-      logoutButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        logout();
-      });
-    }
-
-    const donateButtons = document.querySelectorAll('[id^="donate-button"]');
-    donateButtons.forEach(button => {
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        onDonateClick();
-      });
+        if (cancelFile) {
+            cancelFile.addEventListener('click', (event) => {
+                event.preventDefault();
+                resetFileUpload();
+            });
+        }
     });
 
-    const resetButtons = document.querySelectorAll('[id^="reset-button"]');
-    resetButtons.forEach(button => {
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        reset();
-      });
-    });
+    function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const fileDropArea = document.getElementById('file-drop-area');
+            const fileNameElement = document.getElementById('file-name');
+            const cancelFile = document.getElementById('cancel-file');
 
-    // File upload related functionality
-    const uploadFileButton = document.querySelector('button[onclick="showFileUpload()"]');
-    if (uploadFileButton) {
-      uploadFileButton.addEventListener('click', showFileUpload);
+            if (fileDropArea && fileNameElement && cancelFile) {
+                fileDropArea.className = 'bg-gray-100 rounded-lg p-8 text-center';
+                fileNameElement.textContent = file.name;
+                fileDropArea.innerHTML = `<p class="text-gray-700">${file.name}</p>`;
+                cancelFile.classList.remove('hidden');
+            }
+        }
     }
 
-    const pasteLinkButton = document.querySelector('button[onclick="hideFileUpload()"]');
-    if (pasteLinkButton) {
-      pasteLinkButton.addEventListener('click', hideFileUpload);
+    function resetFileUpload() {
+        const fileDropArea = document.getElementById('file-drop-area');
+        const cancelFile = document.getElementById('cancel-file');
+        const fileInput = document.querySelector('input[type="file"]');
+
+        if (fileDropArea && cancelFile && fileInput) {
+            fileDropArea.className = 'border-2 border-dashed border-gray-300 rounded-lg p-8 text-center';
+            fileDropArea.innerHTML = `
+                <p class="text-gray-500 mb-2">Drag a file here or choose a file to upload</p>
+                <label class="cursor-pointer text-blue-500 hover:underline">
+                    choose a file to upload
+                    <input type="file" class="hidden" onchange="handleFileSelect(event)">
+                </label>
+            `;
+            cancelFile.classList.add('hidden');
+            fileInput.value = '';
+        }
     }
 
-    const fileInput = document.querySelector('input[type="file"]');
-    if (fileInput) {
-      fileInput.addEventListener('change', handleFileSelect);
+    function showFileUpload() {
+        document.getElementById('input-section').classList.add('hidden');
+        document.getElementById('file-upload-section').classList.remove('hidden');
     }
-  });
 
-  function showFileUpload() {
-    document.getElementById('input-section').classList.add('hidden');
-    document.getElementById('file-upload-section').classList.remove('hidden');
-  }
-
-  function hideFileUpload() {
-    document.getElementById('input-section').classList.remove('hidden');
-    document.getElementById('file-upload-section').classList.add('hidden');
-  }
-
-  function handleFileSelect(event) {
-    const file = event.target.files[0];
-    if (file) {
-      const fileNameElement = document.getElementById('file-name');
-      if (fileNameElement) {
-        fileNameElement.textContent = file.name;
-        fileNameElement.file = file;
-      }
+    function hideFileUpload() {
+        document.getElementById('file-upload-section').classList.add('hidden');
+        document.getElementById('input-section').classList.remove('hidden');
+        resetFileUpload();
     }
-  }
-</script>
+
+    function onConvertClick() {
+        const fileUploadSection = document.getElementById('file-upload-section');
+        const inputSection = document.getElementById('input-section');
+        const statusSection = document.getElementById('status-section');
+
+        if (fileUploadSection && inputSection && statusSection) {
+            fileUploadSection.classList.add('hidden');
+            inputSection.classList.add('hidden');
+            statusSection.classList.remove('hidden');
+            updateProcessingStage();
+        }
+    }
+
+    function updateProcessingStage() {
+        // Simulating processing stages
+        const stages = [
+            "Analyzing audio...",
+            "Extracting text...",
+            "Structuring content...",
+            "Finalizing document..."
+        ];
+        let currentStage = 0;
+
+        const processingStage = document.getElementById('processing-stage');
+
+        const interval = setInterval(() => {
+            if (currentStage < stages.length) {
+                processingStage.textContent = stages[currentStage];
+                currentStage++;
+            } else {
+                clearInterval(interval);
+                showDoneSection();
+            }
+        }, 2000);
+    }
+
+    function showDoneSection() {
+        const statusSection = document.getElementById('status-section');
+        const doneSection = document.getElementById('done-section');
+
+        if (statusSection && doneSection) {
+            statusSection.classList.add('hidden');
+            doneSection.classList.remove('hidden');
+        }
+    }
+    </script>
 </body>
 </html>

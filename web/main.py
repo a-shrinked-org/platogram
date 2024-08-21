@@ -381,9 +381,9 @@ class handler(BaseHTTPRequestHandler):
                         logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
 
                     # Call plato.index() without the assemblyai_api_key argument
-                    plato.index(url, lang=task['lang'], images=task.get('images', False))
+                    plato.index(url, lang=task['lang']))
 
-                    title, abstract = audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
+                    title, abstract = audio_to_paper(url, task['lang'], output_dir)
                 finally:
                     if 'file' in task:
                         try:

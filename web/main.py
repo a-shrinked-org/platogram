@@ -145,30 +145,93 @@ def send_email_with_resend(to_email, subject, body, attachments):
         logger.error(f"Failed to send email. Status: {response.status_code}, Error: {response.text}")
 
 def audio_to_paper(url: str, lang: str, output_dir: Path) -> tuple[str, str]:
-    # Get absolute path of current working directory
-    script_path = Path.cwd() / "examples" / "audio_to_paper.sh"
-    command = f'cd {output_dir} && {script_path} "{url}" --lang {lang} --verbose'
+    logger.info(f"Processing audio from: {url}")
 
-    process = subprocess.Popen(
-        command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        shell=True,
-        text=True
+    # Initialize Platogram models
+    language_model = plato.llm.get_model(
+        "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
     )
 
-    stdout, stderr = process.communicate()
+    # Transcribe audio
+    logger.info("Transcribing audio...")
+    transcriber = aai.Transcriber()
+    transcript = transcriber.transcribe(url)
 
-    if process.returncode != 0:
-        raise RuntimeError(f"""Failed to execute {command} with return code {process.returncode}.
+    # Index the transcript
+    logger.info("Indexing transcript...")
+    content = plato.index(transcript['text'], language_model)
 
-stdout:
-{stdout}
+    # Generate title and abstract
+    title = content.title
+    abstract = content.summary
 
-stderr:
-{stderr}""")
+    # Generate additional content
+    logger.info("Generating additional content...")
+    contributors = plato.generate(
+        query="List the contributors mentioned in the transcript.",
+        context_size="large",
+        prefill="## Contributors\n",
+        url=url,
+        lang=lang
+    )
 
-    return stdout, stderr
+    introduction = plato.generate(
+        query="Write an introduction based on the transcript.",
+        context_size="large",
+        prefill="## Introduction\n",
+        url=url,
+        lang=lang
+    )
+
+    conclusion = plato.generate(
+        query="Write a conclusion based on the transcript.",
+        context_size="large",
+        prefill="## Conclusion\n",
+        url=url,
+        lang=lang
+    )
+
+    # Compile the full content
+    full_content = f"""# {title}
+
+## Abstract
+
+{abstract}
+
+{contributors}
+
+{introduction}
+
+## Transcript
+
+{transcript['text']}
+
+{conclusion}
+
+## References
+
+{content.references}
+"""
+
+    # Generate PDF files
+    logger.info("Generating PDF files...")
+    pdf_path = output_dir / f"{title.replace(' ', '_')}.pdf"
+    pdf_no_refs_path = output_dir / f"{title.replace(' ', '_')}_no_refs.pdf"
+
+    # Use subprocess to call pandoc for PDF generation
+    try:
+        subprocess.run(['pandoc', '-o', str(pdf_path), '--from', 'markdown', '--pdf-engine=xelatex'],
+                       input=full_content, text=True, check=True)
+
+        # Generate a version without references
+        content_no_refs = full_content.split("## References")[0]
+        subprocess.run(['pandoc', '-o', str(pdf_no_refs_path), '--from', 'markdown', '--pdf-engine=xelatex'],
+                       input=content_no_refs, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error generating PDF: {str(e)}")
+        raise
+
+    return title, abstract
 
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -251,7 +314,7 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    def process_and_send_email(self, task_id):
+     def process_and_send_email(self, task_id):
         try:
             task = tasks[task_id]
             user_email = task.get('email')
@@ -268,27 +331,13 @@ class handler(BaseHTTPRequestHandler):
                     url = f"file://{task['file']}"
 
                 try:
-                    stdout, stderr = audio_to_paper(url, task['lang'], output_dir)
+                    title, abstract = audio_to_paper(url, task['lang'], output_dir)
                 finally:
                     if url.startswith("file:///tmp/platogram_uploads"):
                         try:
                             os.remove(url.replace("file:///tmp/platogram_uploads", "/tmp/platogram_uploads"))
                         except OSError as e:
                             logger.warning(f"Failed to delete temporary file {url}: {e}")
-
-                title_match = re.search(r"<title>(.*?)</title>", stdout, re.DOTALL)
-                if title_match:
-                    title = title_match.group(1).strip()
-                else:
-                    title = "👋"
-                    logger.warning("No title found in stdout, using default title")
-
-                abstract_match = re.search(r"<abstract>(.*?)</abstract>", stdout, re.DOTALL)
-                if abstract_match:
-                    abstract = abstract_match.group(1).strip()
-                else:
-                    abstract = ""
-                    logger.warning("No abstract found in stdout, using default abstract")
 
                 files = [f for f in output_dir.glob('*') if f.is_file()]
 

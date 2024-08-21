@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>datacapture</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://platogram.vercel.app/styles.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         .font-perfectly-nineties {
@@ -13,41 +14,71 @@
     </style>
 </head>
 <body class="font-subtle bg-white text-slate-900">
+    <div id="language-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3 class="font-perfectly-nineties text-2xl mb-4">Select Language</h3>
+            <button class="cta mb-2">English</button>
+            <button class="cta mb-2">Spanish</button>
+            <button class="cta">Cancel</button>
+        </div>
+    </div>
+
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <header class="flex justify-between items-center py-4">
             <div class="flex items-center space-x-2">
                 <div class="w-6 h-6 bg-slate-900"></div>
                 <span class="font-perfectly-nineties text-xl">datacapture</span>
             </div>
-            <button class="bg-slate-900 text-white px-4 py-2 rounded-full text-sm">Log out</button>
+            <div>
+                <button id="login-button" class="cta">Log In</button>
+                <button id="logout-button" class="cta hidden">Log Out</button>
+            </div>
         </header>
 
-        <main class="mt-16">
-            <section class="text-center mb-16">
-                <h1 class="font-perfectly-nineties text-4xl sm:text-5xl md:text-6xl mb-6">
-                    Transform spoken words<br>into structured knowledge.
-                </h1>
-                <p class="text-xl mb-6">
-                    Unlock insights from audio and video —<br>
-                    beyond transcripts, summaries, and<br>
-                    scattered notes.
-                </p>
-                <p class="text-2xl font-bold mb-12">
-                    10x your content understanding.
-                </p>
-                <div class="max-w-lg mx-auto bg-gray-100 rounded-lg p-4">
-                    <input type="text" placeholder="Paste a link to a YouTube video or Google Drive file" class="w-full p-2 mb-2 rounded border border-gray-300">
-                    <div class="flex justify-between items-center">
-                        <button class="flex items-center text-gray-600">
-                            <span class="mr-2">🔗</span> Upload a file
-                        </button>
-                        <button class="bg-slate-900 text-white px-4 py-2 rounded text-sm">Convert</button>
-                    </div>
+        <main class="mt-16" role="main">
+            <h1 class="font-perfectly-nineties text-4xl sm:text-5xl md:text-6xl mb-6 text-center">
+                Transform spoken words<br>into structured knowledge.
+            </h1>
+
+            <section id="input-section" class="cta-container">
+                <p class="mb-4">Convert hours of audio into structured, readable documents</p>
+                <div class="input-wrapper">
+                    <input type="text" id="url-input" placeholder="Paste a link to a YouTube video or Google Drive file" class="w-full p-2 mb-2 rounded border border-gray-300">
+                    <label for="file-upload" class="upload-button">
+                        <span class="upload-icon">
+                            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld2JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPgogICAgICAgICAgICAgICAgICA8cGF0aCBkPSJNMjEgMTV2NGEyIDIgMCAwIDEtMiAySDVhMiAyIDAgMCAxLTItMnYtNCI+PC9wYXRoPgogICAgICAgICAgICAgICAgICA8cG9seWxpbmUgcG9pbnRzPSIxNyA4IDEyIDMgNyA4Ij48L3BvbHlsaW5lPgogICAgICAgICAgICAgICAgICA8bGluZSB4MT0iMTIiIHkxPSIzIiB4Mj0iMTIiIHkyPSIxNSI+PC9saW5lPgogICAgICAgICAgICAgICAgPC9zdmc+" alt="Upload">
+                        </span>
+                        <input type="file" id="file-upload" class="hidden">
+                    </label>
                 </div>
+                <p id="file-name" class="mt-2 text-sm"></p>
+                <button id="convert-button" class="cta mt-4">Convert</button>
+                <button id="donate-button" class="cta donate mt-4">Donate</button>
                 <p class="text-sm text-gray-500 mt-4">
                     Transcription times can vary depending on the file size, length of the content, and how busy our servers are.
                 </p>
             </section>
+
+            <div id="done-section" class="cta-container hidden">
+                <div class="success-icon">✔</div>
+                <p>Done! Please check your e-mail inbox in a few minutes.</p>
+                <button class="cta">Got it!</button>
+            </div>
+
+            <div id="status-section" class="cta-container hidden">
+                <p>Working on it. You will receive an email from Artyom Astafurov with PDF, Word, and Markdown documents once ready.</p>
+                <p>Processing time is quick - about 5 mins for each hour of content. Hang tight!</p>
+                <div id="animation-container">
+                    <div id="runner"></div>
+                </div>
+                <div id="processing-stage" class="mt-4"></div>
+                <button id="donate-button-status" class="cta donate mt-4">Donate</button>
+            </div>
+
+            <div id="error-section" class="cta-container hidden">
+                <p>An error occurred. Please try again.</p>
+                <button id="reset-button" class="cta">Reset</button>
+            </div>
 
             <section class="mb-16">
                 <div class="bg-gray-100 rounded-lg p-6">
@@ -145,16 +176,56 @@
                 </p>
                 <button class="bg-slate-900 text-white px-6 py-3 rounded-full text-lg">Contact Us</button>
             </section>
+
         </main>
 
         <footer class="text-center py-8">
-            <div class="mb-4">
+            <p>Platogram is built with 💜 in New York and Boston by <a href="https://codeanyway.com" target="_blank" rel="noopener noreferrer">Code Anyway, Inc</a> in 2023-2024</p>
+            <div class="mt-4">
                 <a href="#" class="text-blue-600 hover:underline mr-4">Privacy</a>
                 <a href="#" class="text-blue-600 hover:underline">Terms</a>
             </div>
-            <p class="text-gray-600 mb-2">By © 2024 WAFFLY & CODEANYWAY, INC.</p>
-            <p class="text-gray-600 uppercase">21 W 46th St 16th Flr, New York, NY</p>
         </footer>
     </div>
+
+    <script src="https://platogram.vercel.app/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileUpload = document.getElementById('file-upload');
+            const fileName = document.getElementById('file-name');
+            const convertButton = document.getElementById('convert-button');
+            const inputSection = document.getElementById('input-section');
+            const doneSection = document.getElementById('done-section');
+            const statusSection = document.getElementById('status-section');
+            const errorSection = document.getElementById('error-section');
+            const resetButton = document.getElementById('reset-button');
+            const loginButton = document.getElementById('login-button');
+            const logoutButton = document.getElementById('logout-button');
+
+            fileUpload.addEventListener('change', function(e) {
+                if (e.target.files.length > 0) {
+                    fileName.textContent = e.target.files[0].name;
+                }
+            });
+
+            convertButton.addEventListener('click', function() {
+                // This logic is handled in app.js
+            });
+
+            resetButton.addEventListener('click', function() {
+                errorSection.classList.add('hidden');
+                inputSection.classList.remove('hidden');
+                fileName.textContent = '';
+            });
+
+            loginButton.addEventListener('click', function() {
+                // Login logic is handled in app.js
+            });
+
+            logoutButton.addEventListener('click', function() {
+                // Logout logic is handled in app.js
+            });
+        });
+    </script>
 </body>
 </html>

@@ -147,6 +147,24 @@ def send_email_with_resend(to_email, subject, body, attachments):
 def audio_to_paper(url: str, lang: str, output_dir: Path) -> tuple[str, str]:
     logger.info(f"Processing audio from: {url}")
 
+    # Check for required API keys
+    if not os.getenv('ANTHROPIC_API_KEY'):
+        raise EnvironmentError("ANTHROPIC_API_KEY is not set")
+    if not os.getenv('ASSEMBLYAI_API_KEY'):
+        logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
+
+    # Set language-specific prompts
+    if lang == "en":
+        CONTRIBUTORS_PROMPT = "Thoroughly review the <context> and identify the list of contributors. Output as Markdown list: First Name, Last Name, Title, Organization. Output \"Unknown\" if the contributors are not known. In the end of the list always add \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Start with \"## Contributors, Acknowledgements, Mentions\""
+        INTRODUCTION_PROMPT = "Thoroughly review the <context> and write \"Introduction\" chapter for the paper. Write in the style of the original <context>. Use only words from <context>. Use quotes from <context> when necessary. Make sure to include <markers>. Output as Markdown. Start with \"## Introduction\""
+        CONCLUSION_PROMPT = "Thoroughly review the <context> and write \"Conclusion\" chapter for the paper. Write in the style of the original <context>. Use only words from <context>. Use quotes from <context> when necessary. Make sure to include <markers>. Output as Markdown. Start with \"## Conclusion\""
+    elif lang == "es":
+        CONTRIBUTORS_PROMPT = "Revise a fondo el <context> e identifique la lista de contribuyentes. Salida como lista Markdown: Nombre, Apellido, Título, Organización. Salida \"Desconocido\" si los contribuyentes no se conocen. Al final de la lista, agregue siempre \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Comience con \"## Contribuyentes, Agradecimientos, Menciones\""
+        INTRODUCTION_PROMPT = "Revise a fondo el <context> y escriba el capítulo \"Introducción\" para el artículo. Escriba en el estilo del original <context>. Use solo las palabras de <context>. Use comillas del original <context> cuando sea necesario. Asegúrese de incluir <markers>. Salida como Markdown. Comience con \"## Introducción\""
+        CONCLUSION_PROMPT = "Revise a fondo el <context> y escriba el capítulo \"Conclusión\" para el artículo. Escriba en el estilo del original <context>. Use solo las palabras de <context>. Use comillas del original <context> cuando sea necesario. Asegúrese de incluir <markers>. Salida como Markdown. Comience con \"## Conclusión\""
+    else:
+        raise ValueError(f"Unsupported language: {lang}")
+
     # Initialize Platogram models
     language_model = plato.llm.get_model(
         "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
@@ -155,45 +173,38 @@ def audio_to_paper(url: str, lang: str, output_dir: Path) -> tuple[str, str]:
     # Transcribe audio
     logger.info("Transcribing audio...")
     transcriber = aai.Transcriber()
+    transcript = transcriber.transcribe(url)
 
-    if url.startswith("file://"):
-        # Handle local file
-        file_path = url[7:]  # Remove "file://" prefix
-        with open(file_path, 'rb') as audio_file:
-            transcript = transcriber.transcribe(audio_file)
-    else:
-        # Handle URL
-        transcript = transcriber.transcribe(url)
+    # Generate content
+    logger.info("Generating content...")
+    content = plato.index(transcript.text, language_model)
+    title = plato.get_title(url, lang=lang)
+    abstract = plato.get_abstract(url, lang=lang)
+    passages = plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
+    references = plato.get_references(url, lang=lang)
+    chapters = plato.get_chapters(url, lang=lang)
 
-    # Index the transcript
-    logger.info("Indexing transcript...")
-    content = plato.index(transcript['text'], language_model)
-
-    # Generate title and abstract
-    title = content.title
-    abstract = content.summary
-
-    # Generate additional content
-    logger.info("Generating additional content...")
     contributors = plato.generate(
-        query="List the contributors mentioned in the transcript.",
+        query=CONTRIBUTORS_PROMPT,
         context_size="large",
-        prefill="## Contributors\n",
+        prefill="## Contributors, Acknowledgements, Mentions\n",
         url=url,
         lang=lang
     )
 
     introduction = plato.generate(
-        query="Write an introduction based on the transcript.",
+        query=INTRODUCTION_PROMPT,
         context_size="large",
+        inline_references=True,
         prefill="## Introduction\n",
         url=url,
         lang=lang
     )
 
     conclusion = plato.generate(
-        query="Write a conclusion based on the transcript.",
+        query=CONCLUSION_PROMPT,
         context_size="large",
+        inline_references=True,
         prefill="## Conclusion\n",
         url=url,
         lang=lang
@@ -202,45 +213,60 @@ def audio_to_paper(url: str, lang: str, output_dir: Path) -> tuple[str, str]:
     # Compile the full content
     full_content = f"""# {title}
 
+## Origin
+
+{url}
+
 ## Abstract
 
 {abstract}
 
 {contributors}
 
+## Chapters
+
+{chapters}
+
 {introduction}
 
-## Transcript
+## Discussion
 
-{transcript['text']}
+{passages}
 
 {conclusion}
 
 ## References
 
-{content.references}
+{references}
 """
 
     # Generate PDF files
     logger.info("Generating PDF files...")
-    pdf_path = output_dir / f"{title.replace(' ', '_')}.pdf"
-    pdf_no_refs_path = output_dir / f"{title.replace(' ', '_')}_no_refs.pdf"
+    pdf_path = output_dir / f"{title.replace(' ', '_')}-refs.pdf"
+    pdf_no_refs_path = output_dir / f"{title.replace(' ', '_')}-no-refs.pdf"
+    docx_path = output_dir / f"{title.replace(' ', '_')}-refs.docx"
 
-    # Use subprocess to call pandoc for PDF generation
+    # Use subprocess to call pandoc for PDF and DOCX generation
     try:
+        # With references
         subprocess.run(['pandoc', '-o', str(pdf_path), '--from', 'markdown', '--pdf-engine=xelatex'],
                        input=full_content, text=True, check=True)
 
-        # Generate a version without references
-        content_no_refs = full_content.split("## References")[0]
+        # Without references
+        content_no_refs = re.sub(r'\[\[([0-9]+)\]\]\([^)]+\)', '', full_content)
+        content_no_refs = re.sub(r'\[([0-9]+)\]', '', content_no_refs)
+        content_no_refs = content_no_refs.split("## References")[0]
         subprocess.run(['pandoc', '-o', str(pdf_no_refs_path), '--from', 'markdown', '--pdf-engine=xelatex'],
                        input=content_no_refs, text=True, check=True)
+
+        # DOCX version
+        subprocess.run(['pandoc', '-o', str(docx_path), '--from', 'markdown'],
+                       input=full_content, text=True, check=True)
     except subprocess.CalledProcessError as e:
-        logger.error(f"Error generating PDF: {str(e)}")
+        logger.error(f"Error generating documents: {str(e)}")
         raise
 
     return title, abstract
-
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)

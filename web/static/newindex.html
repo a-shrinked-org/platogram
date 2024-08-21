@@ -31,29 +31,34 @@
                 <span class="font-perfectly-nineties text-xl">datacapture</span>
             </div>
             <div>
-                <button id="login-button" class="bg-slate-900 text-white px-4 py-2 rounded-full text-sm">Log In</button>
-                <button id="logout-button" class="bg-slate-900 text-white px-4 py-2 rounded-full text-sm hidden">Log Out</button>
+                <a href="#" id="login-button" class="text-blue-600 hover:underline">Log In</a>
+                <a href="#" id="logout-button" class="text-blue-600 hover:underline hidden">Log Out</a>
             </div>
         </header>
 
         <main class="mt-16" role="main">
-            <h1 class="font-perfectly-nineties text-4xl sm:text-5xl md:text-6xl mb-6 text-center">
+            <h1 class="font-perfectly-nineties text-black text-4xl sm:text-5xl md:text-6xl mb-6 text-center">
                 Transform spoken words<br>into structured knowledge
             </h1>
 
             <section id="input-section" class="max-w-lg mx-auto bg-gray-100 rounded-lg p-4 mb-8">
                 <p class="mb-4 text-center">Convert hours of audio into structured, readable documents</p>
-                <div class="flex items-center mb-4">
+                <div class="input-wrapper flex items-center mb-4">
                     <input type="text" id="url-input" placeholder="Paste a link to a YouTube video or Google Drive file" class="flex-grow p-2 rounded-l-lg border border-gray-300">
                     <label for="file-upload" class="bg-white p-2 rounded-r-lg border border-l-0 border-gray-300 cursor-pointer">
                         <span class="upload-icon">🔗</span>
-                        <input type="file" id="file-upload" class="hidden">
+                        <input
+                type="file"
+                id="file-upload"
+                accept=".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a"
+                style="display: none"
+              />
                     </label>
                 </div>
-                <p id="file-name" class="text-sm text-gray-600 mb-4"></p>
+                <p id="file-name" class="text-sm text-gray-600 mb-4"></p> <!-- Ensure this element exists -->
                 <div class="flex justify-between">
-                    <button id="convert-button" class="bg-slate-900 text-white px-6 py-2 rounded-full text-sm">Convert</button>
-                    <button id="donate-button" class="bg-red-700 text-white px-6 py-2 rounded-full text-sm">Donate</button>
+                    <button id="convert-button" class="cta bg-slate-900 text-white px-6 py-2 rounded-full text-sm">Convert</button>
+                    <button id="donate-button" class="cta donate bg-red-700 text-white px-6 py-2 rounded-full text-sm">Donate</button>
                 </div>
                 <p class="text-sm text-gray-500 mt-4">
                     Transcription times can vary depending on the file size, length of the content, and how busy our servers are.
@@ -175,7 +180,7 @@
                     learning more about how [Name] could work for your<br>
                     data, book a live demo with us.
                 </p>
-                <button class="bg-slate-900 text-white px-6 py-3 rounded-full text-lg">Contact Us</button>
+                <button class="bg-black text-white px-6 py-3 rounded-full text-lg">Contact Us</button>
             </section>
 
         </main>

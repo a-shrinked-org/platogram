@@ -1,23 +1,20 @@
-import asyncio
-import base64
+from http.server import BaseHTTPRequestHandler
+import json
 import os
 import logging
 import re
 import tempfile
 from pathlib import Path
+import base64
 import time
-import fastapi
-import httpx
+import requests
 import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
 import io
-
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, BackgroundTasks
-from fastapi.responses import JSONResponse
-from fastapi.security import OAuth2PasswordBearer
-from pydantic import BaseModel
+import asyncio
+import subprocess
 
 import platogram as plato
 from anthropic import AnthropicError
@@ -51,11 +48,16 @@ auth0_public_key_cache = {
 # Configure AssemblyAI
 aai.settings.api_key = os.getenv('ASSEMBLYAI_API_KEY')
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+def json_response(handler, status_code, data):
+    handler.send_response(status_code)
+    handler.send_header('Content-type', 'application/json')
+    handler.send_header('Access-Control-Allow-Origin', '*')
+    handler.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    handler.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language')
+    handler.end_headers()
+    handler.wfile.write(json.dumps(data).encode('utf-8'))
 
-app = FastAPI()
-
-async def get_auth0_public_key():
+def get_auth0_public_key():
     current_time = time.time()
     if (
         auth0_public_key_cache["key"]
@@ -65,10 +67,9 @@ async def get_auth0_public_key():
         return auth0_public_key_cache["key"]
 
     logger.info("Fetching new Auth0 public key")
-    async with httpx.AsyncClient() as client:
-        response = await client.get(JWKS_URL)
-        response.raise_for_status()
-        jwks = response.json()
+    response = requests.get(JWKS_URL)
+    response.raise_for_status()
+    jwks = response.json()
 
     x5c = jwks["keys"][0]["x5c"][0]
     cert = load_pem_x509_certificate(
@@ -84,13 +85,13 @@ async def get_auth0_public_key():
 
     return public_key
 
-async def verify_token_and_get_email(token: str):
+def verify_token_and_get_email(token):
     if not token:
         logger.debug("No token provided")
         return None
     try:
         logger.debug(f"Verifying token: {token[:10]}...{token[-10:]}")
-        public_key = await get_auth0_public_key()
+        public_key = get_auth0_public_key()
         payload = jwt.decode(
             token,
             key=public_key,
@@ -112,7 +113,7 @@ async def verify_token_and_get_email(token: str):
         logger.error(f"Couldn't verify token: {str(e)}")
     return None
 
-async def send_email_with_resend(to_email: str, subject: str, body: str, attachments: list[Path]):
+def send_email_with_resend(to_email, subject, body, attachments):
     logger.debug(f"Attempting to send email to: {to_email}")
     url = "https://api.resend.com/emails"
     headers = {
@@ -133,212 +134,234 @@ async def send_email_with_resend(to_email: str, subject: str, body: str, attachm
             content = file.read()
             encoded_content = base64.b64encode(content).decode('utf-8')
             payload["attachments"].append({
-                "filename": attachment.name,
+                "filename": Path(attachment).name,
                 "content": encoded_content
             })
 
     logger.debug(f"Sending email with payload: {json.dumps(payload, default=str)}")
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, headers=headers, json=payload)
+    response = requests.post(url, headers=headers, json=payload)
     if response.status_code == 200:
         logger.info(f"Email sent successfully to {to_email}")
     else:
         logger.error(f"Failed to send email. Status: {response.status_code}, Error: {response.text}")
 
-async def process_and_send_email(task_id: str):
-    try:
-        task = tasks[task_id]
-        user_email = task.get('email')
-        logger.debug(f"Processing task {task_id}. Task data: {task}")
-        logger.debug(f"User email for task {task_id}: {user_email}")
+def audio_to_paper(url: str, lang: str, output_dir: Path) -> tuple[str, str]:
+    # Get absolute path of current working directory
+    script_path = Path.cwd() / "examples" / "audio_to_paper.sh"
+    command = f'cd {output_dir} && {script_path} "{url}" --lang {lang} --verbose'
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_dir = Path(tmpdir)
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True,
+        text=True
+    )
 
-            # Initialize Platogram models
-            language_model = plato.llm.get_model(
-                "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
-            )
+    stdout, stderr = process.communicate()
 
-            # Create the Transcriber object
-            speech_recognition_model = aai.Transcriber()
+    if process.returncode != 0:
+        raise RuntimeError(f"""Failed to execute {command} with return code {process.returncode}.
 
-            # Process audio
-            if 'url' in task:
-                url = task['url']
-            else:
-                url = f"file://{task['file']}"
+stdout:
+{stdout}
 
-            # Check if it's a local file
-            if url.startswith("file://"):
-                with open(task['file'], 'rb') as audio_file:
-                    audio_content = audio_file.read()
-                logger.debug(f"Read binary data, length: {len(audio_content)} bytes")
+stderr:
+{stderr}""")
 
-                try:
-                    transcribe_response = speech_recognition_model.transcribe(audio_content)
-                except UnicodeDecodeError as e:
-                    logger.error(f"UnicodeDecodeError during transcription for task {task_id}: {str(e)}")
-                    tasks[task_id]['status'] = 'failed'
-                    tasks[task_id]['error'] = "Failed to decode byte data - potential encoding issue."
-                    return
-            else:
-                try:
-                    transcribe_response = speech_recognition_model.transcribe(url)
-                except Exception as e:
-                    if "Sign in to confirm you're not a bot" in str(e):
-                        logger.error(f"Authentication required for task {task_id}: {str(e)}")
-                        tasks[task_id]['status'] = 'failed'
-                        tasks[task_id]['error'] = "YouTube requires authentication for this video. Please try a different video or provide a direct audio file."
-                        return
-                    else:
-                        logger.error(f"Error during transcription for task {task_id}: {str(e)}")
-                        raise
+    return stdout, stderr
 
-            transcript = transcribe_response['text']
-            content = plato.index(transcript, language_model)
+class handler(BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language')
+        self.end_headers()
 
-            # Generate output files
-            plato.generate_output_files(content, output_dir)
-
-            files = [f for f in output_dir.glob('*') if f.is_file()]
-
-            subject = f"[Platogram] {content.title}"
-            body = f"""Hi there!
-
-Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
-
-You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
-
-{content.summary}
-
-Please reply to this e-mail if any suggestions, feedback, or questions.
-
----
-Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
-Suggested donation: $2 per hour of content converted."""
-
-            if user_email:
-                logger.debug(f"Sending email to {user_email}")
-                await send_email_with_resend(user_email, subject, body, files)
-                logger.debug("Email sent successfully")
-            else:
-                logger.warning(f"No email available for task {task_id}. Skipping email send.")
-
-        tasks[task_id]['status'] = 'done'
-        logger.debug(f"Conversion completed for task {task_id}")
-
-    except UnicodeDecodeError as e:
-        logger.error(f"UnicodeDecodeError for task {task_id}: {str(e)}")
-        tasks[task_id]['status'] = 'failed'
-        tasks[task_id]['error'] = "Failed to decode byte data - potential encoding issue."
-    except Exception as e:
-        logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}")
-        tasks[task_id]['status'] = 'failed'
-        tasks[task_id]['error'] = str(e)
-
-@app.post("/api/convert")
-async def convert(request: Request, background_tasks: BackgroundTasks):
-    logger.debug("Handling /convert request")
-    content_type = request.headers.get('Content-Type')
-    auth_header = request.headers.get('Authorization', '')
-    user_email = await verify_token_and_get_email(auth_header.split(' ')[1] if auth_header else None)
-    logger.debug(f"User email for conversion: {user_email}")
-
-    try:
-        task_id = str(uuid4())
-        if content_type == 'application/octet-stream':
-            body = await request.body()
-            file_name = request.headers.get('X-File-Name')
-            lang = request.headers.get('X-Language', 'en')
-
-            # Save the file to a temporary location
-            temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
-            temp_dir.mkdir(parents=True, exist_ok=True)
-            temp_file = temp_dir / f"{task_id}_{file_name}"
-            with open(temp_file, 'wb') as f:
-                f.write(body)
-
-            tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
-            logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
-        elif content_type == 'application/json':
-            data = await request.json()
-            url = data.get('url')
-            lang = data.get('lang', 'en')
-            tasks[task_id] = {'status': 'running', 'url': url, 'lang': lang, 'email': user_email}
-            logger.debug(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+    def do_GET(self):
+        if self.path == '/status':
+            self.handle_status()
+        elif self.path == '/reset':
+            self.handle_reset()
         else:
-            logger.error(f"Invalid content type: {content_type}")
-            return JSONResponse(status_code=400, content={"error": "Invalid content type"})
+            json_response(self, 404, {"error": "Not Found"})
 
-        # Start processing
-        tasks[task_id]['status'] = 'processing'
-        background_tasks.add_task(process_and_send_email, task_id, convert_and_send_with_error_handling)
+    def do_POST(self):
+        if self.path == '/convert':
+            self.handle_convert()
+        else:
+            json_response(self, 404, {"error": "Not Found"})
 
-        return JSONResponse(status_code=200, content={"message": "Conversion started", "task_id": task_id})
-    except Exception as e:
-        logger.error(f"Error in handle_convert: {str(e)}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-    async def convert_and_send_with_error_handling(task_id: str):
+    def get_user_email(self):
+        auth_header = self.headers.get('Authorization', '')
+        logger.debug(f"Authorization header: {auth_header}")
+        if not auth_header:
+            logger.warning("No Authorization header found")
+            return None
         try:
-            await process_and_send_email(task_id)
-            tasks[task_id]['status'] = "done"
+            token = auth_header.split(' ')[1]
+            email = verify_token_and_get_email(token)
+            logger.debug(f"User email extracted: {email}")
+            return email
+        except IndexError:
+            logger.error("Malformed Authorization header")
+            return None
+
+    def handle_convert(self):
+        logger.debug("Handling /convert request")
+        content_length = int(self.headers['Content-Length'])
+        content_type = self.headers.get('Content-Type')
+        user_email = self.get_user_email()
+        logger.debug(f"User email for conversion: {user_email}")
+
+        try:
+            task_id = str(uuid4())
+            if content_type == 'application/octet-stream':
+                body = self.rfile.read(content_length)  # Read raw bytes
+                file_name = self.headers.get('X-File-Name')
+                lang = self.headers.get('X-Language', 'en')
+
+                # Save the file to a temporary location
+                temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
+                temp_dir.mkdir(parents=True, exist_ok=True)
+                temp_file = temp_dir / f"{task_id}_{file_name}"
+                with io.open(temp_file, 'wb') as f:
+                    f.write(body)
+
+                tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
+                logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+            elif content_type == 'application/json':
+                body = self.rfile.read(content_length).decode('utf-8')  # JSON should be UTF-8
+                data = json.loads(body)
+                url = data.get('url')
+                lang = data.get('lang', 'en')
+                tasks[task_id] = {'status': 'running', 'url': url, 'lang': lang, 'email': user_email}
+                logger.debug(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+            else:
+                logger.error(f"Invalid content type: {content_type}")
+                json_response(self, 400, {"error": "Invalid content type"})
+                return
+
+            # Start processing
+            tasks[task_id]['status'] = 'processing'
+            self.process_and_send_email(task_id)
+
+            json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
         except Exception as e:
-            logger.exception(f"Error in background task for task {task_id}: {str(e)}")
+            logger.error(f"Error in handle_convert: {str(e)}")
+            json_response(self, 500, {"error": str(e)})
 
-            error = str(e)
-            # Truncate and simplify error message for user-friendly display
-            model = plato.llm.get_model("anthropic/claude-3-5-sonnet", key=os.getenv("ANTHROPIC_API_KEY"))
-            error = model.prompt_model(messages=[
-                plato.types.User(
-                    content=f"""
-                    Given the following error message, provide a concise, user-friendly explanation
-                    that focuses on the key issue and any actionable steps. Avoid technical jargon
-                    and keep the message under 256 characters:
-
-                    Error: {error}
-                    """
-                )
-            ])
-
-            error = error.strip()  # Remove any leading/trailing whitespace
-            tasks[task_id]['error'] = error
-            tasks[task_id]['status'] = "failed"
-
-@app.get("/api/status")
-async def status(request: Request):
-    task_id = request.headers.get('X-Task-ID')
-    if not task_id:
-        return JSONResponse(status_code=200, content={"status": "idle"})
-
-    try:
-        if task_id not in tasks:
-            response = {"status": "not_found"}
-        else:
+    def process_and_send_email(self, task_id):
+        try:
             task = tasks[task_id]
-            response = {
-                "status": task['status'],
-                "error": task.get('error') if task['status'] == "failed" else None
-            }
-        return JSONResponse(status_code=200, content=response)
-    except Exception as e:
-        logger.error(f"Error in handle_status for task {task_id}: {str(e)}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+            user_email = task.get('email')
+            logger.debug(f"Processing task {task_id}. Task data: {task}")
+            logger.debug(f"User email for task {task_id}: {user_email}")
 
-@app.get("/api/reset")
-async def reset(request: Request):
-    task_id = request.headers.get('X-Task-ID')
-    if not task_id:
-        return JSONResponse(status_code=400, content={"error": "Task ID required"})
+            with tempfile.TemporaryDirectory() as tmpdir:
+                output_dir = Path(tmpdir)
 
-    try:
-        if task_id in tasks:
-            del tasks[task_id]
-        return JSONResponse(status_code=200, content={"message": "Task reset"})
-    except Exception as e:
-        logger.error(f"Error in handle_reset for task {task_id}: {str(e)}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+                # Initialize Platogram models
+                language_model = plato.llm.get_model(
+                    "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
+                )
 
-def handler(request, context):
-    return app(request, context)
+                # Process audio
+                if 'url' in task:
+                    url = task['url']
+                else:
+                    url = f"file://{task['file']}"
+
+                try:
+                    stdout, stderr = audio_to_paper(url, task['lang'], output_dir)
+                finally:
+                    if url.startswith("file:///tmp/platogram_uploads"):
+                        try:
+                            os.remove(url.replace("file:///tmp/platogram_uploads", "/tmp/platogram_uploads"))
+                        except OSError as e:
+                            logger.warning(f"Failed to delete temporary file {url}: {e}")
+
+                title_match = re.search(r"<title>(.*?)</title>", stdout, re.DOTALL)
+                if title_match:
+                    title = title_match.group(1).strip()
+                else:
+                    title = "👋"
+                    logger.warning("No title found in stdout, using default title")
+
+                abstract_match = re.search(r"<abstract>(.*?)</abstract>", stdout, re.DOTALL)
+                if abstract_match:
+                    abstract = abstract_match.group(1).strip()
+                else:
+                    abstract = ""
+                    logger.warning("No abstract found in stdout, using default abstract")
+
+                files = [f for f in output_dir.glob('*') if f.is_file()]
+
+                subject = f"[Platogram] {title}"
+                body = f"""Hi there!
+
+    Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
+
+    You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
+
+    {abstract}
+
+    Please reply to this e-mail if any suggestions, feedback, or questions.
+
+    ---
+    Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
+    Suggested donation: $2 per hour of content converted."""
+
+                if user_email:
+                    logger.debug(f"Sending email to {user_email}")
+                    send_email_with_resend(user_email, subject, body, files)
+                    logger.debug("Email sent successfully")
+                else:
+                    logger.warning(f"No email available for task {task_id}. Skipping email send.")
+
+            tasks[task_id]['status'] = 'done'
+            logger.debug(f"Conversion completed for task {task_id}")
+
+        except Exception as e:
+            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}")
+            tasks[task_id]['status'] = 'failed'
+            tasks[task_id]['error'] = str(e)
+
+    def handle_status(self):
+        task_id = self.headers.get('X-Task-ID')
+        if not task_id:
+            json_response(self, 200, {"status": "idle"})
+            return
+
+        try:
+            if task_id not in tasks:
+                response = {"status": "not_found"}
+            else:
+                task = tasks[task_id]
+                response = {
+                    "status": task['status'],
+                    "error": task.get('error') if task['status'] == "failed" else None
+                }
+            json_response(self, 200, response)
+        except Exception as e:
+            logger.error(f"Error in handle_status for task {task_id}: {str(e)}")
+            json_response(self, 500, {"error": str(e)})
+
+    def handle_reset(self):
+        task_id = self.headers.get('X-Task-ID')
+        if not task_id:
+            json_response(self, 400, {"error": "Task ID required"})
+            return
+
+         try:
+            if task_id in tasks:
+                del tasks[task_id]
+            json_response(self, 200, {"message": "Task reset"})
+        except Exception as e:
+            logger.error(f"Error in handle_reset for task {task_id}: {str(e)}")
+            json_response(self, 500, {"error": str(e)})
+
+# Vercel handler
+def vercel_handler(event, context):
+    return handler.handle_request(event, context)

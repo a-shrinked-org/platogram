@@ -15,7 +15,6 @@
     <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
 </head>
 <body class="bg-white">
-    <!-- Language selection modal -->
     <div id="language-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="modal-content bg-white p-6 rounded-lg shadow-lg">
             <h3 class="font-perfectly-nineties text-2xl mb-4">Select Language</h3>
@@ -37,21 +36,23 @@
             </div>
         </div>
 
-        <main class="mt-16">
+        <main class="mt-16" role="main">
             <h1 class="font-perfectly-nineties text-black text-4xl sm:text-5xl md:text-6xl mb-6 text-center">
                 Transform spoken words into structured knowledge.
             </h1>
-            <!-- ... (other content) ... -->
 
             <div id="input-section" class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
-                <div id="link-input" class="mb-4">
+                <p class="mb-4">Convert hours of audio into structured, readable documents</p>
+                <div class="input-wrapper flex items-center mb-4">
+                    <span class="upload-icon mr-2">🔗</span>
                     <input id="url-input" type="text" placeholder="Paste a link to an YouTube video or Google Drive file?" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
+                <div id="file-name" class="mb-2"></div>
                 <button id="convert-button" class="w-full bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 mb-4">
                     Convert
                 </button>
                 <div class="space-y-2">
-                    <button onclick="showFileUpload()" class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300">
+                    <button onclick="handleFileUpload()" class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300">
                         ↑ Upload a file
                     </button>
                     <button class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300 opacity-50 cursor-not-allowed">
@@ -59,67 +60,26 @@
                         <span class="float-right text-sm text-gray-500">Coming soon</span>
                     </button>
                 </div>
-            </div>
-
-            <div id="file-upload-section" class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6 hidden">
-                <button onclick="hideFileUpload()" class="text-gray-600 hover:text-gray-800 mb-4">
-                    ← Paste a link
-                </button>
-                <div id="file-drop-area" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                    <p id="file-name" class="text-gray-700 mb-2"></p>
-                    <p class="text-gray-500 mb-2">Drag a file here or choose a file to upload</p>
-                    <label class="cursor-pointer text-blue-500 hover:underline">
-                        choose a file to upload
-                        <input type="file" class="hidden" onchange="handleFileSelect(event)">
-                    </label>
-                </div>
-                <a id="cancel-file" href="#" class="text-blue-500 hover:underline hidden mt-2 inline-block">cancel</a>
-                <button id="convert-button-file" class="w-full mt-4 bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300">
-                    Convert
-                </button>
-            </div>
-                <div class="space-y-2">
-                    <button onclick="showFileUpload()" class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300">
-                        ↑ Upload a file
-                    </button>
-                    <button class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300 opacity-50 cursor-not-allowed">
-                        ↑ Add a folder
-                        <span class="float-right text-sm text-gray-500">Coming soon</span>
-                    </button>
-                </div>
-            </div>
-
-            <div id="file-upload-section" class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6 hidden">
-                <button onclick="hideFileUpload()" class="text-gray-600 hover:text-gray-800 mb-4">
-                    ← Paste a link
-                </button>
-                <div id="file-drop-area" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                    <p id="file-name" class="text-gray-700 mb-2"></p>
-                    <p class="text-gray-500 mb-2">Drag a file here or choose a file to upload</p>
-                    <label class="cursor-pointer text-blue-500 hover:underline">
-                        choose a file to upload
-                        <input type="file" class="hidden" onchange="handleFileSelect(event)">
-                    </label>
-                </div>
-                <a id="cancel-file" href="#" class="text-blue-500 hover:underline hidden mt-2 inline-block">cancel</a>
-                <button onclick="onConvertClick()" class="w-full mt-4 bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300">
-                    Convert
-                </button>
-            </div>
-
-            <div id="status-section" class="max-w-2xl mx-auto bg-blue-100 rounded-lg p-6 mb-8 hidden">
-                <p>Working on it. You will receive an email once ready.</p>
-                <div id="processing-stage" class="font-semibold text-blue-800 mt-4"></div>
             </div>
 
             <div id="done-section" class="max-w-2xl mx-auto bg-green-100 rounded-lg p-6 mb-8 hidden">
                 <div class="text-4xl text-green-500 mb-4 text-center">✔</div>
                 <p class="text-center">Done! Please check your e-mail inbox in a few minutes.</p>
-                <button onclick="hideFileUpload()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded mx-auto block">Got it!</button>
+                <button onclick="reset()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded mx-auto block">Got it!</button>
+            </div>
+
+            <div id="status-section" class="max-w-2xl mx-auto bg-blue-100 rounded-lg p-6 mb-8 hidden">
+                <p>Working on it. You will receive an email once ready.</p>
+                <p>Processing time is quick - about 5 mins for each hour of content. Hang tight!</p>
+                <div id="animation-container" class="w-48 h-48 border-2 border-blue-300 rounded-lg relative mx-auto my-4">
+                    <div id="runner" class="w-4 h-4 bg-blue-500 rounded-full absolute"></div>
+                </div>
+                <div id="processing-stage" class="text-center font-semibold text-blue-800 mb-4"></div>
+                <button onclick="onDonateClick()" class="bg-green-500 text-white px-4 py-2 rounded mx-auto block">Donate</button>
             </div>
 
             <div id="error-section" class="max-w-2xl mx-auto bg-red-100 rounded-lg p-6 mb-8 hidden">
-                <p>An error occurred. Please try again.</p>
+                <p id="error-message">An error occurred. Please try again.</p>
                 <button onclick="reset()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded">Reset</button>
             </div>
 
@@ -240,13 +200,6 @@
             onConvertClick();
           });
         }
-        const convertButtonFile = document.getElementById('convert-button-file');
-        if (convertButtonFile) {
-          convertButtonFile.addEventListener('click', (event) => {
-            event.preventDefault();
-            onConvertClick();
-          });
-        }
         const loginButton = document.getElementById('login-button');
         if (loginButton) {
           loginButton.addEventListener('click', (event) => {
@@ -275,73 +228,31 @@
             reset();
           });
         });
-
-        // File upload functionality
-        const fileInput = document.querySelector('input[type="file"]');
-        const cancelFile = document.getElementById('cancel-file');
-
-        if (fileInput) {
-          fileInput.addEventListener('change', handleFileSelect);
-        }
-
-        if (cancelFile) {
-          cancelFile.addEventListener('click', (event) => {
-            event.preventDefault();
-            resetFileUpload();
-          });
-        }
       });
 
-      function handleFileSelect(event) {
-        const file = event.target.files[0];
-        if (file) {
-          const fileDropArea = document.getElementById('file-drop-area');
-          const fileNameElement = document.getElementById('file-name');
-          const cancelFile = document.getElementById('cancel-file');
-
-          if (fileDropArea && fileNameElement && cancelFile) {
-            fileDropArea.className = 'bg-gray-100 rounded-lg p-8 text-center';
+      function handleFileUpload() {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a';
+        fileInput.style.display = 'none';
+        fileInput.onchange = (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            const fileNameElement = document.getElementById('file-name');
             fileNameElement.textContent = file.name;
-            fileDropArea.innerHTML = `<p class="text-gray-700">${file.name}</p>`;
-            cancelFile.classList.remove('hidden');
+            fileNameElement.file = file;
+            document.getElementById('url-input').value = '';
           }
-        }
-      }
-
-      function resetFileUpload() {
-        const fileDropArea = document.getElementById('file-drop-area');
-        const cancelFile = document.getElementById('cancel-file');
-        const fileInput = document.querySelector('input[type="file"]');
-
-        if (fileDropArea && cancelFile && fileInput) {
-          fileDropArea.className = 'border-2 border-dashed border-gray-300 rounded-lg p-8 text-center';
-          fileDropArea.innerHTML = `
-            <p class="text-gray-500 mb-2">Drag a file here or choose a file to upload</p>
-            <label class="cursor-pointer text-blue-500 hover:underline">
-              choose a file to upload
-              <input type="file" class="hidden" onchange="handleFileSelect(event)">
-            </label>
-          `;
-          cancelFile.classList.add('hidden');
-          fileInput.value = '';
-        }
-      }
-
-      function showFileUpload() {
-        document.getElementById('input-section').classList.add('hidden');
-        document.getElementById('file-upload-section').classList.remove('hidden');
-      }
-
-      function hideFileUpload() {
-        document.getElementById('file-upload-section').classList.add('hidden');
-        document.getElementById('input-section').classList.remove('hidden');
-        resetFileUpload();
+        };
+        document.body.appendChild(fileInput);
+        fileInput.click();
+        document.body.removeChild(fileInput);
       }
 
       // Ensure these functions are available globally
-      window.showFileUpload = showFileUpload;
-      window.hideFileUpload = hideFileUpload;
-      window.handleFileSelect = handleFileSelect;
+      window.handleFileUpload = handleFileUpload;
+      window.reset = reset;
+      window.onDonateClick = onDonateClick;
     </script>
 </body>
 </html>

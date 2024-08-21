@@ -354,7 +354,7 @@ class handler(BaseHTTPRequestHandler):
             json_response(self, 400, {"error": "Task ID required"})
             return
 
-         try:
+        try:
             if task_id in tasks:
                 del tasks[task_id]
             json_response(self, 200, {"message": "Task reset"})

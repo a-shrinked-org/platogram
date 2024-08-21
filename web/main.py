@@ -13,7 +13,6 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
 import io
-import asyncio
 import subprocess
 
 import platogram as plato
@@ -261,11 +260,6 @@ class handler(BaseHTTPRequestHandler):
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 output_dir = Path(tmpdir)
-
-                # Initialize Platogram models
-                language_model = plato.llm.get_model(
-                    "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
-                )
 
                 # Process audio
                 if 'url' in task:

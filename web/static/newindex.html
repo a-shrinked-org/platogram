@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>datacapture</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://platogram.vercel.app/web/styles.css">
+    <link rel="stylesheet" href="https://platogram.vercel.app/styles.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         .font-perfectly-nineties {
             font-family: 'Perfectly Nineties', sans-serif;
         }
     </style>
+    <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
 </head>
 <body class="font-subtle bg-white text-slate-900">
     <div id="language-modal" class="modal hidden">
@@ -30,8 +31,8 @@
                 <span class="font-perfectly-nineties text-xl">datacapture</span>
             </div>
             <div>
-                <button id="login-button" class="cta">Log In</button>
-                <button id="logout-button" class="cta hidden">Log Out</button>
+                <button id="login-button" class="bg-slate-900 text-white px-4 py-2 rounded-full text-sm">Log In</button>
+                <button id="logout-button" class="bg-slate-900 text-white px-4 py-2 rounded-full text-sm hidden">Log Out</button>
             </div>
         </header>
 
@@ -40,44 +41,44 @@
                 Transform spoken words<br>into structured knowledge
             </h1>
 
-            <section id="input-section" class="cta-container">
-                <p class="mb-4">Convert hours of audio into structured, readable documents</p>
-                <div class="input-wrapper">
-                    <input type="text" id="url-input" placeholder="Paste a link to a YouTube video or Google Drive file" class="w-full p-2 mb-2 rounded border border-gray-300">
-                    <label for="file-upload" class="upload-button">
-                        <span class="upload-icon">
-                            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld2JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPgogICAgICAgICAgICAgICAgICA8cGF0aCBkPSJNMjEgMTV2NGEyIDIgMCAwIDEtMiAySDVhMiAyIDAgMCAxLTItMnYtNCI+PC9wYXRoPgogICAgICAgICAgICAgICAgICA8cG9seWxpbmUgcG9pbnRzPSIxNyA4IDEyIDMgNyA4Ij48L3BvbHlsaW5lPgogICAgICAgICAgICAgICAgICA8bGluZSB4MT0iMTIiIHkxPSIzIiB4Mj0iMTIiIHkyPSIxNSI+PC9saW5lPgogICAgICAgICAgICAgICAgPC9zdmc+" alt="Upload">
-                        </span>
+            <section id="input-section" class="max-w-lg mx-auto bg-gray-100 rounded-lg p-4 mb-8">
+                <p class="mb-4 text-center">Convert hours of audio into structured, readable documents</p>
+                <div class="flex items-center mb-4">
+                    <input type="text" id="url-input" placeholder="Paste a link to a YouTube video or Google Drive file" class="flex-grow p-2 rounded-l-lg border border-gray-300">
+                    <label for="file-upload" class="bg-white p-2 rounded-r-lg border border-l-0 border-gray-300 cursor-pointer">
+                        <span class="upload-icon">🔗</span>
                         <input type="file" id="file-upload" class="hidden">
                     </label>
                 </div>
-                <p id="file-name" class="mt-2 text-sm"></p>
-                <button id="convert-button" class="cta mt-4">Convert</button>
-                <button id="donate-button" class="cta donate mt-4">Donate</button>
+                <p id="file-name" class="text-sm text-gray-600 mb-4"></p>
+                <div class="flex justify-between">
+                    <button id="convert-button" class="bg-slate-900 text-white px-6 py-2 rounded-full text-sm">Convert</button>
+                    <button id="donate-button" class="bg-red-700 text-white px-6 py-2 rounded-full text-sm">Donate</button>
+                </div>
                 <p class="text-sm text-gray-500 mt-4">
                     Transcription times can vary depending on the file size, length of the content, and how busy our servers are.
                 </p>
             </section>
 
-            <div id="done-section" class="cta-container hidden">
-                <div class="success-icon">✔</div>
-                <p>Done! Please check your e-mail inbox in a few minutes.</p>
-                <button class="cta">Got it!</button>
+            <div id="done-section" class="max-w-lg mx-auto bg-green-100 rounded-lg p-4 mb-8 hidden">
+                <div class="text-4xl text-green-500 mb-4 text-center">✔</div>
+                <p class="text-xl font-semibold text-green-800 mb-4 text-center">Done! Please check your e-mail inbox in a few minutes.</p>
+                <button class="bg-green-500 text-white px-6 py-2 rounded-full text-sm block mx-auto">Got it!</button>
             </div>
 
-            <div id="status-section" class="cta-container hidden">
-                <p>Working on it. You will receive an email from Artyom Astafurov with PDF, Word, and Markdown documents once ready.</p>
-                <p>Processing time is quick - about 5 mins for each hour of content. Hang tight!</p>
-                <div id="animation-container">
-                    <div id="runner"></div>
+            <div id="status-section" class="max-w-lg mx-auto bg-blue-100 rounded-lg p-4 mb-8 hidden">
+                <p class="mb-4 text-center">Working on it. You will receive an email from Artyom Astafurov with PDF, Word, and Markdown documents once ready.</p>
+                <p class="mb-4 text-center">Processing time is quick - about 5 mins for each hour of content. Hang tight!</p>
+                <div id="animation-container" class="w-48 h-48 border-2 border-blue-300 rounded-lg relative mx-auto mb-4">
+                    <div id="runner" class="w-4 h-4 bg-blue-500 rounded-full absolute"></div>
                 </div>
-                <div id="processing-stage" class="mt-4"></div>
-                <button id="donate-button-status" class="cta donate mt-4">Donate</button>
+                <div id="processing-stage" class="text-center font-semibold text-blue-800 mb-4"></div>
+                <button id="donate-button-status" class="bg-red-700 text-white px-6 py-2 rounded-full text-sm block mx-auto">Donate</button>
             </div>
 
-            <div id="error-section" class="cta-container hidden">
-                <p>An error occurred. Please try again.</p>
-                <button id="reset-button" class="cta">Reset</button>
+            <div id="error-section" class="max-w-lg mx-auto bg-red-100 rounded-lg p-4 mb-8 hidden">
+                <p class="text-xl font-semibold text-red-800 mb-4 text-center">An error occurred. Please try again.</p>
+                <button id="reset-button" class="bg-red-500 text-white px-6 py-2 rounded-full text-sm block mx-auto">Reset</button>
             </div>
 
             <section class="mb-16">
@@ -180,7 +181,7 @@
         </main>
 
         <footer class="text-center py-8">
-            <p>Platogram is built with 💜 in New York and Boston by <a href="https://codeanyway.com" target="_blank" rel="noopener noreferrer">Code Anyway, Inc</a> in 2023-2024</p>
+            <p>Platogram is built with 💜 in New York and Boston by <a href="https://codeanyway.com" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Code Anyway, Inc</a> in 2023-2024</p>
             <div class="mt-4">
                 <a href="#" class="text-blue-600 hover:underline mr-4">Privacy</a>
                 <a href="#" class="text-blue-600 hover:underline">Terms</a>
@@ -188,7 +189,7 @@
         </footer>
     </div>
 
-    <script src="https://platogram.vercel.app/web/app.js"></script>
+    <script src="https://platogram.vercel.app/app.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const fileUpload = document.getElementById('file-upload');

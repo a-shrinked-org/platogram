@@ -195,43 +195,54 @@
     </div>
 
     <script src="https://platogram.vercel.app/web/app.js"></script>
+    <!-- Initialize app.js functionality -->
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const fileUpload = document.getElementById('file-upload');
-            const fileName = document.getElementById('file-name');
-            const convertButton = document.getElementById('convert-button');
-            const inputSection = document.getElementById('input-section');
-            const doneSection = document.getElementById('done-section');
-            const statusSection = document.getElementById('status-section');
-            const errorSection = document.getElementById('error-section');
-            const resetButton = document.getElementById('reset-button');
-            const loginButton = document.getElementById('login-button');
-            const logoutButton = document.getElementById('logout-button');
+      document.addEventListener('DOMContentLoaded', () => {
+        // Initialize processing stage updates
+        initializeProcessingStage();
 
-            fileUpload.addEventListener('change', function(e) {
-                if (e.target.files.length > 0) {
-                    fileName.textContent = e.target.files[0].name;
-                }
-            });
+        // Add event listeners to buttons
+        const convertButton = document.getElementById('convert-button');
+        if (convertButton) {
+          convertButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            onConvertClick();
+          });
+        }
 
-            convertButton.addEventListener('click', function() {
-                // This logic is handled in app.js
-            });
+        const loginButton = document.getElementById('login-button');
+        if (loginButton) {
+          loginButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            login();
+          });
+        }
 
-            resetButton.addEventListener('click', function() {
-                errorSection.classList.add('hidden');
-                inputSection.classList.remove('hidden');
-                fileName.textContent = '';
-            });
+        const logoutButton = document.getElementById('logout-button');
+        if (logoutButton) {
+          logoutButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            logout();
+          });
+        }
 
-            loginButton.addEventListener('click', function() {
-                // Login logic is handled in app.js
-            });
-
-            logoutButton.addEventListener('click', function() {
-                // Logout logic is handled in app.js
-            });
+        const donateButtons = document.querySelectorAll('[id^="donate-button"]');
+        donateButtons.forEach(button => {
+          button.addEventListener('click', (event) => {
+            event.preventDefault();
+            onDonateClick();
+          });
         });
+
+        const resetButtons = document.querySelectorAll('[id^="reset-button"]');
+        resetButtons.forEach(button => {
+          button.addEventListener('click', (event) => {
+            event.preventDefault();
+            reset();
+          });
+        });
+
+      });
     </script>
 </body>
 </html>

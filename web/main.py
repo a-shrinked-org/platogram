@@ -373,6 +373,11 @@ class handler(BaseHTTPRequestHandler):
                     url = f"file://{task['file']}"
 
                 try:
+                    # Initialize the language model
+                    language_model = plato.llm.get_model(
+                        "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
+                    )
+
                     # Set AssemblyAI API key in the environment if available
                     if os.getenv('ASSEMBLYAI_API_KEY'):
                         logger.info("Transcribing audio to text using AssemblyAI...")
@@ -380,10 +385,10 @@ class handler(BaseHTTPRequestHandler):
                     else:
                         logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
 
-                    # Call plato.index() without the assemblyai_api_key argument
-                    plato.index(url, lang=task['lang'])
+                    # Call plato.index() with the llm argument
+                    plato.index(url, llm=language_model, lang=task['lang'], images=task.get('images', False))
 
-                    title, abstract = audio_to_paper(url, task['lang'], output_dir)
+                    title, abstract = audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
                 finally:
                     if 'file' in task:
                         try:

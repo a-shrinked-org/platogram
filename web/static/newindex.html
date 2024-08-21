@@ -15,6 +15,7 @@
     <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
 </head>
 <body class="bg-white">
+    <!-- Language selection modal -->
     <div id="language-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="modal-content bg-white p-6 rounded-lg shadow-lg">
             <h3 class="font-perfectly-nineties text-2xl mb-4">Select Language</h3>
@@ -101,7 +102,7 @@
 
             <section class="mb-16 max-w-4xl mx-auto">
                 <div class="bg-white">
-                    <img src="https://platogram.vercel.app/web/static/assets/pdf_example.jpg" alt="AI-Powered Speech-to-Text and Knowledge Extraction" class="w-full h-auto rounded-lg shadow-md">
+                    <img src="https://platogram.vercel.app/web/static/Assets/pdf_example.jpg" alt="AI-Powered Speech-to-Text and Knowledge Extraction" class="w-full h-auto rounded-lg shadow-md">
                 </div>
             </section>
 
@@ -141,7 +142,7 @@
             </section>
 
             <section class="mb-16 text-center">
-                <img src="https://platogram.vercel.app/web/static/assets/268vocabulary-1@2x.png" alt="Person reading" class="mx-auto mb-6" style="max-width: 200px;">
+                <img src="https://platogram.vercel.app/web/static/Assets/268vocabulary-1@2x.png" alt="Person reading" class="mx-auto mb-6" style="max-width: 200px;">
                 <h2 class="font-perfectly-nineties text-3xl mb-4">
                     [Name] was created by two tech enthusiasts,<br>
                     <span class="underline">Ivan</span> & <span class="underline">Artyom</span>, who wanted to rediscover the<br>
@@ -205,113 +206,117 @@
     <script src="https://platogram.vercel.app/web/app.js"></script>
     <!-- Initialize app.js functionality -->
     <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const fileInput = document.querySelector('input[type="file"]');
-        const cancelFile = document.getElementById('cancel-file');
-
-        if (fileInput) {
-            fileInput.addEventListener('change', handleFileSelect);
-        }
-
-        if (cancelFile) {
-            cancelFile.addEventListener('click', (event) => {
-                event.preventDefault();
-                resetFileUpload();
-            });
-        }
+  document.addEventListener('DOMContentLoaded', () => {
+    // Initialize processing stage updates
+    initializeProcessingStage();
+    // Add event listeners to buttons
+    const convertButton = document.getElementById('convert-button');
+    if (convertButton) {
+      convertButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        onConvertClick();
+      });
+    }
+    const loginButton = document.getElementById('login-button');
+    if (loginButton) {
+      loginButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        login();
+      });
+    }
+    const logoutButton = document.getElementById('logout-button');
+    if (logoutButton) {
+      logoutButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        logout();
+      });
+    }
+    const donateButtons = document.querySelectorAll('[id^="donate-button"]');
+    donateButtons.forEach(button => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        onDonateClick();
+      });
+    });
+    const resetButtons = document.querySelectorAll('[id^="reset-button"]');
+    resetButtons.forEach(button => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        reset();
+      });
     });
 
-    function handleFileSelect(event) {
-        const file = event.target.files[0];
-        if (file) {
-            const fileDropArea = document.getElementById('file-drop-area');
-            const fileNameElement = document.getElementById('file-name');
-            const cancelFile = document.getElementById('cancel-file');
+    // New file upload functionality
+    const fileInput = document.querySelector('input[type="file"]');
+    const cancelFile = document.getElementById('cancel-file');
 
-            if (fileDropArea && fileNameElement && cancelFile) {
-                fileDropArea.className = 'bg-gray-100 rounded-lg p-8 text-center';
-                fileNameElement.textContent = file.name;
-                fileDropArea.innerHTML = `<p class="text-gray-700">${file.name}</p>`;
-                cancelFile.classList.remove('hidden');
-            }
-        }
+    if (fileInput) {
+      fileInput.addEventListener('change', handleFileSelect);
     }
 
-    function resetFileUpload() {
-        const fileDropArea = document.getElementById('file-drop-area');
-        const cancelFile = document.getElementById('cancel-file');
-        const fileInput = document.querySelector('input[type="file"]');
-
-        if (fileDropArea && cancelFile && fileInput) {
-            fileDropArea.className = 'border-2 border-dashed border-gray-300 rounded-lg p-8 text-center';
-            fileDropArea.innerHTML = `
-                <p class="text-gray-500 mb-2">Drag a file here or choose a file to upload</p>
-                <label class="cursor-pointer text-blue-500 hover:underline">
-                    choose a file to upload
-                    <input type="file" class="hidden" onchange="handleFileSelect(event)">
-                </label>
-            `;
-            cancelFile.classList.add('hidden');
-            fileInput.value = '';
-        }
-    }
-
-    function showFileUpload() {
-        document.getElementById('input-section').classList.add('hidden');
-        document.getElementById('file-upload-section').classList.remove('hidden');
-    }
-
-    function hideFileUpload() {
-        document.getElementById('file-upload-section').classList.add('hidden');
-        document.getElementById('input-section').classList.remove('hidden');
+    if (cancelFile) {
+      cancelFile.addEventListener('click', (event) => {
+        event.preventDefault();
         resetFileUpload();
+      });
     }
 
-    function onConvertClick() {
-        const fileUploadSection = document.getElementById('file-upload-section');
-        const inputSection = document.getElementById('input-section');
-        const statusSection = document.getElementById('status-section');
-
-        if (fileUploadSection && inputSection && statusSection) {
-            fileUploadSection.classList.add('hidden');
-            inputSection.classList.add('hidden');
-            statusSection.classList.remove('hidden');
-            updateProcessingStage();
-        }
+    const uploadFileButton = document.querySelector('button[onclick="showFileUpload()"]');
+    if (uploadFileButton) {
+      uploadFileButton.addEventListener('click', showFileUpload);
     }
 
-    function updateProcessingStage() {
-        // Simulating processing stages
-        const stages = [
-            "Analyzing audio...",
-            "Extracting text...",
-            "Structuring content...",
-            "Finalizing document..."
-        ];
-        let currentStage = 0;
-
-        const processingStage = document.getElementById('processing-stage');
-
-        const interval = setInterval(() => {
-            if (currentStage < stages.length) {
-                processingStage.textContent = stages[currentStage];
-                currentStage++;
-            } else {
-                clearInterval(interval);
-                showDoneSection();
-            }
-        }, 2000);
+    const pasteLinkButton = document.querySelector('button[onclick="hideFileUpload()"]');
+    if (pasteLinkButton) {
+      pasteLinkButton.addEventListener('click', hideFileUpload);
     }
+  });
 
-    function showDoneSection() {
-        const statusSection = document.getElementById('status-section');
-        const doneSection = document.getElementById('done-section');
+  function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (file) {
+      const fileDropArea = document.getElementById('file-drop-area');
+      const fileNameElement = document.getElementById('file-name');
+      const cancelFile = document.getElementById('cancel-file');
 
-        if (statusSection && doneSection) {
-            statusSection.classList.add('hidden');
-            doneSection.classList.remove('hidden');
-        }
+      if (fileDropArea && fileNameElement && cancelFile) {
+        fileDropArea.className = 'bg-gray-100 rounded-lg p-8 text-center';
+        fileNameElement.textContent = file.name;
+        fileDropArea.innerHTML = `<p class="text-gray-700">${file.name}</p>`;
+        cancelFile.classList.remove('hidden');
+      }
     }
-    </script>
+  }
+
+  function resetFileUpload() {
+    const fileDropArea = document.getElementById('file-drop-area');
+    const cancelFile = document.getElementById('cancel-file');
+    const fileInput = document.querySelector('input[type="file"]');
+
+    if (fileDropArea && cancelFile && fileInput) {
+      fileDropArea.className = 'border-2 border-dashed border-gray-300 rounded-lg p-8 text-center';
+      fileDropArea.innerHTML = `
+        <p class="text-gray-500 mb-2">Drag a file here or choose a file to upload</p>
+        <label class="cursor-pointer text-blue-500 hover:underline">
+          choose a file to upload
+          <input type="file" class="hidden" onchange="handleFileSelect(event)">
+        </label>
+      `;
+      cancelFile.classList.add('hidden');
+      fileInput.value = '';
+    }
+  }
+
+  function showFileUpload() {
+    document.getElementById('input-section').classList.add('hidden');
+    document.getElementById('file-upload-section').classList.remove('hidden');
+  }
+
+  function hideFileUpload() {
+    document.getElementById('file-upload-section').classList.add('hidden');
+    document.getElementById('input-section').classList.remove('hidden');
+    resetFileUpload();
+  }
+</script>
 </body>
 </html>

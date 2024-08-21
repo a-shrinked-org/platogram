@@ -25,7 +25,7 @@
         </div>
     </div>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-white">
         <div class="flex justify-between items-center py-4">
             <div class="flex items-center space-x-2">
                 <div class="w-6 h-6 bg-slate-900"></div>
@@ -41,20 +41,43 @@
             <h1 class="font-perfectly-nineties text-black text-4xl sm:text-5xl md:text-6xl mb-6 text-center">
                 Transform spoken words into structured knowledge.
             </h1>
-            <p class="text-center text-xl mb-8">
-                Unlock insights from audio and video — beyond transcripts, summaries, and scattered notes.
-            </p>
-            <p class="text-center text-2xl font-bold mb-12">
-                10x your content understanding.
-            </p>
+            <!-- ... (other content) ... -->
 
             <div id="input-section" class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
                 <div id="link-input" class="mb-4">
                     <input id="url-input" type="text" placeholder="Paste a link to an YouTube video or Google Drive file?" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
-                <button onclick="onConvertClick()" class="w-full bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 mb-4">
+                <button id="convert-button" class="w-full bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 mb-4">
                     Convert
                 </button>
+                <div class="space-y-2">
+                    <button onclick="showFileUpload()" class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300">
+                        ↑ Upload a file
+                    </button>
+                    <button class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300 opacity-50 cursor-not-allowed">
+                        ↑ Add a folder
+                        <span class="float-right text-sm text-gray-500">Coming soon</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="file-upload-section" class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6 hidden">
+                <button onclick="hideFileUpload()" class="text-gray-600 hover:text-gray-800 mb-4">
+                    ← Paste a link
+                </button>
+                <div id="file-drop-area" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                    <p id="file-name" class="text-gray-700 mb-2"></p>
+                    <p class="text-gray-500 mb-2">Drag a file here or choose a file to upload</p>
+                    <label class="cursor-pointer text-blue-500 hover:underline">
+                        choose a file to upload
+                        <input type="file" class="hidden" onchange="handleFileSelect(event)">
+                    </label>
+                </div>
+                <a id="cancel-file" href="#" class="text-blue-500 hover:underline hidden mt-2 inline-block">cancel</a>
+                <button id="convert-button-file" class="w-full mt-4 bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300">
+                    Convert
+                </button>
+            </div>
                 <div class="space-y-2">
                     <button onclick="showFileUpload()" class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300">
                         ↑ Upload a file
@@ -206,117 +229,119 @@
     <script src="https://platogram.vercel.app/web/app.js"></script>
     <!-- Initialize app.js functionality -->
     <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    // Initialize processing stage updates
-    initializeProcessingStage();
-    // Add event listeners to buttons
-    const convertButton = document.getElementById('convert-button');
-    if (convertButton) {
-      convertButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        onConvertClick();
+      document.addEventListener('DOMContentLoaded', () => {
+        // Initialize processing stage updates
+        initializeProcessingStage();
+        // Add event listeners to buttons
+        const convertButton = document.getElementById('convert-button');
+        if (convertButton) {
+          convertButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            onConvertClick();
+          });
+        }
+        const convertButtonFile = document.getElementById('convert-button-file');
+        if (convertButtonFile) {
+          convertButtonFile.addEventListener('click', (event) => {
+            event.preventDefault();
+            onConvertClick();
+          });
+        }
+        const loginButton = document.getElementById('login-button');
+        if (loginButton) {
+          loginButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            login();
+          });
+        }
+        const logoutButton = document.getElementById('logout-button');
+        if (logoutButton) {
+          logoutButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            logout();
+          });
+        }
+        const donateButtons = document.querySelectorAll('[id^="donate-button"]');
+        donateButtons.forEach(button => {
+          button.addEventListener('click', (event) => {
+            event.preventDefault();
+            onDonateClick();
+          });
+        });
+        const resetButtons = document.querySelectorAll('[id^="reset-button"]');
+        resetButtons.forEach(button => {
+          button.addEventListener('click', (event) => {
+            event.preventDefault();
+            reset();
+          });
+        });
+
+        // File upload functionality
+        const fileInput = document.querySelector('input[type="file"]');
+        const cancelFile = document.getElementById('cancel-file');
+
+        if (fileInput) {
+          fileInput.addEventListener('change', handleFileSelect);
+        }
+
+        if (cancelFile) {
+          cancelFile.addEventListener('click', (event) => {
+            event.preventDefault();
+            resetFileUpload();
+          });
+        }
       });
-    }
-    const loginButton = document.getElementById('login-button');
-    if (loginButton) {
-      loginButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        login();
-      });
-    }
-    const logoutButton = document.getElementById('logout-button');
-    if (logoutButton) {
-      logoutButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        logout();
-      });
-    }
-    const donateButtons = document.querySelectorAll('[id^="donate-button"]');
-    donateButtons.forEach(button => {
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        onDonateClick();
-      });
-    });
-    const resetButtons = document.querySelectorAll('[id^="reset-button"]');
-    resetButtons.forEach(button => {
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        reset();
-      });
-    });
 
-    // New file upload functionality
-    const fileInput = document.querySelector('input[type="file"]');
-    const cancelFile = document.getElementById('cancel-file');
+      function handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (file) {
+          const fileDropArea = document.getElementById('file-drop-area');
+          const fileNameElement = document.getElementById('file-name');
+          const cancelFile = document.getElementById('cancel-file');
 
-    if (fileInput) {
-      fileInput.addEventListener('change', handleFileSelect);
-    }
-
-    if (cancelFile) {
-      cancelFile.addEventListener('click', (event) => {
-        event.preventDefault();
-        resetFileUpload();
-      });
-    }
-
-    const uploadFileButton = document.querySelector('button[onclick="showFileUpload()"]');
-    if (uploadFileButton) {
-      uploadFileButton.addEventListener('click', showFileUpload);
-    }
-
-    const pasteLinkButton = document.querySelector('button[onclick="hideFileUpload()"]');
-    if (pasteLinkButton) {
-      pasteLinkButton.addEventListener('click', hideFileUpload);
-    }
-  });
-
-  function handleFileSelect(event) {
-    const file = event.target.files[0];
-    if (file) {
-      const fileDropArea = document.getElementById('file-drop-area');
-      const fileNameElement = document.getElementById('file-name');
-      const cancelFile = document.getElementById('cancel-file');
-
-      if (fileDropArea && fileNameElement && cancelFile) {
-        fileDropArea.className = 'bg-gray-100 rounded-lg p-8 text-center';
-        fileNameElement.textContent = file.name;
-        fileDropArea.innerHTML = `<p class="text-gray-700">${file.name}</p>`;
-        cancelFile.classList.remove('hidden');
+          if (fileDropArea && fileNameElement && cancelFile) {
+            fileDropArea.className = 'bg-gray-100 rounded-lg p-8 text-center';
+            fileNameElement.textContent = file.name;
+            fileDropArea.innerHTML = `<p class="text-gray-700">${file.name}</p>`;
+            cancelFile.classList.remove('hidden');
+          }
+        }
       }
-    }
-  }
 
-  function resetFileUpload() {
-    const fileDropArea = document.getElementById('file-drop-area');
-    const cancelFile = document.getElementById('cancel-file');
-    const fileInput = document.querySelector('input[type="file"]');
+      function resetFileUpload() {
+        const fileDropArea = document.getElementById('file-drop-area');
+        const cancelFile = document.getElementById('cancel-file');
+        const fileInput = document.querySelector('input[type="file"]');
 
-    if (fileDropArea && cancelFile && fileInput) {
-      fileDropArea.className = 'border-2 border-dashed border-gray-300 rounded-lg p-8 text-center';
-      fileDropArea.innerHTML = `
-        <p class="text-gray-500 mb-2">Drag a file here or choose a file to upload</p>
-        <label class="cursor-pointer text-blue-500 hover:underline">
-          choose a file to upload
-          <input type="file" class="hidden" onchange="handleFileSelect(event)">
-        </label>
-      `;
-      cancelFile.classList.add('hidden');
-      fileInput.value = '';
-    }
-  }
+        if (fileDropArea && cancelFile && fileInput) {
+          fileDropArea.className = 'border-2 border-dashed border-gray-300 rounded-lg p-8 text-center';
+          fileDropArea.innerHTML = `
+            <p class="text-gray-500 mb-2">Drag a file here or choose a file to upload</p>
+            <label class="cursor-pointer text-blue-500 hover:underline">
+              choose a file to upload
+              <input type="file" class="hidden" onchange="handleFileSelect(event)">
+            </label>
+          `;
+          cancelFile.classList.add('hidden');
+          fileInput.value = '';
+        }
+      }
 
-  function showFileUpload() {
-    document.getElementById('input-section').classList.add('hidden');
-    document.getElementById('file-upload-section').classList.remove('hidden');
-  }
+      function showFileUpload() {
+        document.getElementById('input-section').classList.add('hidden');
+        document.getElementById('file-upload-section').classList.remove('hidden');
+      }
 
-  function hideFileUpload() {
-    document.getElementById('file-upload-section').classList.add('hidden');
-    document.getElementById('input-section').classList.remove('hidden');
-    resetFileUpload();
-  }
-</script>
+      function hideFileUpload() {
+        document.getElementById('file-upload-section').classList.add('hidden');
+        document.getElementById('input-section').classList.remove('hidden');
+        resetFileUpload();
+      }
+
+      // Ensure these functions are available globally
+      window.showFileUpload = showFileUpload;
+      window.hideFileUpload = hideFileUpload;
+      window.handleFileSelect = handleFileSelect;
+    </script>
 </body>
 </html>

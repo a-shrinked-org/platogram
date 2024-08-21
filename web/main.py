@@ -385,9 +385,10 @@ class handler(BaseHTTPRequestHandler):
                     else:
                         logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
 
-                    # Call plato.index() with the llm argument
-                    plato.index(url, llm=language_model, lang=task['lang'], images=task.get('images', False))
+                    # Call plato.index() without the images argument
+                    plato.index(url, llm=language_model, lang=task['lang'])
 
+                    # Pass the images flag to audio_to_paper if needed
                     title, abstract = audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
                 finally:
                     if 'file' in task:
@@ -395,6 +396,7 @@ class handler(BaseHTTPRequestHandler):
                             os.remove(task['file'])
                         except OSError as e:
                             logger.warning(f"Failed to delete temporary file {task['file']}: {e}")
+    
 
                 files = [f for f in output_dir.glob('*') if f.is_file()]
 

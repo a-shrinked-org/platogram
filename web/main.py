@@ -144,14 +144,12 @@ def send_email_with_resend(to_email, subject, body, attachments):
     else:
         logger.error(f"Failed to send email. Status: {response.status_code}, Error: {response.text}")
 
-def audio_to_paper(url: str, lang: str, output_dir: Path) -> tuple[str, str]:
+def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
     logger.info(f"Processing audio from: {url}")
 
     # Check for required API keys
     if not os.getenv('ANTHROPIC_API_KEY'):
         raise EnvironmentError("ANTHROPIC_API_KEY is not set")
-    if not os.getenv('ASSEMBLYAI_API_KEY'):
-        logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
 
     # Set language-specific prompts
     if lang == "en":
@@ -180,10 +178,10 @@ def audio_to_paper(url: str, lang: str, output_dir: Path) -> tuple[str, str]:
     # Transcribe or index content
     if os.getenv('ASSEMBLYAI_API_KEY'):
         logger.info("Transcribing audio to text using AssemblyAI...")
-        plato.index(url, assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY'), lang=lang)
+        plato.index(url, assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY'), lang=lang, images=images)
     else:
         logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
-        plato.index(url, lang=lang)
+        plato.index(url, lang=lang, images=images)
 
     # Generate content
     logger.info("Generating content...")
@@ -375,7 +373,7 @@ class handler(BaseHTTPRequestHandler):
                     url = f"file://{task['file']}"
 
                 try:
-                    title, abstract = audio_to_paper(url, task['lang'], output_dir)
+                    title, abstract = audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
                 finally:
                     if 'file' in task:
                         try:

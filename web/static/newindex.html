@@ -15,14 +15,14 @@
     <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
 </head>
 <body class="font-subtle bg-white text-slate-900">
-    <div id="language-modal" class="modal hidden">
-        <div class="modal-content">
-            <h3 class="font-perfectly-nineties text-2xl mb-4">Select Language</h3>
-            <button class="cta mb-2">English</button>
-            <button class="cta mb-2">Spanish</button>
-            <button class="cta">Cancel</button>
+    <div id="language-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="modal-content bg-white p-6 rounded-lg shadow-lg">
+          <h3 class="font-perfectly-nineties text-2xl mb-4">Select Language</h3>
+          <button id="en-btn" class="block w-full text-left py-2 px-4 hover:bg-gray-100 rounded">English</button>
+          <button id="es-btn" class="block w-full text-left py-2 px-4 hover:bg-gray-100 rounded">Spanish</button>
+          <button id="cancel-btn" class="mt-4 bg-gray-200 text-gray-800 py-2 px-4 rounded hover:bg-gray-300">Cancel</button>
         </div>
-    </div>
+      </div>
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <header class="flex justify-between items-center py-4">

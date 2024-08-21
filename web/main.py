@@ -155,7 +155,15 @@ def audio_to_paper(url: str, lang: str, output_dir: Path) -> tuple[str, str]:
     # Transcribe audio
     logger.info("Transcribing audio...")
     transcriber = aai.Transcriber()
-    transcript = transcriber.transcribe(url)
+
+    if url.startswith("file://"):
+        # Handle local file
+        file_path = url[7:]  # Remove "file://" prefix
+        with open(file_path, 'rb') as audio_file:
+            transcript = transcriber.transcribe(audio_file)
+    else:
+        # Handle URL
+        transcript = transcriber.transcribe(url)
 
     # Index the transcript
     logger.info("Indexing transcript...")
@@ -333,11 +341,11 @@ class handler(BaseHTTPRequestHandler):
                 try:
                     title, abstract = audio_to_paper(url, task['lang'], output_dir)
                 finally:
-                    if url.startswith("file:///tmp/platogram_uploads"):
+                    if 'file' in task:
                         try:
-                            os.remove(url.replace("file:///tmp/platogram_uploads", "/tmp/platogram_uploads"))
+                            os.remove(task['file'])
                         except OSError as e:
-                            logger.warning(f"Failed to delete temporary file {url}: {e}")
+                            logger.warning(f"Failed to delete temporary file {task['file']}: {e}")
 
                 files = [f for f in output_dir.glob('*') if f.is_file()]
 

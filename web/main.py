@@ -6,6 +6,7 @@ import re
 import tempfile
 from pathlib import Path
 import time
+import fastapi
 import httpx
 import jwt
 from cryptography.hazmat.primitives import serialization

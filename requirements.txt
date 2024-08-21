@@ -10,3 +10,4 @@ aiohttp==3.10.5
 requests==2.26.0
 python-jose==3.3.0
 tenacity==9.0.0
+fastapi==0.112.1

@@ -170,14 +170,23 @@ def audio_to_paper(url: str, lang: str, output_dir: Path) -> tuple[str, str]:
         "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
     )
 
-    # Transcribe audio
-    logger.info("Transcribing audio...")
-    transcriber = aai.Transcriber()
-    transcript = transcriber.transcribe(url)
+    # Handle local file paths
+    if url.startswith("file://"):
+        file_path = url[7:]  # Remove "file://" prefix
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Local file not found: {file_path}")
+        url = file_path  # Use the local file path directly
+
+    # Transcribe or index content
+    if os.getenv('ASSEMBLYAI_API_KEY'):
+        logger.info("Transcribing audio to text using AssemblyAI...")
+        plato.index(url, assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY'), lang=lang)
+    else:
+        logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
+        plato.index(url, lang=lang)
 
     # Generate content
     logger.info("Generating content...")
-    content = plato.index(transcript.text, language_model)
     title = plato.get_title(url, lang=lang)
     abstract = plato.get_abstract(url, lang=lang)
     passages = plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
@@ -267,6 +276,7 @@ def audio_to_paper(url: str, lang: str, output_dir: Path) -> tuple[str, str]:
         raise
 
     return title, abstract
+
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
@@ -404,40 +414,6 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}")
             tasks[task_id]['status'] = 'failed'
             tasks[task_id]['error'] = str(e)
-
-    def handle_status(self):
-        task_id = self.headers.get('X-Task-ID')
-        if not task_id:
-            json_response(self, 200, {"status": "idle"})
-            return
-
-        try:
-            if task_id not in tasks:
-                response = {"status": "not_found"}
-            else:
-                task = tasks[task_id]
-                response = {
-                    "status": task['status'],
-                    "error": task.get('error') if task['status'] == "failed" else None
-                }
-            json_response(self, 200, response)
-        except Exception as e:
-            logger.error(f"Error in handle_status for task {task_id}: {str(e)}")
-            json_response(self, 500, {"error": str(e)})
-
-    def handle_reset(self):
-        task_id = self.headers.get('X-Task-ID')
-        if not task_id:
-            json_response(self, 400, {"error": "Task ID required"})
-            return
-
-        try:
-            if task_id in tasks:
-                del tasks[task_id]
-            json_response(self, 200, {"message": "Task reset"})
-        except Exception as e:
-            logger.error(f"Error in handle_reset for task {task_id}: {str(e)}")
-            json_response(self, 500, {"error": str(e)})
 
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')

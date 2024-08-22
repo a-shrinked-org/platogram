@@ -372,95 +372,95 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-   async def process_and_send_email(self, task_id):
-    try:
-        task = tasks[task_id]
-        user_email = task.get('email')
-        logger.info(f"Starting processing for task {task_id}. User email: {user_email}")
+    async def process_and_send_email(self, task_id):
+        try:
+            task = tasks[task_id]
+            user_email = task.get('email')
+            logger.info(f"Starting processing for task {task_id}. User email: {user_email}")
 
-        async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
-            output_dir = Path(tmpdir)
+            async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
+                output_dir = Path(tmpdir)
 
-            # Process audio
-            if 'url' in task:
-                url = task['url']
-            else:
-                url = f"file://{task['file']}"
-
-            logger.info(f"Processing URL: {url}")
-
-            try:
-                # Initialize the language model
-                language_model = plato.llm.get_model(
-                    "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
-                )
-                logger.info("Language model initialized")
-
-                # Set AssemblyAI API key in the environment if available
-                if os.getenv('ASSEMBLYAI_API_KEY'):
-                    logger.info("Transcribing audio to text using AssemblyAI...")
-                    os.environ['ASSEMBLYAI_API_KEY'] = os.getenv('ASSEMBLYAI_API_KEY')
+                # Process audio
+                if 'url' in task:
+                    url = task['url']
                 else:
-                    logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
+                    url = f"file://{task['file']}"
 
-                # Call plato.index() with error handling
+                logger.info(f"Processing URL: {url}")
+
                 try:
-                    logger.info("Calling plato.index()...")
-                    await plato.index(url, llm=language_model, lang=task['lang'])
-                    logger.info("plato.index() completed successfully")
-                except AttributeError as e:
-                    if "'str' object has no attribute 'text'" in str(e):
-                        logger.warning("Received string input instead of transcript objects. Attempting to process as string.")
-                        words = url.split()  # Simple word splitting
-                        transcript_objects = [type('obj', (), {'text': w})() for w in words]
-                        await plato.index(transcript_objects, llm=language_model, lang=task['lang'])
-                        logger.info("Processed string input successfully")
+                    # Initialize the language model
+                    language_model = plato.llm.get_model(
+                        "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
+                    )
+                    logger.info("Language model initialized")
+
+                    # Set AssemblyAI API key in the environment if available
+                    if os.getenv('ASSEMBLYAI_API_KEY'):
+                        logger.info("Transcribing audio to text using AssemblyAI...")
+                        os.environ['ASSEMBLYAI_API_KEY'] = os.getenv('ASSEMBLYAI_API_KEY')
                     else:
-                        raise
+                        logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
 
-                # Call audio_to_paper function
-                logger.info("Calling audio_to_paper function...")
-                title, abstract = await audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
-                logger.info(f"audio_to_paper completed. Title: {title}")
+                    # Call plato.index() with error handling
+                    try:
+                        logger.info("Calling plato.index()...")
+                        await plato.index(url, llm=language_model, lang=task['lang'])
+                        logger.info("plato.index() completed successfully")
+                    except AttributeError as e:
+                        if "'str' object has no attribute 'text'" in str(e):
+                            logger.warning("Received string input instead of transcript objects. Attempting to process as string.")
+                            words = url.split()  # Simple word splitting
+                            transcript_objects = [type('obj', (), {'text': w})() for w in words]
+                            await plato.index(transcript_objects, llm=language_model, lang=task['lang'])
+                            logger.info("Processed string input successfully")
+                        else:
+                            raise
 
-                files = [f for f in output_dir.glob('*') if f.is_file()]
-                logger.info(f"Generated {len(files)} files")
+                    # Call audio_to_paper function
+                    logger.info("Calling audio_to_paper function...")
+                    title, abstract = await audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
+                    logger.info(f"audio_to_paper completed. Title: {title}")
 
-                subject = f"[Platogram] {title}"
-                body = f"""Hi there!
+                    files = [f for f in output_dir.glob('*') if f.is_file()]
+                    logger.info(f"Generated {len(files)} files")
 
-Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
+                    subject = f"[Platogram] {title}"
+                    body = f"""Hi there!
 
-You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
+    Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
 
-{abstract}
+    You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
 
-Please reply to this e-mail if any suggestions, feedback, or questions.
+    {abstract}
 
----
-Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
-Suggested donation: $2 per hour of content converted."""
+    Please reply to this e-mail if any suggestions, feedback, or questions.
 
-                if user_email:
-                    logger.info(f"Sending email to {user_email}")
-                    await send_email_with_resend(user_email, subject, body, files)
-                    logger.info("Email sent successfully")
-                else:
-                    logger.warning(f"No email available for task {task_id}. Skipping email send.")
+    ---
+    Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
+    Suggested donation: $2 per hour of content converted."""
 
-                tasks[task_id]['status'] = 'done'
-                logger.info(f"Conversion completed for task {task_id}")
+                    if user_email:
+                        logger.info(f"Sending email to {user_email}")
+                        await send_email_with_resend(user_email, subject, body, files)
+                        logger.info("Email sent successfully")
+                    else:
+                        logger.warning(f"No email available for task {task_id}. Skipping email send.")
 
-            except Exception as e:
-                logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
-                tasks[task_id]['status'] = 'failed'
-                tasks[task_id]['error'] = str(e)
-                raise
+                    tasks[task_id]['status'] = 'done'
+                    logger.info(f"Conversion completed for task {task_id}")
 
-    except Exception as e:
-        logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
-        tasks[task_id]['status'] = 'failed'
-        tasks[task_id]['error'] = str(e)
+                except Exception as e:
+                    logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
+                    tasks[task_id]['status'] = 'failed'
+                    tasks[task_id]['error'] = str(e)
+                    raise
+
+        except Exception as e:
+            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
+            tasks[task_id]['status'] = 'failed'
+            tasks[task_id]['error'] = str(e)
 
     def get_user_email(self):
         auth_header = self.headers.get('Authorization', '')

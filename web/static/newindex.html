@@ -50,7 +50,8 @@
     />
     <button
         id="convert-button"
-        class="w-full bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 mb-4"
+        class="w-full bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 opacity-50 cursor-not-allowed"
+        disabled
     >
         Convert
     </button>
@@ -91,7 +92,8 @@
     </div>
     <button
         id="convert-file-button"
-        class="w-full mt-4 bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300"
+        class="w-full mt-4 bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 opacity-50 cursor-not-allowed"
+        disabled
     >
         Convert
     </button>
@@ -126,19 +128,19 @@
 
             <section class="grid md:grid-cols-3 gap-8 mb-16 max-w-2xl mx-auto bg-white">
                 <div>
-                    <h3 class="font-perfectly-nineties text-xl mb-4 bg-white">Drop a link, get a document</h3>
+                    <h3 class="font-perfectly-nineties text-xl mb-4 bg-white  text-black">Drop a link, get a document</h3>
                     <p class="text-gray-600">
                         Paste any audio/video URL - we'll email you a well-organized, readable document without storing your content.
                     </p>
                 </div>
                 <div>
-                    <h3 class="font-perfectly-nineties text-xl mb-4 bg-white">References included</h3>
+                    <h3 class="font-perfectly-nineties text-xl mb-4 bg-white  text-black">References included</h3>
                     <p class="text-gray-600">
                         Each response is backed by precise references to the original content, ensuring credibility and context.
                     </p>
                 </div>
                 <div>
-                    <h3 class="font-perfectly-nineties text-xl mb-4 bg-white">
+                    <h3 class="font-perfectly-nineties text-xl mb-4 bg-white  text-black">
                         Build your dataset
                         <span class="bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full ml-2">Soon</span>
                     </h3>
@@ -149,7 +151,7 @@
             </section>
 
             <section class="mb-16 max-w-2xl mx-auto bg-white">
-                <h2 class="font-perfectly-nineties text-3xl mb-6 text-black">SCheck examples</h2>
+                <h2 class="font-perfectly-nineties text-3xl mb-6 text-black">Check examples</h2>
                 <div class="space-y-4">
                     <div class="flex justify-between items-center">
                         <a href="#" class="text-blue-600 hover:underline">John Carmack: From Gaming Pioneer to AI Visionary - A Journey of Innovation and Insight</a>
@@ -177,8 +179,8 @@
                 </p>
             </section>
 
-            <section class="grid md:grid-cols-2 gap-8 mb-16">
-                <div class="bg-gray-100 p-6 rounded-lg">
+            <section class="grid md:grid-cols-2 gap-8 mb-16 bg-white">
+                <div class="bg-gray-70 p-6 rounded-lg">
                     <h3 class="font-perfectly-nineties text-2xl mb-4">Generic AI Summaries</h3>
                     <ul class="space-y-2 text-gray-600">
                         <li>• Shallow summaries lacking depth</li>
@@ -188,7 +190,7 @@
                         <li>• Privacy concerns with data storage and usage</li>
                     </ul>
                 </div>
-                <div class="bg-green-100 p-6 rounded-lg">
+                <div class="bg-gray-70 p-6 rounded-lg">
                     <h3 class="font-perfectly-nineties text-2xl mb-4">Advantages of structured documents</h3>
                     <ul class="space-y-2 text-gray-600">
                         <li>• Original paraphrased format</li>
@@ -227,347 +229,96 @@
 
     <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
     <script src="https://platogram.vercel.app/web/app.js"></script>
-  <script>
-let auth0Client = null;
-const processingStages = [
-  "Byte Whispering", "Qubit Juggling", "Syntax Gymnastics",
-  "Pixel Wrangling", "Neuron Tickling", "Algorithm Disco",
-  "Data Origami", "Bit Barbecue", "Logic Limbo",
-  "Quantum Knitting"
-];
-let currentStageIndex = 0;
-let processingStageInterval;
-
-function debugLog(message) {
-  console.log(`[DEBUG] ${message}`);
-}
-
-<script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const urlInput = document.getElementById('url-input');
-            const convertButton = document.getElementById('convert-button');
-            const uploadFileButton = document.getElementById('upload-file-button');
-            const fileUploadSection = document.getElementById('file-upload-section');
-            const inputSection = document.getElementById('input-section');
-            const backToUrlButton = document.getElementById('back-to-url');
-            const fileDropArea = document.getElementById('file-drop-area');
-            const fileInput = document.querySelector('input[type="file"]');
-            const convertFileButton = document.getElementById('convert-file-button');
-            const fileNameDisplay = document.getElementById('file-name-display');
-
-            // URL input handling
-            urlInput.addEventListener('input', () => {
-                convertButton.disabled = !urlInput.value.trim();
-                convertButton.classList.toggle('opacity-50', !urlInput.value.trim());
-                convertButton.classList.toggle('cursor-not-allowed', !urlInput.value.trim());
-            });
-
-            // Convert button for URL
-            convertButton.addEventListener('click', (event) => {
-                event.preventDefault();
-                if (urlInput.value.trim()) {
-                    onConvertClick();
-                }
-            });
-
-            // Upload file button
-            uploadFileButton.addEventListener('click', () => {
-                inputSection.classList.add('hidden');
-                fileUploadSection.classList.remove('hidden');
-            });
-
-            // Back to URL button
-            backToUrlButton.addEventListener('click', () => {
-                fileUploadSection.classList.add('hidden');
-                inputSection.classList.remove('hidden');
-            });
-
-            // File drop area
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                fileDropArea.addEventListener(eventName, preventDefaults, false);
-            });
-
-            function preventDefaults(e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-
-            ['dragenter', 'dragover'].forEach(eventName => {
-                fileDropArea.addEventListener(eventName, highlight, false);
-            });
-
-            ['dragleave', 'drop'].forEach(eventName => {
-                fileDropArea.addEventListener(eventName, unhighlight, false);
-            });
-
-            function highlight() {
-                fileDropArea.classList.add('border-blue-500', 'bg-blue-50');
-            }
-
-            function unhighlight() {
-                fileDropArea.classList.remove('border-blue-500', 'bg-blue-50');
-            }
-
-            fileDropArea.addEventListener('drop', handleDrop, false);
-
-            function handleDrop(e) {
-                const dt = e.dataTransfer;
-                const files = dt.files;
-                handleFiles(files);
-            }
-
-            function handleFiles(files) {
-                if (files.length > 0) {
-                    const file = files[0];
-                    fileNameDisplay.textContent = file.name;
-                    updateConvertFileButton();
-                }
-            }
-
-            // File input change
-            fileInput.addEventListener('change', (event) => {
-                handleFiles(event.target.files);
-            });
-
-            // Convert file button
-            convertFileButton.addEventListener('click', (event) => {
-                event.preventDefault();
-                if (fileNameDisplay.textContent) {
-                    onConvertClick();
-                }
-            });
-
-            function updateConvertFileButton() {
-                const hasFile = fileNameDisplay.textContent !== '';
-                convertFileButton.disabled = !hasFile;
-                convertFileButton.classList.toggle('opacity-50', !hasFile);
-                convertFileButton.classList.toggle('cursor-not-allowed', !hasFile);
-            }
-
-    // Add event listeners to buttons
-    const loginButton = document.getElementById('login-button');
-    if (loginButton) {
-        loginButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            login();
-        });
-    }
-
-    const logoutButton = document.getElementById('logout-button');
-    if (logoutButton) {
-        logoutButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            logout();
-        });
-    }
-
-    const donateButtons = document.querySelectorAll('[id^="donate-button"]');
-    donateButtons.forEach(button => {
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            onDonateClick();
-        });
-    });
-
-    const resetButtons = document.querySelectorAll('[id^="reset-button"]');
-    resetButtons.forEach(button => {
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            reset();
-        });
-    });
-
-    // Initialize other parts of your application
-    initAuth0().catch((error) => console.error("Error initializing app:", error));
-});
-
-function initializeProcessingStage() {
-    debugLog("Initializing processing stage");
-    updateProcessingStage();
-    processingStageInterval = setInterval(updateProcessingStage, 3000);
-}
-
-function updateProcessingStage() {
-    const statusSection = document.getElementById('status-section');
-    const processingStage = document.getElementById('processing-stage');
-
-    if (!statusSection) {
-        console.warn("Status section not found");
-        return;
-    }
-    if (!processingStage) {
-        console.warn("Processing stage element not found");
-        return;
-    }
-    if (!Array.isArray(processingStages) || processingStages.length === 0) {
-        console.error("processingStages is not properly defined");
-        return;
-    }
-    if (currentStageIndex < 0 || currentStageIndex >= processingStages.length) {
-        console.error("Invalid currentStageIndex:", currentStageIndex);
-        currentStageIndex = 0;  // Reset to a valid index
-    }
-
-    if (!statusSection.classList.contains('hidden')) {
-        processingStage.textContent = processingStages[currentStageIndex];
-        currentStageIndex = (currentStageIndex + 1) % processingStages.length;
-        debugLog("Updated processing stage to: " + processingStages[currentStageIndex]);
-    } else {
-        console.warn("Status section is hidden. Skipping update.");
-    }
-}
-
-function onConvertClick() {
-    debugLog("Convert button clicked");
-    const inputData = getInputData();
-    if (!inputData.url && !inputData.file) {
-        showErrorMessage("Please provide a URL or upload a file");
-        return;
-    }
-    showLanguageSelectionModal(inputData);
-}
-
-function getInputData() {
-    const urlInput = document.getElementById("url-input");
-    const fileNameDisplay = document.getElementById("file-name-display");
-    return {
-        url: urlInput ? urlInput.value.trim() : '',
-        file: fileNameDisplay && fileNameDisplay.textContent ? { name: fileNameDisplay.textContent } : null
-    };
-}
-
-function showLanguageSelectionModal(inputData) {
-    const modal = document.getElementById('language-modal');
-    if (!modal) {
-        console.error("Language modal not found in the DOM");
-        return;
-    }
-
-    modal.classList.remove('hidden');
-
-    const handleLanguageSelection = async (lang) => {
-        debugLog(`Language selected: ${lang}`);
-        modal.classList.add('hidden');
-        await postToConvert(inputData, lang);
-    };
-
-    document.getElementById('en-btn').onclick = () => handleLanguageSelection('en');
-    document.getElementById('es-btn').onclick = () => handleLanguageSelection('es');
-    document.getElementById('cancel-btn').onclick = () => {
-        debugLog("Language selection cancelled");
-        modal.classList.add('hidden');
-    };
-}
-
-async function postToConvert(inputData, lang) {
-    // Implement your conversion logic here
-    debugLog(`Starting conversion for ${inputData.url || inputData.file.name} in ${lang}`);
-    updateUIStatus("running", "Starting conversion process...");
-    // Simulate conversion process
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    updateUIStatus("done", "Conversion process completed!");
-}
-
-function updateUIStatus(status, message = "") {
-    debugLog(`Updating UI status: ${status}`);
-    const inputSection = document.getElementById("input-section");
-    const fileUploadSection = document.getElementById("file-upload-section");
-    const statusSection = document.getElementById("status-section");
-    const doneSection = document.getElementById("done-section");
-    const errorSection = document.getElementById("error-section");
-
-    [inputSection, fileUploadSection, statusSection, doneSection, errorSection].forEach(section => {
-        if (section) section.classList.add("hidden");
-    });
-
-    switch (status) {
-        case "running":
-            if (statusSection) statusSection.classList.remove("hidden");
-            break;
-        case "done":
-            if (doneSection) doneSection.classList.remove("hidden");
-            break;
-        case "error":
-            if (errorSection) {
-                errorSection.classList.remove("hidden");
-                const errorMessage = errorSection.querySelector("p");
-                if (errorMessage) errorMessage.textContent = message;
-            }
-            break;
-        default:
-            if (inputSection) inputSection.classList.remove("hidden");
-    }
-}
-
-function showErrorMessage(message) {
-    const errorSection = document.getElementById('error-section');
-    const errorMessage = document.getElementById('error-message');
-    if (errorSection && errorMessage) {
-        errorMessage.textContent = message;
-        errorSection.classList.remove('hidden');
-    } else {
-        console.error("Error section or message element not found");
-    }
-}
-
-function reset() {
-    // Reset form state
+ <script>
+document.addEventListener('DOMContentLoaded', () => {
     const urlInput = document.getElementById('url-input');
-    const fileNameDisplay = document.getElementById('file-name-display');
     const convertButton = document.getElementById('convert-button');
+    const uploadFileButton = document.getElementById('upload-file-button');
+    const fileUploadSection = document.getElementById('file-upload-section');
+    const inputSection = document.getElementById('input-section');
+    const backToUrlButton = document.getElementById('back-to-url');
+    const fileDropArea = document.getElementById('file-drop-area');
+    const fileInput = document.querySelector('input[type="file"]');
     const convertFileButton = document.getElementById('convert-file-button');
+    const fileNameDisplay = document.getElementById('file-name-display');
 
-    if (urlInput) urlInput.value = '';
-    if (fileNameDisplay) fileNameDisplay.textContent = '';
-    if (convertButton) {
-        convertButton.disabled = true;
-        convertButton.classList.add('opacity-50', 'cursor-not-allowed');
-    }
-    if (convertFileButton) {
-        convertFileButton.disabled = true;
-        convertFileButton.classList.add('opacity-50', 'cursor-not-allowed');
-    }
+    // Initialize processing stage updates
+        initializeProcessingStage();
 
-    // Hide all sections except input
-    const sections = ['file-upload-section', 'done-section', 'status-section', 'error-section'];
-    sections.forEach(id => {
-        const section = document.getElementById(id);
-        if (section) section.classList.add('hidden');
+    // URL input handling
+    urlInput.addEventListener('input', () => {
+        const hasValue = urlInput.value.trim() !== '';
+        convertButton.disabled = !hasValue;
+        convertButton.classList.toggle('opacity-50', !hasValue);
+        convertButton.classList.toggle('cursor-not-allowed', !hasValue);
     });
 
-    // Show input section
-    const inputSection = document.getElementById('input-section');
-    if (inputSection) inputSection.classList.remove('hidden');
-}
+    // Upload file button
+    uploadFileButton.addEventListener('click', () => {
+        inputSection.classList.add('hidden');
+        fileUploadSection.classList.remove('hidden');
+    });
 
-function onDonateClick() {
-    window.open("https://buy.stripe.com/eVa29p3PK5OXbq84gl", "_blank");
-}
+    // Back to URL button
+    backToUrlButton.addEventListener('click', () => {
+        fileUploadSection.classList.add('hidden');
+        inputSection.classList.remove('hidden');
+    });
 
-// Ensure these functions are available globally
-window.onConvertClick = onConvertClick;
-window.login = login;
-window.logout = logout;
-window.onDonateClick = onDonateClick;
-window.reset = reset;
-window.initializeProcessingStage = initializeProcessingStage;
-window.updateProcessingStage = updateProcessingStage;
+    // File drop area
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        fileDropArea.addEventListener(eventName, preventDefaults, false);
+    });
 
-// Placeholder for Auth0 initialization (replace with actual implementation)
-async function initAuth0() {
-    // Implement your Auth0 initialization logic here
-    debugLog("Auth0 initialized");
-}
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
 
-function login() {
-    // Implement your login logic here
-    debugLog("Login function called");
-}
+    ['dragenter', 'dragover'].forEach(eventName => {
+        fileDropArea.addEventListener(eventName, highlight, false);
+    });
 
-function logout() {
-    // Implement your logout logic here
-    debugLog("Logout function called");
-}
+    ['dragleave', 'drop'].forEach(eventName => {
+        fileDropArea.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight() {
+        fileDropArea.classList.add('border-blue-500', 'bg-blue-50');
+    }
+
+    function unhighlight() {
+        fileDropArea.classList.remove('border-blue-500', 'bg-blue-50');
+    }
+
+    fileDropArea.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFiles(files);
+    }
+
+    function handleFiles(files) {
+        if (files.length > 0) {
+            const file = files[0];
+            fileNameDisplay.textContent = file.name;
+            updateConvertFileButton();
+        }
+    }
+
+    // File input change
+    fileInput.addEventListener('change', (event) => {
+        handleFiles(event.target.files);
+    });
+
+    function updateConvertFileButton() {
+        const hasFile = fileNameDisplay.textContent !== '';
+        convertFileButton.disabled = !hasFile;
+        convertFileButton.classList.toggle('opacity-50', !hasFile);
+        convertFileButton.classList.toggle('cursor-not-allowed', !hasFile);
+    }
+});
 </script>
 </body>
 </html>

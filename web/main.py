@@ -370,7 +370,7 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"AttributeError in {func.__name__}: {str(e)}")
             return str(result)
 
-    def process_and_send_email(self, task_id):
+    async def process_and_send_email(self, task_id):
         try:
             task = tasks[task_id]
             user_email = task.get('email')
@@ -405,34 +405,44 @@ class handler(BaseHTTPRequestHandler):
                     except AttributeError as e:
                         if "'str' object has no attribute 'text'" in str(e):
                             logger.warning("Received string input instead of transcript objects. Attempting to process as string.")
-                            from nltk.tokenize import sent_tokenize
-                            import nltk
-                            nltk.download('punkt', quiet=True)
+                            from nltk.tokenize import word_tokenize
 
-                            # Assume the url is actually the transcript text in this case
-                            sentences = sent_tokenize(url)
-                            transcript_objects = [type('obj', (), {'text': s})() for s in sentences]
+                            # Use a simple word tokenizer instead of sent_tokenize
+                            words = word_tokenize(url)
+                            transcript_objects = [type('obj', (), {'text': w})() for w in words]
                             plato.index(transcript_objects, llm=language_model, lang=task['lang'])
                         else:
                             raise
 
                     # Call audio_to_paper function
-                    stdout, stderr = audio_to_paper(url, task['lang'], output_dir, task_id)
+                    title, abstract = await audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
 
-                    # Parse title and abstract from stdout
-                    title_match = re.search(r"<title>(.*?)</title>", stdout, re.DOTALL)
-                    if title_match:
-                        title = title_match.group(1).strip()
-                    else:
-                        title = "👋"
-                        logger.warning("No title found in stdout, using default title")
+                    files = [f for f in output_dir.glob('*') if f.is_file()]
 
-                    abstract_match = re.search(r"<abstract>(.*?)</abstract>", stdout, re.DOTALL)
-                    if abstract_match:
-                        abstract = abstract_match.group(1).strip()
+                    subject = f"[Platogram] {title}"
+                    body = f"""Hi there!
+
+    Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
+
+    You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
+
+    {abstract}
+
+    Please reply to this e-mail if any suggestions, feedback, or questions.
+
+    ---
+    Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
+    Suggested donation: $2 per hour of content converted."""
+
+                    if user_email:
+                        logger.debug(f"Sending email to {user_email}")
+                        send_email_with_resend(user_email, subject, body, files)
+                        logger.debug("Email sent successfully")
                     else:
-                        abstract = ""
-                        logger.warning("No abstract found in stdout, using default abstract")
+                        logger.warning(f"No email available for task {task_id}. Skipping email send.")
+
+                    tasks[task_id]['status'] = 'done'
+                    logger.debug(f"Conversion completed for task {task_id}")
 
                 except Exception as e:
                     logger.error(f"Error in audio processing: {str(e)}", exc_info=True)

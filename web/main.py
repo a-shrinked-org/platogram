@@ -328,7 +328,7 @@ class handler(BaseHTTPRequestHandler):
         else:
             json_response(self, 404, {"error": "Not Found"})
 
-    async def handle_convert(self):
+   async def handle_convert(self):
     logger.debug("Handling /convert request")
     content_length = int(self.headers['Content-Length'])
     content_type = self.headers.get('Content-Type')
@@ -372,32 +372,32 @@ class handler(BaseHTTPRequestHandler):
         logger.error(f"Error in handle_convert: {str(e)}")
         json_response(self, 500, {"error": str(e)})
 
-        async def process_and_send_email(self, task_id):
-         try:
-             task = tasks[task_id]
-             user_email = task.get('email')
-             logger.info(f"Starting processing for task {task_id}. User email: {user_email}")
+     async def process_and_send_email(self, task_id):
+    try:
+        task = tasks[task_id]
+        user_email = task.get('email')
+        logger.info(f"Starting processing for task {task_id}. User email: {user_email}")
 
-             async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
-                 output_dir = Path(tmpdir)
+        async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
 
-                 # Process audio
-                 if 'url' in task:
-                     url = task['url']
-                 else:
-                     url = f"file://{task['file']}"
+            # Process audio
+            if 'url' in task:
+                url = task['url']
+            else:
+                url = f"file://{task['file']}"
 
-                 logger.info(f"Processing URL: {url}")
+            logger.info(f"Processing URL: {url}")
 
-                 try:
-                     # Initialize the language model
-                     language_model = plato.llm.get_model(
-                         "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
-                     )
-                     logger.info("Language model initialized")
+            try:
+                # Initialize the language model
+                language_model = plato.llm.get_model(
+                    "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
+                )
+                logger.info("Language model initialized")
 
-                     # Set AssemblyAI API key in the environment if available
-                     if os.getenv('ASSEMBLYAI_API_KEY'):
+                # Set AssemblyAI API key in the environment if available
+                if os.getenv('ASSEMBLYAI_API_KEY'):
                          logger.info("Transcribing audio to text using AssemblyAI...")
                          os.environ['ASSEMBLYAI_API_KEY'] = os.getenv('ASSEMBLYAI_API_KEY')
                      else:

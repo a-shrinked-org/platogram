@@ -166,10 +166,10 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
     # Transcribe or index content
     if os.getenv('ASSEMBLYAI_API_KEY'):
         logger.info("Transcribing audio to text using AssemblyAI...")
-        plato.index(url, assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY'), lang=lang)
+        plato.index(url, llm=language_model, assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY'), lang=lang)
     else:
         logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
-        plato.index(url, lang=lang)
+        plato.index(url, llm=language_model, lang=lang)
 
     # Generate content
     logger.info("Generating content...")
@@ -179,42 +179,43 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
     references = plato.get_references(url, lang=lang)
     chapters = plato.get_chapters(url, lang=lang)
 
-    # Handle potential string returns
-    title = title.text if hasattr(title, 'text') else str(title)
-    abstract = abstract.text if hasattr(abstract, 'text') else str(abstract)
-    passages = passages.text if hasattr(passages, 'text') else str(passages)
-    references = references.text if hasattr(references, 'text') else str(references)
-    chapters = chapters.text if hasattr(chapters, 'text') else str(chapters)
+    # Set language-specific prompts
+    if lang == "en":
+        CONTRIBUTORS_PROMPT = "Thoroughly review the <context> and identify the list of contributors. Output as Markdown list: First Name, Last Name, Title, Organization. Output \"Unknown\" if the contributors are not known. In the end of the list always add \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Start with \"## Contributors, Acknowledgements, Mentions\""
+        INTRODUCTION_PROMPT = "Thoroughly review the <context> and write \"Introduction\" chapter for the paper. Write in the style of the original <context>. Use only words from <context>. Use quotes from <context> when necessary. Make sure to include <markers>. Output as Markdown. Start with \"## Introduction\""
+        CONCLUSION_PROMPT = "Thoroughly review the <context> and write \"Conclusion\" chapter for the paper. Write in the style of the original <context>. Use only words from <context>. Use quotes from <context> when necessary. Make sure to include <markers>. Output as Markdown. Start with \"## Conclusion\""
+    elif lang == "es":
+        CONTRIBUTORS_PROMPT = "Revise a fondo el <context> e identifique la lista de contribuyentes. Salida como lista Markdown: Nombre, Apellido, Título, Organización. Salida \"Desconocido\" si los contribuyentes no se conocen. Al final de la lista, agregue siempre \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Comience con \"## Contribuyentes, Agradecimientos, Menciones\""
+        INTRODUCTION_PROMPT = "Revise a fondo el <context> y escriba el capítulo \"Introducción\" para el artículo. Escriba en el estilo del original <context>. Use solo las palabras de <context>. Use comillas del original <context> cuando sea necesario. Asegúrese de incluir <markers>. Salida como Markdown. Comience con \"## Introducción\""
+        CONCLUSION_PROMPT = "Revise a fondo el <context> y escriba el capítulo \"Conclusión\" para el artículo. Escriba en el estilo del original <context>. Use solo las palabras de <context>. Use comillas del original <context> cuando sea necesario. Asegúrese de incluir <markers>. Salida como Markdown. Comience con \"## Conclusión\""
+    else:
+        raise ValueError(f"Unsupported language: {lang}")
 
-    # Generate additional content
     contributors = plato.generate(
         query=CONTRIBUTORS_PROMPT,
         context_size="large",
-        prefill="## Contributors, Acknowledgements, Mentions\n",
+        prefill=f"## Contributors, Acknowledgements, Mentions\n",
         url=url,
         lang=lang
     )
-    contributors = contributors.text if hasattr(contributors, 'text') else str(contributors)
 
     introduction = plato.generate(
         query=INTRODUCTION_PROMPT,
         context_size="large",
         inline_references=True,
-        prefill="## Introduction\n",
+        prefill=f"## Introduction\n",
         url=url,
         lang=lang
     )
-    introduction = introduction.text if hasattr(introduction, 'text') else str(introduction)
 
     conclusion = plato.generate(
         query=CONCLUSION_PROMPT,
         context_size="large",
         inline_references=True,
-        prefill="## Conclusion\n",
+        prefill=f"## Conclusion\n",
         url=url,
         lang=lang
     )
-    conclusion = conclusion.text if hasattr(conclusion, 'text') else str(conclusion)
 
     # Compile the full content
     full_content = f"""# {title}

@@ -120,7 +120,7 @@ def verify_token_and_get_email(token):
     return None
 
 def send_email_with_resend(to_email, subject, body, attachments):
-    logger.debug(f"Attempting to send email to: {to_email}")
+    logger.info(f"Attempting to send email to: {to_email}")
     url = "https://api.resend.com/emails"
     headers = {
         "Authorization": f"Bearer {RESEND_API_KEY}",
@@ -144,13 +144,15 @@ def send_email_with_resend(to_email, subject, body, attachments):
                 "content": encoded_content
             })
 
-    logger.debug(f"Sending email with payload: {json.dumps(payload, default=str)}")
+    logger.info(f"Sending email with payload: {json.dumps(payload, default=str)}")
     response = requests.post(url, headers=headers, json=payload)
     if response.status_code == 200:
         logger.info(f"Email sent successfully to {to_email}")
+        logger.debug(f"Resend API response: {response.text}")
     else:
         logger.error(f"Failed to send email. Status: {response.status_code}, Error: {response.text}")
-
+        logger.debug(f"Failed payload: {json.dumps(payload, default=str)}")
+    return response
 def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
     logger.info(f"Processing audio from: {url}")
 
@@ -297,12 +299,27 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path == '/status':
+        if self.path.startswith('/task_status'):
+            self.handle_task_status()
+        elif self.path == '/status':
             self.handle_status()
         elif self.path == '/reset':
             self.handle_reset()
         else:
             json_response(self, 404, {"error": "Not Found"})
+
+    def handle_task_status(self):
+        task_id = self.path.split('/')[-1]
+        if task_id in tasks:
+            task = tasks[task_id]
+            response = {
+                "task_id": task_id,
+                "status": task['status'],
+                "error": task.get('error') if task['status'] == "failed" else None
+            }
+            json_response(self, 200, response)
+        else:
+            json_response(self, 404, {"error": "Task not found"})
 
     def do_POST(self):
         if self.path == '/convert':
@@ -354,54 +371,62 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    async def process_and_send_email(self, task_id):
-        try:
-            task = tasks[task_id]
-            user_email = task.get('email')
-            logger.debug(f"Processing task {task_id}. Task data: {task}")
-            logger.debug(f"User email for task {task_id}: {user_email}")
+   async def process_and_send_email(self, task_id):
+    try:
+        task = tasks[task_id]
+        user_email = task.get('email')
+        logger.info(f"Starting processing for task {task_id}. User email: {user_email}")
 
-            async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
-                output_dir = Path(tmpdir)
+        async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
 
-                # Process audio
-                if 'url' in task:
-                    url = task['url']
+            # Process audio
+            if 'url' in task:
+                url = task['url']
+            else:
+                url = f"file://{task['file']}"
+
+            logger.info(f"Processing URL: {url}")
+
+            try:
+                # Initialize the language model
+                language_model = plato.llm.get_model(
+                    "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
+                )
+                logger.info("Language model initialized")
+
+                # Set AssemblyAI API key in the environment if available
+                if os.getenv('ASSEMBLYAI_API_KEY'):
+                    logger.info("Transcribing audio to text using AssemblyAI...")
+                    os.environ['ASSEMBLYAI_API_KEY'] = os.getenv('ASSEMBLYAI_API_KEY')
                 else:
-                    url = f"file://{task['file']}"
+                    logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
 
+                # Call plato.index() with error handling
                 try:
-                    # Initialize the language model
-                    language_model = plato.llm.get_model(
-                        "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
-                    )
-
-                    # Set AssemblyAI API key in the environment if available
-                    if os.getenv('ASSEMBLYAI_API_KEY'):
-                        logger.info("Transcribing audio to text using AssemblyAI...")
-                        os.environ['ASSEMBLYAI_API_KEY'] = os.getenv('ASSEMBLYAI_API_KEY')
+                    logger.info("Calling plato.index()...")
+                    plato.index(url, llm=language_model, lang=task['lang'])
+                    logger.info("plato.index() completed successfully")
+                except AttributeError as e:
+                    if "'str' object has no attribute 'text'" in str(e):
+                        logger.warning("Received string input instead of transcript objects. Attempting to process as string.")
+                        words = url.split()  # Simple word splitting
+                        transcript_objects = [type('obj', (), {'text': w})() for w in words]
+                        plato.index(transcript_objects, llm=language_model, lang=task['lang'])
+                        logger.info("Processed string input successfully")
                     else:
-                        logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
+                        raise
 
-                    # Call plato.index() with error handling
-                    try:
-                        plato.index(url, llm=language_model, lang=task['lang'])
-                    except AttributeError as e:
-                        if "'str' object has no attribute 'text'" in str(e):
-                            logger.warning("Received string input instead of transcript objects. Attempting to process as string.")
-                            words = url.split()  # Simple word splitting
-                            transcript_objects = [type('obj', (), {'text': w})() for w in words]
-                            plato.index(transcript_objects, llm=language_model, lang=task['lang'])
-                        else:
-                            raise
+                # Call audio_to_paper function
+                logger.info("Calling audio_to_paper function...")
+                title, abstract = audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
+                logger.info(f"audio_to_paper completed. Title: {title}")
 
-                    # Call audio_to_paper function
-                    title, abstract = audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
+                files = [f for f in output_dir.glob('*') if f.is_file()]
+                logger.info(f"Generated {len(files)} files")
 
-                    files = [f for f in output_dir.glob('*') if f.is_file()]
-
-                    subject = f"[Platogram] {title}"
-                    body = f"""Hi there!
+                subject = f"[Platogram] {title}"
+                body = f"""Hi there!
 
     Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
 
@@ -415,30 +440,31 @@ class handler(BaseHTTPRequestHandler):
     Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
     Suggested donation: $2 per hour of content converted."""
 
-                    if user_email:
-                        logger.debug(f"Sending email to {user_email}")
-                        send_email_with_resend(user_email, subject, body, files)
-                        logger.debug("Email sent successfully")
-                    else:
-                        logger.warning(f"No email available for task {task_id}. Skipping email send.")
+                if user_email:
+                    logger.info(f"Sending email to {user_email}")
+                    send_email_with_resend(user_email, subject, body, files)
+                    logger.info("Email sent successfully")
+                else:
+                    logger.warning(f"No email available for task {task_id}. Skipping email send.")
 
-                except Exception as e:
-                    logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
-                    raise
-                finally:
-                    if 'file' in task:
-                        try:
-                            os.remove(task['file'])
-                        except OSError as e:
-                            logger.warning(f"Failed to delete temporary file {task['file']}: {e}")
+            except Exception as e:
+                logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
+                raise
+            finally:
+                if 'file' in task:
+                    try:
+                        os.remove(task['file'])
+                        logger.info(f"Removed temporary file: {task['file']}")
+                    except OSError as e:
+                        logger.warning(f"Failed to delete temporary file {task['file']}: {e}")
 
-            tasks[task_id]['status'] = 'done'
-            logger.debug(f"Conversion completed for task {task_id}")
+        tasks[task_id]['status'] = 'done'
+        logger.info(f"Conversion completed for task {task_id}")
 
-        except Exception as e:
-            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
-            tasks[task_id]['status'] = 'failed'
-            tasks[task_id]['error'] = str(e)
+    except Exception as e:
+        logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
+        tasks[task_id]['status'] = 'failed'
+        tasks[task_id]['error'] = str(e)
 
     def get_user_email(self):
         auth_header = self.headers.get('Authorization', '')

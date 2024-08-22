@@ -372,7 +372,7 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-   async def process_and_send_email(self, task_id):
+       async def process_and_send_email(self, task_id):
     try:
         task = tasks[task_id]
         user_email = task.get('email')
@@ -429,17 +429,17 @@ class handler(BaseHTTPRequestHandler):
                 subject = f"[Platogram] {title}"
                 body = f"""Hi there!
 
-    Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
+Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
 
-    You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
+You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
 
-    {abstract}
+{abstract}
 
-    Please reply to this e-mail if any suggestions, feedback, or questions.
+Please reply to this e-mail if any suggestions, feedback, or questions.
 
-    ---
-    Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
-    Suggested donation: $2 per hour of content converted."""
+---
+Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
+Suggested donation: $2 per hour of content converted."""
 
                 if user_email:
                     logger.info(f"Sending email to {user_email}")

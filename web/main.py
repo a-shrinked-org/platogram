@@ -9,6 +9,8 @@ import base64
 import time
 import requests
 import jwt
+import stripe
+import logfire
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
@@ -29,6 +31,12 @@ from nltk.tokenize import sent_tokenize
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+# Configure Stripe
+stripe.api_key = os.getenv("STRIPE_API_KEY")
+
+# Configure logfire
+logfire.configure()
 
 # In-memory storage (Note: This will reset on each function invocation)
 tasks = {}
@@ -296,7 +304,7 @@ class handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language')
+        self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language, X-Price, X-Token')
         self.end_headers()
 
     def do_GET(self):
@@ -329,11 +337,11 @@ class handler(BaseHTTPRequestHandler):
             json_response(self, 404, {"error": "Not Found"})
 
     async def handle_convert(self):
-        logger.debug("Handling /convert request")
+        logfire.info("Handling /convert request")
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
         user_email = self.get_user_email()
-        logger.debug(f"User email for conversion: {user_email}")
+        logfire.info(f"User email for conversion: {user_email}")
 
         try:
             task_id = str(uuid4())
@@ -341,6 +349,8 @@ class handler(BaseHTTPRequestHandler):
                 body = self.rfile.read(content_length)  # Read raw bytes
                 file_name = self.headers.get('X-File-Name')
                 lang = self.headers.get('X-Language', 'en')
+                price = float(self.headers.get('X-Price', 0))
+                token = self.headers.get('X-Token')
 
                 # Save the file to a temporary location
                 temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
@@ -349,17 +359,19 @@ class handler(BaseHTTPRequestHandler):
                 with open(temp_file, 'wb') as f:
                     f.write(body)
 
-                tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
-                logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+                tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email, 'price': price, 'token': token}
+                logfire.info(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
             elif content_type == 'application/json':
                 body = self.rfile.read(content_length).decode('utf-8')
                 data = json.loads(body)
                 url = data.get('url')
                 lang = data.get('lang', 'en')
-                tasks[task_id] = {'status': 'running', 'url': url, 'lang': lang, 'email': user_email}
-                logger.debug(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+                price = float(data.get('price', 0))
+                token = data.get('token')
+                tasks[task_id] = {'status': 'running', 'url': url, 'lang': lang, 'email': user_email, 'price': price, 'token': token}
+                logfire.info(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
             else:
-                logger.error(f"Invalid content type: {content_type}")
+                logfire.error(f"Invalid content type: {content_type}")
                 json_response(self, 400, {"error": "Invalid content type"})
                 return
 
@@ -369,14 +381,14 @@ class handler(BaseHTTPRequestHandler):
 
             json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
         except Exception as e:
-            logger.error(f"Error in handle_convert: {str(e)}")
-            json_response(self, 500, {"error": str(e)})
+            logfire.exception(f"Error in handle_convert: {str(e)}")
+            json_response(self, 500, {"error": "An unexpected error occurred. Please try again later."})
 
     async def process_and_send_email(self, task_id):
         try:
             task = tasks[task_id]
             user_email = task.get('email')
-            logger.info(f"Starting processing for task {task_id}. User email: {user_email}")
+            logfire.info(f"Starting processing for task {task_id}. User email: {user_email}")
 
             async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
                 output_dir = Path(tmpdir)
@@ -387,44 +399,44 @@ class handler(BaseHTTPRequestHandler):
                 else:
                     url = f"file://{task['file']}"
 
-                logger.info(f"Processing URL: {url}")
+                logfire.info(f"Processing URL: {url}")
 
                 try:
                     # Initialize the language model
                     language_model = plato.llm.get_model(
                         "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
                     )
-                    logger.info("Language model initialized")
+                    logfire.info("Language model initialized")
 
                     # Set AssemblyAI API key in the environment if available
                     if os.getenv('ASSEMBLYAI_API_KEY'):
-                        logger.info("Transcribing audio to text using AssemblyAI...")
+                        logfire.info("Transcribing audio to text using AssemblyAI...")
                         os.environ['ASSEMBLYAI_API_KEY'] = os.getenv('ASSEMBLYAI_API_KEY')
                     else:
-                        logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
+                        logfire.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
 
                     # Call plato.index() with error handling
                     try:
-                        logger.info("Calling plato.index()...")
+                        logfire.info("Calling plato.index()...")
                         await plato.index(url, llm=language_model, lang=task['lang'])
-                        logger.info("plato.index() completed successfully")
+                        logfire.info("plato.index() completed successfully")
                     except AttributeError as e:
                         if "'str' object has no attribute 'text'" in str(e):
-                            logger.warning("Received string input instead of transcript objects. Attempting to process as string.")
+                            logfire.warning("Received string input instead of transcript objects. Attempting to process as string.")
                             words = url.split()  # Simple word splitting
                             transcript_objects = [type('obj', (), {'text': w})() for w in words]
                             await plato.index(transcript_objects, llm=language_model, lang=task['lang'])
-                            logger.info("Processed string input successfully")
+                            logfire.info("Processed string input successfully")
                         else:
                             raise
 
                     # Call audio_to_paper function
-                    logger.info("Calling audio_to_paper function...")
+                    logfire.info("Calling audio_to_paper function...")
                     title, abstract = await audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
-                    logger.info(f"audio_to_paper completed. Title: {title}")
+                    logfire.info(f"audio_to_paper completed. Title: {title}")
 
                     files = [f for f in output_dir.glob('*') if f.is_file()]
-                    logger.info(f"Generated {len(files)} files")
+                    logfire.info(f"Generated {len(files)} files")
 
                     subject = f"[Platogram] {title}"
                     body = f"""Hi there!
@@ -442,39 +454,68 @@ class handler(BaseHTTPRequestHandler):
     Suggested donation: $2 per hour of content converted."""
 
                     if user_email:
-                        logger.info(f"Sending email to {user_email}")
+                        logfire.info(f"Sending email to {user_email}")
                         await send_email_with_resend(user_email, subject, body, files)
-                        logger.info("Email sent successfully")
+                        logfire.info("Email sent successfully")
                     else:
-                        logger.warning(f"No email available for task {task_id}. Skipping email send.")
+                        logfire.warning(f"No email available for task {task_id}. Skipping email send.")
 
                     tasks[task_id]['status'] = 'done'
-                    logger.info(f"Conversion completed for task {task_id}")
+                    logfire.info(f"Conversion completed for task {task_id}")
+
+                    # Process payment
+                    if task['price'] > 0 and task['token']:
+                        try:
+                            charge = stripe.Charge.create(
+                                amount=int(task['price'] * 100),
+                                currency='usd',
+                                source=task['token'],
+                                description=f'Platogram conversion: {title}'
+                            )
+                            logfire.info(f"Payment processed successfully for task {task_id}", charge_id=charge.id)
+                        except stripe.error.StripeError as e:
+                            logfire.error(f"Stripe payment failed for task {task_id}: {str(e)}")
+                            tasks[task_id]['error'] = "Payment processing failed. Please contact support."
+                    else:
+                        logfire.info(f"No charge for task {task_id}")
 
                 except Exception as e:
-                    logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
+                    logfire.exception(f"Error in audio processing: {str(e)}")
                     tasks[task_id]['status'] = 'failed'
-                    tasks[task_id]['error'] = str(e)
+                    tasks[task_id]['error'] = self.get_user_friendly_error_message(str(e))
                     raise
 
         except Exception as e:
-            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
+            logfire.exception(f"Error in process_and_send_email for task {task_id}: {str(e)}")
             tasks[task_id]['status'] = 'failed'
-            tasks[task_id]['error'] = str(e)
+            tasks[task_id]['error'] = self.get_user_friendly_error_message(str(e))
+
+    def get_user_friendly_error_message(self, error_message):
+        # Use a language model to generate a user-friendly error message
+        model = plato.llm.get_model("anthropic/claude-3-5-sonnet", key=os.getenv("ANTHROPIC_API_KEY"))
+        prompt = f"""
+        Given the following error message, provide a concise, user-friendly explanation
+        that focuses on the key issue and any actionable steps. Avoid technical jargon
+        and keep the message under 256 characters:
+
+        Error: {error_message}
+        """
+        response = model.prompt_model(messages=[plato.types.User(content=prompt)])
+        return response.strip()[:256]  # Truncate to 256 characters
 
     def get_user_email(self):
         auth_header = self.headers.get('Authorization', '')
-        logger.debug(f"Authorization header: {auth_header}")
+        logfire.debug(f"Authorization header: {auth_header}")
         if not auth_header:
-            logger.warning("No Authorization header found")
+            logfire.warning("No Authorization header found")
             return None
         try:
             token = auth_header.split(' ')[1]
             email = verify_token_and_get_email(token)
-            logger.debug(f"User email extracted: {email}")
+            logfire.debug(f"User email extracted: {email}")
             return email
         except IndexError:
-            logger.error("Malformed Authorization header")
+            logfire.error("Malformed Authorization header")
             return None
 
     def handle_status(self):
@@ -494,22 +535,29 @@ class handler(BaseHTTPRequestHandler):
                 }
             json_response(self, 200, response)
         except Exception as e:
-            logger.error(f"Error in handle_status for task {task_id}: {str(e)}")
-            json_response(self, 500, {"error": str(e)})
+            logfire.exception(f"Error in handle_status for task {task_id}: {str(e)}")
+            json_response(self, 500, {"error": "An unexpected error occurred while checking status."})
 
     def handle_reset(self):
-        task_id = self.headers.get('X-Task-ID')
-        if not task_id:
-            json_response(self, 400, {"error": "Task ID required"})
+        user_email = self.get_user_email()
+        if not user_email:
+            json_response(self, 401, {"error": "Unauthorized"})
             return
 
         try:
-            if task_id in tasks:
+            task_ids_to_remove = []
+            for task_id, task in tasks.items():
+                if task.get('email') == user_email:
+                    task_ids_to_remove.append(task_id)
+
+            for task_id in task_ids_to_remove:
                 del tasks[task_id]
-            json_response(self, 200, {"message": "Task reset"})
+
+            logfire.info(f"Reset tasks for user: {user_email}")
+            json_response(self, 200, {"message": "Tasks reset successfully"})
         except Exception as e:
-            logger.error(f"Error in handle_reset for task {task_id}: {str(e)}")
-            json_response(self, 500, {"error": str(e)})
+            logfire.exception(f"Error in handle_reset for user {user_email}: {str(e)}")
+            json_response(self, 500, {"error": "An unexpected error occurred while resetting tasks."})
 
 # Vercel handler
 def vercel_handler(event, context):

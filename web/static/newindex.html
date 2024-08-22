@@ -42,24 +42,81 @@
             </h1>
 
             <div id="input-section" class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
-                <p class="mb-4">Convert hours of audio into structured, readable documents</p>
-                <div class="input-wrapper flex items-center mb-4">
-                    <span class="upload-icon mr-2">🔗</span>
-                    <input id="url-input" type="text" placeholder="Paste a link to an YouTube video or Google Drive file?" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+    <input
+        id="url-input"
+        type="text"
+        placeholder="Paste a link to an YouTube video or Google Drive file?"
+        class="w-full p-3 mb-4 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+    />
+    <button
+        id="convert-button"
+        class="w-full bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 mb-4 opacity-50 cursor-not-allowed"
+        disabled
+    >
+        Convert
+    </button>
+    <div class="mt-4 space-y-2">
+        <button
+            id="upload-file-button"
+            class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300"
+        >
+            ↑ Upload a file
+        </button>
+        <button class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300 opacity-50 cursor-not-allowed">
+            ↑ Add a folder
+            <span class="float-right text-sm text-gray-500">Coming soon</span>
+        </button>
+    </div>
+</div>
+
+<div id="file-upload-section" class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6 hidden">
+    <div class="flex items-center mb-4">
+        <button
+            id="back-to-url"
+            class="text-gray-600 hover:text-gray-800"
+        >
+            ← Paste a link
+        </button>
+    </div>
+    <div
+        id="file-drop-area"
+        class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center"
+    >
+        <p id="file-name-display" class="text-gray-700 mb-2"></p>
+        <p class="text-gray-500 mb-2">Drag a file here or choose a file to upload</p>
+        <label class="cursor-pointer text-blue-500 hover:underline">
+            choose a file to upload
+            <input
+                type="file"
+                class="hidden"
+                accept=".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a"
+            />
+        </label>
+    </div>
+    <button
+        id="convert-file-button"
+        class="w-full mt-4 bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 opacity-50 cursor-not-allowed"
+        disabled
+    >
+        Convert
+    </button>
+</div>
+
+            <div id="file-upload-section" class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6 hidden">
+                <button id="back-to-url" class="text-gray-600 hover:text-gray-800 mb-4">
+                    ← Paste a link
+                </button>
+                <div id="file-drop-area" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                    <p id="file-name-display" class="text-gray-700 mb-2"></p>
+                    <p class="text-gray-500 mb-2">Drag a file here or choose a file to upload</p>
+                    <label class="cursor-pointer text-blue-500 hover:underline">
+                        choose a file to upload
+                        <input type="file" class="hidden" accept=".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a">
+                    </label>
                 </div>
-                <div id="file-name" class="mb-2"></div>
-                <button id="convert-button" class="w-full bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 mb-4">
+                <button id="convert-file-button" class="w-full mt-4 bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300">
                     Convert
                 </button>
-                <div class="space-y-2">
-                    <button onclick="handleFileUpload()" class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300">
-                        ↑ Upload a file
-                    </button>
-                    <button class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300 opacity-50 cursor-not-allowed">
-                        ↑ Add a folder
-                        <span class="float-right text-sm text-gray-500">Coming soon</span>
-                    </button>
-                </div>
             </div>
 
             <div id="done-section" class="max-w-2xl mx-auto bg-green-100 rounded-lg p-6 mb-8 hidden">
@@ -177,8 +234,12 @@
 
         </main>
 
-        <footer class="text-center py-8">
-            <p>Platogram is built with 💜 in New York and Boston by <a href="https://codeanyway.com" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Code Anyway, Inc</a> in 2023-2024</p>
+   <footer class="mt-16 text-center">
+            <p>
+                Platogram is built with 💜 in New York and Boston by
+                <a href="https://codeanyway.com" class="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">Code Anyway, Inc</a>
+                in 2023-2024
+            </p>
             <div class="mt-4">
                 <a href="#" class="text-blue-600 hover:underline mr-4">Privacy</a>
                 <a href="#" class="text-blue-600 hover:underline">Terms</a>
@@ -186,225 +247,193 @@
         </footer>
     </div>
 
-    <script src="https://platogram.vercel.app/web/app.js"></script>
-    <!-- Initialize app.js functionality -->
+    <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
+    <script src="app.js"></script>
     <script>
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialize processing stage updates
-    initializeProcessingStage();
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initialize processing stage updates
+        initializeProcessingStage();
 
-    const urlInput = document.getElementById('url-input');
-    const convertButton = document.getElementById('convert-button');
-    const uploadFileButton = document.getElementById('upload-file-button');
-    const fileUploadSection = document.getElementById('file-upload-section');
-    const inputSection = document.getElementById('input-section');
-    const backToUrlButton = document.getElementById('back-to-url');
-    const fileDropArea = document.getElementById('file-drop-area');
-    const fileInput = document.querySelector('input[type="file"]');
-    const convertFileButton = document.getElementById('convert-file-button');
-    const fileName = document.getElementById('file-name');
+        const urlInput = document.getElementById('url-input');
+        const convertButton = document.getElementById('convert-button');
+        const uploadFileButton = document.getElementById('upload-file-button');
+        const fileUploadSection = document.getElementById('file-upload-section');
+        const inputSection = document.getElementById('input-section');
+        const backToUrlButton = document.getElementById('back-to-url');
+        const fileDropArea = document.getElementById('file-drop-area');
+        const fileInput = document.querySelector('input[type="file"]');
+        const convertFileButton = document.getElementById('convert-file-button');
+        const fileName = document.getElementById('file-name');
+        const fileNameDisplay = document.getElementById('file-name-display');
 
-    // Add event listeners to buttons
-    if (convertButton) {
+        // URL input handling
+        urlInput.addEventListener('input', () => {
+            convertButton.disabled = !urlInput.value.trim();
+            convertButton.classList.toggle('opacity-50', !urlInput.value.trim());
+            convertButton.classList.toggle('cursor-not-allowed', !urlInput.value.trim());
+        });
+
+        // Convert button for URL
         convertButton.addEventListener('click', (event) => {
             event.preventDefault();
             if (urlInput.value.trim()) {
                 onConvertClick();
             }
         });
-    }
 
-    const loginButton = document.getElementById('login-button');
-    if (loginButton) {
-        loginButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            login();
+        // Upload file button
+        uploadFileButton.addEventListener('click', () => {
+            inputSection.classList.add('hidden');
+            fileUploadSection.classList.remove('hidden');
         });
-    }
 
-    const logoutButton = document.getElementById('logout-button');
-    if (logoutButton) {
-        logoutButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            logout();
+        // Back to URL button
+        backToUrlButton.addEventListener('click', () => {
+            fileUploadSection.classList.add('hidden');
+            inputSection.classList.remove('hidden');
         });
-    }
 
-    const donateButtons = document.querySelectorAll('[id^="donate-button"]');
-    donateButtons.forEach(button => {
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            onDonateClick();
+        // File drop area
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            fileDropArea.addEventListener(eventName, preventDefaults, false);
         });
-    });
 
-    const resetButtons = document.querySelectorAll('[id^="reset-button"]');
-    resetButtons.forEach(button => {
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            reset();
-        });
-    });
-
-    // URL input handling
-    urlInput.addEventListener('input', () => {
-        convertButton.disabled = !urlInput.value.trim();
-        convertButton.classList.toggle('opacity-50', !urlInput.value.trim());
-        convertButton.classList.toggle('cursor-not-allowed', !urlInput.value.trim());
-    });
-
-    // Upload file button
-    uploadFileButton.addEventListener('click', () => {
-        inputSection.classList.add('hidden');
-        fileUploadSection.classList.remove('hidden');
-    });
-
-    // Back to URL button
-    backToUrlButton.addEventListener('click', () => {
-        fileUploadSection.classList.add('hidden');
-        inputSection.classList.remove('hidden');
-    });
-
-    // File drop area
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        fileDropArea.addEventListener(eventName, preventDefaults, false);
-    });
-
-    function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-        fileDropArea.addEventListener(eventName, highlight, false);
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-        fileDropArea.addEventListener(eventName, unhighlight, false);
-    });
-
-    function highlight() {
-        fileDropArea.classList.add('drag-over');
-    }
-
-    function unhighlight() {
-        fileDropArea.classList.remove('drag-over');
-    }
-
-    fileDropArea.addEventListener('drop', handleDrop, false);
-
-    function handleDrop(e) {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        handleFiles(files);
-    }
-
-    function handleFiles(files) {
-        if (files.length > 0) {
-            const file = files[0];
-            fileName.textContent = file.name;
-            convertFileButton.disabled = false;
-            convertFileButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
         }
-    }
 
-    // File input change
-    fileInput.addEventListener('change', (event) => {
-        handleFiles(event.target.files);
+        ['dragenter', 'dragover'].forEach(eventName => {
+            fileDropArea.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            fileDropArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight() {
+            fileDropArea.classList.add('drag-over');
+        }
+
+        function unhighlight() {
+            fileDropArea.classList.remove('drag-over');
+        }
+
+        fileDropArea.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        function handleFiles(files) {
+            if (files.length > 0) {
+                const file = files[0];
+                fileName.textContent = file.name;
+                fileNameDisplay.textContent = file.name;
+                convertFileButton.disabled = false;
+                convertFileButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // File input change
+        fileInput.addEventListener('change', (event) => {
+            handleFiles(event.target.files);
+        });
+
+        // Convert file button
+        convertFileButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            if (fileName.textContent) {
+                onConvertClick();
+            }
+        });
+
+        // Add event listeners to buttons
+        const loginButton = document.getElementById('login-button');
+        if (loginButton) {
+            loginButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                login();
+            });
+        }
+
+        const logoutButton = document.getElementById('logout-button');
+        if (logoutButton) {
+            logoutButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                logout();
+            });
+        }
+
+        const donateButtons = document.querySelectorAll('[id^="donate-button"]');
+        donateButtons.forEach(button => {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                onDonateClick();
+            });
+        });
+
+        const resetButtons = document.querySelectorAll('[id^="reset-button"]');
+        resetButtons.forEach(button => {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                reset();
+            });
+        });
+
+        // Initialize other parts of your application
+        initAuth0().catch((error) => console.error("Error initializing app:", error));
     });
 
-    // Convert file button
-    convertFileButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        if (fileName.textContent) {
-            onConvertClick();
+    function reset() {
+        // Reset form state
+        document.getElementById('url-input').value = '';
+        document.getElementById('file-name').textContent = '';
+        document.getElementById('file-name-display').textContent = '';
+        document.getElementById('convert-button').disabled = true;
+        document.getElementById('convert-button').classList.add('opacity-50', 'cursor-not-allowed');
+        document.getElementById('convert-file-button').disabled = true;
+        document.getElementById('convert-file-button').classList.add('opacity-50', 'cursor-not-allowed');
+
+        // Hide all sections except input
+        document.getElementById('file-upload-section').classList.add('hidden');
+        document.getElementById('done-section').classList.add('hidden');
+        document.getElementById('status-section').classList.add('hidden');
+        document.getElementById('error-section').classList.add('hidden');
+
+        // Show input section
+        document.getElementById('input-section').classList.remove('hidden');
+    }
+
+    function showLanguageSelectionModal(inputData) {
+        const modal = document.getElementById('language-modal');
+        if (!modal) {
+            console.error("Language modal not found in the DOM");
+            return;
         }
-    });
 
-    // Initialize other parts of your application
-    initAuth0().catch((error) => console.error("Error initializing app:", error));
-});
+        modal.classList.remove('hidden');
 
-function reset() {
-    // Reset form state
-    document.getElementById('url-input').value = '';
-    document.getElementById('file-name').textContent = '';
-    document.getElementById('convert-button').disabled = true;
-    document.getElementById('convert-button').classList.add('opacity-50', 'cursor-not-allowed');
-    document.getElementById('convert-file-button').disabled = true;
-    document.getElementById('convert-file-button').classList.add('opacity-50', 'cursor-not-allowed');
+        const handleLanguageSelection = async (lang) => {
+            debugLog(`Language selected: ${lang}`);
+            modal.classList.add('hidden');
+            await postToConvert(inputData, lang);
+        };
 
-    // Hide all sections except input
-    document.getElementById('file-upload-section').classList.add('hidden');
-    document.getElementById('done-section').classList.add('hidden');
-    document.getElementById('status-section').classList.add('hidden');
-    document.getElementById('error-section').classList.add('hidden');
-
-    // Show input section
-    document.getElementById('input-section').classList.remove('hidden');
-}
-
-function initializeProcessingStage() {
-    debugLog("Initializing processing stage");
-    updateProcessingStage();
-    processingStageInterval = setInterval(updateProcessingStage, 3000);
-}
-
-function updateProcessingStage() {
-    const statusSection = document.getElementById('status-section');
-    const processingStage = document.getElementById('processing-stage');
-
-    if (!statusSection) {
-        console.warn("Status section not found");
-        return;
-    }
-    if (!processingStage) {
-        console.warn("Processing stage element not found");
-        return;
-    }
-    if (!Array.isArray(processingStages) || processingStages.length === 0) {
-        console.error("processingStages is not properly defined");
-        return;
-    }
-    if (currentStageIndex < 0 || currentStageIndex >= processingStages.length) {
-        console.error("Invalid currentStageIndex:", currentStageIndex);
-        currentStageIndex = 0;  // Reset to a valid index
+        document.getElementById('en-btn').onclick = () => handleLanguageSelection('en');
+        document.getElementById('es-btn').onclick = () => handleLanguageSelection('es');
+        document.getElementById('cancel-btn').onclick = () => {
+            debugLog("Language selection cancelled");
+            modal.classList.add('hidden');
+        };
     }
 
-    if (!statusSection.classList.contains('hidden')) {
-        processingStage.textContent = processingStages[currentStageIndex];
-        currentStageIndex = (currentStageIndex + 1) % processingStages.length;
-        debugLog("Updated processing stage to: " + processingStages[currentStageIndex]);
-    } else {
-        console.warn("Status section is hidden. Skipping update.");
-    }
-}
-
-function handleFileUpload() {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a';
-    fileInput.style.display = 'none';
-    fileInput.onchange = (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            const fileNameElement = document.getElementById('file-name');
-            fileNameElement.textContent = file.name;
-            fileNameElement.file = file;
-            document.getElementById('url-input').value = '';
-        }
-    };
-    document.body.appendChild(fileInput);
-    fileInput.click();
-    document.body.removeChild(fileInput);
-}
-
-// Ensure these functions are available globally
-window.reset = reset;
-window.onDonateClick = onDonateClick;
-window.handleFileUpload = handleFileUpload;
-window.initializeProcessingStage = initializeProcessingStage;
-window.updateProcessingStage = updateProcessingStage;
-</script>
+    // Ensure these functions are available globally
+    window.reset = reset;
+    window.onDonateClick = onDonateClick;
+    window.showLanguageSelectionModal = showLanguageSelectionModal;
+    </script>
 </body>
 </html>

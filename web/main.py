@@ -282,6 +282,12 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
 
     return title, abstract
 
+import asyncio
+import aiofiles
+import aiofiles.tempfile
+
+# ... (other imports remain the same)
+
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
@@ -348,18 +354,7 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    def safe_get(func, *args, **kwargs):
-        try:
-            result = func(*args, **kwargs)
-            logger.debug(f"{func.__name__} returned type: {type(result)}")
-            if hasattr(result, 'text'):
-                return result.text
-            return str(result)
-        except AttributeError as e:
-            logger.error(f"AttributeError in {func.__name__}: {str(e)}")
-            return str(result)
-
- async def process_and_send_email(self, task_id):
+    async def process_and_send_email(self, task_id):
         try:
             task = tasks[task_id]
             user_email = task.get('email')
@@ -444,6 +439,21 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
             tasks[task_id]['status'] = 'failed'
             tasks[task_id]['error'] = str(e)
+
+    def get_user_email(self):
+        auth_header = self.headers.get('Authorization', '')
+        logger.debug(f"Authorization header: {auth_header}")
+        if not auth_header:
+            logger.warning("No Authorization header found")
+            return None
+        try:
+            token = auth_header.split(' ')[1]
+            email = verify_token_and_get_email(token)
+            logger.debug(f"User email extracted: {email}")
+            return email
+        except IndexError:
+            logger.error("Malformed Authorization header")
+            return None
 
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')

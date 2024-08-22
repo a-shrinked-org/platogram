@@ -9,6 +9,72 @@
   --text-color: #333;
 }
 
+@font-face {
+    font-family: 'Perfectly Nineties';
+    src: url('PerfectlyNineties-RegularItalic.eot');
+    src: url('PerfectlyNineties-RegularItalic.eot?#iefix') format('embedded-opentype'),
+        url('PerfectlyNineties-RegularItalic.woff2') format('woff2'),
+        url('PerfectlyNineties-RegularItalic.woff') format('woff');
+    font-weight: normal;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Perfectly Nineties';
+    src: url('PerfectlyNineties-BoldItalic.eot');
+    src: url('PerfectlyNineties-BoldItalic.eot?#iefix') format('embedded-opentype'),
+        url('PerfectlyNineties-BoldItalic.woff2') format('woff2'),
+        url('PerfectlyNineties-BoldItalic.woff') format('woff');
+    font-weight: bold;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Perfectly Nineties S';
+    src: url('PerfectlyNineties-Bold.eot');
+    src: url('PerfectlyNineties-Bold.eot?#iefix') format('embedded-opentype'),
+        url('PerfectlyNineties-Bold.woff2') format('woff2'),
+        url('PerfectlyNineties-Bold.woff') format('woff');
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Perfectly Nineties';
+    src: url('PerfectlyNineties-Regular.eot');
+    src: url('PerfectlyNineties-Regular.eot?#iefix') format('embedded-opentype'),
+        url('PerfectlyNineties-Regular.woff2') format('woff2'),
+        url('PerfectlyNineties-Regular.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Perfectly Nineties';
+    src: url('PerfectlyNineties-SemiboldItalic.eot');
+    src: url('PerfectlyNineties-SemiboldItalic.eot?#iefix') format('embedded-opentype'),
+        url('PerfectlyNineties-SemiboldItalic.woff2') format('woff2'),
+        url('PerfectlyNineties-SemiboldItalic.woff') format('woff');
+    font-weight: 600;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Perfectly Nineties';
+    src: url('PerfectlyNineties-Semibold.eot');
+    src: url('PerfectlyNineties-Semibold.eot?#iefix') format('embedded-opentype'),
+        url('PerfectlyNineties-Semibold.woff2') format('woff2'),
+        url('PerfectlyNineties-Semibold.woff') format('woff');
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
 body,
 html {
   height: 100%;

@@ -9,78 +9,90 @@
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://platogram.vercel.app/web/styles.css">
   </head>
-  <body>
-    <div id="language-modal" class="modal hidden">
-      <div class="modal-content">
-        <h3>Select Language</h3>
-        <button id="en-btn">English</button>
-        <button id="es-btn">Spanish</button>
-        <button id="cancel-btn">Cancel</button>
-      </div>
+  <body class="bg-white">
+    <div id="language-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="modal-content bg-white p-6 rounded-lg shadow-lg">
+            <h3 class="font-perfectly-nineties text-2xl mb-4">Select Language</h3>
+            <button id="en-btn" class="block w-full text-left py-2 px-4 hover:bg-gray-100 rounded">English</button>
+            <button id="es-btn" class="block w-full text-left py-2 px-4 hover:bg-gray-100 rounded">Spanish</button>
+            <button id="cancel-btn" class="mt-4 bg-gray-200 text-gray-800 py-2 px-4 rounded hover:bg-gray-300">Cancel</button>
+        </div>
     </div>
-    <div class="container">
-      <header>
-        <a href="#" class="cta" id="login-button">Log In</a>
-        <a href="#" class="cta" id="logout-button">Log Out</a>
-      </header>
 
-      <main>
-        <h1>Transform Speech into Knowledge</h1>
-
-        <div id="input-section" class="cta-container">
-          <p>
-            Convert hours of audio into structured, readable documents
-          </p>
-          <div class="input-wrapper">
-            <input type="text" id="url-input" placeholder="Link to YouTube, Google Drive, audio, transcript, or upload" />
-            <label for="file-upload" class="upload-button">
-              <span class="upload-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="17 8 12 3 7 8"></polyline>
-                  <line x1="12" y1="3" x2="12" y2="15"></line>
-                </svg>
-              </span>
-              <input
-                type="file"
-                id="file-upload"
-                accept=".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a"
-                style="display: none"
-              />
-            </label>
-          </div>
-            <span id="file-name"></span> <!-- Ensure this element exists -->
-          <a href="#" class="cta" id="convert-button">Convert</a>
-          <a href="#" class="cta donate" id="donate-button">Donate</a>
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-white">
+        <div class="flex justify-between items-center py-4">
+            <div class="flex items-center space-x-2">
+                <div class="w-6 h-6 bg-slate-900"></div>
+                <span class="font-perfectly-nineties text-xl">datacapture</span>
+            </div>
+            <div>
+                <button id="login-button" class="text-blue-600 hover:underline">Log In</button>
+                <button id="logout-button" class="text-blue-600 hover:underline hidden">Log Out</button>
+            </div>
         </div>
 
-        <div id="done-section" class="cta-container hidden">
-          <div class="success-icon">&#10004;</div>
-          <p>
-            Done! Please check your e-mail inbox in a few minutes.
-          </p>
-          <button id="reset-button" class="cta">Got it!</button>
-        </div>
+        <main class="mt-16" role="main">
+            <h1 class="font-perfectly-nineties text-black text-4xl sm:text-5xl md:text-6xl mb-6 text-center">
+                Transform spoken words into structured knowledge.
+            </h1>
 
-        <div id="status-section" class="cta-container hidden">
-          <p>
-            Working on it. You will receive an email from Artyom Astafurov with
-            PDF, Word, and Markdown documents once ready.
-          </p>
-          <p>
-            Processing time is quick - about 5 mins for each hour of content. Hang tight!
-          </p>
-          <div id="animation-container">
-            <div id="runner"></div>
-            <p id="processing-stage"></p>
-          </div>
-          <button class="cta donate" id="donate-button-status">Donate</button>
-        </div>
+            <div id="input-section" class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
+                <p class="mb-4">Convert hours of audio into structured, readable documents</p>
+                <div class="input-wrapper flex items-center mb-4">
+                    <span class="upload-icon mr-2">🔗</span>
+                    <input id="url-input" type="text" placeholder="Paste a link to an YouTube video or Google Drive file?" class="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <button id="convert-button" class="w-full bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 mb-4 opacity-50 cursor-not-allowed" disabled>
+                    Convert
+                </button>
+                <div class="space-y-2">
+                    <button id="upload-file-button" class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300">
+                        ↑ Upload a file
+                    </button>
+                    <button class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300 opacity-50 cursor-not-allowed">
+                        ↑ Add a folder
+                        <span class="float-right text-sm text-gray-500">Coming soon</span>
+                    </button>
+                </div>
+            </div>
 
-        <div id="error-section" class="cta-container hidden">
-          <p>An error occurred. Please try again.</p>
-          <button id="reset-button-error" class="cta">Reset</button>
-        </div>
+            <div id="file-upload-section" class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6 hidden">
+                <button id="back-to-url" class="text-gray-600 hover:text-gray-800 mb-4">
+                    ← Paste a link
+                </button>
+                <div id="file-drop-area" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                    <p id="file-name" class="text-gray-700 mb-2"></p>
+                    <p class="text-gray-500 mb-2">Drag a file here or choose a file to upload</p>
+                    <label class="cursor-pointer text-blue-500 hover:underline">
+                        choose a file to upload
+                        <input type="file" class="hidden" accept=".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a">
+                    </label>
+                </div>
+                <button id="convert-file-button" class="w-full mt-4 bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 opacity-50 cursor-not-allowed" disabled>
+                    Convert
+                </button>
+            </div>
+
+            <div id="done-section" class="max-w-2xl mx-auto bg-green-100 rounded-lg p-6 mb-8 hidden">
+                <div class="text-4xl text-green-500 mb-4 text-center">✔</div>
+                <p class="text-center">Done! Please check your e-mail inbox in a few minutes.</p>
+                <button onclick="reset()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded mx-auto block">Got it!</button>
+            </div>
+
+            <div id="status-section" class="max-w-2xl mx-auto bg-blue-100 rounded-lg p-6 mb-8 hidden">
+                <p>Working on it. You will receive an email once ready.</p>
+                <p>Processing time is quick - about 5 mins for each hour of content. Hang tight!</p>
+                <div id="animation-container" class="w-48 h-48 border-2 border-blue-300 rounded-lg relative mx-auto my-4">
+                    <div id="runner" class="w-4 h-4 bg-blue-500 rounded-full absolute"></div>
+                </div>
+                <div id="processing-stage" class="text-center font-semibold text-blue-800 mb-4"></div>
+                <button onclick="onDonateClick()" class="bg-green-500 text-white px-4 py-2 rounded mx-auto block">Donate</button>
+            </div>
+
+            <div id="error-section" class="max-w-2xl mx-auto bg-red-100 rounded-lg p-6 mb-8 hidden">
+                <p id="error-message">An error occurred. Please try again.</p>
+                <button onclick="reset()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded">Reset</button>
+            </div>
 
         <section class="features-section">
           <div class="features-grid">
@@ -256,7 +268,105 @@
     <!-- End of LiveChat code -->
     <script src="https://platogram.vercel.app/web/app.js"></script>
     <!-- Initialize app.js functionality -->
-    <script>
+
+      <script>
+          document.addEventListener('DOMContentLoaded', () => {
+              const urlInput = document.getElementById('url-input');
+              const convertButton = document.getElementById('convert-button');
+              const uploadFileButton = document.getElementById('upload-file-button');
+              const fileUploadSection = document.getElementById('file-upload-section');
+              const inputSection = document.getElementById('input-section');
+              const backToUrlButton = document.getElementById('back-to-url');
+              const fileDropArea = document.getElementById('file-drop-area');
+              const fileInput = document.querySelector('input[type="file"]');
+              const convertFileButton = document.getElementById('convert-file-button');
+              const fileName = document.getElementById('file-name');
+
+              // URL input handling
+              urlInput.addEventListener('input', () => {
+                  convertButton.disabled = !urlInput.value.trim();
+                  convertButton.classList.toggle('opacity-50', !urlInput.value.trim());
+                  convertButton.classList.toggle('cursor-not-allowed', !urlInput.value.trim());
+              });
+
+              // Convert button for URL
+              convertButton.addEventListener('click', (event) => {
+                  event.preventDefault();
+                  if (urlInput.value.trim()) {
+                      onConvertClick();
+                  }
+              });
+
+              // Upload file button
+              uploadFileButton.addEventListener('click', () => {
+                  inputSection.classList.add('hidden');
+                  fileUploadSection.classList.remove('hidden');
+              });
+
+              // Back to URL button
+              backToUrlButton.addEventListener('click', () => {
+                  fileUploadSection.classList.add('hidden');
+                  inputSection.classList.remove('hidden');
+              });
+
+              // File drop area
+              ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                  fileDropArea.addEventListener(eventName, preventDefaults, false);
+              });
+
+              function preventDefaults(e) {
+                  e.preventDefault();
+                  e.stopPropagation();
+              }
+
+              ['dragenter', 'dragover'].forEach(eventName => {
+                  fileDropArea.addEventListener(eventName, highlight, false);
+              });
+
+              ['dragleave', 'drop'].forEach(eventName => {
+                  fileDropArea.addEventListener(eventName, unhighlight, false);
+              });
+
+              function highlight() {
+                  fileDropArea.classList.add('drag-over');
+              }
+
+              function unhighlight() {
+                  fileDropArea.classList.remove('drag-over');
+              }
+
+              fileDropArea.addEventListener('drop', handleDrop, false);
+
+              function handleDrop(e) {
+                  const dt = e.dataTransfer;
+                  const files = dt.files;
+                  handleFiles(files);
+              }
+
+              function handleFiles(files) {
+                  if (files.length > 0) {
+                      const file = files[0];
+                      fileName.textContent = file.name;
+                      convertFileButton.disabled = false;
+                      convertFileButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                  }
+              }
+
+              // File input change
+              fileInput.addEventListener('change', (event) => {
+                  handleFiles(event.target.files);
+              });
+
+              // Convert file button
+              convertFileButton.addEventListener('click', (event) => {
+                  event.preventDefault();
+                  if (fileName.textContent) {
+                      onConvertClick();
+                  }
+              });
+
+
+
       document.addEventListener('DOMContentLoaded', () => {
         // Initialize processing stage updates
         initializeProcessingStage();

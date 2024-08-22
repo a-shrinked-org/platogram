@@ -189,70 +189,222 @@
     <script src="https://platogram.vercel.app/web/app.js"></script>
     <!-- Initialize app.js functionality -->
     <script>
-      document.addEventListener('DOMContentLoaded', () => {
-        // Initialize processing stage updates
-        initializeProcessingStage();
-        // Add event listeners to buttons
-        const convertButton = document.getElementById('convert-button');
-        if (convertButton) {
-          convertButton.addEventListener('click', (event) => {
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize processing stage updates
+    initializeProcessingStage();
+
+    const urlInput = document.getElementById('url-input');
+    const convertButton = document.getElementById('convert-button');
+    const uploadFileButton = document.getElementById('upload-file-button');
+    const fileUploadSection = document.getElementById('file-upload-section');
+    const inputSection = document.getElementById('input-section');
+    const backToUrlButton = document.getElementById('back-to-url');
+    const fileDropArea = document.getElementById('file-drop-area');
+    const fileInput = document.querySelector('input[type="file"]');
+    const convertFileButton = document.getElementById('convert-file-button');
+    const fileName = document.getElementById('file-name');
+
+    // Add event listeners to buttons
+    if (convertButton) {
+        convertButton.addEventListener('click', (event) => {
             event.preventDefault();
-            onConvertClick();
-          });
-        }
-        const loginButton = document.getElementById('login-button');
-        if (loginButton) {
-          loginButton.addEventListener('click', (event) => {
+            if (urlInput.value.trim()) {
+                onConvertClick();
+            }
+        });
+    }
+
+    const loginButton = document.getElementById('login-button');
+    if (loginButton) {
+        loginButton.addEventListener('click', (event) => {
             event.preventDefault();
             login();
-          });
-        }
-        const logoutButton = document.getElementById('logout-button');
-        if (logoutButton) {
-          logoutButton.addEventListener('click', (event) => {
+        });
+    }
+
+    const logoutButton = document.getElementById('logout-button');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', (event) => {
             event.preventDefault();
             logout();
-          });
-        }
-        const donateButtons = document.querySelectorAll('[id^="donate-button"]');
-        donateButtons.forEach(button => {
-          button.addEventListener('click', (event) => {
+        });
+    }
+
+    const donateButtons = document.querySelectorAll('[id^="donate-button"]');
+    donateButtons.forEach(button => {
+        button.addEventListener('click', (event) => {
             event.preventDefault();
             onDonateClick();
-          });
         });
-        const resetButtons = document.querySelectorAll('[id^="reset-button"]');
-        resetButtons.forEach(button => {
-          button.addEventListener('click', (event) => {
+    });
+
+    const resetButtons = document.querySelectorAll('[id^="reset-button"]');
+    resetButtons.forEach(button => {
+        button.addEventListener('click', (event) => {
             event.preventDefault();
             reset();
-          });
         });
-      });
+    });
 
-      function handleFileUpload() {
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = '.srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a';
-        fileInput.style.display = 'none';
-        fileInput.onchange = (event) => {
-          const file = event.target.files[0];
-          if (file) {
+    // URL input handling
+    urlInput.addEventListener('input', () => {
+        convertButton.disabled = !urlInput.value.trim();
+        convertButton.classList.toggle('opacity-50', !urlInput.value.trim());
+        convertButton.classList.toggle('cursor-not-allowed', !urlInput.value.trim());
+    });
+
+    // Upload file button
+    uploadFileButton.addEventListener('click', () => {
+        inputSection.classList.add('hidden');
+        fileUploadSection.classList.remove('hidden');
+    });
+
+    // Back to URL button
+    backToUrlButton.addEventListener('click', () => {
+        fileUploadSection.classList.add('hidden');
+        inputSection.classList.remove('hidden');
+    });
+
+    // File drop area
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        fileDropArea.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        fileDropArea.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        fileDropArea.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight() {
+        fileDropArea.classList.add('drag-over');
+    }
+
+    function unhighlight() {
+        fileDropArea.classList.remove('drag-over');
+    }
+
+    fileDropArea.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFiles(files);
+    }
+
+    function handleFiles(files) {
+        if (files.length > 0) {
+            const file = files[0];
+            fileName.textContent = file.name;
+            convertFileButton.disabled = false;
+            convertFileButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    }
+
+    // File input change
+    fileInput.addEventListener('change', (event) => {
+        handleFiles(event.target.files);
+    });
+
+    // Convert file button
+    convertFileButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        if (fileName.textContent) {
+            onConvertClick();
+        }
+    });
+
+    // Initialize other parts of your application
+    initAuth0().catch((error) => console.error("Error initializing app:", error));
+});
+
+function reset() {
+    // Reset form state
+    document.getElementById('url-input').value = '';
+    document.getElementById('file-name').textContent = '';
+    document.getElementById('convert-button').disabled = true;
+    document.getElementById('convert-button').classList.add('opacity-50', 'cursor-not-allowed');
+    document.getElementById('convert-file-button').disabled = true;
+    document.getElementById('convert-file-button').classList.add('opacity-50', 'cursor-not-allowed');
+
+    // Hide all sections except input
+    document.getElementById('file-upload-section').classList.add('hidden');
+    document.getElementById('done-section').classList.add('hidden');
+    document.getElementById('status-section').classList.add('hidden');
+    document.getElementById('error-section').classList.add('hidden');
+
+    // Show input section
+    document.getElementById('input-section').classList.remove('hidden');
+}
+
+function initializeProcessingStage() {
+    debugLog("Initializing processing stage");
+    updateProcessingStage();
+    processingStageInterval = setInterval(updateProcessingStage, 3000);
+}
+
+function updateProcessingStage() {
+    const statusSection = document.getElementById('status-section');
+    const processingStage = document.getElementById('processing-stage');
+
+    if (!statusSection) {
+        console.warn("Status section not found");
+        return;
+    }
+    if (!processingStage) {
+        console.warn("Processing stage element not found");
+        return;
+    }
+    if (!Array.isArray(processingStages) || processingStages.length === 0) {
+        console.error("processingStages is not properly defined");
+        return;
+    }
+    if (currentStageIndex < 0 || currentStageIndex >= processingStages.length) {
+        console.error("Invalid currentStageIndex:", currentStageIndex);
+        currentStageIndex = 0;  // Reset to a valid index
+    }
+
+    if (!statusSection.classList.contains('hidden')) {
+        processingStage.textContent = processingStages[currentStageIndex];
+        currentStageIndex = (currentStageIndex + 1) % processingStages.length;
+        debugLog("Updated processing stage to: " + processingStages[currentStageIndex]);
+    } else {
+        console.warn("Status section is hidden. Skipping update.");
+    }
+}
+
+function handleFileUpload() {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a';
+    fileInput.style.display = 'none';
+    fileInput.onchange = (event) => {
+        const file = event.target.files[0];
+        if (file) {
             const fileNameElement = document.getElementById('file-name');
             fileNameElement.textContent = file.name;
             fileNameElement.file = file;
             document.getElementById('url-input').value = '';
-          }
-        };
-        document.body.appendChild(fileInput);
-        fileInput.click();
-        document.body.removeChild(fileInput);
-      }
+        }
+    };
+    document.body.appendChild(fileInput);
+    fileInput.click();
+    document.body.removeChild(fileInput);
+}
 
-      // Ensure these functions are available globally
-      window.handleFileUpload = handleFileUpload;
-      window.reset = reset;
-      window.onDonateClick = onDonateClick;
-    </script>
+// Ensure these functions are available globally
+window.reset = reset;
+window.onDonateClick = onDonateClick;
+window.handleFileUpload = handleFileUpload;
+window.initializeProcessingStage = initializeProcessingStage;
+window.updateProcessingStage = updateProcessingStage;
+</script>
 </body>
 </html>

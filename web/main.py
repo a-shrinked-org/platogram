@@ -328,49 +328,49 @@ class handler(BaseHTTPRequestHandler):
         else:
             json_response(self, 404, {"error": "Not Found"})
 
-  async def handle_convert(self):
-    logger.debug("Handling /convert request")
-    content_length = int(self.headers['Content-Length'])
-    content_type = self.headers.get('Content-Type')
-    user_email = self.get_user_email()
-    logger.debug(f"User email for conversion: {user_email}")
+    async def handle_convert(self):
+        logger.debug("Handling /convert request")
+        content_length = int(self.headers['Content-Length'])
+        content_type = self.headers.get('Content-Type')
+        user_email = self.get_user_email()
+        logger.debug(f"User email for conversion: {user_email}")
 
-    try:
-        task_id = str(uuid4())
-        if content_type == 'application/octet-stream':
-            body = self.rfile.read(content_length)  # Read raw bytes
-            file_name = self.headers.get('X-File-Name')
-            lang = self.headers.get('X-Language', 'en')
+        try:
+            task_id = str(uuid4())
+            if content_type == 'application/octet-stream':
+                body = self.rfile.read(content_length)  # Read raw bytes
+                file_name = self.headers.get('X-File-Name')
+                lang = self.headers.get('X-Language', 'en')
 
-            # Save the file to a temporary location
-            temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
-            temp_dir.mkdir(parents=True, exist_ok=True)
-            temp_file = temp_dir / f"{task_id}_{file_name}"
-            with open(temp_file, 'wb') as f:
-                f.write(body)
+                # Save the file to a temporary location
+                temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
+                temp_dir.mkdir(parents=True, exist_ok=True)
+                temp_file = temp_dir / f"{task_id}_{file_name}"
+                with open(temp_file, 'wb') as f:
+                    f.write(body)
 
-            tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
-            logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
-        elif content_type == 'application/json':
-            body = self.rfile.read(content_length).decode('utf-8')
-            data = json.loads(body)
-            url = data.get('url')
-            lang = data.get('lang', 'en')
-            tasks[task_id] = {'status': 'running', 'url': url, 'lang': lang, 'email': user_email}
-            logger.debug(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
-        else:
-            logger.error(f"Invalid content type: {content_type}")
-            json_response(self, 400, {"error": "Invalid content type"})
-            return
+                tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
+                logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+            elif content_type == 'application/json':
+                body = self.rfile.read(content_length).decode('utf-8')
+                data = json.loads(body)
+                url = data.get('url')
+                lang = data.get('lang', 'en')
+                tasks[task_id] = {'status': 'running', 'url': url, 'lang': lang, 'email': user_email}
+                logger.debug(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+            else:
+                logger.error(f"Invalid content type: {content_type}")
+                json_response(self, 400, {"error": "Invalid content type"})
+                return
 
-        # Start processing
-        tasks[task_id]['status'] = 'processing'
-        await self.process_and_send_email(task_id)
+            # Start processing
+            tasks[task_id]['status'] = 'processing'
+            asyncio.create_task(self.process_and_send_email(task_id))
 
-        json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
-    except Exception as e:
-        logger.error(f"Error in handle_convert: {str(e)}")
-        json_response(self, 500, {"error": str(e)})
+            json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
+        except Exception as e:
+            logger.error(f"Error in handle_convert: {str(e)}")
+            json_response(self, 500, {"error": str(e)})
 
    async def process_and_send_email(self, task_id):
     try:

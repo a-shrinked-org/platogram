@@ -14,6 +14,7 @@ import logfire
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
+from vercel_kv import VercelKV
 import io
 import subprocess
 import asyncio
@@ -37,6 +38,19 @@ stripe.api_key = os.getenv("STRIPE_API_KEY")
 
 # Configure logfire
 logfire.configure()
+
+kv = VercelKV(os.environ["KV_REST_API_URL"], os.environ["KV_REST_API_TOKEN"])
+
+async def create_task(task_id, task_data):
+    await kv.set(f"task:{task_id}", json.dumps(task_data))
+
+    async def get_task_status(task_id):
+        task_data = await kv.get(f"task:{task_id}")
+        if task_data:
+            return json.loads(task_data)
+        return None
+
+
 
 # In-memory storage (Note: This will reset on each function invocation)
 tasks = {}
@@ -319,12 +333,12 @@ class handler(BaseHTTPRequestHandler):
 
     def handle_task_status(self):
         task_id = self.path.split('/')[-1]
-        if task_id in tasks:
-            task = tasks[task_id]
+        task_data = asyncio.run(get_task_status(task_id))
+        if task_data:
             response = {
                 "task_id": task_id,
-                "status": task['status'],
-                "error": task.get('error') if task['status'] == "failed" else None
+                "status": task_data['status'],
+                "error": task_data.get('error') if task_data['status'] == "failed" else None
             }
             json_response(self, 200, response)
         else:
@@ -337,56 +351,79 @@ class handler(BaseHTTPRequestHandler):
             json_response(self, 404, {"error": "Not Found"})
 
     async def handle_convert(self):
-        logfire.info("Handling /convert request")
-        content_length = int(self.headers['Content-Length'])
-        content_type = self.headers.get('Content-Type')
-        user_email = self.get_user_email()
-        logfire.info(f"User email for conversion: {user_email}")
+    logfire.info("Handling /convert request")
+    content_length = int(self.headers['Content-Length'])
+    content_type = self.headers.get('Content-Type')
+    user_email = self.get_user_email()
+    logfire.info(f"User email for conversion: {user_email}")
 
+    try:
+        task_id = str(uuid4())
+        if content_type == 'application/octet-stream':
+            body = self.rfile.read(content_length)  # Read raw bytes
+            file_name = self.headers.get('X-File-Name')
+            lang = self.headers.get('X-Language', 'en')
+            price = float(self.headers.get('X-Price', 0))
+            token = self.headers.get('X-Token')
+
+            # Save the file to a temporary location
+            temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_file = temp_dir / f"{task_id}_{file_name}"
+            with open(temp_file, 'wb') as f:
+                f.write(body)
+
+            task_data = {'status': 'processing', 'file': str(temp_file), 'lang': lang, 'email': user_email, 'price': price, 'token': token}
+            logfire.info(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+        elif content_type == 'application/json':
+            body = self.rfile.read(content_length).decode('utf-8')
+            data = json.loads(body)
+            url = data.get('url')
+            lang = data.get('lang', 'en')
+            price = float(data.get('price', 0))
+            token = data.get('token')
+            task_data = {'status': 'processing', 'url': url, 'lang': lang, 'email': user_email, 'price': price, 'token': token}
+            logfire.info(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+        else:
+            logfire.error(f"Invalid content type: {content_type}")
+            json_response(self, 400, {"error": "Invalid content type"})
+            return
+
+        # Save task data to Vercel KV
+        await create_task(task_id, task_data)
+        # Add task to processing queue
+        await kv.rpush("task_queue", task_id)
+
+        json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
+    except Exception as e:
+        logfire.exception(f"Error in handle_convert: {str(e)}")
+        json_response(self, 500, {"error": "An unexpected error occurred. Please try again later."})
+
+async def process_tasks():
+    while True:
+        task_id = await kv.lpop("task_queue")
+        if not task_id:
+            break
+
+        task_data = await get_task_status(task_id)
+        if task_data and task_data['status'] == 'processing':
+            try:
+                # Process the task
+                await process_and_send_email(task_id, task_data)
+
+                # Update task status
+                task_data['status'] = 'done'
+                await create_task(task_id, task_data)
+            except Exception as e:
+                logfire.exception(f"Error processing task {task_id}: {str(e)}")
+                task_data['status'] = 'failed'
+                task_data['error'] = str(e)
+                await create_task(task_id, task_data)
+
+# Modifing process_and_send_email to accept task_data
+async def process_and_send_email(task_id, task_data):
         try:
-            task_id = str(uuid4())
-            if content_type == 'application/octet-stream':
-                body = self.rfile.read(content_length)  # Read raw bytes
-                file_name = self.headers.get('X-File-Name')
-                lang = self.headers.get('X-Language', 'en')
-                price = float(self.headers.get('X-Price', 0))
-                token = self.headers.get('X-Token')
-
-                # Save the file to a temporary location
-                temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
-                temp_dir.mkdir(parents=True, exist_ok=True)
-                temp_file = temp_dir / f"{task_id}_{file_name}"
-                with open(temp_file, 'wb') as f:
-                    f.write(body)
-
-                tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email, 'price': price, 'token': token}
-                logfire.info(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
-            elif content_type == 'application/json':
-                body = self.rfile.read(content_length).decode('utf-8')
-                data = json.loads(body)
-                url = data.get('url')
-                lang = data.get('lang', 'en')
-                price = float(data.get('price', 0))
-                token = data.get('token')
-                tasks[task_id] = {'status': 'running', 'url': url, 'lang': lang, 'email': user_email, 'price': price, 'token': token}
-                logfire.info(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
-            else:
-                logfire.error(f"Invalid content type: {content_type}")
-                json_response(self, 400, {"error": "Invalid content type"})
-                return
-
-            # Start processing
-            tasks[task_id]['status'] = 'processing'
-            asyncio.create_task(self.process_and_send_email(task_id))
-
-            json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
-        except Exception as e:
-            logfire.exception(f"Error in handle_convert: {str(e)}")
-            json_response(self, 500, {"error": "An unexpected error occurred. Please try again later."})
-
-    async def process_and_send_email(self, task_id):
-        try:
-            task = tasks[task_id]
+            task = task_data
             user_email = task.get('email')
             logfire.info(f"Starting processing for task {task_id}. User email: {user_email}")
 
@@ -460,7 +497,7 @@ class handler(BaseHTTPRequestHandler):
                     else:
                         logfire.warning(f"No email available for task {task_id}. Skipping email send.")
 
-                    tasks[task_id]['status'] = 'done'
+                    task_data['status'] = 'done'
                     logfire.info(f"Conversion completed for task {task_id}")
 
                     # Process payment
@@ -475,20 +512,20 @@ class handler(BaseHTTPRequestHandler):
                             logfire.info(f"Payment processed successfully for task {task_id}", charge_id=charge.id)
                         except stripe.error.StripeError as e:
                             logfire.error(f"Stripe payment failed for task {task_id}: {str(e)}")
-                            tasks[task_id]['error'] = "Payment processing failed. Please contact support."
+                            task_data['error'] = "Payment processing failed. Please contact support."
                     else:
                         logfire.info(f"No charge for task {task_id}")
 
                 except Exception as e:
                     logfire.exception(f"Error in audio processing: {str(e)}")
-                    tasks[task_id]['status'] = 'failed'
-                    tasks[task_id]['error'] = self.get_user_friendly_error_message(str(e))
+                    task_data['status'] = 'failed'
+                    task_data['error'] = self.get_user_friendly_error_message(str(e))
                     raise
 
         except Exception as e:
             logfire.exception(f"Error in process_and_send_email for task {task_id}: {str(e)}")
-            tasks[task_id]['status'] = 'failed'
-            tasks[task_id]['error'] = self.get_user_friendly_error_message(str(e))
+            task_data['status'] = 'failed'
+            task_data['error'] = self.get_user_friendly_error_message(str(e))
 
     def get_user_friendly_error_message(self, error_message):
         # Use a language model to generate a user-friendly error message
@@ -528,7 +565,7 @@ class handler(BaseHTTPRequestHandler):
             if task_id not in tasks:
                 response = {"status": "not_found"}
             else:
-                task = tasks[task_id]
+                task = task_data
                 response = {
                     "status": task['status'],
                     "error": task.get('error') if task['status'] == "failed" else None
@@ -551,7 +588,7 @@ class handler(BaseHTTPRequestHandler):
                     task_ids_to_remove.append(task_id)
 
             for task_id in task_ids_to_remove:
-                del tasks[task_id]
+                del task_data
 
             logfire.info(f"Reset tasks for user: {user_email}")
             json_response(self, 200, {"message": "Tasks reset successfully"})

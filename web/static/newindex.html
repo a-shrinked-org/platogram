@@ -254,6 +254,8 @@
 
          // Add event listeners to buttons
          const convertButton = document.getElementById('convert-button');
+         const convertFileButton = document.getElementById('convert-file-button');
+
          if (convertButton) {
            convertButton.addEventListener('click', (event) => {
              event.preventDefault();
@@ -261,10 +263,8 @@
            });
          }
 
-         // Add event listeners to buttons
-         const convertButtonTwo = document.getElementById('convert-file-button');
-         if (convertButton) {
-           convertButton.addEventListener('click', (event) => {
+         if (convertFileButton) {
+           convertFileButton.addEventListener('click', (event) => {
              event.preventDefault();
              onConvertClick();
            });

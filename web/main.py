@@ -14,6 +14,10 @@ from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
 import io
 import subprocess
+import asyncio
+import aiofiles
+import aiofiles.tempfile
+
 
 import platogram as plato
 from anthropic import AnthropicError
@@ -296,26 +300,11 @@ class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path == '/convert':
-            self.handle_convert()
+            asyncio.run(self.handle_convert())
         else:
             json_response(self, 404, {"error": "Not Found"})
 
-    def get_user_email(self):
-        auth_header = self.headers.get('Authorization', '')
-        logger.debug(f"Authorization header: {auth_header}")
-        if not auth_header:
-            logger.warning("No Authorization header found")
-            return None
-        try:
-            token = auth_header.split(' ')[1]
-            email = verify_token_and_get_email(token)
-            logger.debug(f"User email extracted: {email}")
-            return email
-        except IndexError:
-            logger.error("Malformed Authorization header")
-            return None
-
-    def handle_convert(self):
+    async def handle_convert(self):
         logger.debug("Handling /convert request")
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
@@ -333,13 +322,13 @@ class handler(BaseHTTPRequestHandler):
                 temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
                 temp_dir.mkdir(parents=True, exist_ok=True)
                 temp_file = temp_dir / f"{task_id}_{file_name}"
-                with io.open(temp_file, 'wb') as f:
+                with open(temp_file, 'wb') as f:
                     f.write(body)
 
                 tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
                 logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
             elif content_type == 'application/json':
-                body = self.rfile.read(content_length).decode('utf-8')  # JSON should be UTF-8
+                body = self.rfile.read(content_length).decode('utf-8')
                 data = json.loads(body)
                 url = data.get('url')
                 lang = data.get('lang', 'en')
@@ -352,7 +341,7 @@ class handler(BaseHTTPRequestHandler):
 
             # Start processing
             tasks[task_id]['status'] = 'processing'
-            self.process_and_send_email(task_id)
+            asyncio.create_task(self.process_and_send_email(task_id))
 
             json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
         except Exception as e:
@@ -370,14 +359,14 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"AttributeError in {func.__name__}: {str(e)}")
             return str(result)
 
-    async def process_and_send_email(self, task_id):
+ async def process_and_send_email(self, task_id):
         try:
             task = tasks[task_id]
             user_email = task.get('email')
             logger.debug(f"Processing task {task_id}. Task data: {task}")
             logger.debug(f"User email for task {task_id}: {user_email}")
 
-            with tempfile.TemporaryDirectory() as tmpdir:
+            async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
                 output_dir = Path(tmpdir)
 
                 # Process audio
@@ -405,17 +394,14 @@ class handler(BaseHTTPRequestHandler):
                     except AttributeError as e:
                         if "'str' object has no attribute 'text'" in str(e):
                             logger.warning("Received string input instead of transcript objects. Attempting to process as string.")
-                            from nltk.tokenize import word_tokenize
-
-                            # Use a simple word tokenizer instead of sent_tokenize
-                            words = word_tokenize(url)
+                            words = url.split()  # Simple word splitting
                             transcript_objects = [type('obj', (), {'text': w})() for w in words]
                             plato.index(transcript_objects, llm=language_model, lang=task['lang'])
                         else:
                             raise
 
                     # Call audio_to_paper function
-                    title, abstract = await audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
+                    title, abstract = audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
 
                     files = [f for f in output_dir.glob('*') if f.is_file()]
 
@@ -441,9 +427,6 @@ class handler(BaseHTTPRequestHandler):
                     else:
                         logger.warning(f"No email available for task {task_id}. Skipping email send.")
 
-                    tasks[task_id]['status'] = 'done'
-                    logger.debug(f"Conversion completed for task {task_id}")
-
                 except Exception as e:
                     logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
                     raise
@@ -454,10 +437,14 @@ class handler(BaseHTTPRequestHandler):
                         except OSError as e:
                             logger.warning(f"Failed to delete temporary file {task['file']}: {e}")
 
+            tasks[task_id]['status'] = 'done'
+            logger.debug(f"Conversion completed for task {task_id}")
+
         except Exception as e:
             logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
             tasks[task_id]['status'] = 'failed'
             tasks[task_id]['error'] = str(e)
+
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')
         if not task_id:

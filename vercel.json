@@ -15,8 +15,10 @@
     }
   ],
   "crons": [
+    {
     "path": "/api/cron",
     "schedule": "*/5 * * * *"
+  }
   ],
   "routes": [
     {

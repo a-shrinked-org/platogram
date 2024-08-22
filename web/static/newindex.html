@@ -92,7 +92,7 @@
                     </label>
                 </div>
                 <button
-                    id="convert-button"
+                    id="convert-file-button"
                     class="w-full mt-4 bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 opacity-50 cursor-not-allowed"
                     disabled
                 >
@@ -247,6 +247,15 @@
 
          // Add event listeners to buttons
          const convertButton = document.getElementById('convert-button');
+         if (convertButton) {
+           convertButton.addEventListener('click', (event) => {
+             event.preventDefault();
+             onConvertClick();
+           });
+         }
+
+         // Add event listeners to buttons
+         const convertButtonTwo = document.getElementById('convert-file-button');
          if (convertButton) {
            convertButton.addEventListener('click', (event) => {
              event.preventDefault();

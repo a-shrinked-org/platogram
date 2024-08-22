@@ -41,7 +41,7 @@
                 Transform spoken words into structured knowledge.
             </h1>
 
-            <div id="input-section" class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
+         <div id="input-section" class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
     <input
         id="url-input"
         type="text"
@@ -50,8 +50,7 @@
     />
     <button
         id="convert-button"
-        class="w-full bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 mb-4 opacity-50 cursor-not-allowed"
-        disabled
+        class="w-full bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 mb-4"
     >
         Convert
     </button>
@@ -71,10 +70,7 @@
 
 <div id="file-upload-section" class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6 hidden">
     <div class="flex items-center mb-4">
-        <button
-            id="back-to-url"
-            class="text-gray-600 hover:text-gray-800"
-        >
+        <button id="back-to-url" class="text-gray-600 hover:text-gray-800">
             ← Paste a link
         </button>
     </div>
@@ -95,29 +91,11 @@
     </div>
     <button
         id="convert-file-button"
-        class="w-full mt-4 bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 opacity-50 cursor-not-allowed"
-        disabled
+        class="w-full mt-4 bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300"
     >
         Convert
     </button>
 </div>
-
-            <div id="file-upload-section" class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6 hidden">
-                <button id="back-to-url" class="text-gray-600 hover:text-gray-800 mb-4">
-                    ← Paste a link
-                </button>
-                <div id="file-drop-area" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                    <p id="file-name-display" class="text-gray-700 mb-2"></p>
-                    <p class="text-gray-500 mb-2">Drag a file here or choose a file to upload</p>
-                    <label class="cursor-pointer text-blue-500 hover:underline">
-                        choose a file to upload
-                        <input type="file" class="hidden" accept=".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a">
-                    </label>
-                </div>
-                <button id="convert-file-button" class="w-full mt-4 bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300">
-                    Convert
-                </button>
-            </div>
 
             <div id="done-section" class="max-w-2xl mx-auto bg-green-100 rounded-lg p-6 mb-8 hidden">
                 <div class="text-4xl text-green-500 mb-4 text-center">✔</div>
@@ -171,7 +149,7 @@
             </section>
 
             <section class="mb-16 max-w-2xl mx-auto bg-white">
-                <h2 class="font-perfectly-nineties text-3xl mb-6 bg-black">See it in action</h2>
+                <h2 class="font-perfectly-nineties text-3xl mb-6 text-black">SCheck examples</h2>
                 <div class="space-y-4">
                     <div class="flex justify-between items-center">
                         <a href="#" class="text-blue-600 hover:underline">John Carmack: From Gaming Pioneer to AI Visionary - A Journey of Innovation and Insight</a>
@@ -183,18 +161,18 @@
 
             <section class="mb-16 text-center bg-white">
                 <img src="https://platogram.vercel.app/web/static/Assets/268vocabulary-1@2x.png" alt="Person reading" class="mx-auto mb-6" style="max-width: 350px;">
-                <h2 class="font-perfectly-nineties text-3xl mb-4 bg-white">
+                <h2 class="font-perfectly-nineties text-3xl mb-4 bg-white text-black">
                     [Name] was created by two tech enthusiasts,<br>
                     <span class="underline">Ivan</span> & <span class="underline">Artyom</span>, who wanted to rediscover the<br>
                     magic in spoken stories.
                 </h2>
-                <p class="text-xl mb-6">
+                <p class="text-xl mb-6 text-black">
                     This project transforms spoken words into<br>
                     structured data. It's a new way to know who said<br>
                     what — unlike vague AI summaries, with privacy<br>
                     and attribution at its core.
                 </p>
-                <p class="text-xl font-bold underline">
+                <p class="text-xl font-bold underline text-black">
                     Try it with your favorite podcast or video.
                 </p>
             </section>
@@ -223,7 +201,7 @@
             </section>
 
             <section class="text-center mb-16 bg-white">
-                <h2 class="font-perfectly-nineties text-3xl mb-6 bg-black">Book a demo</h2>
+                <h2 class="font-perfectly-nineties text-3xl mb-6 text-black">Book a demo</h2>
                 <p class="text-xl mb-6">
                     If you're an organization or business who's interested in<br>
                     learning more about how [Name] could work for your<br>
@@ -264,113 +242,107 @@ function debugLog(message) {
   console.log(`[DEBUG] ${message}`);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialize processing stage updates
-    initializeProcessingStage();
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlInput = document.getElementById('url-input');
+            const convertButton = document.getElementById('convert-button');
+            const uploadFileButton = document.getElementById('upload-file-button');
+            const fileUploadSection = document.getElementById('file-upload-section');
+            const inputSection = document.getElementById('input-section');
+            const backToUrlButton = document.getElementById('back-to-url');
+            const fileDropArea = document.getElementById('file-drop-area');
+            const fileInput = document.querySelector('input[type="file"]');
+            const convertFileButton = document.getElementById('convert-file-button');
+            const fileNameDisplay = document.getElementById('file-name-display');
 
-    const urlInput = document.getElementById('url-input');
-    const convertButton = document.getElementById('convert-button');
-    const uploadFileButton = document.getElementById('upload-file-button');
-    const fileUploadSection = document.getElementById('file-upload-section');
-    const inputSection = document.getElementById('input-section');
-    const backToUrlButton = document.getElementById('back-to-url');
-    const fileDropArea = document.getElementById('file-drop-area');
-    const fileInput = document.querySelector('input[type="file"]');
-    const convertFileButton = document.getElementById('convert-file-button');
-    const fileNameDisplay = document.getElementById('file-name-display');
+            // URL input handling
+            urlInput.addEventListener('input', () => {
+                convertButton.disabled = !urlInput.value.trim();
+                convertButton.classList.toggle('opacity-50', !urlInput.value.trim());
+                convertButton.classList.toggle('cursor-not-allowed', !urlInput.value.trim());
+            });
 
-    // URL input handling
-    urlInput.addEventListener('input', () => {
-        const hasValue = urlInput.value.trim() !== '';
-        convertButton.disabled = !hasValue;
-        convertButton.classList.toggle('opacity-50', !hasValue);
-        convertButton.classList.toggle('cursor-not-allowed', !hasValue);
-    });
+            // Convert button for URL
+            convertButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                if (urlInput.value.trim()) {
+                    onConvertClick();
+                }
+            });
 
-    // Convert button for URL
-    convertButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        if (urlInput.value.trim()) {
-            onConvertClick();
-        }
-    });
+            // Upload file button
+            uploadFileButton.addEventListener('click', () => {
+                inputSection.classList.add('hidden');
+                fileUploadSection.classList.remove('hidden');
+            });
 
-    // Upload file button
-    uploadFileButton.addEventListener('click', () => {
-        inputSection.classList.add('hidden');
-        fileUploadSection.classList.remove('hidden');
-    });
+            // Back to URL button
+            backToUrlButton.addEventListener('click', () => {
+                fileUploadSection.classList.add('hidden');
+                inputSection.classList.remove('hidden');
+            });
 
-    // Back to URL button
-    backToUrlButton.addEventListener('click', () => {
-        fileUploadSection.classList.add('hidden');
-        inputSection.classList.remove('hidden');
-        fileNameDisplay.textContent = '';
-        fileInput.value = '';
-        updateConvertFileButton();
-    });
+            // File drop area
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                fileDropArea.addEventListener(eventName, preventDefaults, false);
+            });
 
-    // File drop area
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        fileDropArea.addEventListener(eventName, preventDefaults, false);
-    });
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
 
-    function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
+            ['dragenter', 'dragover'].forEach(eventName => {
+                fileDropArea.addEventListener(eventName, highlight, false);
+            });
 
-    ['dragenter', 'dragover'].forEach(eventName => {
-        fileDropArea.addEventListener(eventName, highlight, false);
-    });
+            ['dragleave', 'drop'].forEach(eventName => {
+                fileDropArea.addEventListener(eventName, unhighlight, false);
+            });
 
-    ['dragleave', 'drop'].forEach(eventName => {
-        fileDropArea.addEventListener(eventName, unhighlight, false);
-    });
+            function highlight() {
+                fileDropArea.classList.add('border-blue-500', 'bg-blue-50');
+            }
 
-    function highlight() {
-        fileDropArea.classList.add('border-blue-500', 'bg-blue-50');
-    }
+            function unhighlight() {
+                fileDropArea.classList.remove('border-blue-500', 'bg-blue-50');
+            }
 
-    function unhighlight() {
-        fileDropArea.classList.remove('border-blue-500', 'bg-blue-50');
-    }
+            fileDropArea.addEventListener('drop', handleDrop, false);
 
-    fileDropArea.addEventListener('drop', handleDrop, false);
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles(files);
+            }
 
-    function handleDrop(e) {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        handleFiles(files);
-    }
+            function handleFiles(files) {
+                if (files.length > 0) {
+                    const file = files[0];
+                    fileNameDisplay.textContent = file.name;
+                    updateConvertFileButton();
+                }
+            }
 
-    function handleFiles(files) {
-        if (files.length > 0) {
-            const file = files[0];
-            fileNameDisplay.textContent = file.name;
-            updateConvertFileButton();
-        }
-    }
+            // File input change
+            fileInput.addEventListener('change', (event) => {
+                handleFiles(event.target.files);
+            });
 
-    // File input change
-    fileInput.addEventListener('change', (event) => {
-        handleFiles(event.target.files);
-    });
+            // Convert file button
+            convertFileButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                if (fileNameDisplay.textContent) {
+                    onConvertClick();
+                }
+            });
 
-    // Convert file button
-    convertFileButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        if (fileNameDisplay.textContent) {
-            onConvertClick();
-        }
-    });
-
-    function updateConvertFileButton() {
-        const hasFile = fileNameDisplay.textContent !== '';
-        convertFileButton.disabled = !hasFile;
-        convertFileButton.classList.toggle('opacity-50', !hasFile);
-        convertFileButton.classList.toggle('cursor-not-allowed', !hasFile);
-    }
+            function updateConvertFileButton() {
+                const hasFile = fileNameDisplay.textContent !== '';
+                convertFileButton.disabled = !hasFile;
+                convertFileButton.classList.toggle('opacity-50', !hasFile);
+                convertFileButton.classList.toggle('cursor-not-allowed', !hasFile);
+            }
 
     // Add event listeners to buttons
     const loginButton = document.getElementById('login-button');

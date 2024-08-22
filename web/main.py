@@ -20,7 +20,7 @@ import subprocess
 import asyncio
 import aiofiles
 import aiofiles.tempfile
-
+import aiohttp
 
 import platogram as plato
 from anthropic import AnthropicError
@@ -44,16 +44,11 @@ kv = VercelKV(os.environ["KV_REST_API_URL"], os.environ["KV_REST_API_TOKEN"])
 async def create_task(task_id, task_data):
     await kv.set(f"task:{task_id}", json.dumps(task_data))
 
-    async def get_task_status(task_id):
-        task_data = await kv.get(f"task:{task_id}")
-        if task_data:
-            return json.loads(task_data)
-        return None
-
-
-
-# In-memory storage (Note: This will reset on each function invocation)
-tasks = {}
+async def get_task_status(task_id):
+    task_data = await kv.get(f"task:{task_id}")
+    if task_data:
+        return json.loads(task_data)
+    return None
 
 # Resend API key
 RESEND_API_KEY = os.getenv('RESEND_API_KEY')
@@ -81,7 +76,7 @@ def json_response(handler, status_code, data):
     handler.send_header('Content-type', 'application/json')
     handler.send_header('Access-Control-Allow-Origin', '*')
     handler.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    handler.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language')
+    handler.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language, X-Price, X-Token')
     handler.end_headers()
     handler.wfile.write(json.dumps(data).encode('utf-8'))
 
@@ -176,6 +171,7 @@ async def send_email_with_resend(to_email, subject, body, attachments):
                 logger.error(f"Failed to send email. Status: {response.status}, Error: {await response.text()}")
                 logger.debug(f"Failed payload: {json.dumps(payload, default=str)}")
             return response
+
 async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
     logger.info(f"Processing audio from: {url}")
 
@@ -307,12 +303,6 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
 
     return title, abstract
 
-import asyncio
-import aiofiles
-import aiofiles.tempfile
-
-# ... (other imports remain the same)
-
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
@@ -331,9 +321,9 @@ class handler(BaseHTTPRequestHandler):
         else:
             json_response(self, 404, {"error": "Not Found"})
 
-    def handle_task_status(self):
+    async def handle_task_status(self):
         task_id = self.path.split('/')[-1]
-        task_data = asyncio.run(get_task_status(task_id))
+        task_data = await get_task_status(task_id)
         if task_data:
             response = {
                 "task_id": task_id,
@@ -351,53 +341,106 @@ class handler(BaseHTTPRequestHandler):
             json_response(self, 404, {"error": "Not Found"})
 
     async def handle_convert(self):
-    logfire.info("Handling /convert request")
-    content_length = int(self.headers['Content-Length'])
-    content_type = self.headers.get('Content-Type')
-    user_email = self.get_user_email()
-    logfire.info(f"User email for conversion: {user_email}")
+        logfire.info("Handling /convert request")
+        content_length = int(self.headers['Content-Length'])
+        content_type = self.headers.get('Content-Type')
+        user_email = self.get_user_email()
+        logfire.info(f"User email for conversion: {user_email}")
 
-    try:
-        task_id = str(uuid4())
-        if content_type == 'application/octet-stream':
-            body = self.rfile.read(content_length)  # Read raw bytes
-            file_name = self.headers.get('X-File-Name')
-            lang = self.headers.get('X-Language', 'en')
-            price = float(self.headers.get('X-Price', 0))
-            token = self.headers.get('X-Token')
+        try:
+            task_id = str(uuid4())
+            if content_type == 'application/octet-stream':
+                body = self.rfile.read(content_length)  # Read raw bytes
+                file_name = self.headers.get('X-File-Name')
+                lang = self.headers.get('X-Language', 'en')
+                price = float(self.headers.get('X-Price', 0))
+                token = self.headers.get('X-Token')
 
-            # Save the file to a temporary location
-            temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
-            temp_dir.mkdir(parents=True, exist_ok=True)
-            temp_file = temp_dir / f"{task_id}_{file_name}"
-            with open(temp_file, 'wb') as f:
-                f.write(body)
+                # Save the file to a temporary location
+                temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
+                temp_dir.mkdir(parents=True, exist_ok=True)
+                temp_file = temp_dir / f"{task_id}_{file_name}"
+                with open(temp_file, 'wb') as f:
+                    f.write(body)
 
-            task_data = {'status': 'processing', 'file': str(temp_file), 'lang': lang, 'email': user_email, 'price': price, 'token': token}
-            logfire.info(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
-        elif content_type == 'application/json':
-            body = self.rfile.read(content_length).decode('utf-8')
-            data = json.loads(body)
-            url = data.get('url')
-            lang = data.get('lang', 'en')
-            price = float(data.get('price', 0))
-            token = data.get('token')
-            task_data = {'status': 'processing', 'url': url, 'lang': lang, 'email': user_email, 'price': price, 'token': token}
-            logfire.info(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
-        else:
-            logfire.error(f"Invalid content type: {content_type}")
-            json_response(self, 400, {"error": "Invalid content type"})
+                task_data = {'status': 'processing', 'file': str(temp_file), 'lang': lang, 'email': user_email, 'price': price, 'token': token}
+                logfire.info(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+            elif content_type == 'application/json':
+                body = self.rfile.read(content_length).decode('utf-8')
+                data = json.loads(body)
+                url = data.get('url')
+                lang = data.get('lang', 'en')
+                price = float(data.get('price', 0))
+                token = data.get('token')
+                task_data = {'status': 'processing', 'url': url, 'lang': lang, 'email': user_email, 'price': price, 'token': token}
+                logfire.info(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+            else:
+                logfire.error(f"Invalid content type: {content_type}")
+                json_response(self, 400, {"error": "Invalid content type"})
+                return
+
+            # Save task data to Vercel KV
+            await create_task(task_id, task_data)
+            # Add task to processing queue
+            await kv.rpush("task_queue", task_id)
+
+            json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
+        except Exception as e:
+            logfire.exception(f"Error in handle_convert: {str(e)}")
+            json_response(self, 500, {"error": "An unexpected error occurred. Please try again later."})
+
+    def get_user_email(self):
+        auth_header = self.headers.get('Authorization', '')
+        logfire.debug(f"Authorization header: {auth_header}")
+        if not auth_header:
+            logfire.warning("No Authorization header found")
+            return None
+        try:
+            token = auth_header.split(' ')[1]
+            email = verify_token_and_get_email(token)
+            logfire.debug(f"User email extracted: {email}")
+            return email
+        except IndexError:
+            logfire.error("Malformed Authorization header")
+            return None
+
+    async def handle_status(self):
+        task_id = self.headers.get('X-Task-ID')
+        if not task_id:
+            json_response(self, 200, {"status": "idle"})
             return
 
-        # Save task data to Vercel KV
-        await create_task(task_id, task_data)
-        # Add task to processing queue
-        await kv.rpush("task_queue", task_id)
+        try:
+            task_data = await get_task_status(task_id)
+            if not task_data:
+                response = {"status": "not_found"}
+            else:
+                response = {
+                    "status": task_data['status'],
+                    "error": task_data.get('error') if task_data['status'] == "failed" else None
+                }
+            json_response(self, 200, response)
+        except Exception as e:
+            logfire.exception(f"Error in handle_status for task {task_id}: {str(e)}")
+            json_response(self, 500, {"error": "An unexpected error occurred while checking status."})
 
-        json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
-    except Exception as e:
-        logfire.exception(f"Error in handle_convert: {str(e)}")
-        json_response(self, 500, {"error": "An unexpected error occurred. Please try again later."})
+    async def handle_reset(self):
+        user_email = self.get_user_email()
+        if not user_email:
+            json_response(self, 401, {"error": "Unauthorized"})
+            return
+
+        try:
+            async for key in kv.scan_iter("task:*"):
+                task_data = await get_task_status(key.split(':')[1])
+                if task_data and task_data.get('email') == user_email:
+                    await kv.delete(key)
+
+            logfire.info(f"Reset tasks for user: {user_email}")
+            json_response(self, 200, {"message": "Tasks reset successfully"})
+        except Exception as e:
+            logfire.exception(f"Error in handle_reset for user {user_email}: {str(e)}")
+            json_response(self, 500, {"error": "An unexpected error occurred while resetting tasks."})
 
 async def process_tasks():
     while True:
@@ -420,112 +463,110 @@ async def process_tasks():
                 task_data['error'] = str(e)
                 await create_task(task_id, task_data)
 
-# Modifing process_and_send_email to accept task_data
 async def process_and_send_email(task_id, task_data):
-        try:
-            task = task_data
-            user_email = task.get('email')
-            logfire.info(f"Starting processing for task {task_id}. User email: {user_email}")
+    try:
+        user_email = task_data.get('email')
+        logfire.info(f"Starting processing for task {task_id}. User email: {user_email}")
 
-            async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
-                output_dir = Path(tmpdir)
+        async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
 
-                # Process audio
-                if 'url' in task:
-                    url = task['url']
+            # Process audio
+            if 'url' in task_data:
+                url = task_data['url']
+            else:
+                url = f"file://{task_data['file']}"
+
+            logfire.info(f"Processing URL: {url}")
+
+            try:
+                # Initialize the language model
+                language_model = plato.llm.get_model(
+                    "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
+                )
+                logfire.info("Language model initialized")
+
+                # Set AssemblyAI API key in the environment if available
+                if os.getenv('ASSEMBLYAI_API_KEY'):
+                    logfire.info("Transcribing audio to text using AssemblyAI...")
+                    os.environ['ASSEMBLYAI_API_KEY'] = os.getenv('ASSEMBLYAI_API_KEY')
                 else:
-                    url = f"file://{task['file']}"
+                    logfire.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
 
-                logfire.info(f"Processing URL: {url}")
-
+                # Call plato.index() with error handling
                 try:
-                    # Initialize the language model
-                    language_model = plato.llm.get_model(
-                        "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
-                    )
-                    logfire.info("Language model initialized")
-
-                    # Set AssemblyAI API key in the environment if available
-                    if os.getenv('ASSEMBLYAI_API_KEY'):
-                        logfire.info("Transcribing audio to text using AssemblyAI...")
-                        os.environ['ASSEMBLYAI_API_KEY'] = os.getenv('ASSEMBLYAI_API_KEY')
+                    logfire.info("Calling plato.index()...")
+                    await plato.index(url, llm=language_model, lang=task_data['lang'])
+                    logfire.info("plato.index() completed successfully")
+                except AttributeError as e:
+                    if "'str' object has no attribute 'text'" in str(e):
+                        logfire.warning("Received string input instead of transcript objects. Attempting to process as string.")
+                        words = url.split()  # Simple word splitting
+                        transcript_objects = [type('obj', (), {'text': w})() for w in words]
+                        await plato.index(transcript_objects, llm=language_model, lang=task_data['lang'])
+                        logfire.info("Processed string input successfully")
                     else:
-                        logfire.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
+                        raise
 
-                    # Call plato.index() with error handling
+                # Call audio_to_paper function
+                logfire.info("Calling audio_to_paper function...")
+                title, abstract = await audio_to_paper(url, task_data['lang'], output_dir, images=task_data.get('images', False))
+                logfire.info(f"audio_to_paper completed. Title: {title}")
+
+                files = [f for f in output_dir.glob('*') if f.is_file()]
+                logfire.info(f"Generated {len(files)} files")
+
+                subject = f"[Platogram] {title}"
+                body = f"""Hi there!
+
+Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
+
+You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
+
+{abstract}
+
+Please reply to this e-mail if any suggestions, feedback, or questions.
+
+---
+Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
+Suggested donation: $2 per hour of content converted."""
+
+                if user_email:
+                    logfire.info(f"Sending email to {user_email}")
+                    await send_email_with_resend(user_email, subject, body, files)
+                    logfire.info("Email sent successfully")
+                else:
+                    logfire.warning(f"No email available for task {task_id}. Skipping email send.")
+
+                task_data['status'] = 'done'
+                logfire.info(f"Conversion completed for task {task_id}")
+
+                # Process payment
+                if task_data['price'] > 0 and task_data['token']:
                     try:
-                        logfire.info("Calling plato.index()...")
-                        await plato.index(url, llm=language_model, lang=task['lang'])
-                        logfire.info("plato.index() completed successfully")
-                    except AttributeError as e:
-                        if "'str' object has no attribute 'text'" in str(e):
-                            logfire.warning("Received string input instead of transcript objects. Attempting to process as string.")
-                            words = url.split()  # Simple word splitting
-                            transcript_objects = [type('obj', (), {'text': w})() for w in words]
-                            await plato.index(transcript_objects, llm=language_model, lang=task['lang'])
-                            logfire.info("Processed string input successfully")
-                        else:
-                            raise
+                        charge = stripe.Charge.create(
+                            amount=int(task_data['price'] * 100),
+                            currency='usd',
+                            source=task_data['token'],
+                            description=f'Platogram conversion: {title}'
+                        )
+                        logfire.info(f"Payment processed successfully for task {task_id}", charge_id=charge.id)
+                    except stripe.error.StripeError as e:
+                        logfire.error(f"Stripe payment failed for task {task_id}: {str(e)}")
+                        task_data['error'] = "Payment processing failed. Please contact support."
+                else:
+                    logfire.info(f"No charge for task {task_id}")
 
-                    # Call audio_to_paper function
-                    logfire.info("Calling audio_to_paper function...")
-                    title, abstract = await audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
-                    logfire.info(f"audio_to_paper completed. Title: {title}")
+            except Exception as e:
+                logfire.exception(f"Error in audio processing: {str(e)}")
+                task_data['status'] = 'failed'
+                task_data['error'] = get_user_friendly_error_message(str(e))
+                raise
 
-                    files = [f for f in output_dir.glob('*') if f.is_file()]
-                    logfire.info(f"Generated {len(files)} files")
-
-                    subject = f"[Platogram] {title}"
-                    body = f"""Hi there!
-
-    Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
-
-    You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
-
-    {abstract}
-
-    Please reply to this e-mail if any suggestions, feedback, or questions.
-
-    ---
-    Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
-    Suggested donation: $2 per hour of content converted."""
-
-                    if user_email:
-                        logfire.info(f"Sending email to {user_email}")
-                        await send_email_with_resend(user_email, subject, body, files)
-                        logfire.info("Email sent successfully")
-                    else:
-                        logfire.warning(f"No email available for task {task_id}. Skipping email send.")
-
-                    task_data['status'] = 'done'
-                    logfire.info(f"Conversion completed for task {task_id}")
-
-                    # Process payment
-                    if task['price'] > 0 and task['token']:
-                        try:
-                            charge = stripe.Charge.create(
-                                amount=int(task['price'] * 100),
-                                currency='usd',
-                                source=task['token'],
-                                description=f'Platogram conversion: {title}'
-                            )
-                            logfire.info(f"Payment processed successfully for task {task_id}", charge_id=charge.id)
-                        except stripe.error.StripeError as e:
-                            logfire.error(f"Stripe payment failed for task {task_id}: {str(e)}")
-                            task_data['error'] = "Payment processing failed. Please contact support."
-                    else:
-                        logfire.info(f"No charge for task {task_id}")
-
-                except Exception as e:
-                    logfire.exception(f"Error in audio processing: {str(e)}")
-                    task_data['status'] = 'failed'
-                    task_data['error'] = self.get_user_friendly_error_message(str(e))
-                    raise
-
-        except Exception as e:
-            logfire.exception(f"Error in process_and_send_email for task {task_id}: {str(e)}")
-            task_data['status'] = 'failed'
-            task_data['error'] = self.get_user_friendly_error_message(str(e))
+    except Exception as e:
+        logfire.exception(f"Error in process_and_send_email for task {task_id}: {str(e)}")
+        task_data['status'] = 'failed'
+        task_data['error'] = get_user_friendly_error_message(str(e))
 
     def get_user_friendly_error_message(self, error_message):
         # Use a language model to generate a user-friendly error message

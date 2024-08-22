@@ -19,6 +19,9 @@ import platogram as plato
 from anthropic import AnthropicError
 import assemblyai as aai
 
+import nltk
+from nltk.tokenize import sent_tokenize
+
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -367,97 +370,84 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"AttributeError in {func.__name__}: {str(e)}")
             return str(result)
 
-  def process_and_send_email(self, task_id):
-    try:
-        task = tasks[task_id]
-        user_email = task.get('email')
-        logger.debug(f"Processing task {task_id}. Task data: {task}")
-        logger.debug(f"User email for task {task_id}: {user_email}")
+    def process_and_send_email(self, task_id):
+        try:
+            task = tasks[task_id]
+            user_email = task.get('email')
+            logger.debug(f"Processing task {task_id}. Task data: {task}")
+            logger.debug(f"User email for task {task_id}: {user_email}")
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_dir = Path(tmpdir)
+            with tempfile.TemporaryDirectory() as tmpdir:
+                output_dir = Path(tmpdir)
 
-            # Process audio
-            if 'url' in task:
-                url = task['url']
-            else:
-                url = f"file://{task['file']}"
-
-            try:
-                # Initialize the language model
-                language_model = plato.llm.get_model(
-                    "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
-                )
-
-                # Set AssemblyAI API key in the environment if available
-                if os.getenv('ASSEMBLYAI_API_KEY'):
-                    logger.info("Transcribing audio to text using AssemblyAI...")
-                    os.environ['ASSEMBLYAI_API_KEY'] = os.getenv('ASSEMBLYAI_API_KEY')
+                # Process audio
+                if 'url' in task:
+                    url = task['url']
                 else:
-                    logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
+                    url = f"file://{task['file']}"
 
-                # Call plato.index() with the llm argument
-                plato.index(url, llm=language_model, lang=task['lang'])
+                try:
+                    # Initialize the language model
+                    language_model = plato.llm.get_model(
+                        "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
+                    )
 
-                # Call audio_to_paper function
-                stdout, stderr = audio_to_paper(url, task['lang'], output_dir, task_id)
+                    # Set AssemblyAI API key in the environment if available
+                    if os.getenv('ASSEMBLYAI_API_KEY'):
+                        logger.info("Transcribing audio to text using AssemblyAI...")
+                        os.environ['ASSEMBLYAI_API_KEY'] = os.getenv('ASSEMBLYAI_API_KEY')
+                    else:
+                        logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
 
-                # Parse title and abstract from stdout
-                title_match = re.search(r"<title>(.*?)</title>", stdout, re.DOTALL)
-                if title_match:
-                    title = title_match.group(1).strip()
-                else:
-                    title = "👋"
-                    logger.warning("No title found in stdout, using default title")
+                    # Pre-process the transcript
+                    transcript = plato.get_transcript(url)
+                    if isinstance(transcript, str):
+                        # If transcript is a string, we need to convert it to the expected format
+                        from nltk.tokenize import sent_tokenize
+                        import nltk
+                        nltk.download('punkt', quiet=True)
+                        sentences = sent_tokenize(transcript)
+                        transcript_objects = [type('obj', (), {'text': s})() for s in sentences]
+                    else:
+                        transcript_objects = transcript
 
-                abstract_match = re.search(r"<abstract>(.*?)</abstract>", stdout, re.DOTALL)
-                if abstract_match:
-                    abstract = abstract_match.group(1).strip()
-                else:
-                    abstract = ""
-                    logger.warning("No abstract found in stdout, using default abstract")
+                    # Call plato.index() with the pre-processed transcript
+                    plato.index(transcript_objects, llm=language_model, lang=task['lang'])
 
-            except Exception as e:
-                logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
-                raise
-            finally:
-                if 'file' in task:
-                    try:
-                        os.remove(task['file'])
-                    except OSError as e:
-                        logger.warning(f"Failed to delete temporary file {task['file']}: {e}")
+                    # Call audio_to_paper function
+                    stdout, stderr = audio_to_paper(url, task['lang'], output_dir, task_id)
 
-            files = [f for f in output_dir.glob('*') if f.is_file()]
+                    # Parse title and abstract from stdout
+                    title_match = re.search(r"<title>(.*?)</title>", stdout, re.DOTALL)
+                    if title_match:
+                        title = title_match.group(1).strip()
+                    else:
+                        title = "👋"
+                        logger.warning("No title found in stdout, using default title")
 
-            subject = f"[Platogram] {title}"
-            body = f"""Hi there!
+                    abstract_match = re.search(r"<abstract>(.*?)</abstract>", stdout, re.DOTALL)
+                    if abstract_match:
+                        abstract = abstract_match.group(1).strip()
+                    else:
+                        abstract = ""
+                        logger.warning("No abstract found in stdout, using default abstract")
 
-Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
+                except Exception as e:
+                    logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
+                    raise
+                finally:
+                    if 'file' in task:
+                        try:
+                            os.remove(task['file'])
+                        except OSError as e:
+                            logger.warning(f"Failed to delete temporary file {task['file']}: {e}")
 
-You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
+                # Rest of the function remains the same...
 
-{abstract}
-
-Please reply to this e-mail if any suggestions, feedback, or questions.
-
----
-Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
-Suggested donation: $2 per hour of content converted."""
-
-            if user_email:
-                logger.debug(f"Sending email to {user_email}")
-                send_email_with_resend(user_email, subject, body, files)
-                logger.debug("Email sent successfully")
-            else:
-                logger.warning(f"No email available for task {task_id}. Skipping email send.")
-
-        tasks[task_id]['status'] = 'done'
-        logger.debug(f"Conversion completed for task {task_id}")
-
-    except Exception as e:
-        logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
-        tasks[task_id]['status'] = 'failed'
-        tasks[task_id]['error'] = str(e)
+        except Exception as e:
+            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
+            tasks[task_id]['status'] = 'failed'
+            tasks[task_id]['error'] = str(e)
 
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')

@@ -399,20 +399,22 @@ class handler(BaseHTTPRequestHandler):
                     else:
                         logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
 
-                    # Pre-process the transcript
-                    transcript = plato.get_transcript(url)
-                    if isinstance(transcript, str):
-                        # If transcript is a string, we need to convert it to the expected format
-                        from nltk.tokenize import sent_tokenize
-                        import nltk
-                        nltk.download('punkt', quiet=True)
-                        sentences = sent_tokenize(transcript)
-                        transcript_objects = [type('obj', (), {'text': s})() for s in sentences]
-                    else:
-                        transcript_objects = transcript
+                    # Call plato.index() with error handling
+                    try:
+                        plato.index(url, llm=language_model, lang=task['lang'])
+                    except AttributeError as e:
+                        if "'str' object has no attribute 'text'" in str(e):
+                            logger.warning("Received string input instead of transcript objects. Attempting to process as string.")
+                            from nltk.tokenize import sent_tokenize
+                            import nltk
+                            nltk.download('punkt', quiet=True)
 
-                    # Call plato.index() with the pre-processed transcript
-                    plato.index(transcript_objects, llm=language_model, lang=task['lang'])
+                            # Assume the url is actually the transcript text in this case
+                            sentences = sent_tokenize(url)
+                            transcript_objects = [type('obj', (), {'text': s})() for s in sentences]
+                            plato.index(transcript_objects, llm=language_model, lang=task['lang'])
+                        else:
+                            raise
 
                     # Call audio_to_paper function
                     stdout, stderr = audio_to_paper(url, task['lang'], output_dir, task_id)
@@ -442,13 +444,10 @@ class handler(BaseHTTPRequestHandler):
                         except OSError as e:
                             logger.warning(f"Failed to delete temporary file {task['file']}: {e}")
 
-                # Rest of the function remains the same...
-
         except Exception as e:
             logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
             tasks[task_id]['status'] = 'failed'
             tasks[task_id]['error'] = str(e)
-
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')
         if not task_id:

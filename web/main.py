@@ -356,6 +356,17 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
+    def safe_get(func, *args, **kwargs):
+        try:
+            result = func(*args, **kwargs)
+            logger.debug(f"{func.__name__} returned type: {type(result)}")
+            if hasattr(result, 'text'):
+                return result.text
+            return str(result)
+        except AttributeError as e:
+            logger.error(f"AttributeError in {func.__name__}: {str(e)}")
+            return str(result)
+
     def process_and_send_email(self, task_id):
         try:
             task = tasks[task_id]
@@ -386,10 +397,23 @@ class handler(BaseHTTPRequestHandler):
                         logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
 
                     # Call plato.index() without the images argument
+                    logger.debug("Calling plato.index()")
                     plato.index(url, llm=language_model, lang=task['lang'])
 
                     # Pass the images flag to audio_to_paper if needed
-                    title, abstract = audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
+                    logger.debug("Calling audio_to_paper()")
+                    title = safe_get(audio_to_paper, url, task['lang'], output_dir, images=task.get('images', False))
+
+                    # If title is a tuple (as expected), unpack it
+                    if isinstance(title, tuple):
+                        title, abstract = title
+                    else:
+                        logger.warning(f"Unexpected return type from audio_to_paper: {type(title)}")
+                        abstract = "Abstract not available"
+
+                except Exception as e:
+                    logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
+                    raise
                 finally:
                     if 'file' in task:
                         try:
@@ -397,9 +421,7 @@ class handler(BaseHTTPRequestHandler):
                         except OSError as e:
                             logger.warning(f"Failed to delete temporary file {task['file']}: {e}")
     
-
                 files = [f for f in output_dir.glob('*') if f.is_file()]
-
                 subject = f"[Platogram] {title}"
                 body = f"""Hi there!
 
@@ -426,7 +448,7 @@ class handler(BaseHTTPRequestHandler):
             logger.debug(f"Conversion completed for task {task_id}")
 
         except Exception as e:
-            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}")
+            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
             tasks[task_id]['status'] = 'failed'
             tasks[task_id]['error'] = str(e)
 

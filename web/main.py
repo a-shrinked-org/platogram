@@ -521,3 +521,22 @@ async def handle_request(event, context):
 
 def handler(event, context):
     return asyncio.get_event_loop().run_until_complete(handle_request(event, context))
+
+# This is the entry point for Vercel
+def vercel_handler(request):
+    # Convert the Vercel request to the format expected by your handler
+    event = {
+        'httpMethod': request.method,
+        'path': request.url.path,
+        'headers': dict(request.headers),
+        'body': request.body.decode() if request.body else ''
+    }
+
+    result = handler(event, {})
+
+    # Convert the result back to what Vercel expects
+    return {
+        'statusCode': result['statusCode'],
+        'headers': result.get('headers', {}),
+        'body': result['body']
+    }

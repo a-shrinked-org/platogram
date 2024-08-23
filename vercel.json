@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "web/main.py",
+      "src": "main.py",
       "use": "@vercel/python",
       "config": {
         "maxLambdaSize": "15mb",
@@ -13,12 +13,6 @@
       "src": "web/**",
       "use": "@vercel/static"
     }
-  ],
-  "crons": [
-    {
-    "path": "/api/cron",
-    "schedule": "*/5 * * * *"
-  }
   ],
   "routes": [
     {
@@ -35,7 +29,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/web/main.py"
+      "dest": "/main.py"
     }
   ],
   "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e ."

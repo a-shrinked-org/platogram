@@ -387,69 +387,123 @@ async def get_user_friendly_error_message(error_message):
     response = await model.prompt_model(messages=[plato.types.User(content=prompt)])
     return response.strip()[:256]
 
+async def handle_task_status(task_id):
+    pool = await get_db_pool()
+    task_data = await get_task_status(pool, task_id)
+    if task_data:
+        response = {
+            "task_id": task_id,
+            "status": task_data['status'],
+            "error": task_data.get('error') if task_data['status'] == "failed" else None
+        }
+        return {'statusCode': 200, 'body': json.dumps(response)}
+    else:
+        return {'statusCode': 404, 'body': json.dumps({"error": "Task not found"})}
+
+async def handle_status(headers):
+    task_id = headers.get('X-Task-ID')
+    if not task_id:
+        return {'statusCode': 200, 'body': json.dumps({"status": "idle"})}
+
+    pool = await get_db_pool()
+    try:
+        task_data = await get_task_status(pool, task_id)
+        if not task_data:
+            response = {"status": "not_found"}
+        else:
+            response = {
+                "status": task_data['status'],
+                "error": task_data.get('error') if task_data['status'] == "failed" else None
+            }
+        return {'statusCode': 200, 'body': json.dumps(response)}
+    except Exception as e:
+        logger.exception(f"Error in handle_status for task {task_id}: {str(e)}")
+        return {'statusCode': 500, 'body': json.dumps({"error": "An unexpected error occurred while checking status."})}
+
+async def handle_reset(headers):
+    user_email = verify_token_and_get_email(headers.get('Authorization', '').split(' ')[1])
+    if not user_email:
+        return {'statusCode': 401, 'body': json.dumps({"error": "Unauthorized"})}
+
+    pool = await get_db_pool()
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "DELETE FROM tasks WHERE data->>'email' = $1",
+                user_email
+            )
+        logfire.info(f"Reset tasks for user: {user_email}")
+        return {'statusCode': 200, 'body': json.dumps({"message": "Tasks reset successfully"})}
+    except Exception as e:
+        logfire.exception(f"Error in handle_reset for user {user_email}: {str(e)}")
+        return {'statusCode': 500, 'body': json.dumps({"error": "An unexpected error occurred while resetting tasks."})}
+
+async def handle_convert(headers, body):
+    user_email = verify_token_and_get_email(headers.get('Authorization', '').split(' ')[1])
+    if not user_email:
+        return {'statusCode': 401, 'body': json.dumps({"error": "Unauthorized"})}
+
+    pool = await get_db_pool()
+    try:
+        task_id = str(uuid4())
+        data = json.loads(body)
+        task_data = {
+            'status': 'processing',
+            'url': data.get('url'),
+            'lang': data.get('lang', 'en'),
+            'email': user_email,
+            'price': float(data.get('price', 0)),
+            'token': data.get('token')
+        }
+        await create_task(pool, task_id, task_data)
+        asyncio.create_task(process_and_send_email(pool, task_id, task_data))
+        return {'statusCode': 200, 'body': json.dumps({"message": "Conversion started", "task_id": task_id})}
+    except Exception as e:
+        logfire.exception(f"Error in handle_convert: {str(e)}")
+        return {'statusCode': 500, 'body': json.dumps({"error": "An unexpected error occurred. Please try again later."})}
+
+db_pool = None
+
+async def get_db_pool():
+    global db_pool
+    if db_pool is None:
+        db_pool = await asyncpg.create_pool(os.environ['POSTGRES_URL'])
+    return db_pool
+
 async def handle_request(event, context):
     pool = await get_db_pool()
 
-    try:
-        path = event['path']
-        method = event['httpMethod']
-        headers = event['headers']
+    path = event['path']
+    method = event['httpMethod']
+    headers = event['headers']
+    body = event.get('body', '')
 
-        if method == 'GET':
-            if path.startswith('/task_status'):
-                task_id = path.split('/')[-1]
-                task_data = await get_task_status(pool, task_id)
-                if task_data:
-                    response = {
-                        "task_id": task_id,
-                        "status": task_data['status'],
-                        "error": task_data.get('error') if task_data['status'] == "failed" else None
-                    }
-                    return {'statusCode': 200, 'body': json.dumps(response)}
-                else:
-                    return {'statusCode': 404, 'body': json.dumps({"error": "Task not found"})}
-            elif path == '/status':
-                return {'statusCode': 200, 'body': json.dumps({"status": "OK"})}
-            elif path == '/reset':
-                user_email = verify_token_and_get_email(headers.get('Authorization', '').split(' ')[1])
-                if not user_email:
-                    return {'statusCode': 401, 'body': json.dumps({"error": "Unauthorized"})}
-                async with pool.acquire() as conn:
-                    await conn.execute(
-                        "DELETE FROM tasks WHERE data->>'email' = $1",
-                        user_email
-                    )
-                return {'statusCode': 200, 'body': json.dumps({"message": "Tasks reset successfully"})}
-            else:
-                return {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
-        elif method == 'POST':
-            if path == '/convert':
-                body = json.loads(event['body'])
-                user_email = verify_token_and_get_email(headers.get('Authorization', '').split(' ')[1])
-                if not user_email:
-                    return {'statusCode': 401, 'body': json.dumps({"error": "Unauthorized"})}
-
-                task_id = str(uuid4())
-                task_data = {
-                    'status': 'processing',
-                    'url': body.get('url'),
-                    'lang': body.get('lang', 'en'),
-                    'email': user_email,
-                    'price': float(body.get('price', 0)),
-                    'token': body.get('token')
-                }
-                await create_task(pool, task_id, task_data)
-                asyncio.create_task(process_and_send_email(pool, task_id, task_data))
-                return {'statusCode': 200, 'body': json.dumps({"message": "Conversion started", "task_id": task_id})}
-            else:
-                return {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
+    if method == 'GET':
+        if path.startswith('/task_status'):
+            return await handle_task_status(path.split('/')[-1])
+        elif path == '/status':
+            return await handle_status(headers)
+        elif path == '/reset':
+            return await handle_reset(headers)
         else:
-            return {'statusCode': 405, 'body': json.dumps({"error": "Method Not Allowed"})}
-    except Exception as e:
-        logger.exception(f"Error in handle_request: {str(e)}")
-        return {'statusCode': 500, 'body': json.dumps({"error": "An unexpected error occurred"})}
-    finally:
-        await pool.close()
+            return {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
+    elif method == 'POST':
+        if path == '/convert':
+            return await handle_convert(headers, body)
+        else:
+            return {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
+    elif method == 'OPTIONS':
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-File-Name, X-Language, X-Price, X-Token'
+            },
+            'body': ''
+        }
+    else:
+        return {'statusCode': 405, 'body': json.dumps({"error": "Method Not Allowed"})}
 
 def handler(event, context):
     return asyncio.get_event_loop().run_until_complete(handle_request(event, context))

@@ -1,26 +1,14 @@
-import { kv } from '@vercel/kv';
+import { handler } from '../main';
 
-export default async function handler(req, res) {
-  const { authorization } = req.headers;
+export default async function (req, res) {
+  const event = {
+    httpMethod: 'GET',
+    path: '/api/cron',
+    headers: req.headers,
+    body: null,
+  };
 
-  if (authorization !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(401).end('Unauthorized');
-  }
+  const result = await handler(event, {});
 
-  try {
-    // Call your Python function to process tasks
-    const { exec } = require('child_process');
-    exec('python3 -c "from main import process_tasks; import asyncio; asyncio.run(process_tasks())"', (error, stdout, stderr) => {
-      if (error) {
-        console.error(`exec error: ${error}`);
-        return res.status(500).end('Error processing tasks');
-      }
-      console.log(`stdout: ${stdout}`);
-      console.error(`stderr: ${stderr}`);
-      res.status(200).end('Tasks processed successfully');
-    });
-  } catch (error) {
-    console.error('Error processing tasks:', error);
-    res.status(500).end('Error processing tasks');
-  }
+  res.status(result.statusCode).json(JSON.parse(result.body));
 }

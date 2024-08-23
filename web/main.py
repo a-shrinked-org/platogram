@@ -42,25 +42,15 @@ logfire.configure()
 async def get_db_pool():
     return await asyncpg.create_pool(os.environ['POSTGRES_URL'])
 
-# Initialize the pool at the module level
-db_pool = None
-
-async def initialize_db_pool():
-    global db_pool
-    db_pool = await get_db_pool()
-
-# Call this function at the start of your application
-asyncio.run(initialize_db_pool())
-
-async def create_task(task_id, task_data):
-    async with db_pool.acquire() as conn:
+async def create_task(pool, task_id, task_data):
+    async with pool.acquire() as conn:
         await conn.execute(
             "INSERT INTO tasks (id, data) VALUES ($1, $2)",
             task_id, json.dumps(task_data)
         )
 
-async def get_task_status(task_id):
-    async with db_pool.acquire() as conn:
+async def get_task_status(pool, task_id):
+    async with pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT data FROM tasks WHERE id = $1",
             task_id
@@ -353,25 +343,26 @@ class handler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language, X-Price, X-Token')
         self.end_headers()
 
-    def do_GET(self):
+    async def do_GET(self):
         if self.path.startswith('/task_status'):
-            asyncio.run(self.handle_task_status())
+            await self.handle_task_status()
         elif self.path == '/status':
-            asyncio.run(self.handle_status())
+            await self.handle_status()
         elif self.path == '/reset':
-            asyncio.run(self.handle_reset())
+            await self.handle_reset()
         else:
             json_response(self, 404, {"error": "Not Found"})
 
-    def do_POST(self):
+    async def do_POST(self):
         if self.path == '/convert':
-            asyncio.run(self.handle_convert())
+            await self.handle_convert()
         else:
             json_response(self, 404, {"error": "Not Found"})
 
     async def handle_task_status(self):
+        pool = await get_db_pool()
         task_id = self.path.split('/')[-1]
-        task_data = await get_task_status(task_id)
+        task_data = await get_task_status(pool, task_id)
         if task_data:
             response = {
                 "task_id": task_id,
@@ -390,6 +381,7 @@ class handler(BaseHTTPRequestHandler):
         logfire.info(f"User email for conversion: {user_email}")
 
         try:
+            pool = await get_db_pool()
             task_id = str(uuid4())
             if content_type == 'application/octet-stream':
                 body = self.rfile.read(content_length)  # Read raw bytes
@@ -421,10 +413,11 @@ class handler(BaseHTTPRequestHandler):
                 json_response(self, 400, {"error": "Invalid content type"})
                 return
 
-            # Save task data to Vercel KV
-            await create_task(task_id, task_data)
-            # Add task to processing queue
-            await kv.rpush("task_queue", task_id)
+            # Save task data to database
+            await create_task(pool, task_id, task_data)
+
+            # Start processing in background
+            asyncio.create_task(process_and_send_email(pool, task_id, task_data))
 
             json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
         except Exception as e:
@@ -505,7 +498,7 @@ async def process_tasks():
                 task_data['error'] = str(e)
                 await create_task(task_id, task_data)
 
-async def process_and_send_email(task_id, task_data):
+async def process_and_send_email(pool, task_id, task_data):
     try:
         user_email = task_data.get('email')
         logfire.info(f"Starting processing for task {task_id}. User email: {user_email}")
@@ -682,12 +675,10 @@ Suggested donation: $2 per hour of content converted."""
 # Vercel handler
 def vercel_handler(event, context):
     async def async_handler(event, context):
-        global db_pool
-        if db_pool is None:
-            db_pool = await get_db_pool()
+        pool = await get_db_pool()
 
         # Create table if it doesn't exist
-        async with db_pool.acquire() as conn:
+        async with pool.acquire() as conn:
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS tasks (
                     id TEXT PRIMARY KEY,
@@ -735,11 +726,12 @@ def vercel_handler(event, context):
         elif mock_request.method == 'OPTIONS':
             server.do_OPTIONS()
 
+        await pool.close()
+
         return {
             'statusCode': mock_response.status_code,
             'headers': mock_response.headers,
             'body': mock_response.body,
         }
 
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(async_handler(event, context))
+    return asyncio.run(async_handler(event, context))

@@ -209,6 +209,124 @@ function showErrorMessage(message) {
   }
 }
 
+async function postToConvert(inputData, lang) {
+  const chunkSize = 4 * 1024 * 1024; // 4MB chunks
+  let body;
+  let headers = {};
+
+  const maxRetries = 3; // Number of retries
+  const retryDelay = 2000; // Delay between retries
+
+  try {
+    updateUIStatus("running", "Starting conversion process...");
+
+    const token = await auth0Client.getTokenSilently({
+      audience: "https://platogram.vercel.app",
+    });
+    debugLog("Obtained token for convert");
+
+    headers.Authorization = `Bearer ${token}`;
+    headers["Content-Type"] = inputData.file
+      ? "application/octet-stream"
+      : "application/json";
+
+    if (inputData.file) {
+      const file = inputData.file;
+      const totalChunks = Math.ceil(file.size / chunkSize);
+
+      for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+        const start = chunkIndex * chunkSize;
+        const end = Math.min(start + chunkSize, file.size);
+        const chunk = file.slice(start, end);
+
+        headers["X-File-Name"] = file.name;
+        headers["X-Chunk-Index"] = chunkIndex.toString();
+        headers["X-Total-Chunks"] = totalChunks.toString();
+        headers["X-Language"] = lang;
+
+        let response;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          try {
+            response = await fetch("/convert", {
+              method: "POST",
+              headers: headers,
+              body: chunk,
+            });
+
+            if (response.ok) break; // Exit loop if request was successful
+          } catch (error) {
+            if (attempt < maxRetries - 1) {
+              await new Promise((resolve) => setTimeout(resolve, retryDelay)); // Wait before retrying
+            } else {
+              throw error; // Throw error if all retries fail
+            }
+          }
+        }
+
+        if (response) {
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            debugLog("Received chunk: " + chunk);
+            updateUIStatus("running", chunk);
+          }
+        }
+      }
+    } else if (inputData.url) {
+      body = JSON.stringify({ url: inputData.url, lang: lang });
+
+      let response;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          response = await fetch("/convert", {
+            method: "POST",
+            headers: headers,
+            body: body,
+          });
+
+          if (response.ok) break; // Exit loop if request was successful
+        } catch (error) {
+          if (attempt < maxRetries - 1) {
+            await new Promise((resolve) => setTimeout(resolve, retryDelay)); // Wait before retrying
+          } else {
+            throw error; // Throw error if all retries fail
+          }
+        }
+      }
+
+      if (response) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value);
+          debugLog("Received chunk: " + chunk);
+          updateUIStatus("running", chunk);
+        }
+      }
+    } else {
+      throw new Error("No input provided");
+    }
+
+    updateUIStatus(
+      "done",
+      "Conversion process initiated. You will receive an email when it's complete."
+    );
+  } catch (error) {
+    console.error("Error in postToConvert:", error);
+    updateUIStatus(
+      "error",
+      error.message || "An error occurred during conversion"
+    );
+  }
+}
+
 async function login() {
   try {
     if (!auth0Client) throw new Error("Auth0 client not initialized");
@@ -241,7 +359,7 @@ function showLanguageSelectionModal(inputData) {
   }
 
   modal.classList.remove("hidden");
-  modal.style.display = "block";
+  modal.style.display = "block"; // or 'flex', depending on your layout
 
   const handleLanguageSelection = async (lang) => {
     debugLog(`Language selected: ${lang}`);

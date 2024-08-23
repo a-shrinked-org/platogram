@@ -57,11 +57,11 @@ async def get_task_status(pool, task_id):
         )
         return json.loads(row['data']) if row else None
 
-async def process_tasks():
+async def process_tasks(pool):
     while True:
-        async with db_pool.acquire() as conn:
+        async with pool.acquire() as conn:
             task = await conn.fetchrow(
-                "SELECT id, data FROM tasks WHERE status = 'processing' LIMIT 1"
+                "SELECT id, data FROM tasks WHERE data->>'status' = 'processing' LIMIT 1"
             )
             if not task:
                 break
@@ -70,7 +70,7 @@ async def process_tasks():
             task_data = json.loads(task['data'])
 
             try:
-                await process_and_send_email(task_id, task_data)
+                await process_and_send_email(pool, task_id, task_data)
                 await conn.execute(
                     "UPDATE tasks SET data = $1 WHERE id = $2",
                     json.dumps({**task_data, 'status': 'done'}), task_id
@@ -336,6 +336,30 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
     return title, abstract
 
 class handler(BaseHTTPRequestHandler):
+    async def do_GET(self):
+        pool = await get_db_pool()
+        try:
+            if self.path.startswith('/task_status'):
+                await self.handle_task_status(pool)
+            elif self.path == '/status':
+                await self.handle_status(pool)
+            elif self.path == '/reset':
+                await self.handle_reset(pool)
+            else:
+                json_response(self, 404, {"error": "Not Found"})
+        finally:
+            await pool.close()
+
+    async def do_POST(self):
+        pool = await get_db_pool()
+        try:
+            if self.path == '/convert':
+                await self.handle_convert(pool)
+            else:
+                json_response(self, 404, {"error": "Not Found"})
+        finally:
+            await pool.close()
+
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -343,24 +367,7 @@ class handler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language, X-Price, X-Token')
         self.end_headers()
 
-    async def do_GET(self):
-        if self.path.startswith('/task_status'):
-            await self.handle_task_status()
-        elif self.path == '/status':
-            await self.handle_status()
-        elif self.path == '/reset':
-            await self.handle_reset()
-        else:
-            json_response(self, 404, {"error": "Not Found"})
-
-    async def do_POST(self):
-        if self.path == '/convert':
-            await self.handle_convert()
-        else:
-            json_response(self, 404, {"error": "Not Found"})
-
-    async def handle_task_status(self):
-        pool = await get_db_pool()
+    async def handle_task_status(self, pool):
         task_id = self.path.split('/')[-1]
         task_data = await get_task_status(pool, task_id)
         if task_data:
@@ -373,7 +380,7 @@ class handler(BaseHTTPRequestHandler):
         else:
             json_response(self, 404, {"error": "Task not found"})
 
-    async def handle_convert(self):
+    async def handle_convert(self, pool):
         logfire.info("Handling /convert request")
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
@@ -381,7 +388,6 @@ class handler(BaseHTTPRequestHandler):
         logfire.info(f"User email for conversion: {user_email}")
 
         try:
-            pool = await get_db_pool()
             task_id = str(uuid4())
             if content_type == 'application/octet-stream':
                 body = self.rfile.read(content_length)  # Read raw bytes
@@ -439,14 +445,14 @@ class handler(BaseHTTPRequestHandler):
             logfire.error("Malformed Authorization header")
             return None
 
-    async def handle_status(self):
+    async def handle_status(self, pool):
         task_id = self.headers.get('X-Task-ID')
         if not task_id:
             json_response(self, 200, {"status": "idle"})
             return
 
         try:
-            task_data = await get_task_status(task_id)
+            task_data = await get_task_status(pool, task_id)
             if not task_data:
                 response = {"status": "not_found"}
             else:
@@ -459,14 +465,14 @@ class handler(BaseHTTPRequestHandler):
             logfire.exception(f"Error in handle_status for task {task_id}: {str(e)}")
             json_response(self, 500, {"error": "An unexpected error occurred while checking status."})
 
-    async def handle_reset(self):
+    async def handle_reset(self, pool):
         user_email = self.get_user_email()
         if not user_email:
             json_response(self, 401, {"error": "Unauthorized"})
             return
 
         try:
-            async with db_pool.acquire() as conn:
+            async with pool.acquire() as conn:
                 await conn.execute(
                     "DELETE FROM tasks WHERE data->>'email' = $1",
                     user_email
@@ -476,27 +482,6 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             logfire.exception(f"Error in handle_reset for user {user_email}: {str(e)}")
             json_response(self, 500, {"error": "An unexpected error occurred while resetting tasks."})
-
-async def process_tasks():
-    while True:
-        task_id = await kv.lpop("task_queue")
-        if not task_id:
-            break
-
-        task_data = await get_task_status(task_id)
-        if task_data and task_data['status'] == 'processing':
-            try:
-                # Process the task
-                await process_and_send_email(task_id, task_data)
-
-                # Update task status
-                task_data['status'] = 'done'
-                await create_task(task_id, task_data)
-            except Exception as e:
-                logfire.exception(f"Error processing task {task_id}: {str(e)}")
-                task_data['status'] = 'failed'
-                task_data['error'] = str(e)
-                await create_task(task_id, task_data)
 
 async def process_and_send_email(pool, task_id, task_data):
     try:
@@ -592,6 +577,13 @@ Suggested donation: $2 per hour of content converted."""
                 else:
                     logfire.info(f"No charge for task {task_id}")
 
+                # Update task status in the database
+                async with pool.acquire() as conn:
+                    await conn.execute(
+                        "UPDATE tasks SET data = $1 WHERE id = $2",
+                        json.dumps(task_data), task_id
+                    )
+
             except Exception as e:
                 logfire.exception(f"Error in audio processing: {str(e)}")
                 task_data['status'] = 'failed'
@@ -603,135 +595,87 @@ Suggested donation: $2 per hour of content converted."""
         task_data['status'] = 'failed'
         task_data['error'] = get_user_friendly_error_message(str(e))
 
-    def get_user_friendly_error_message(self, error_message):
-        # Use a language model to generate a user-friendly error message
-        model = plato.llm.get_model("anthropic/claude-3-5-sonnet", key=os.getenv("ANTHROPIC_API_KEY"))
-        prompt = f"""
-        Given the following error message, provide a concise, user-friendly explanation
-        that focuses on the key issue and any actionable steps. Avoid technical jargon
-        and keep the message under 256 characters:
+        # Update task status in the database
+        async with pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE tasks SET data = $1 WHERE id = $2",
+                json.dumps(task_data), task_id
+            )
 
-        Error: {error_message}
-        """
-        response = model.prompt_model(messages=[plato.types.User(content=prompt)])
-        return response.strip()[:256]  # Truncate to 256 characters
+def get_user_friendly_error_message(error_message):
+    # Use a language model to generate a user-friendly error message
+    model = plato.llm.get_model("anthropic/claude-3-5-sonnet", key=os.getenv("ANTHROPIC_API_KEY"))
+    prompt = f"""
+    Given the following error message, provide a concise, user-friendly explanation
+    that focuses on the key issue and any actionable steps. Avoid technical jargon
+    and keep the message under 256 characters:
 
-    def get_user_email(self):
-        auth_header = self.headers.get('Authorization', '')
-        logfire.debug(f"Authorization header: {auth_header}")
-        if not auth_header:
-            logfire.warning("No Authorization header found")
-            return None
-        try:
-            token = auth_header.split(' ')[1]
-            email = verify_token_and_get_email(token)
-            logfire.debug(f"User email extracted: {email}")
-            return email
-        except IndexError:
-            logfire.error("Malformed Authorization header")
-            return None
-
-    def handle_status(self):
-        task_id = self.headers.get('X-Task-ID')
-        if not task_id:
-            json_response(self, 200, {"status": "idle"})
-            return
-
-        try:
-            if task_id not in tasks:
-                response = {"status": "not_found"}
-            else:
-                task = task_data
-                response = {
-                    "status": task['status'],
-                    "error": task.get('error') if task['status'] == "failed" else None
-                }
-            json_response(self, 200, response)
-        except Exception as e:
-            logfire.exception(f"Error in handle_status for task {task_id}: {str(e)}")
-            json_response(self, 500, {"error": "An unexpected error occurred while checking status."})
-
-    def handle_reset(self):
-        user_email = self.get_user_email()
-        if not user_email:
-            json_response(self, 401, {"error": "Unauthorized"})
-            return
-
-        try:
-            task_ids_to_remove = []
-            for task_id, task in tasks.items():
-                if task.get('email') == user_email:
-                    task_ids_to_remove.append(task_id)
-
-            for task_id in task_ids_to_remove:
-                del task_data
-
-            logfire.info(f"Reset tasks for user: {user_email}")
-            json_response(self, 200, {"message": "Tasks reset successfully"})
-        except Exception as e:
-            logfire.exception(f"Error in handle_reset for user {user_email}: {str(e)}")
-            json_response(self, 500, {"error": "An unexpected error occurred while resetting tasks."})
+    Error: {error_message}
+    """
+    response = model.prompt_model(messages=[plato.types.User(content=prompt)])
+    return response.strip()[:256]  # Truncate to 256 characters
 
 # Vercel handler
 def vercel_handler(event, context):
     async def async_handler(event, context):
         pool = await get_db_pool()
 
-        # Create table if it doesn't exist
-        async with pool.acquire() as conn:
-            await conn.execute('''
-                CREATE TABLE IF NOT EXISTS tasks (
-                    id TEXT PRIMARY KEY,
-                    data JSONB NOT NULL
-                )
-            ''')
-            
-        class MockRequest:
-            def __init__(self, event):
-                self.headers = event['headers']
-                self.method = event['httpMethod']
-                self.path = event['path']
-                self.body = event.get('body', '')
+        try:
+            # Create table if it doesn't exist
+            async with pool.acquire() as conn:
+                await conn.execute('''
+                    CREATE TABLE IF NOT EXISTS tasks (
+                        id TEXT PRIMARY KEY,
+                        data JSONB NOT NULL
+                    )
+                ''')
 
-        class MockResponse:
-            def __init__(self):
-                self.status_code = 200
-                self.headers = {}
-                self.body = ''
+            class MockRequest:
+                def __init__(self, event):
+                    self.headers = event['headers']
+                    self.method = event['httpMethod']
+                    self.path = event['path']
+                    self.body = event.get('body', '')
 
-            def send_response(self, status_code):
-                self.status_code = status_code
+            class MockResponse:
+                def __init__(self):
+                    self.status_code = 200
+                    self.headers = {}
+                    self.body = ''
 
-            def send_header(self, key, value):
-                self.headers[key] = value
+                def send_response(self, status_code):
+                    self.status_code = status_code
 
-            def end_headers(self):
-                pass
+                def send_header(self, key, value):
+                    self.headers[key] = value
 
-            def wfile(self):
-                class MockWFile:
-                    def write(self, data):
-                        self.body += data.decode('utf-8') if isinstance(data, bytes) else data
-                return MockWFile()
+                def end_headers(self):
+                    pass
 
-        mock_request = MockRequest(event)
-        mock_response = MockResponse()
+                def wfile(self):
+                    class MockWFile:
+                        def write(self, data):
+                            self.body += data.decode('utf-8') if isinstance(data, bytes) else data
+                    return MockWFile()
 
-        server = handler(mock_request, mock_request.path, mock_response)
+            mock_request = MockRequest(event)
+            mock_response = MockResponse()
 
-        if mock_request.method == 'GET':
-            await server.do_GET()
-        elif mock_request.method == 'POST':
-            await server.do_POST()
-        elif mock_request.method == 'OPTIONS':
-            server.do_OPTIONS()
+            server = handler(mock_request, mock_request.path, mock_response)
 
-        await pool.close()
+            if mock_request.method == 'GET':
+                await server.do_GET()
+            elif mock_request.method == 'POST':
+                await server.do_POST()
+            elif mock_request.method == 'OPTIONS':
+                server.do_OPTIONS()
 
-        return {
-            'statusCode': mock_response.status_code,
-            'headers': mock_response.headers,
-            'body': mock_response.body,
-        }
+            return {
+                'statusCode': mock_response.status_code,
+                'headers': mock_response.headers,
+                'body': mock_response.body,
+            }
+        finally:
+            await pool.close()
 
     return asyncio.run(async_handler(event, context))

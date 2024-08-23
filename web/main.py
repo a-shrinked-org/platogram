@@ -1,4 +1,3 @@
-from http.server import BaseHTTPRequestHandler
 import json
 import os
 import logging
@@ -15,8 +14,6 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
 import asyncpg
-import io
-import subprocess
 import asyncio
 import aiofiles
 import aiofiles.tempfile
@@ -25,9 +22,6 @@ import aiohttp
 import platogram as plato
 from anthropic import AnthropicError
 import assemblyai as aai
-
-import nltk
-from nltk.tokenize import sent_tokenize
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
@@ -38,49 +32,6 @@ stripe.api_key = os.getenv("STRIPE_API_KEY")
 
 # Configure logfire
 logfire.configure()
-
-async def get_db_pool():
-    return await asyncpg.create_pool(os.environ['POSTGRES_URL'])
-
-async def create_task(pool, task_id, task_data):
-    async with pool.acquire() as conn:
-        await conn.execute(
-            "INSERT INTO tasks (id, data) VALUES ($1, $2)",
-            task_id, json.dumps(task_data)
-        )
-
-async def get_task_status(pool, task_id):
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT data FROM tasks WHERE id = $1",
-            task_id
-        )
-        return json.loads(row['data']) if row else None
-
-async def process_tasks(pool):
-    while True:
-        async with pool.acquire() as conn:
-            task = await conn.fetchrow(
-                "SELECT id, data FROM tasks WHERE data->>'status' = 'processing' LIMIT 1"
-            )
-            if not task:
-                break
-
-            task_id = task['id']
-            task_data = json.loads(task['data'])
-
-            try:
-                await process_and_send_email(pool, task_id, task_data)
-                await conn.execute(
-                    "UPDATE tasks SET data = $1 WHERE id = $2",
-                    json.dumps({**task_data, 'status': 'done'}), task_id
-                )
-            except Exception as e:
-                logfire.exception(f"Error processing task {task_id}: {str(e)}")
-                await conn.execute(
-                    "UPDATE tasks SET data = $1 WHERE id = $2",
-                    json.dumps({**task_data, 'status': 'failed', 'error': str(e)}), task_id
-                )
 
 # Resend API key
 RESEND_API_KEY = os.getenv('RESEND_API_KEY')
@@ -103,14 +54,23 @@ auth0_public_key_cache = {
 # Configure AssemblyAI
 aai.settings.api_key = os.getenv('ASSEMBLYAI_API_KEY')
 
-def json_response(handler, status_code, data):
-    handler.send_response(status_code)
-    handler.send_header('Content-type', 'application/json')
-    handler.send_header('Access-Control-Allow-Origin', '*')
-    handler.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    handler.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language, X-Price, X-Token')
-    handler.end_headers()
-    handler.wfile.write(json.dumps(data).encode('utf-8'))
+async def get_db_pool():
+    return await asyncpg.create_pool(os.environ['POSTGRES_URL'])
+
+async def create_task(pool, task_id, task_data):
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO tasks (id, data) VALUES ($1, $2)",
+            task_id, json.dumps(task_data)
+        )
+
+async def get_task_status(pool, task_id):
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT data FROM tasks WHERE id = $1",
+            task_id
+        )
+        return json.loads(row['data']) if row else None
 
 def get_auth0_public_key():
     current_time = time.time()
@@ -207,23 +167,19 @@ async def send_email_with_resend(to_email, subject, body, attachments):
 async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
     logger.info(f"Processing audio from: {url}")
 
-    # Check for required API keys
     if not os.getenv('ANTHROPIC_API_KEY'):
         raise EnvironmentError("ANTHROPIC_API_KEY is not set")
 
-    # Initialize Platogram models
     language_model = plato.llm.get_model(
         "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
     )
 
-    # Handle local file paths
     if url.startswith("file://"):
-        file_path = url[7:]  # Remove "file://" prefix
+        file_path = url[7:]
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Local file not found: {file_path}")
-        url = file_path  # Use the local file path directly
+        url = file_path
 
-    # Transcribe or index content
     if os.getenv('ASSEMBLYAI_API_KEY'):
         logger.info("Transcribing audio to text using AssemblyAI...")
         await plato.index(url, llm=language_model, assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY'), lang=lang)
@@ -231,7 +187,6 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
         logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
         await plato.index(url, llm=language_model, lang=lang)
 
-    # Generate content
     logger.info("Generating content...")
     title = await plato.get_title(url, lang=lang)
     abstract = await plato.get_abstract(url, lang=lang)
@@ -239,7 +194,6 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
     references = await plato.get_references(url, lang=lang)
     chapters = await plato.get_chapters(url, lang=lang)
 
-    # Set language-specific prompts
     if lang == "en":
         CONTRIBUTORS_PROMPT = "Thoroughly review the <context> and identify the list of contributors. Output as Markdown list: First Name, Last Name, Title, Organization. Output \"Unknown\" if the contributors are not known. In the end of the list always add \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Start with \"## Contributors, Acknowledgements, Mentions\""
         INTRODUCTION_PROMPT = "Thoroughly review the <context> and write \"Introduction\" chapter for the paper. Write in the style of the original <context>. Use only words from <context>. Use quotes from <context> when necessary. Make sure to include <markers>. Output as Markdown. Start with \"## Introduction\""
@@ -251,7 +205,7 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
     else:
         raise ValueError(f"Unsupported language: {lang}")
 
-    contributors = plato.generate(
+    contributors = await plato.generate(
         query=CONTRIBUTORS_PROMPT,
         context_size="large",
         prefill=f"## Contributors, Acknowledgements, Mentions\n",
@@ -259,7 +213,7 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
         lang=lang
     )
 
-    introduction = plato.generate(
+    introduction = await plato.generate(
         query=INTRODUCTION_PROMPT,
         context_size="large",
         inline_references=True,
@@ -268,7 +222,7 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
         lang=lang
     )
 
-    conclusion = plato.generate(
+    conclusion = await plato.generate(
         query=CONCLUSION_PROMPT,
         context_size="large",
         inline_references=True,
@@ -277,7 +231,6 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
         lang=lang
     )
 
-    # Compile the full content
     full_content = f"""# {title}
 
 ## Origin
@@ -307,181 +260,48 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
 {references}
 """
 
-    # Generate PDF files
     logger.info("Generating PDF files...")
     pdf_path = output_dir / f"{title.replace(' ', '_')}-refs.pdf"
     pdf_no_refs_path = output_dir / f"{title.replace(' ', '_')}-no-refs.pdf"
     docx_path = output_dir / f"{title.replace(' ', '_')}-refs.docx"
 
-    # Use subprocess to call pandoc for PDF and DOCX generation
     try:
-        # With references
-        subprocess.run(['pandoc', '-o', str(pdf_path), '--from', 'markdown', '--pdf-engine=xelatex'],
-                       input=full_content, text=True, check=True)
+        process = await asyncio.create_subprocess_exec(
+            'pandoc', '-o', str(pdf_path), '--from', 'markdown', '--pdf-engine=xelatex',
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate(full_content.encode())
+        if process.returncode != 0:
+            logger.error(f"Error generating PDF: {stderr.decode()}")
+            raise RuntimeError(f"PDF generation failed with return code {process.returncode}")
 
-        # Without references
         content_no_refs = re.sub(r'\[\[([0-9]+)\]\]\([^)]+\)', '', full_content)
         content_no_refs = re.sub(r'\[([0-9]+)\]', '', content_no_refs)
         content_no_refs = content_no_refs.split("## References")[0]
-        subprocess.run(['pandoc', '-o', str(pdf_no_refs_path), '--from', 'markdown', '--pdf-engine=xelatex'],
-                       input=content_no_refs, text=True, check=True)
 
-        # DOCX version
-        subprocess.run(['pandoc', '-o', str(docx_path), '--from', 'markdown'],
-                       input=full_content, text=True, check=True)
-    except subprocess.CalledProcessError as e:
+        process = await asyncio.create_subprocess_exec(
+            'pandoc', '-o', str(pdf_no_refs_path), '--from', 'markdown', '--pdf-engine=xelatex',
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate(content_no_refs.encode())
+        if process.returncode != 0:
+            logger.error(f"Error generating PDF without references: {stderr.decode()}")
+            raise RuntimeError(f"PDF generation (no refs) failed with return code {process.returncode}")
+
+        process = await asyncio.create_subprocess_exec(
+            'pandoc', '-o', str(docx_path), '--from', 'markdown',
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate(full_content.encode())
+        if process.returncode != 0:
+            logger.error(f"Error generating DOCX: {stderr.decode()}")
+            raise RuntimeError(f"DOCX generation failed with return code {process.returncode}")
+
+    except Exception as e:
         logger.error(f"Error generating documents: {str(e)}")
         raise
 
     return title, abstract
-
-class handler(BaseHTTPRequestHandler):
-    async def do_GET(self):
-        pool = await get_db_pool()
-        try:
-            if self.path.startswith('/task_status'):
-                await self.handle_task_status(pool)
-            elif self.path == '/status':
-                await self.handle_status(pool)
-            elif self.path == '/reset':
-                await self.handle_reset(pool)
-            else:
-                json_response(self, 404, {"error": "Not Found"})
-        finally:
-            await pool.close()
-
-    async def do_POST(self):
-        pool = await get_db_pool()
-        try:
-            if self.path == '/convert':
-                await self.handle_convert(pool)
-            else:
-                json_response(self, 404, {"error": "Not Found"})
-        finally:
-            await pool.close()
-
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language, X-Price, X-Token')
-        self.end_headers()
-
-    async def handle_task_status(self, pool):
-        task_id = self.path.split('/')[-1]
-        task_data = await get_task_status(pool, task_id)
-        if task_data:
-            response = {
-                "task_id": task_id,
-                "status": task_data['status'],
-                "error": task_data.get('error') if task_data['status'] == "failed" else None
-            }
-            json_response(self, 200, response)
-        else:
-            json_response(self, 404, {"error": "Task not found"})
-
-    async def handle_convert(self, pool):
-        logfire.info("Handling /convert request")
-        content_length = int(self.headers['Content-Length'])
-        content_type = self.headers.get('Content-Type')
-        user_email = self.get_user_email()
-        logfire.info(f"User email for conversion: {user_email}")
-
-        try:
-            task_id = str(uuid4())
-            if content_type == 'application/octet-stream':
-                body = self.rfile.read(content_length)  # Read raw bytes
-                file_name = self.headers.get('X-File-Name')
-                lang = self.headers.get('X-Language', 'en')
-                price = float(self.headers.get('X-Price', 0))
-                token = self.headers.get('X-Token')
-
-                # Save the file to a temporary location
-                temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
-                temp_dir.mkdir(parents=True, exist_ok=True)
-                temp_file = temp_dir / f"{task_id}_{file_name}"
-                with open(temp_file, 'wb') as f:
-                    f.write(body)
-
-                task_data = {'status': 'processing', 'file': str(temp_file), 'lang': lang, 'email': user_email, 'price': price, 'token': token}
-                logfire.info(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
-            elif content_type == 'application/json':
-                body = self.rfile.read(content_length).decode('utf-8')
-                data = json.loads(body)
-                url = data.get('url')
-                lang = data.get('lang', 'en')
-                price = float(data.get('price', 0))
-                token = data.get('token')
-                task_data = {'status': 'processing', 'url': url, 'lang': lang, 'email': user_email, 'price': price, 'token': token}
-                logfire.info(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
-            else:
-                logfire.error(f"Invalid content type: {content_type}")
-                json_response(self, 400, {"error": "Invalid content type"})
-                return
-
-            # Save task data to database
-            await create_task(pool, task_id, task_data)
-
-            # Start processing in background
-            asyncio.create_task(process_and_send_email(pool, task_id, task_data))
-
-            json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
-        except Exception as e:
-            logfire.exception(f"Error in handle_convert: {str(e)}")
-            json_response(self, 500, {"error": "An unexpected error occurred. Please try again later."})
-
-    def get_user_email(self):
-        auth_header = self.headers.get('Authorization', '')
-        logfire.debug(f"Authorization header: {auth_header}")
-        if not auth_header:
-            logfire.warning("No Authorization header found")
-            return None
-        try:
-            token = auth_header.split(' ')[1]
-            email = verify_token_and_get_email(token)
-            logfire.debug(f"User email extracted: {email}")
-            return email
-        except IndexError:
-            logfire.error("Malformed Authorization header")
-            return None
-
-    async def handle_status(self, pool):
-        task_id = self.headers.get('X-Task-ID')
-        if not task_id:
-            json_response(self, 200, {"status": "idle"})
-            return
-
-        try:
-            task_data = await get_task_status(pool, task_id)
-            if not task_data:
-                response = {"status": "not_found"}
-            else:
-                response = {
-                    "status": task_data['status'],
-                    "error": task_data.get('error') if task_data['status'] == "failed" else None
-                }
-            json_response(self, 200, response)
-        except Exception as e:
-            logfire.exception(f"Error in handle_status for task {task_id}: {str(e)}")
-            json_response(self, 500, {"error": "An unexpected error occurred while checking status."})
-
-    async def handle_reset(self, pool):
-        user_email = self.get_user_email()
-        if not user_email:
-            json_response(self, 401, {"error": "Unauthorized"})
-            return
-
-        try:
-            async with pool.acquire() as conn:
-                await conn.execute(
-                    "DELETE FROM tasks WHERE data->>'email' = $1",
-                    user_email
-                )
-            logfire.info(f"Reset tasks for user: {user_email}")
-            json_response(self, 200, {"message": "Tasks reset successfully"})
-        except Exception as e:
-            logfire.exception(f"Error in handle_reset for user {user_email}: {str(e)}")
-            json_response(self, 500, {"error": "An unexpected error occurred while resetting tasks."})
 
 async def process_and_send_email(pool, task_id, task_data):
     try:
@@ -491,53 +311,17 @@ async def process_and_send_email(pool, task_id, task_data):
         async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
 
-            # Process audio
-            if 'url' in task_data:
-                url = task_data['url']
-            else:
-                url = f"file://{task_data['file']}"
-
+            url = task_data.get('url') or f"file://{task_data['file']}"
             logfire.info(f"Processing URL: {url}")
 
-            try:
-                # Initialize the language model
-                language_model = plato.llm.get_model(
-                    "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
-                )
-                logfire.info("Language model initialized")
+            title, abstract = await audio_to_paper(url, task_data['lang'], output_dir, images=task_data.get('images', False))
+            logfire.info(f"Audio to paper completed. Title: {title}")
 
-                # Set AssemblyAI API key in the environment if available
-                if os.getenv('ASSEMBLYAI_API_KEY'):
-                    logfire.info("Transcribing audio to text using AssemblyAI...")
-                    os.environ['ASSEMBLYAI_API_KEY'] = os.getenv('ASSEMBLYAI_API_KEY')
-                else:
-                    logfire.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
+            files = [f for f in output_dir.glob('*') if f.is_file()]
+            logfire.info(f"Generated {len(files)} files")
 
-                # Call plato.index() with error handling
-                try:
-                    logfire.info("Calling plato.index()...")
-                    await plato.index(url, llm=language_model, lang=task_data['lang'])
-                    logfire.info("plato.index() completed successfully")
-                except AttributeError as e:
-                    if "'str' object has no attribute 'text'" in str(e):
-                        logfire.warning("Received string input instead of transcript objects. Attempting to process as string.")
-                        words = url.split()  # Simple word splitting
-                        transcript_objects = [type('obj', (), {'text': w})() for w in words]
-                        await plato.index(transcript_objects, llm=language_model, lang=task_data['lang'])
-                        logfire.info("Processed string input successfully")
-                    else:
-                        raise
-
-                # Call audio_to_paper function
-                logfire.info("Calling audio_to_paper function...")
-                title, abstract = await audio_to_paper(url, task_data['lang'], output_dir, images=task_data.get('images', False))
-                logfire.info(f"audio_to_paper completed. Title: {title}")
-
-                files = [f for f in output_dir.glob('*') if f.is_file()]
-                logfire.info(f"Generated {len(files)} files")
-
-                subject = f"[Platogram] {title}"
-                body = f"""Hi there!
+            subject = f"[Platogram] {title}"
+            body = f"""Hi there!
 
 Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
 
@@ -551,59 +335,49 @@ Please reply to this e-mail if any suggestions, feedback, or questions.
 Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
 Suggested donation: $2 per hour of content converted."""
 
-                if user_email:
-                    logfire.info(f"Sending email to {user_email}")
-                    await send_email_with_resend(user_email, subject, body, files)
-                    logfire.info("Email sent successfully")
-                else:
-                    logfire.warning(f"No email available for task {task_id}. Skipping email send.")
+            if user_email:
+                logfire.info(f"Sending email to {user_email}")
+                await send_email_with_resend(user_email, subject, body, files)
+                logfire.info("Email sent successfully")
+            else:
+                logfire.warning(f"No email available for task {task_id}. Skipping email send.")
 
-                task_data['status'] = 'done'
-                logfire.info(f"Conversion completed for task {task_id}")
+            task_data['status'] = 'done'
+            logfire.info(f"Conversion completed for task {task_id}")
 
-                # Process payment
-                if task_data['price'] > 0 and task_data['token']:
-                    try:
-                        charge = stripe.Charge.create(
-                            amount=int(task_data['price'] * 100),
-                            currency='usd',
-                            source=task_data['token'],
-                            description=f'Platogram conversion: {title}'
-                        )
-                        logfire.info(f"Payment processed successfully for task {task_id}", charge_id=charge.id)
-                    except stripe.error.StripeError as e:
-                        logfire.error(f"Stripe payment failed for task {task_id}: {str(e)}")
-                        task_data['error'] = "Payment processing failed. Please contact support."
-                else:
-                    logfire.info(f"No charge for task {task_id}")
-
-                # Update task status in the database
-                async with pool.acquire() as conn:
-                    await conn.execute(
-                        "UPDATE tasks SET data = $1 WHERE id = $2",
-                        json.dumps(task_data), task_id
+            if task_data['price'] > 0 and task_data['token']:
+                try:
+                    charge = stripe.Charge.create(
+                        amount=int(task_data['price'] * 100),
+                        currency='usd',
+                        source=task_data['token'],
+                        description=f'Platogram conversion: {title}'
                     )
+                    logfire.info(f"Payment processed successfully for task {task_id}", charge_id=charge.id)
+                except stripe.error.StripeError as e:
+                    logfire.error(f"Stripe payment failed for task {task_id}: {str(e)}")
+                    task_data['error'] = "Payment processing failed. Please contact support."
+            else:
+                logfire.info(f"No charge for task {task_id}")
 
-            except Exception as e:
-                logfire.exception(f"Error in audio processing: {str(e)}")
-                task_data['status'] = 'failed'
-                task_data['error'] = get_user_friendly_error_message(str(e))
-                raise
+            async with pool.acquire() as conn:
+                await conn.execute(
+                    "UPDATE tasks SET data = $1 WHERE id = $2",
+                    json.dumps(task_data), task_id
+                )
 
     except Exception as e:
         logfire.exception(f"Error in process_and_send_email for task {task_id}: {str(e)}")
         task_data['status'] = 'failed'
-        task_data['error'] = get_user_friendly_error_message(str(e))
+        task_data['error'] = await get_user_friendly_error_message(str(e))
 
-        # Update task status in the database
         async with pool.acquire() as conn:
             await conn.execute(
                 "UPDATE tasks SET data = $1 WHERE id = $2",
                 json.dumps(task_data), task_id
             )
 
-def get_user_friendly_error_message(error_message):
-    # Use a language model to generate a user-friendly error message
+async def get_user_friendly_error_message(error_message):
     model = plato.llm.get_model("anthropic/claude-3-5-sonnet", key=os.getenv("ANTHROPIC_API_KEY"))
     prompt = f"""
     Given the following error message, provide a concise, user-friendly explanation
@@ -612,70 +386,72 @@ def get_user_friendly_error_message(error_message):
 
     Error: {error_message}
     """
-    response = model.prompt_model(messages=[plato.types.User(content=prompt)])
-    return response.strip()[:256]  # Truncate to 256 characters
+    response = await model.prompt_model(messages=[plato.types.User(content=prompt)])
+    return response.strip()[:256]
 
-# Vercel handler
-def vercel_handler(event, context):
-    async def async_handler(event, context):
-        pool = await get_db_pool()
+async def handle_request(event, context):
+    pool = await get_db_pool()
 
-        try:
-            # Create table if it doesn't exist
-            async with pool.acquire() as conn:
-                await conn.execute('''
-                    CREATE TABLE IF NOT EXISTS tasks (
-                        id TEXT PRIMARY KEY,
-                        data JSONB NOT NULL
+    try:
+        path = event['path']
+        method = event['httpMethod']
+        headers = event['headers']
+
+        if method == 'GET':
+            if path.startswith('/task_status'):
+                task_id = path.split('/')[-1]
+                task_data = await get_task_status(pool, task_id)
+                if task_data:
+                    response = {
+                        "task_id": task_id,
+                        "status": task_data['status'],
+                        "error": task_data.get('error') if task_data['status'] == "failed" else None
+                    }
+                    return {'statusCode': 200, 'body': json.dumps(response)}
+                else:
+                    return {'statusCode': 404, 'body': json.dumps({"error": "Task not found"})}
+            elif path == '/status':
+                return {'statusCode': 200, 'body': json.dumps({"status": "OK"})}
+            elif path == '/reset':
+                user_email = verify_token_and_get_email(headers.get('Authorization', '').split(' ')[1])
+                if not user_email:
+                    return {'statusCode': 401, 'body': json.dumps({"error": "Unauthorized"})}
+                async with pool.acquire() as conn:
+                    await conn.execute(
+                        "DELETE FROM tasks WHERE data->>'email' = $1",
+                        user_email
                     )
-                ''')
+                return {'statusCode': 200, 'body': json.dumps({"message": "Tasks reset successfully"})}
+            else:
+                return {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
+        elif method == 'POST':
+            if path == '/convert':
+                body = json.loads(event['body'])
+                user_email = verify_token_and_get_email(headers.get('Authorization', '').split(' ')[1])
+                if not user_email:
+                    return {'statusCode': 401, 'body': json.dumps({"error": "Unauthorized"})}
 
-            class MockRequest:
-                def __init__(self, event):
-                    self.headers = event['headers']
-                    self.method = event['httpMethod']
-                    self.path = event['path']
-                    self.body = event.get('body', '')
+                task_id = str(uuid4())
+                task_data = {
+                    'status': 'processing',
+                    'url': body.get('url'),
+                    'lang': body.get('lang', 'en'),
+                    'email': user_email,
+                    'price': float(body.get('price', 0)),
+                    'token': body.get('token')
+                }
+                await create_task(pool, task_id, task_data)
+                asyncio.create_task(process_and_send_email(pool, task_id, task_data))
+                return {'statusCode': 200, 'body': json.dumps({"message": "Conversion started", "task_id": task_id})}
+            else:
+                return {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
+        else:
+            return {'statusCode': 405, 'body': json.dumps({"error": "Method Not Allowed"})}
+    except Exception as e:
+        logger.exception(f"Error in handle_request: {str(e)}")
+        return {'statusCode': 500, 'body': json.dumps({"error": "An unexpected error occurred"})}
+    finally:
+        await pool.close()
 
-            class MockResponse:
-                def __init__(self):
-                    self.status_code = 200
-                    self.headers = {}
-                    self.body = ''
-
-                def send_response(self, status_code):
-                    self.status_code = status_code
-
-                def send_header(self, key, value):
-                    self.headers[key] = value
-
-                def end_headers(self):
-                    pass
-
-                def wfile(self):
-                    class MockWFile:
-                        def write(self, data):
-                            self.body += data.decode('utf-8') if isinstance(data, bytes) else data
-                    return MockWFile()
-
-            mock_request = MockRequest(event)
-            mock_response = MockResponse()
-
-            server = handler(mock_request, mock_request.path, mock_response)
-
-            if mock_request.method == 'GET':
-                await server.do_GET()
-            elif mock_request.method == 'POST':
-                await server.do_POST()
-            elif mock_request.method == 'OPTIONS':
-                server.do_OPTIONS()
-
-            return {
-                'statusCode': mock_response.status_code,
-                'headers': mock_response.headers,
-                'body': mock_response.body,
-            }
-        finally:
-            await pool.close()
-
-    return asyncio.run(async_handler(event, context))
+def handler(event, context):
+    return asyncio.get_event_loop().run_until_complete(handle_request(event, context))

@@ -313,11 +313,17 @@ class handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path.startswith('/task_status'):
-            self.handle_task_status()
+            asyncio.run(self.handle_task_status())
         elif self.path == '/status':
-            self.handle_status()
+            asyncio.run(self.handle_status())
         elif self.path == '/reset':
-            self.handle_reset()
+            asyncio.run(self.handle_reset())
+        else:
+            json_response(self, 404, {"error": "Not Found"})
+
+    def do_POST(self):
+        if self.path == '/convert':
+            asyncio.run(self.handle_convert())
         else:
             json_response(self, 404, {"error": "Not Found"})
 
@@ -333,12 +339,6 @@ class handler(BaseHTTPRequestHandler):
             json_response(self, 200, response)
         else:
             json_response(self, 404, {"error": "Task not found"})
-
-    def do_POST(self):
-        if self.path == '/convert':
-            asyncio.run(self.handle_convert())
-        else:
-            json_response(self, 404, {"error": "Not Found"})
 
     async def handle_convert(self):
         logfire.info("Handling /convert request")
@@ -674,7 +674,7 @@ def vercel_handler(event, context):
         server = handler(mock_request, mock_request.path, mock_response)
 
         if mock_request.method == 'GET':
-            server.do_GET()
+            await server.do_GET()
         elif mock_request.method == 'POST':
             await server.do_POST()
         elif mock_request.method == 'OPTIONS':

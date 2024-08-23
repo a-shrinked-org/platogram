@@ -209,14 +209,14 @@ function showErrorMessage(message) {
   }
 }
 
-// function getInputData() {
-//   const urlInput = document.getElementById("url-input");
-//   const fileNameElement = document.getElementById("file-name");
-//   return {
-//     url: urlInput ? urlInput.value.trim() : "",
-//     file: fileNameElement && fileNameElement.file ? fileNameElement.file : null,
-//   };
-// }
+function getInputData() {
+const urlInput = document.getElementById("url-input");
+const fileNameElement = document.getElementById("file-name");
+return {
+url: urlInput ? urlInput.value.trim() : "",
+file: fileNameElement && fileNameElement.file ? fileNameElement.file : null,
+};
+}
 
 async function login() {
   try {

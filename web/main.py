@@ -72,6 +72,13 @@ async def get_task_status(pool, task_id):
         )
         return json.loads(row['data']) if row else None
 
+async def update_task_status(pool, task_id, task_data):
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE tasks SET data = $1 WHERE id = $2",
+            json.dumps(task_data), task_id
+        )
+
 def get_auth0_public_key():
     current_time = time.time()
     if (
@@ -360,22 +367,13 @@ Suggested donation: $2 per hour of content converted."""
             else:
                 logfire.info(f"No charge for task {task_id}")
 
-            async with pool.acquire() as conn:
-                await conn.execute(
-                    "UPDATE tasks SET data = $1 WHERE id = $2",
-                    json.dumps(task_data), task_id
-                )
+            await update_task_status(pool, task_id, task_data)
 
     except Exception as e:
         logfire.exception(f"Error in process_and_send_email for task {task_id}: {str(e)}")
         task_data['status'] = 'failed'
         task_data['error'] = await get_user_friendly_error_message(str(e))
-
-        async with pool.acquire() as conn:
-            await conn.execute(
-                "UPDATE tasks SET data = $1 WHERE id = $2",
-                json.dumps(task_data), task_id
-            )
+        await update_task_status(pool, task_id, task_data)
 
 async def get_user_friendly_error_message(error_message):
     model = plato.llm.get_model("anthropic/claude-3-5-sonnet", key=os.getenv("ANTHROPIC_API_KEY"))
@@ -390,7 +388,6 @@ async def get_user_friendly_error_message(error_message):
     return response.strip()[:256]
 
 async def handle_request(event, context):
-    return {'statusCode': 200, 'body': json.dumps({"message": "work?"})}
     pool = await get_db_pool()
 
     try:

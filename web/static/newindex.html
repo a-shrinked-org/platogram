@@ -7,7 +7,6 @@
     <title>datacapture</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
-
     <link rel="stylesheet" href="https://platogram.vercel.app/web/styles.css">
     <link rel="stylesheet" href="./styles.css">
     <style>
@@ -185,42 +184,12 @@
             transform: scale(1.05);
             text-decoration: none;
         }
-
-        #language-modal {}
     </style>
-    <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
 </head>
 
 <body class="bg-white">
-    <div id="language-modal" class="modal hidden inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="modal-content bg-white p-6 rounded-lg shadow-lg">
-            <h3>Knowledge Extraction Job #00000</h3>
-            <p>We'll craft a well-organized, readable document delivered straight to your inbox. Processing time varies
-                based on content length and server load, typically ranging from 15 minutes to a few hours.</p>
-            <div class="language-selection">
-                <select id="lang-select" class="lang-dropdown">
-                    <option value="en">English</option>
-                    <option value="es">Spanish</option>
-                </select>
-            </div>
-            <div class="price-input">
-                <label for="price-input">Name Your Price (USD):</label>
-                <input type="number" id="price-input" value="2.00" step="0.01" min="0">
-                <p class="price-explanation">
-                    Suggested: $2/hour. Enter $0 to try for free.
-                </p>
-            </div>
-            <div class="my-3" id="card-element">
-                <!-- Stripe Card Element will be inserted here -->
-            </div>
-            <div id="card-errors" role="alert"></div>
-            <button id="submit-btn" class="cta" onclick="stripeCheck()">Submit</button>
-            <button id="cancel-btn" class="cta" onclick="closeLanguageModal()">Cancel</button>
-        </div>
-    </div>
-
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-white">
-        <div class="flex justify-between items-center py-4">
+        <header class="flex justify-between items-center py-4">
             <div class="flex items-center space-x-2">
                 <div class="w-6 h-6 bg-slate-900"></div>
                 <span class="font-perfectly-nineties text-xl">datacapture</span>
@@ -229,7 +198,7 @@
                 <button id="login-button" class="text-blue-600 hover:underline">Log In</button>
                 <button id="logout-button" class="text-blue-600 hover:underline hidden">Log Out</button>
             </div>
-        </div>
+        </header>
 
         <main class="mt-16" role="main">
             <h1
@@ -587,298 +556,353 @@
         </footer>
     </div>
 
-    <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
-    <script src="https://platogram.vercel.app/web/app.js"></script>
-    <script src="https://js.stripe.com/v3/"></script>
-    <script src="./../app.js"></script> <!-- УБрать -->
-    <script>
-        let stripe, elements, card;
+    <div id="language-modal" class="modal hidden inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="modal-content bg-white p-6 rounded-lg shadow-lg">
+            <h3>Knowledge Extraction Job #00000</h3>
+            <p>We'll craft a well-organized, readable document delivered straight to your inbox. Processing time varies
+                based on content length and server load, typically ranging from 15 minutes to a few hours.</p>
+            <div class="language-selection">
+                <select id="lang-select" class="lang-dropdown">
+                    <option value="en">English</option>
+                    <option value="es">Spanish</option>
+                </select>
+            </div>
+            <div class="price-input">
+                <label for="price-input">Name Your Price (USD):</label>
+                <input type="number" id="price-input" value="2.00" step="0.01" min="0">
+                <p class="price-explanation">
+                    Suggested: $2/hour. Enter $0 to try for free.
+                </p>
+            </div>
+            <div class="my-3" id="card-element">
+                <!-- Stripe Card Element will be inserted here -->
+            </div>
+            <div id="card-errors" role="alert"></div>
+            <button id="submit-btn" class="cta" onclick="stripeCheck()">Submit</button>
+            <button id="cancel-btn" class="cta" onclick="closeLanguageModal()">Cancel</button>
+        </div>
+    </div>
+</body>
+
+<script>
+    let stripe, elements, card;
 
 
-        function initStripe() {
-            const modal = document.getElementById('language-modal');
-            modal.classList.remove('hidden');
-            stripe = Stripe('pk_live_51M7o8vFSngJcZDqfHcvpYSTIJ2TKO4SOlRKYrhkCe2HL8oXnoiCcKDuNluTjBwJsjIqBHHIONNAjFn1mC1qQ1HON00kuu0frmg');
+    function initStripe() {
+        const modal = document.getElementById('language-modal');
+        modal.classList.remove('hidden');
+        stripe = Stripe('pk_live_51M7o8vFSngJcZDqfHcvpYSTIJ2TKO4SOlRKYrhkCe2HL8oXnoiCcKDuNluTjBwJsjIqBHHIONNAjFn1mC1qQ1HON00kuu0frmg');
 
-            elements = stripe.elements();
-            card = elements.create('card');
-            card.mount('#card-element');
+        elements = stripe.elements();
+        card = elements.create('card');
+        card.mount('#card-element');
+    }
+    function getInputData() {
+        const urlInput = document.getElementById("url-input").value;
+        const fileInput = document.querySelector('input[type="file"]').files[0];
+        return urlInput || fileInput;
+    }
+    function closeLanguageModal() {
+        const modal = document.getElementById('language-modal');
+        modal.classList.add('hidden');
+    }
+    async function stripeCheck(event) {
+        const priceInput = document.getElementById('price-input');
+        const language = document.getElementById('lang-select').value;
 
-
+        const price = parseFloat(priceInput.value);
+        if (isNaN(price) || price < 0) {
+            const errorElement = document.getElementById('card-errors');
+            errorElement.textContent = 'Please enter a valid price.';
+            return;
         }
-        function getInputData() {
-            const urlInput = document.getElementById("url-input").value;
-            const fileInput = document.querySelector('input[type="file"]').files[0];
-            return urlInput || fileInput;
-        }
-        function closeLanguageModal() {
-            const modal = document.getElementById('language-modal');
-            modal.classList.add('hidden');
-        }
-        async function stripeCheck(event) {
 
-            const price = document.getElementById('price-input').value;
-            const language = document.getElementById('lang-select').value;
+        try {
+            let tokenId = null;
+
 
             if (price > 0) {
-                try {
-                    const { token, error } = await stripe.createToken(card);
-                    if (error) {
-
-                        const errorElement = document.getElementById('card-errors');
-                        errorElement.textContent = error.message;
-                    } else {
-
-                        const inputData = getInputData();
-
-                        await postToConvert(inputData, language, token.id, price);
-                        document.getElementById('language-modal').classList.add('hidden');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
+                const { token, error } = await stripe.createToken(card);
+                if (error) {
                     const errorElement = document.getElementById('card-errors');
-                    errorElement.textContent = 'An error occurred. Please try again.';
+                    errorElement.textContent = error.message;
+                    return;
                 }
+                tokenId = token.id;
+            }
+
+            const inputData = getInputData();
+            await postToConvert(inputData, language, tokenId, price);
+
+
+            document.getElementById('language-modal').classList.add('hidden');
+        } catch (error) {
+            console.error('Error:', error);
+            const errorElement = document.getElementById('card-errors');
+            errorElement.textContent = 'An error occurred. Please try again.';
+        }
+    }
+
+    async function postToConvert(inputData, lang, tokenSTR, price) {
+        const chunkSize = 4 * 1024 * 1024; // 4MB chunks
+        const maxRetries = 3; // Number of retries
+        const retryDelay = 2000; // Delay between retries (in milliseconds)
+        let headers = {};
+
+        try {
+            updateUIStatus("running", "Starting conversion process...");
+
+
+            const authToken = await auth0Client.getTokenSilently({
+                audience: "https://platogram.vercel.app",
+            });
+            debugLog("Obtained token for convert");
+
+
+            headers.Authorization = `Bearer ${authToken}`;
+            headers["Content-Type"] = inputData.file
+                ? "application/octet-stream"
+                : "application/json";
+
+
+            if (inputData.file) {
+                const file = inputData.file;
+                const totalChunks = Math.ceil(file.size / chunkSize);
+
+                for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                    const start = chunkIndex * chunkSize;
+                    const end = Math.min(start + chunkSize, file.size);
+                    const chunk = file.slice(start, end);
+
+
+                    headers["X-File-Name"] = file.name;
+                    headers["X-Chunk-Index"] = chunkIndex.toString();
+                    headers["X-Total-Chunks"] = totalChunks.toString();
+                    headers["X-Language"] = lang;
+                    headers["X-Price"] = price.toString();
+                    headers["X-Token"] = tokenSTR;
+
+                    await sendChunk(chunk, headers, maxRetries, retryDelay);
+                }
+            } else if (inputData.url) {
+                const body = JSON.stringify({ url: inputData.url, lang: lang });
+                await sendRequest(body, headers, maxRetries, retryDelay);
             } else {
-                document.getElementById('language-modal').classList.add('hidden');
-                const inputData = getInputData();
-                await postToConvert(inputData, language, null, 0);
+                throw new Error("No input provided");
             }
+
+            updateUIStatus(
+                "done",
+                "Conversion process initiated. You will receive an email when it's complete."
+            );
+        } catch (error) {
+            console.error("Error in postToConvert:", error);
+            updateUIStatus(
+                "error",
+                error.message || "An error occurred during conversion"
+            );
         }
-        async function postToConvert(inputData, lang, tokenSTR, price) {
-            console.log(inputData, lang, tokenSTR, price);
-            const chunkSize = 4 * 1024 * 1024; // 4MB chunks
-            let body;
-            let headers = {};
+    }
 
-            const maxRetries = 3; // Number of retries
-            const retryDelay = 2000; // Delay between retries
-
+    // Функция для отправки чанков файла
+    async function sendChunk(chunk, headers, maxRetries, retryDelay) {
+        let response;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
             try {
-                updateUIStatus("running", "Starting conversion process...");
-
-                const token = await auth0Client.getTokenSilently({
-                    audience: "https://platogram.vercel.app",
+                response = await fetch("/convert", {
+                    method: "POST",
+                    headers: headers,
+                    body: chunk,
                 });
-                debugLog("Obtained token for convert");
-
-                headers.Authorization = `Bearer ${token}`;
-                headers["Content-Type"] = inputData.file
-                    ? "application/octet-stream"
-                    : "application/json";
-
-                if (inputData.file) {
-                    const file = inputData.file;
-                    const totalChunks = Math.ceil(file.size / chunkSize);
-
-                    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-                        const start = chunkIndex * chunkSize;
-                        const end = Math.min(start + chunkSize, file.size);
-                        const chunk = file.slice(start, end);
-
-                        headers["X-File-Name"] = file.name;
-                        headers["X-Chunk-Index"] = chunkIndex.toString();
-                        headers["X-Total-Chunks"] = totalChunks.toString();
-                        headers["X-Language"] = lang;
-                        headers["X-Price"] = tokenSTR;
-                        headers["X-Token"] = price;
-
-                        let response;
-                        for (let attempt = 0; attempt < maxRetries; attempt++) {
-                            try {
-                                response = await fetch("/convert", {
-                                    method: "POST",
-                                    headers: headers,
-                                    body: chunk,
-                                });
-
-                                if (response.ok) break; // Exit loop if request was successful
-                            } catch (error) {
-                                if (attempt < maxRetries - 1) {
-                                    await new Promise((resolve) => setTimeout(resolve, retryDelay)); // Wait before retrying
-                                } else {
-                                    throw error; // Throw error if all retries fail
-                                }
-                            }
-                        }
-
-                        if (response) {
-                            const reader = response.body.getReader();
-                            const decoder = new TextDecoder();
-
-                            while (true) {
-                                const { done, value } = await reader.read();
-                                if (done) break;
-                                const chunk = decoder.decode(value);
-                                debugLog("Received chunk: " + chunk);
-                                updateUIStatus("running", chunk);
-                            }
-                        }
-                    }
-                } else if (inputData.url) {
-                    body = JSON.stringify({ url: inputData.url, lang: lang });
-
-                    let response;
-                    for (let attempt = 0; attempt < maxRetries; attempt++) {
-                        try {
-                            response = await fetch("/convert", {
-                                method: "POST",
-                                headers: headers,
-                                body: body,
-                            });
-
-                            if (response.ok) break; // Exit loop if request was successful
-                        } catch (error) {
-                            if (attempt < maxRetries - 1) {
-                                await new Promise((resolve) => setTimeout(resolve, retryDelay)); // Wait before retrying
-                            } else {
-                                throw error; // Throw error if all retries fail
-                            }
-                        }
-                    }
-
-                    if (response) {
-                        const reader = response.body.getReader();
-                        const decoder = new TextDecoder();
-
-                        while (true) {
-                            const { done, value } = await reader.read();
-                            if (done) break;
-                            const chunk = decoder.decode(value);
-                            debugLog("Received chunk: " + chunk);
-                            updateUIStatus("running", chunk);
-                        }
-                    }
-                } else {
-                    throw new Error("No input provided");
-                }
-
-                updateUIStatus(
-                    "done",
-                    "Conversion process initiated. You will receive an email when it's complete."
-                );
+                if (response.ok) break;
             } catch (error) {
-                console.error("Error in postToConvert:", error);
-                updateUIStatus(
-                    "error",
-                    error.message || "An error occurred during conversion"
-                );
+                if (attempt < maxRetries - 1) {
+                    await delay(retryDelay);
+                } else {
+                    throw error;
+                }
             }
         }
-        document.addEventListener('DOMContentLoaded', () => {
-            const urlInput = document.getElementById('url-input');
-            const uploadFileButton = document.getElementById('upload-file-button');
-            const fileUploadSection = document.getElementById('file-upload-section');
-            const inputSection = document.getElementById('input-section');
-            const backToUrlButton = document.getElementById('back-to-url');
-            const fileDropArea = document.getElementById('file-drop-area');
-            const fileInput = document.querySelector('input[type="file"]');
-            const fileNameDisplay = document.getElementById('file-name-display');
 
-            // Initialize processing stage updates
-            initializeProcessingStage();
+        if (response) {
+            await handleResponse(response);
+        }
+    }
 
-            // Add event listeners to buttons
-            const convertButton = document.getElementById('convert-button');
-            const convertFileButton = document.getElementById('convert-file-button');
-
-            if (convertButton) {
-                convertButton.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    if (!stripe) {
-                        initStripe();
-                    }
-
+    // Функция для отправки запроса с телом
+    async function sendRequest(body, headers, maxRetries, retryDelay) {
+        let response;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                response = await fetch("/convert", {
+                    method: "POST",
+                    headers: headers,
+                    body: body,
                 });
-            }
-
-            if (convertFileButton) {
-                convertFileButton.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    if (!stripe) {
-                        initStripe();
-                    }
-
-                });
-            }
-
-            // URL input handling
-            urlInput.addEventListener('input', () => {
-                const hasValue = urlInput.value.trim() !== '';
-                convertButton.disabled = !hasValue;
-                convertButton.classList.toggle('opacity-50', !hasValue);
-                convertButton.classList.toggle('cursor-not-allowed', !hasValue);
-            });
-
-            // Upload file button
-            uploadFileButton.addEventListener('click', () => {
-                inputSection.classList.add('hidden');
-                fileUploadSection.classList.remove('hidden');
-            });
-
-            // Back to URL button
-            backToUrlButton.addEventListener('click', () => {
-                fileUploadSection.classList.add('hidden');
-                inputSection.classList.remove('hidden');
-            });
-
-            // File drop area
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                fileDropArea.addEventListener(eventName, preventDefaults, false);
-            });
-
-            function preventDefaults(e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-
-            ['dragenter', 'dragover'].forEach(eventName => {
-                fileDropArea.addEventListener(eventName, highlight, false);
-            });
-
-            ['dragleave', 'drop'].forEach(eventName => {
-                fileDropArea.addEventListener(eventName, unhighlight, false);
-            });
-
-            function highlight() {
-                fileDropArea.classList.add('border-blue-500', 'bg-blue-50');
-            }
-
-            function unhighlight() {
-                fileDropArea.classList.remove('border-blue-500', 'bg-blue-50');
-            }
-
-            fileDropArea.addEventListener('drop', handleDrop, false);
-
-            function handleDrop(e) {
-                const dt = e.dataTransfer;
-                const files = dt.files;
-                handleFiles(files);
-            }
-
-            function handleFiles(files) {
-                if (files.length > 0) {
-                    const file = files[0];
-                    fileNameDisplay.textContent = file.name;
-                    updateConvertFileButton();
+                if (response.ok) break;
+            } catch (error) {
+                if (attempt < maxRetries - 1) {
+                    await delay(retryDelay);
+                } else {
+                    throw error;
                 }
             }
+        }
 
-            // File input change
-            fileInput.addEventListener('change', (event) => {
-                handleFiles(event.target.files);
-            });
+        if (response) {
+            await handleResponse(response);
+        }
+    }
 
-            function updateConvertFileButton() {
-                const hasFile = fileNameDisplay.textContent !== '';
-                convertFileButton.disabled = !hasFile;
-                convertFileButton.classList.toggle('opacity-50', !hasFile);
-                convertFileButton.classList.toggle('cursor-not-allowed', !hasFile);
+    // Функция для обработки ответа
+    async function handleResponse(response) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            debugLog("Received chunk: " + chunk);
+            updateUIStatus("running", chunk);
+        }
+    }
+
+    // Функция для задержки
+    function delay(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+
+        const elements = {
+            urlInput: document.getElementById('url-input'),
+            uploadFileButton: document.getElementById('upload-file-button'),
+            fileUploadSection: document.getElementById('file-upload-section'),
+            inputSection: document.getElementById('input-section'),
+            backToUrlButton: document.getElementById('back-to-url'),
+            fileDropArea: document.getElementById('file-drop-area'),
+            fileInput: document.querySelector('input[type="file"]'),
+            fileNameDisplay: document.getElementById('file-name-display'),
+            convertButton: document.getElementById('convert-button'),
+            convertFileButton: document.getElementById('convert-file-button'),
+        };
+
+
+        initializeProcessingStage();
+
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                closeLanguageModal();
             }
         });
 
 
-    </script>
-</body>
+        if (elements.convertButton) {
+            elements.convertButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                initializeStripeIfNeeded();
+            });
+        }
+
+        if (elements.convertFileButton) {
+            elements.convertFileButton.addEventListener('click', (event) => {
+                event.preventDefault();
+                initializeStripeIfNeeded();
+            });
+        }
+
+
+        elements.urlInput.addEventListener('input', () => {
+            toggleConvertButtonState(elements.urlInput.value.trim() !== '', elements.convertButton);
+        });
+
+
+        elements.uploadFileButton.addEventListener('click', () => {
+            toggleSections(elements.inputSection, elements.fileUploadSection);
+        });
+
+
+        elements.backToUrlButton.addEventListener('click', () => {
+            toggleSections(elements.fileUploadSection, elements.inputSection);
+        });
+
+        // Обработка drag-and-drop
+        setupDragAndDrop(elements.fileDropArea, handleFiles);
+
+
+        elements.fileInput.addEventListener('change', (event) => {
+            handleFiles(event.target.files);
+        });
+
+
+        function initializeStripeIfNeeded() {
+            if (!stripe) {
+                initStripe();
+            }
+        }
+
+
+        function toggleConvertButtonState(isActive, button) {
+            button.disabled = !isActive;
+            button.classList.toggle('opacity-50', !isActive);
+            button.classList.toggle('cursor-not-allowed', !isActive);
+        }
+
+
+        function toggleSections(hiddenSection, visibleSection) {
+            hiddenSection.classList.add('hidden');
+            visibleSection.classList.remove('hidden');
+        }
+
+
+        function setupDragAndDrop(dropArea, filesHandler) {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, true), false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, false), false);
+            });
+
+            dropArea.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                filesHandler(files);
+            });
+        }
+
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+
+        function toggleHighlight(dropArea, isActive) {
+            dropArea.classList.toggle('border-blue-500', isActive);
+            dropArea.classList.toggle('bg-blue-50', isActive);
+        }
+
+
+        function handleFiles(files) {
+            if (files.length > 0) {
+                const file = files[0];
+                elements.fileNameDisplay.textContent = file.name;
+                toggleConvertButtonState(true, elements.convertFileButton);
+            }
+        }
+    });
+
+</script>
+<script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
+<script src="https://js.stripe.com/v3/"></script>
+<script src="https://platogram.vercel.app/web/app.js"></script>
+<!-- <script src="./../app.js"></script>  -->
 
 </html>

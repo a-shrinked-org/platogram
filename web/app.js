@@ -209,15 +209,6 @@ function showErrorMessage(message) {
   }
 }
 
-// function getInputData() {
-//   const urlInput = document.getElementById("url-input");
-//   const fileNameElement = document.getElementById("file-name");
-//   return {
-//     url: urlInput ? urlInput.value.trim() : "",
-//     file: fileNameElement && fileNameElement.file ? fileNameElement.file : null,
-//   };
-// }
-
 async function login() {
   try {
     if (!auth0Client) throw new Error("Auth0 client not initialized");
@@ -438,65 +429,6 @@ function safeUpdateProcessingStage() {
   } catch (error) {
     console.error("Error in safeUpdateProcessingStage:", error);
   }
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  debugLog("DOM Content Loaded");
-
-  const uploadIcon = document.querySelector(".upload-icon");
-  const fileNameElement = document.getElementById("file-name");
-  const urlInput = document.getElementById("url-input");
-
-  if (uploadIcon && fileNameElement && urlInput) {
-    // Add the event listener to the upload icon only once
-    uploadIcon.addEventListener("click", handleFileUpload);
-
-    urlInput.addEventListener("input", () => {
-      if (urlInput.value.trim() !== "") {
-        fileNameElement.textContent = ""; // Clear file name when URL is entered
-        fileNameElement.file = null; // Clear the stored File object
-      }
-    });
-  } else {
-    console.error("One or more elements for file upload not found");
-  }
-
-  // Initialize other parts of your application
-  initAuth0().catch((error) => console.error("Error initializing app:", error));
-});
-
-let fileInput; // Объявляем переменную для хранения элемента fileInput
-function handleFileUpload() {
-  const fileNameElement = document.getElementById("file-name");
-  const urlInput = document.getElementById("url-input");
-  if (!fileInput) {
-    // Создаем элемент fileInput только один раз
-    fileInput = document.createElement("input");
-    fileInput.type = "file";
-    fileInput.accept = ".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a";
-    fileInput.style.display = "none";
-    // Добавляем элемент в body
-    document.body.appendChild(fileInput);
-    // Добавляем обработчик изменения только один раз
-    fileInput.addEventListener(
-      "change",
-      (event) => {
-        const file = event.target.files[0];
-        if (file) {
-          fileNameElement.textContent = file.name;
-          fileNameElement.file = file; // Сохраняем объект File
-          urlInput.value = ""; // Очищаем URL input при выборе файла
-          debugLog("File selected: " + file.name);
-        } else {
-          fileNameElement.textContent = "";
-          fileNameElement.file = null; // Очищаем сохраненный объект File
-          debugLog("No file selected");
-        }
-      },
-      { once: true }
-    ); // Обработчик с опцией { once: true } для удаления после первого вызова
-  }
-  fileInput.click();
 }
 
 // Ensure all functions are in global scope

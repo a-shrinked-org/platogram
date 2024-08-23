@@ -1,16 +1,10 @@
 let auth0Client = null;
 
 const processingStages = [
-  "Byte Whispering",
-  "Qubit Juggling",
-  "Syntax Gymnastics",
-  "Pixel Wrangling",
-  "Neuron Tickling",
-  "Algorithm Disco",
-  "Data Origami",
-  "Bit Barbecue",
-  "Logic Limbo",
-  "Quantum Knitting",
+  "Byte Whispering", "Qubit Juggling", "Syntax Gymnastics",
+  "Pixel Wrangling", "Neuron Tickling", "Algorithm Disco",
+  "Data Origami", "Bit Barbecue", "Logic Limbo",
+  "Quantum Knitting"
 ];
 let currentStageIndex = 0;
 let processingStageInterval;
@@ -20,29 +14,29 @@ function debugLog(message) {
 }
 
 async function initAuth0() {
-  try {
-    auth0Client = await auth0.createAuth0Client({
-      domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
-      clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
-      authorizationParams: {
-        redirect_uri: window.location.origin,
-        audience: "https://platogram.vercel.app/",
-        scope: "openid profile email",
-      },
-      cacheLocation: "localstorage",
-    });
-    debugLog("Auth0 client initialized successfully");
+    try {
+        auth0Client = await auth0.createAuth0Client({
+            domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
+            clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
+            authorizationParams: {
+                redirect_uri: window.location.origin,
+                audience: "https://platogram.vercel.app/",
+                scope: "openid profile email",
+            },
+            cacheLocation: "localstorage",
+        });
+        debugLog("Auth0 client initialized successfully");
 
-    const query = window.location.search;
-    if (query.includes("code=") && query.includes("state=")) {
-      await auth0Client.handleRedirectCallback();
-      window.history.replaceState({}, document.title, "/");
+        const query = window.location.search;
+        if (query.includes("code=") && query.includes("state=")) {
+            await auth0Client.handleRedirectCallback();
+            window.history.replaceState({}, document.title, "/");
+        }
+
+        await updateUI();
+    } catch (error) {
+        console.error("Error initializing Auth0:", error);
     }
-
-    await updateUI();
-  } catch (error) {
-    console.error("Error initializing Auth0:", error);
-  }
 }
 
 function updateUIStatus(status, errorMessage = "") {
@@ -53,15 +47,13 @@ function updateUIStatus(status, errorMessage = "") {
   const doneSection = document.getElementById("done-section");
   const processingStage = document.getElementById("processing-stage");
 
-  [inputSection, statusSection, errorSection, doneSection].forEach(
-    (section) => {
-      if (section) {
-        section.classList.add("hidden");
-      } else {
-        console.warn(`Section not found: ${section}`);
-      }
+  [inputSection, statusSection, errorSection, doneSection].forEach(section => {
+    if (section) {
+      section.classList.add("hidden");
+    } else {
+      console.warn(`Section not found: ${section}`);
     }
-  );
+  });
 
   switch (status) {
     case "running":
@@ -97,8 +89,7 @@ function updateUIStatus(status, errorMessage = "") {
         errorSection.classList.remove("hidden");
         const errorParagraph = errorSection.querySelector("p");
         if (errorParagraph) {
-          errorParagraph.textContent =
-            errorMessage || "An error occurred. Please try again.";
+          errorParagraph.textContent = errorMessage || "An error occurred. Please try again.";
         } else {
           console.error("Error paragraph not found in error section");
         }
@@ -176,37 +167,37 @@ function onDonateClick() {
 }
 
 async function onConvertClick(event) {
-  if (event) event.preventDefault();
-  debugLog("Convert button clicked");
+    if (event) event.preventDefault();
+    debugLog("Convert button clicked");
 
-  try {
-    if (!auth0Client) throw new Error("Auth0 client not initialized");
+    try {
+        if (!auth0Client) throw new Error("Auth0 client not initialized");
 
-    const inputData = getInputData();
-    if (!inputData.url && !inputData.file) {
-      showErrorMessage("Please provide a URL or upload a file");
-      return;
+        const inputData = getInputData();
+        if (!inputData.url && !inputData.file) {
+            showErrorMessage("Please provide a URL or upload a file");
+            return;
+        }
+
+        if (await auth0Client.isAuthenticated()) {
+            showLanguageSelectionModal(inputData);
+        } else {
+            login();
+        }
+    } catch (error) {
+        console.error("Error in onConvertClick:", error);
+        updateUIStatus("error", error.message);
     }
-
-    if (await auth0Client.isAuthenticated()) {
-      showLanguageSelectionModal(inputData);
-    } else {
-      login();
-    }
-  } catch (error) {
-    console.error("Error in onConvertClick:", error);
-    updateUIStatus("error", error.message);
-  }
 }
 
 function showErrorMessage(message) {
-  const errorElement = document.getElementById("error-message");
-  if (errorElement) {
-    errorElement.textContent = message;
-    errorElement.classList.remove("hidden");
-  } else {
-    console.error("Error message element not found");
-  }
+    const errorElement = document.getElementById('error-message');
+    if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.classList.remove('hidden');
+    } else {
+        console.error("Error message element not found");
+    }
 }
 
 async function postToConvert(inputData, lang) {
@@ -214,7 +205,7 @@ async function postToConvert(inputData, lang) {
   let body;
   let headers = {};
 
-  const maxRetries = 3; // Number of retries
+  const maxRetries = 3;   // Number of retries
   const retryDelay = 2000; // Delay between retries
 
   try {
@@ -226,9 +217,7 @@ async function postToConvert(inputData, lang) {
     debugLog("Obtained token for convert");
 
     headers.Authorization = `Bearer ${token}`;
-    headers["Content-Type"] = inputData.file
-      ? "application/octet-stream"
-      : "application/json";
+    headers['Content-Type'] = inputData.file ? 'application/octet-stream' : 'application/json';
 
     if (inputData.file) {
       const file = inputData.file;
@@ -239,10 +228,10 @@ async function postToConvert(inputData, lang) {
         const end = Math.min(start + chunkSize, file.size);
         const chunk = file.slice(start, end);
 
-        headers["X-File-Name"] = file.name;
-        headers["X-Chunk-Index"] = chunkIndex.toString();
-        headers["X-Total-Chunks"] = totalChunks.toString();
-        headers["X-Language"] = lang;
+        headers['X-File-Name'] = file.name;
+        headers['X-Chunk-Index'] = chunkIndex.toString();
+        headers['X-Total-Chunks'] = totalChunks.toString();
+        headers['X-Language'] = lang;
 
         let response;
         for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -254,9 +243,10 @@ async function postToConvert(inputData, lang) {
             });
 
             if (response.ok) break; // Exit loop if request was successful
+
           } catch (error) {
             if (attempt < maxRetries - 1) {
-              await new Promise((resolve) => setTimeout(resolve, retryDelay)); // Wait before retrying
+              await new Promise(resolve => setTimeout(resolve, retryDelay)); // Wait before retrying
             } else {
               throw error; // Throw error if all retries fail
             }
@@ -289,9 +279,10 @@ async function postToConvert(inputData, lang) {
           });
 
           if (response.ok) break; // Exit loop if request was successful
+
         } catch (error) {
           if (attempt < maxRetries - 1) {
-            await new Promise((resolve) => setTimeout(resolve, retryDelay)); // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, retryDelay)); // Wait before retrying
           } else {
             throw error; // Throw error if all retries fail
           }
@@ -314,17 +305,20 @@ async function postToConvert(inputData, lang) {
       throw new Error("No input provided");
     }
 
-    updateUIStatus(
-      "done",
-      "Conversion process initiated. You will receive an email when it's complete."
-    );
+    updateUIStatus("done", "Conversion process initiated. You will receive an email when it's complete.");
   } catch (error) {
     console.error("Error in postToConvert:", error);
-    updateUIStatus(
-      "error",
-      error.message || "An error occurred during conversion"
-    );
+    updateUIStatus("error", error.message || "An error occurred during conversion");
   }
+}
+
+function getInputData() {
+  const urlInput = document.getElementById("url-input");
+  const fileNameElement = document.getElementById("file-name");
+  return {
+    url: urlInput ? urlInput.value.trim() : '',
+    file: fileNameElement && fileNameElement.file ? fileNameElement.file : null
+  };
 }
 
 async function login() {
@@ -352,28 +346,26 @@ async function logout() {
 }
 
 function showLanguageSelectionModal(inputData) {
-  const modal = document.getElementById("language-modal");
+  const modal = document.getElementById('language-modal');
   if (!modal) {
     console.error("Language modal not found in the DOM");
     return;
   }
 
-  modal.classList.remove("hidden");
-  modal.style.display = "block"; // or 'flex', depending on your layout
+  modal.classList.remove('hidden');
+  modal.style.display = 'block'; // or 'flex', depending on your layout
 
   const handleLanguageSelection = async (lang) => {
     debugLog(`Language selected: ${lang}`);
-    modal.classList.add("hidden");
+    modal.classList.add('hidden');
     await postToConvert(inputData, lang);
   };
 
-  document.getElementById("en-btn").onclick = () =>
-    handleLanguageSelection("en");
-  document.getElementById("es-btn").onclick = () =>
-    handleLanguageSelection("es");
-  document.getElementById("cancel-btn").onclick = () => {
+  document.getElementById('en-btn').onclick = () => handleLanguageSelection('en');
+  document.getElementById('es-btn').onclick = () => handleLanguageSelection('es');
+  document.getElementById('cancel-btn').onclick = () => {
     debugLog("Language selection cancelled");
-    modal.classList.add("hidden");
+    modal.classList.add('hidden');
   };
 }
 
@@ -399,11 +391,9 @@ async function pollStatus(token) {
         updateUIStatus("idle", "Ready for new conversion");
         break;
       case "failed":
-        let errorMessage =
-          result.error || "An error occurred during processing";
+        let errorMessage = result.error || "An error occurred during processing";
         if (errorMessage.includes("YouTube requires authentication")) {
-          errorMessage =
-            "YouTube requires authentication for this video. Please try a different video or provide a direct audio file.";
+          errorMessage = "YouTube requires authentication for this video. Please try a different video or provide a direct audio file.";
         }
         console.error("Conversion failed:", errorMessage);
         updateUIStatus("error", errorMessage);
@@ -417,10 +407,7 @@ async function pollStatus(token) {
     }
   } catch (error) {
     console.error("Error polling status:", error);
-    updateUIStatus(
-      "error",
-      `An error occurred while checking status: ${error.message}`
-    );
+    updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
   }
 }
 
@@ -432,15 +419,13 @@ function updateUIStatus(status, message = "") {
   const doneSection = document.getElementById("done-section");
   const processingStage = document.getElementById("processing-stage");
 
-  [inputSection, statusSection, errorSection, doneSection].forEach(
-    (section) => {
-      if (section) {
-        section.classList.add("hidden");
-      } else {
-        console.warn(`Section not found: ${section}`);
-      }
+  [inputSection, statusSection, errorSection, doneSection].forEach(section => {
+    if (section) {
+      section.classList.add("hidden");
+    } else {
+      console.warn(`Section not found: ${section}`);
     }
-  );
+  });
 
   switch (status) {
     case "running":
@@ -476,8 +461,7 @@ function updateUIStatus(status, message = "") {
         errorSection.classList.remove("hidden");
         const errorParagraph = errorSection.querySelector("p");
         if (errorParagraph) {
-          errorParagraph.textContent =
-            message || "An error occurred. Please try again.";
+          errorParagraph.textContent = message || "An error occurred. Please try again.";
         } else {
           console.error("Error paragraph not found in error section");
         }
@@ -500,8 +484,8 @@ function clearProcessingStageInterval() {
 }
 
 function updateProcessingStage() {
-  const statusSection = document.getElementById("status-section");
-  const processingStage = document.getElementById("processing-stage");
+  const statusSection = document.getElementById('status-section');
+  const processingStage = document.getElementById('processing-stage');
 
   if (!statusSection) {
     console.warn("Status section not found");
@@ -517,15 +501,13 @@ function updateProcessingStage() {
   }
   if (currentStageIndex < 0 || currentStageIndex >= processingStages.length) {
     console.error("Invalid currentStageIndex:", currentStageIndex);
-    currentStageIndex = 0; // Reset to a valid index
+    currentStageIndex = 0;  // Reset to a valid index
   }
 
-  if (!statusSection.classList.contains("hidden")) {
+  if (!statusSection.classList.contains('hidden')) {
     processingStage.textContent = processingStages[currentStageIndex];
     currentStageIndex = (currentStageIndex + 1) % processingStages.length;
-    debugLog(
-      "Updated processing stage to: " + processingStages[currentStageIndex]
-    );
+    debugLog("Updated processing stage to: " + processingStages[currentStageIndex]);
   } else {
     console.warn("Status section is hidden. Skipping update.");
   }
@@ -539,14 +521,69 @@ function initializeProcessingStage() {
 
 function safeUpdateProcessingStage() {
   try {
-    if (document.readyState === "complete") {
+    if (document.readyState === 'complete') {
       updateProcessingStage();
     } else {
-      window.addEventListener("load", updateProcessingStage);
+      window.addEventListener('load', updateProcessingStage);
     }
   } catch (error) {
     console.error("Error in safeUpdateProcessingStage:", error);
   }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  debugLog("DOM Content Loaded");
+
+  const uploadIcon = document.querySelector('.upload-icon');
+  const fileNameElement = document.getElementById('file-name');
+  const urlInput = document.getElementById('url-input');
+
+  if (uploadIcon && fileNameElement && urlInput) {
+    // Add the event listener to the upload icon only once
+    uploadIcon.addEventListener('click', handleFileUpload);
+
+    urlInput.addEventListener('input', () => {
+      if (urlInput.value.trim() !== '') {
+        fileNameElement.textContent = ''; // Clear file name when URL is entered
+        fileNameElement.file = null; // Clear the stored File object
+      }
+    });
+  } else {
+    console.error("One or more elements for file upload not found");
+  }
+
+  // Initialize other parts of your application
+  initAuth0().catch((error) => console.error("Error initializing app:", error));
+});
+
+let fileInput; // Объявляем переменную для хранения элемента fileInput
+function handleFileUpload() {
+  const fileNameElement = document.getElementById('file-name');
+  const urlInput = document.getElementById('url-input');
+  if (!fileInput) {
+    // Создаем элемент fileInput только один раз
+    fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a';
+    fileInput.style.display = 'none';
+    // Добавляем элемент в body
+    document.body.appendChild(fileInput);
+    // Добавляем обработчик изменения только один раз
+    fileInput.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        fileNameElement.textContent = file.name;
+        fileNameElement.file = file; // Сохраняем объект File
+        urlInput.value = ''; // Очищаем URL input при выборе файла
+        debugLog("File selected: " + file.name);
+      } else {
+        fileNameElement.textContent = '';
+        fileNameElement.file = null; // Очищаем сохраненный объект File
+        debugLog("No file selected");
+      }
+    }, { once: true }); // Обработчик с опцией { once: true } для удаления после первого вызова
+  }
+  fileInput.click();
 }
 
 // Ensure all functions are in global scope

@@ -14,7 +14,7 @@ import logfire
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
-from vercel_kv import VercelKV
+import asyncpg
 import io
 import subprocess
 import asyncio
@@ -39,16 +39,58 @@ stripe.api_key = os.getenv("STRIPE_API_KEY")
 # Configure logfire
 logfire.configure()
 
-kv = VercelKV(os.environ["KV_REST_API_URL"], os.environ["KV_REST_API_TOKEN"])
+async def get_db_pool():
+    return await asyncpg.create_pool(os.environ['POSTGRES_URL'])
+
+# Initialize the pool at the module level
+db_pool = None
+
+async def initialize_db_pool():
+    global db_pool
+    db_pool = await get_db_pool()
+
+# Call this function at the start of your application
+asyncio.run(initialize_db_pool())
 
 async def create_task(task_id, task_data):
-    await kv.set(f"task:{task_id}", json.dumps(task_data))
+    async with db_pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO tasks (id, data) VALUES ($1, $2)",
+            task_id, json.dumps(task_data)
+        )
 
 async def get_task_status(task_id):
-    task_data = await kv.get(f"task:{task_id}")
-    if task_data:
-        return json.loads(task_data)
-    return None
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT data FROM tasks WHERE id = $1",
+            task_id
+        )
+        return json.loads(row['data']) if row else None
+
+async def process_tasks():
+    while True:
+        async with db_pool.acquire() as conn:
+            task = await conn.fetchrow(
+                "SELECT id, data FROM tasks WHERE status = 'processing' LIMIT 1"
+            )
+            if not task:
+                break
+
+            task_id = task['id']
+            task_data = json.loads(task['data'])
+
+            try:
+                await process_and_send_email(task_id, task_data)
+                await conn.execute(
+                    "UPDATE tasks SET data = $1 WHERE id = $2",
+                    json.dumps({**task_data, 'status': 'done'}), task_id
+                )
+            except Exception as e:
+                logfire.exception(f"Error processing task {task_id}: {str(e)}")
+                await conn.execute(
+                    "UPDATE tasks SET data = $1 WHERE id = $2",
+                    json.dumps({**task_data, 'status': 'failed', 'error': str(e)}), task_id
+                )
 
 # Resend API key
 RESEND_API_KEY = os.getenv('RESEND_API_KEY')
@@ -431,11 +473,11 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            async for key in kv.scan_iter("task:*"):
-                task_data = await get_task_status(key.split(':')[1])
-                if task_data and task_data.get('email') == user_email:
-                    await kv.delete(key)
-
+            async with db_pool.acquire() as conn:
+                await conn.execute(
+                    "DELETE FROM tasks WHERE data->>'email' = $1",
+                    user_email
+                )
             logfire.info(f"Reset tasks for user: {user_email}")
             json_response(self, 200, {"message": "Tasks reset successfully"})
         except Exception as e:
@@ -640,6 +682,7 @@ Suggested donation: $2 per hour of content converted."""
 # Vercel handler
 def vercel_handler(event, context):
     async def async_handler(event, context):
+        await initialize_db_pool()
         class MockRequest:
             def __init__(self, event):
                 self.headers = event['headers']

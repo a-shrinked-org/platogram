@@ -12,4 +12,4 @@ python-jose==3.3.0
 tenacity==9.0.0
 nltk==3.9.1
 stripe==10.8.0
-vercel-kv==0.1.5
+asyncpg==0.28.0

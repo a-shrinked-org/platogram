@@ -54,8 +54,13 @@ auth0_public_key_cache = {
 # Configure AssemblyAI
 aai.settings.api_key = os.getenv('ASSEMBLYAI_API_KEY')
 
+db_pool = None
+
 async def get_db_pool():
-    return await asyncpg.create_pool(os.environ['POSTGRES_URL'])
+    global db_pool
+    if db_pool is None:
+        db_pool = await asyncpg.create_pool(os.environ['POSTGRES_URL'])
+    return db_pool
 
 async def create_task(pool, task_id, task_data):
     async with pool.acquire() as conn:
@@ -78,7 +83,6 @@ async def update_task_status(pool, task_id, task_data):
             "UPDATE tasks SET data = $1 WHERE id = $2",
             json.dumps(task_data), task_id
         )
-
 def get_auth0_public_key():
     current_time = time.time()
     if (
@@ -375,18 +379,6 @@ Suggested donation: $2 per hour of content converted."""
         task_data['error'] = await get_user_friendly_error_message(str(e))
         await update_task_status(pool, task_id, task_data)
 
-async def get_user_friendly_error_message(error_message):
-    model = plato.llm.get_model("anthropic/claude-3-5-sonnet", key=os.getenv("ANTHROPIC_API_KEY"))
-    prompt = f"""
-    Given the following error message, provide a concise, user-friendly explanation
-    that focuses on the key issue and any actionable steps. Avoid technical jargon
-    and keep the message under 256 characters:
-
-    Error: {error_message}
-    """
-    response = await model.prompt_model(messages=[plato.types.User(content=prompt)])
-    return response.strip()[:256]
-
 async def handle_task_status(task_id):
     pool = await get_db_pool()
     task_data = await get_task_status(pool, task_id)
@@ -456,19 +448,29 @@ async def handle_convert(headers, body):
             'token': data.get('token')
         }
         await create_task(pool, task_id, task_data)
-        asyncio.create_task(process_and_send_email(pool, task_id, task_data))
-        return {'statusCode': 200, 'body': json.dumps({"message": "Conversion started", "task_id": task_id})}
+        # Instead of running the task immediately, we'll let the cron job handle it
+        return {'statusCode': 200, 'body': json.dumps({"message": "Conversion queued", "task_id": task_id})}
     except Exception as e:
         logfire.exception(f"Error in handle_convert: {str(e)}")
         return {'statusCode': 500, 'body': json.dumps({"error": "An unexpected error occurred. Please try again later."})}
 
-db_pool = None
+async def handle_cron(event, context):
+    pool = await get_db_pool()
+    try:
+        async with pool.acquire() as conn:
+            tasks = await conn.fetch(
+                "SELECT id, data FROM tasks WHERE data->>'status' = 'processing'"
+            )
 
-async def get_db_pool():
-    global db_pool
-    if db_pool is None:
-        db_pool = await asyncpg.create_pool(os.environ['POSTGRES_URL'])
-    return db_pool
+        for task in tasks:
+            task_id = task['id']
+            task_data = json.loads(task['data'])
+            asyncio.create_task(process_and_send_email(pool, task_id, task_data))
+
+        return {'statusCode': 200, 'body': json.dumps({"message": "Cron job executed successfully"})}
+    except Exception as e:
+        logfire.exception(f"Error in cron job: {str(e)}")
+        return {'statusCode': 500, 'body': json.dumps({"error": "An error occurred during the cron job execution"})}
 
 async def handle_request(event, context):
     logger.info(f"Received request: {event}")
@@ -489,6 +491,8 @@ async def handle_request(event, context):
             return await handle_status(headers)
         elif path == '/reset':
             return await handle_reset(headers)
+        elif path == '/api/cron':
+            return await handle_cron(event, context)
         else:
             return {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
     elif method == 'POST':

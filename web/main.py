@@ -390,6 +390,7 @@ async def get_user_friendly_error_message(error_message):
     return response.strip()[:256]
 
 async def handle_request(event, context):
+    return {'statusCode': 200, 'body': json.dumps({"message": "work?"})}
     pool = await get_db_pool()
 
     try:

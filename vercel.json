@@ -29,7 +29,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/main.py"
+      "dest": "main.py"
     }
   ],
   "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e ."

@@ -471,16 +471,20 @@ async def get_db_pool():
     return db_pool
 
 async def handle_request(event, context):
+    logger.info(f"Received request: {event}")
     pool = await get_db_pool()
 
     path = event['path']
     method = event['httpMethod']
-    headers = event['headers']
+    headers = event.get('headers', {})
     body = event.get('body', '')
 
+    logger.info(f"Processing {method} request to {path}")
+
     if method == 'GET':
-        if path.startswith('/task_status'):
-            return await handle_task_status(path.split('/')[-1])
+        if path.startswith('/task_status/'):
+            task_id = path.split('/')[-1]
+            return await handle_task_status(task_id)
         elif path == '/status':
             return await handle_status(headers)
         elif path == '/reset':

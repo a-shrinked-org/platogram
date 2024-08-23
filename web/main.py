@@ -394,15 +394,20 @@ async def handle_task_status(task_id):
 
 async def handle_status(headers):
     task_id = headers.get('X-Task-ID')
+    logger.info(f"Handling status request for task_id: {task_id}")
+
     if not task_id:
+        logger.info("No task_id provided, returning idle status")
         return {'statusCode': 200, 'body': json.dumps({"status": "idle"})}
 
     pool = await get_db_pool()
     try:
         task_data = await get_task_status(pool, task_id)
         if not task_data:
+            logger.info(f"No task found for task_id: {task_id}")
             response = {"status": "not_found"}
         else:
+            logger.info(f"Task status for {task_id}: {task_data['status']}")
             response = {
                 "status": task_data['status'],
                 "error": task_data.get('error') if task_data['status'] == "failed" else None
@@ -485,6 +490,7 @@ async def handle_request(event, context):
 
     if method == 'GET':
         if path.startswith('/task_status/'):
+            logger.info("Handling /status request")
             task_id = path.split('/')[-1]
             return await handle_task_status(task_id)
         elif path == '/status':

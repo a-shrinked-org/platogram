@@ -371,15 +371,19 @@ function showLanguageSelectionModal(inputData) {
 
 async function pollStatus(token) {
   try {
+    console.log("Polling status with token:", token);
     const response = await fetch("/status", {
       headers: { Authorization: `Bearer ${token}` },
     });
+
+    console.log("Status response:", response);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const result = await response.json();
+    console.log("Polling status response:", result);
     debugLog("Polling status response: " + JSON.stringify(result));
 
     switch (result.status) {

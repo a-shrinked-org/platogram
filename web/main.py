@@ -682,7 +682,19 @@ Suggested donation: $2 per hour of content converted."""
 # Vercel handler
 def vercel_handler(event, context):
     async def async_handler(event, context):
-        await initialize_db_pool()
+        global db_pool
+        if db_pool is None:
+            db_pool = await get_db_pool()
+
+        # Create table if it doesn't exist
+        async with db_pool.acquire() as conn:
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS tasks (
+                    id TEXT PRIMARY KEY,
+                    data JSONB NOT NULL
+                )
+            ''')
+            
         class MockRequest:
             def __init__(self, event):
                 self.headers = event['headers']

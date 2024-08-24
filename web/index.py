@@ -17,3 +17,7 @@ def handle_vercel_request(request):
 
     # Call the vercel_handler from main.py
     return vercel_handler(event, None)
+
+# This is the handler function that Vercel will call
+def handler(request):
+    return handle_vercel_request(request)

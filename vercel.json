@@ -13,29 +13,18 @@
       "use": "@vercel/static"
     }
   ],
+  "routes": [
+    { "src": "/status", "dest": "web/index.py" },
+    { "src": "/reset", "dest": "web/index.py" },
+    { "src": "/convert", "dest": "web/index.py" },
+    { "src": "/task_status/.*", "dest": "web/index.py" },
+    { "src": "/api/cron", "dest": "web/index.py" },
+    { "src": "/(.*)", "dest": "/web/$1" }
+  ],
   "crons": [
     {
       "path": "/api/cron",
       "schedule": "*/5 * * * *"
     }
-  ],
-  "routes": [
-    {
-      "src": "/",
-      "dest": "/web/index.html"
-    },
-    {
-      "src": "/web",
-      "dest": "/web/index.html"
-    },
-    {
-      "src": "/web/(.*)",
-      "dest": "/web/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/web/main.py"
-    }
-  ],
-  "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e ."
+  ]
 }

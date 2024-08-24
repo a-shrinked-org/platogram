@@ -1,7 +1,8 @@
 from main import handler
 import json
+import asyncio
 
-def vercel_handler(request):
+def handle_vercel_request(request):
     # Convert Vercel request to the format expected by our handler
     event = {
         'httpMethod': request.method,
@@ -10,7 +11,8 @@ def vercel_handler(request):
         'body': request.body.decode() if request.body else ''
     }
 
-    response = handler(event, None)
+    # Call the vercel_handler from main.py
+    response = vercel_handler(event, None)
 
     # Ensure the response is JSON serializable
     if isinstance(response['body'], str):
@@ -19,9 +21,4 @@ def vercel_handler(request):
         except json.JSONDecodeError:
             response['body'] = json.dumps({'error': 'Internal server error'})
 
-    # Convert the response to the format expected by Vercel
-    return {
-        'statusCode': response['statusCode'],
-        'headers': response.get('headers', {}),
-        'body': response['body']
-    }
+    return response

@@ -521,37 +521,55 @@ async def handle_request(event, context):
         return {'statusCode': 405, 'body': json.dumps({"error": "Method Not Allowed"})}
 
 # This is the entry point for Vercel
-def handler(event, context):
-    async def async_handler():
-        path = event['path']
-        method = event['httpMethod']
-        headers = event['headers']
-        body = event.get('body', '')
+def vercel_handler(event, context):
+    async def async_handler(event, context):
+        global db_pool
+        if db_pool is None:
+            db_pool = await get_db_pool()
+        # Create table if it doesn't exist
+        async with db_pool.acquire() as conn:
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS tasks (
+                    id TEXT PRIMARY KEY,
+                    data JSONB NOT NULL
+                )
+            ''')
 
-        if method == 'GET':
-            if path.startswith('/api/task_status/'):
-                task_id = path.split('/')[-1]
-                return await handle_task_status(task_id)
-            elif path == '/api/status':
-                return await handle_status(headers)
-            elif path == '/api/reset':
-                return await handle_reset(headers)
-            elif path == '/api/cron':
-                return await handle_cron(event, context)
-        elif method == 'POST':
-            if path == '/api/convert':
-                return await handle_convert(headers, body)
-        elif method == 'OPTIONS':
-            return {
-                'statusCode': 200,
-                'headers': {
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                    'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-File-Name, X-Language, X-Price, X-Token'
-                },
-                'body': ''
-            }
-
-        return {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
-
-    return asyncio.run(async_handler())
+        class MockRequest:
+            def __init__(self, event):
+                self.headers = event['headers']
+                self.method = event['httpMethod']
+                self.path = event['path']
+                self.body = event.get('body', '')
+        class MockResponse:
+            def __init__(self):
+                self.status_code = 200
+                self.headers = {}
+                self.body = ''
+            def send_response(self, status_code):
+                self.status_code = status_code
+            def send_header(self, key, value):
+                self.headers[key] = value
+            def end_headers(self):
+                pass
+            def wfile(self):
+                class MockWFile:
+                    def write(self, data):
+                        self.body += data.decode('utf-8') if isinstance(data, bytes) else data
+                return MockWFile()
+        mock_request = MockRequest(event)
+        mock_response = MockResponse()
+        server = handler(mock_request, mock_request.path, mock_response)
+        if mock_request.method == 'GET':
+            await server.do_GET()
+        elif mock_request.method == 'POST':
+            await server.do_POST()
+        elif mock_request.method == 'OPTIONS':
+            server.do_OPTIONS()
+        return {
+            'statusCode': mock_response.status_code,
+            'headers': mock_response.headers,
+            'body': mock_response.body,
+        }
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(async_handler(event, context))

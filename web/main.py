@@ -528,15 +528,30 @@ def handler(event, context):
         headers = event['headers']
         body = event.get('body', '')
 
-        result = await handle_request(event, context)
+        if method == 'GET':
+            if path.startswith('/api/task_status/'):
+                task_id = path.split('/')[-1]
+                return await handle_task_status(task_id)
+            elif path == '/api/status':
+                return await handle_status(headers)
+            elif path == '/api/reset':
+                return await handle_reset(headers)
+            elif path == '/api/cron':
+                return await handle_cron(event, context)
+        elif method == 'POST':
+            if path == '/api/convert':
+                return await handle_convert(headers, body)
+        elif method == 'OPTIONS':
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-File-Name, X-Language, X-Price, X-Token'
+                },
+                'body': ''
+            }
 
-        # Ensure the response body is JSON
-        if isinstance(result['body'], str):
-            try:
-                json.loads(result['body'])
-            except json.JSONDecodeError:
-                result['body'] = json.dumps({"error": "Internal server error"})
-
-        return result
+        return {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
 
     return asyncio.run(async_handler())

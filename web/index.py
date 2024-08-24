@@ -1,36 +1,27 @@
 from main import handler
-from http.server import BaseHTTPRequestHandler
-from io import BytesIO
+import json
 
-class VercelHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.handle_request('GET')
+def vercel_handler(request):
+    # Convert Vercel request to the format expected by our handler
+    event = {
+        'httpMethod': request.method,
+        'path': request.url.path,
+        'headers': dict(request.headers),
+        'body': request.body.decode() if request.body else ''
+    }
 
-    def do_POST(self):
-        self.handle_request('POST')
+    response = handler(event, None)
 
-    def do_OPTIONS(self):
-        self.handle_request('OPTIONS')
+    # Ensure the response is JSON serializable
+    if isinstance(response['body'], str):
+        try:
+            json.loads(response['body'])
+        except json.JSONDecodeError:
+            response['body'] = json.dumps({'error': 'Internal server error'})
 
-    def handle_request(self, method):
-        content_length = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(content_length).decode() if content_length > 0 else ''
-
-        event = {
-            'httpMethod': method,
-            'path': self.path,
-            'headers': dict(self.headers),
-            'body': body
-        }
-
-        result = handler(event, None)
-
-        self.send_response(result['statusCode'])
-        for key, value in result.get('headers', {}).items():
-            self.send_header(key, value)
-        self.end_headers()
-        self.wfile.write(result['body'].encode())
-
-def vercel_handler(request, response):
-    handler = VercelHandler(request, response, None)
-    handler.handle_request(request.method)
+    # Convert the response to the format expected by Vercel
+    return {
+        'statusCode': response['statusCode'],
+        'headers': response.get('headers', {}),
+        'body': response['body']
+    }

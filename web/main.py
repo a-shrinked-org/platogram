@@ -1,3 +1,4 @@
+from http.server import BaseHTTPRequestHandler
 import json
 import os
 import logging
@@ -8,32 +9,29 @@ import base64
 import time
 import requests
 import jwt
-import stripe
-import logfire
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
-import asyncpg
+import io
+import subprocess
 import asyncio
 import aiofiles
 import aiofiles.tempfile
-import aiohttp
-# from http.server import BaseHTTPRequestHandler
-# from io import BytesIO
+
 
 import platogram as plato
 from anthropic import AnthropicError
 import assemblyai as aai
 
+import nltk
+from nltk.tokenize import sent_tokenize
+
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Configure Stripe
-stripe.api_key = os.getenv("STRIPE_API_KEY")
-
-# Configure logfire
-logfire.configure()
+# In-memory storage (Note: This will reset on each function invocation)
+tasks = {}
 
 # Resend API key
 RESEND_API_KEY = os.getenv('RESEND_API_KEY')
@@ -56,35 +54,15 @@ auth0_public_key_cache = {
 # Configure AssemblyAI
 aai.settings.api_key = os.getenv('ASSEMBLYAI_API_KEY')
 
-db_pool = None
+def json_response(handler, status_code, data):
+    handler.send_response(status_code)
+    handler.send_header('Content-type', 'application/json')
+    handler.send_header('Access-Control-Allow-Origin', '*')
+    handler.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    handler.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language')
+    handler.end_headers()
+    handler.wfile.write(json.dumps(data).encode('utf-8'))
 
-async def get_db_pool():
-    global db_pool
-    if db_pool is None:
-        db_pool = await asyncpg.create_pool(os.environ['POSTGRES_URL'])
-    return db_pool
-
-async def create_task(pool, task_id, task_data):
-    async with pool.acquire() as conn:
-        await conn.execute(
-            "INSERT INTO tasks (id, data) VALUES ($1, $2)",
-            task_id, json.dumps(task_data)
-        )
-
-async def get_task_status(pool, task_id):
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT data FROM tasks WHERE id = $1",
-            task_id
-        )
-        return json.loads(row['data']) if row else None
-
-async def update_task_status(pool, task_id, task_data):
-    async with pool.acquire() as conn:
-        await conn.execute(
-            "UPDATE tasks SET data = $1 WHERE id = $2",
-            json.dumps(task_data), task_id
-        )
 def get_auth0_public_key():
     current_time = time.time()
     if (
@@ -176,23 +154,26 @@ async def send_email_with_resend(to_email, subject, body, attachments):
                 logger.error(f"Failed to send email. Status: {response.status}, Error: {await response.text()}")
                 logger.debug(f"Failed payload: {json.dumps(payload, default=str)}")
             return response
-
 async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
     logger.info(f"Processing audio from: {url}")
 
+    # Check for required API keys
     if not os.getenv('ANTHROPIC_API_KEY'):
         raise EnvironmentError("ANTHROPIC_API_KEY is not set")
 
+    # Initialize Platogram models
     language_model = plato.llm.get_model(
         "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
     )
 
+    # Handle local file paths
     if url.startswith("file://"):
-        file_path = url[7:]
+        file_path = url[7:]  # Remove "file://" prefix
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Local file not found: {file_path}")
-        url = file_path
+        url = file_path  # Use the local file path directly
 
+    # Transcribe or index content
     if os.getenv('ASSEMBLYAI_API_KEY'):
         logger.info("Transcribing audio to text using AssemblyAI...")
         await plato.index(url, llm=language_model, assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY'), lang=lang)
@@ -200,6 +181,7 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
         logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
         await plato.index(url, llm=language_model, lang=lang)
 
+    # Generate content
     logger.info("Generating content...")
     title = await plato.get_title(url, lang=lang)
     abstract = await plato.get_abstract(url, lang=lang)
@@ -207,6 +189,7 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
     references = await plato.get_references(url, lang=lang)
     chapters = await plato.get_chapters(url, lang=lang)
 
+    # Set language-specific prompts
     if lang == "en":
         CONTRIBUTORS_PROMPT = "Thoroughly review the <context> and identify the list of contributors. Output as Markdown list: First Name, Last Name, Title, Organization. Output \"Unknown\" if the contributors are not known. In the end of the list always add \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Start with \"## Contributors, Acknowledgements, Mentions\""
         INTRODUCTION_PROMPT = "Thoroughly review the <context> and write \"Introduction\" chapter for the paper. Write in the style of the original <context>. Use only words from <context>. Use quotes from <context> when necessary. Make sure to include <markers>. Output as Markdown. Start with \"## Introduction\""
@@ -218,7 +201,7 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
     else:
         raise ValueError(f"Unsupported language: {lang}")
 
-    contributors = await plato.generate(
+    contributors = plato.generate(
         query=CONTRIBUTORS_PROMPT,
         context_size="large",
         prefill=f"## Contributors, Acknowledgements, Mentions\n",
@@ -226,7 +209,7 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
         lang=lang
     )
 
-    introduction = await plato.generate(
+    introduction = plato.generate(
         query=INTRODUCTION_PROMPT,
         context_size="large",
         inline_references=True,
@@ -235,7 +218,7 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
         lang=lang
     )
 
-    conclusion = await plato.generate(
+    conclusion = plato.generate(
         query=CONCLUSION_PROMPT,
         context_size="large",
         inline_references=True,
@@ -244,6 +227,7 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
         lang=lang
     )
 
+    # Compile the full content
     full_content = f"""# {title}
 
 ## Origin
@@ -273,249 +257,308 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
 {references}
 """
 
+    # Generate PDF files
     logger.info("Generating PDF files...")
     pdf_path = output_dir / f"{title.replace(' ', '_')}-refs.pdf"
     pdf_no_refs_path = output_dir / f"{title.replace(' ', '_')}-no-refs.pdf"
     docx_path = output_dir / f"{title.replace(' ', '_')}-refs.docx"
 
+    # Use subprocess to call pandoc for PDF and DOCX generation
     try:
-        process = await asyncio.create_subprocess_exec(
-            'pandoc', '-o', str(pdf_path), '--from', 'markdown', '--pdf-engine=xelatex',
-            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await process.communicate(full_content.encode())
-        if process.returncode != 0:
-            logger.error(f"Error generating PDF: {stderr.decode()}")
-            raise RuntimeError(f"PDF generation failed with return code {process.returncode}")
+        # With references
+        subprocess.run(['pandoc', '-o', str(pdf_path), '--from', 'markdown', '--pdf-engine=xelatex'],
+                       input=full_content, text=True, check=True)
 
+        # Without references
         content_no_refs = re.sub(r'\[\[([0-9]+)\]\]\([^)]+\)', '', full_content)
         content_no_refs = re.sub(r'\[([0-9]+)\]', '', content_no_refs)
         content_no_refs = content_no_refs.split("## References")[0]
+        subprocess.run(['pandoc', '-o', str(pdf_no_refs_path), '--from', 'markdown', '--pdf-engine=xelatex'],
+                       input=content_no_refs, text=True, check=True)
 
-        process = await asyncio.create_subprocess_exec(
-            'pandoc', '-o', str(pdf_no_refs_path), '--from', 'markdown', '--pdf-engine=xelatex',
-            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await process.communicate(content_no_refs.encode())
-        if process.returncode != 0:
-            logger.error(f"Error generating PDF without references: {stderr.decode()}")
-            raise RuntimeError(f"PDF generation (no refs) failed with return code {process.returncode}")
-
-        process = await asyncio.create_subprocess_exec(
-            'pandoc', '-o', str(docx_path), '--from', 'markdown',
-            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await process.communicate(full_content.encode())
-        if process.returncode != 0:
-            logger.error(f"Error generating DOCX: {stderr.decode()}")
-            raise RuntimeError(f"DOCX generation failed with return code {process.returncode}")
-
-    except Exception as e:
+        # DOCX version
+        subprocess.run(['pandoc', '-o', str(docx_path), '--from', 'markdown'],
+                       input=full_content, text=True, check=True)
+    except subprocess.CalledProcessError as e:
         logger.error(f"Error generating documents: {str(e)}")
         raise
 
     return title, abstract
 
-async def process_and_send_email(pool, task_id, task_data):
-    try:
-        user_email = task_data.get('email')
-        logfire.info(f"Starting processing for task {task_id}. User email: {user_email}")
+import asyncio
+import aiofiles
+import aiofiles.tempfile
 
-        async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
-            output_dir = Path(tmpdir)
+# ... (other imports remain the same)
 
-            url = task_data.get('url') or f"file://{task_data['file']}"
-            logfire.info(f"Processing URL: {url}")
+class handler(BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language')
+        self.end_headers()
 
-            title, abstract = await audio_to_paper(url, task_data['lang'], output_dir, images=task_data.get('images', False))
-            logfire.info(f"Audio to paper completed. Title: {title}")
-
-            files = [f for f in output_dir.glob('*') if f.is_file()]
-            logfire.info(f"Generated {len(files)} files")
-
-            subject = f"[Platogram] {title}"
-            body = f"""Hi there!
-
-Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
-
-You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
-
-{abstract}
-
-Please reply to this e-mail if any suggestions, feedback, or questions.
-
----
-Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
-Suggested donation: $2 per hour of content converted."""
-
-            if user_email:
-                logfire.info(f"Sending email to {user_email}")
-                await send_email_with_resend(user_email, subject, body, files)
-                logfire.info("Email sent successfully")
-            else:
-                logfire.warning(f"No email available for task {task_id}. Skipping email send.")
-
-            task_data['status'] = 'done'
-            logfire.info(f"Conversion completed for task {task_id}")
-
-            if task_data['price'] > 0 and task_data['token']:
-                try:
-                    charge = stripe.Charge.create(
-                        amount=int(task_data['price'] * 100),
-                        currency='usd',
-                        source=task_data['token'],
-                        description=f'Platogram conversion: {title}'
-                    )
-                    logfire.info(f"Payment processed successfully for task {task_id}", charge_id=charge.id)
-                except stripe.error.StripeError as e:
-                    logfire.error(f"Stripe payment failed for task {task_id}: {str(e)}")
-                    task_data['error'] = "Payment processing failed. Please contact support."
-            else:
-                logfire.info(f"No charge for task {task_id}")
-
-            await update_task_status(pool, task_id, task_data)
-
-    except Exception as e:
-        logfire.exception(f"Error in process_and_send_email for task {task_id}: {str(e)}")
-        task_data['status'] = 'failed'
-        task_data['error'] = await get_user_friendly_error_message(str(e))
-        await update_task_status(pool, task_id, task_data)
-
-async def handle_task_status(task_id):
-    pool = await get_db_pool()
-    task_data = await get_task_status(pool, task_id)
-    if task_data:
-        response = {
-            "task_id": task_id,
-            "status": task_data['status'],
-            "error": task_data.get('error') if task_data['status'] == "failed" else None
-        }
-        return {'statusCode': 200, 'body': json.dumps(response)}
-    else:
-        return {'statusCode': 404, 'body': json.dumps({"error": "Task not found"})}
-
-async def handle_status(headers):
-    task_id = headers.get('X-Task-ID')
-    logger.info(f"Handling status request for task_id: {task_id}")
-
-    if not task_id:
-        logger.info("No task_id provided, returning idle status")
-        return {'statusCode': 200, 'body': json.dumps({"status": "idle"})}
-
-    pool = await get_db_pool()
-    try:
-        task_data = await get_task_status(pool, task_id)
-        if not task_data:
-            logger.info(f"No task found for task_id: {task_id}")
-            response = {"status": "not_found"}
+    def do_GET(self):
+        if self.path.startswith('/task_status'):
+            self.handle_task_status()
+        elif self.path == '/status':
+            self.handle_status()
+        elif self.path == '/reset':
+            self.handle_reset()
         else:
-            logger.info(f"Task status for {task_id}: {task_data['status']}")
+            json_response(self, 404, {"error": "Not Found"})
+
+    def handle_task_status(self):
+        task_id = self.path.split('/')[-1]
+        if task_id in tasks:
+            task = tasks[task_id]
             response = {
-                "status": task_data['status'],
-                "error": task_data.get('error') if task_data['status'] == "failed" else None
+                "task_id": task_id,
+                "status": task['status'],
+                "error": task.get('error') if task['status'] == "failed" else None
             }
-        return {'statusCode': 200, 'body': json.dumps(response)}
-    except Exception as e:
-        logger.exception(f"Error in handle_status for task {task_id}: {str(e)}")
-        return {'statusCode': 500, 'body': json.dumps({"error": "An unexpected error occurred while checking status."})}
-async def handle_reset(headers):
-    user_email = verify_token_and_get_email(headers.get('Authorization', '').split(' ')[1])
-    if not user_email:
-        return {'statusCode': 401, 'body': json.dumps({"error": "Unauthorized"})}
+            json_response(self, 200, response)
+        else:
+            json_response(self, 404, {"error": "Task not found"})
 
-    pool = await get_db_pool()
-    try:
-        async with pool.acquire() as conn:
-            await conn.execute(
-                "DELETE FROM tasks WHERE data->>'email' = $1",
-                user_email
-            )
-        logfire.info(f"Reset tasks for user: {user_email}")
-        return {'statusCode': 200, 'body': json.dumps({"message": "Tasks reset successfully"})}
-    except Exception as e:
-        logfire.exception(f"Error in handle_reset for user {user_email}: {str(e)}")
-        return {'statusCode': 500, 'body': json.dumps({"error": "An unexpected error occurred while resetting tasks."})}
+    def do_POST(self):
+        if self.path == '/convert':
+            asyncio.run(self.handle_convert())
+        else:
+            json_response(self, 404, {"error": "Not Found"})
 
-async def handle_convert(headers, body):
-    user_email = verify_token_and_get_email(headers.get('Authorization', '').split(' ')[1])
-    if not user_email:
-        return {'statusCode': 401, 'body': json.dumps({"error": "Unauthorized"})}
+    async def handle_convert(self):
+        logger.debug("Handling /convert request")
+        content_length = int(self.headers['Content-Length'])
+        content_type = self.headers.get('Content-Type')
+        user_email = self.get_user_email()
+        logger.debug(f"User email for conversion: {user_email}")
 
-    pool = await get_db_pool()
-    try:
-        task_id = str(uuid4())
-        data = json.loads(body)
-        task_data = {
-            'status': 'processing',
-            'url': data.get('url'),
-            'lang': data.get('lang', 'en'),
-            'email': user_email,
-            'price': float(data.get('price', 0)),
-            'token': data.get('token')
-        }
-        await create_task(pool, task_id, task_data)
-        # Instead of running the task immediately, we'll let the cron job handle it
-        return {'statusCode': 200, 'body': json.dumps({"message": "Conversion queued", "task_id": task_id})}
-    except Exception as e:
-        logfire.exception(f"Error in handle_convert: {str(e)}")
-        return {'statusCode': 500, 'body': json.dumps({"error": "An unexpected error occurred. Please try again later."})}
+        try:
+            task_id = str(uuid4())
+            if content_type == 'application/octet-stream':
+                body = self.rfile.read(content_length)  # Read raw bytes
+                file_name = self.headers.get('X-File-Name')
+                lang = self.headers.get('X-Language', 'en')
 
-async def handle_cron(event, context):
-    pool = await get_db_pool()
-    try:
-        async with pool.acquire() as conn:
-            tasks = await conn.fetch(
-                "SELECT id, data FROM tasks WHERE data->>'status' = 'processing'"
-            )
+                # Save the file to a temporary location
+                temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
+                temp_dir.mkdir(parents=True, exist_ok=True)
+                temp_file = temp_dir / f"{task_id}_{file_name}"
+                with open(temp_file, 'wb') as f:
+                    f.write(body)
 
-        for task in tasks:
-            task_id = task['id']
-            task_data = json.loads(task['data'])
-            asyncio.create_task(process_and_send_email(pool, task_id, task_data))
+                tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
+                logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+            elif content_type == 'application/json':
+                body = self.rfile.read(content_length).decode('utf-8')
+                data = json.loads(body)
+                url = data.get('url')
+                lang = data.get('lang', 'en')
+                tasks[task_id] = {'status': 'running', 'url': url, 'lang': lang, 'email': user_email}
+                logger.debug(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+            else:
+                logger.error(f"Invalid content type: {content_type}")
+                json_response(self, 400, {"error": "Invalid content type"})
+                return
 
-        return {'statusCode': 200, 'body': json.dumps({"message": "Cron job executed successfully"})}
-    except Exception as e:
-        logfire.exception(f"Error in cron job: {str(e)}")
-        return {'statusCode': 500, 'body': json.dumps({"error": "An error occurred during the cron job execution"})}
+            # Start processing
+            tasks[task_id]['status'] = 'processing'
+            asyncio.create_task(self.process_and_send_email(task_id))
 
-# This is the entry point for Vercel
-async def handle_request(event, context):
-    logger.info(f"Received request: {event}")
+            json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
+        except Exception as e:
+            logger.error(f"Error in handle_convert: {str(e)}")
+            json_response(self, 500, {"error": str(e)})
 
-    path = event['path']
-    method = event['httpMethod']
-    headers = event.get('headers', {})
-    body = event.get('body', '')
+    async def process_and_send_email(self, task_id):
+        try:
+            task = tasks[task_id]
+            user_email = task.get('email')
+            logger.info(f"Starting processing for task {task_id}. User email: {user_email}")
 
-    logger.info(f"Processing {method} request to {path}")
+            async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
+                output_dir = Path(tmpdir)
 
-    if method == 'GET':
-        if path.startswith('/task_status/'):
-            logger.info("Handling /task_status request")
-            task_id = path.split('/')[-1]
-            return await handle_task_status(task_id)
-        elif path == '/status' or path == '/api/status':
-            logger.info("Handling /status or /api/status request")
-            return await handle_status(headers)
-        elif path == '/reset' or path == '/api/reset':
-            return await handle_reset(headers)
-        elif path == '/api/cron':
-            return await handle_cron(event, context)
-    elif method == 'POST':
-        if path == '/convert' or path == '/api/convert':
-            return await handle_convert(headers, body)
-    elif method == 'OPTIONS':
+                # Process audio
+                if 'url' in task:
+                    url = task['url']
+                else:
+                    url = f"file://{task['file']}"
+
+                logger.info(f"Processing URL: {url}")
+
+                try:
+                    # Initialize the language model
+                    language_model = plato.llm.get_model(
+                        "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
+                    )
+                    logger.info("Language model initialized")
+
+                    # Set AssemblyAI API key in the environment if available
+                    if os.getenv('ASSEMBLYAI_API_KEY'):
+                        logger.info("Transcribing audio to text using AssemblyAI...")
+                        os.environ['ASSEMBLYAI_API_KEY'] = os.getenv('ASSEMBLYAI_API_KEY')
+                    else:
+                        logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
+
+                    # Call plato.index() with error handling
+                    try:
+                        logger.info("Calling plato.index()...")
+                        await plato.index(url, llm=language_model, lang=task['lang'])
+                        logger.info("plato.index() completed successfully")
+                    except AttributeError as e:
+                        if "'str' object has no attribute 'text'" in str(e):
+                            logger.warning("Received string input instead of transcript objects. Attempting to process as string.")
+                            words = url.split()  # Simple word splitting
+                            transcript_objects = [type('obj', (), {'text': w})() for w in words]
+                            await plato.index(transcript_objects, llm=language_model, lang=task['lang'])
+                            logger.info("Processed string input successfully")
+                        else:
+                            raise
+
+                    # Call audio_to_paper function
+                    logger.info("Calling audio_to_paper function...")
+                    title, abstract = await audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
+                    logger.info(f"audio_to_paper completed. Title: {title}")
+
+                    files = [f for f in output_dir.glob('*') if f.is_file()]
+                    logger.info(f"Generated {len(files)} files")
+
+                    subject = f"[Platogram] {title}"
+                    body = f"""Hi there!
+
+    Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
+
+    You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
+
+    {abstract}
+
+    Please reply to this e-mail if any suggestions, feedback, or questions.
+
+    ---
+    Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
+    Suggested donation: $2 per hour of content converted."""
+
+                    if user_email:
+                        logger.info(f"Sending email to {user_email}")
+                        await send_email_with_resend(user_email, subject, body, files)
+                        logger.info("Email sent successfully")
+                    else:
+                        logger.warning(f"No email available for task {task_id}. Skipping email send.")
+
+                    tasks[task_id]['status'] = 'done'
+                    logger.info(f"Conversion completed for task {task_id}")
+
+                except Exception as e:
+                    logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
+                    tasks[task_id]['status'] = 'failed'
+                    tasks[task_id]['error'] = str(e)
+                    raise
+
+        except Exception as e:
+            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
+            tasks[task_id]['status'] = 'failed'
+            tasks[task_id]['error'] = str(e)
+
+    def get_user_email(self):
+        auth_header = self.headers.get('Authorization', '')
+        logger.debug(f"Authorization header: {auth_header}")
+        if not auth_header:
+            logger.warning("No Authorization header found")
+            return None
+        try:
+            token = auth_header.split(' ')[1]
+            email = verify_token_and_get_email(token)
+            logger.debug(f"User email extracted: {email}")
+            return email
+        except IndexError:
+            logger.error("Malformed Authorization header")
+            return None
+
+    def handle_status(self):
+        task_id = self.headers.get('X-Task-ID')
+        if not task_id:
+            json_response(self, 200, {"status": "idle"})
+            return
+
+        try:
+            if task_id not in tasks:
+                response = {"status": "not_found"}
+            else:
+                task = tasks[task_id]
+                response = {
+                    "status": task['status'],
+                    "error": task.get('error') if task['status'] == "failed" else None
+                }
+            json_response(self, 200, response)
+        except Exception as e:
+            logger.error(f"Error in handle_status for task {task_id}: {str(e)}")
+            json_response(self, 500, {"error": str(e)})
+
+    def handle_reset(self):
+        task_id = self.headers.get('X-Task-ID')
+        if not task_id:
+            json_response(self, 400, {"error": "Task ID required"})
+            return
+
+        try:
+            if task_id in tasks:
+                del tasks[task_id]
+            json_response(self, 200, {"message": "Task reset"})
+        except Exception as e:
+            logger.error(f"Error in handle_reset for task {task_id}: {str(e)}")
+            json_response(self, 500, {"error": str(e)})
+
+# Vercel handler
+def vercel_handler(event, context):
+    async def async_handler(event, context):
+        class MockRequest:
+            def __init__(self, event):
+                self.headers = event['headers']
+                self.method = event['httpMethod']
+                self.path = event['path']
+                self.body = event.get('body', '')
+
+        class MockResponse:
+            def __init__(self):
+                self.status_code = 200
+                self.headers = {}
+                self.body = ''
+
+            def send_response(self, status_code):
+                self.status_code = status_code
+
+            def send_header(self, key, value):
+                self.headers[key] = value
+
+            def end_headers(self):
+                pass
+
+            def wfile(self):
+                class MockWFile:
+                    def write(self, data):
+                        self.body += data.decode('utf-8') if isinstance(data, bytes) else data
+                return MockWFile()
+
+        mock_request = MockRequest(event)
+        mock_response = MockResponse()
+
+        server = handler(mock_request, mock_request.path, mock_response)
+
+        if mock_request.method == 'GET':
+            server.do_GET()
+        elif mock_request.method == 'POST':
+            await server.do_POST()
+        elif mock_request.method == 'OPTIONS':
+            server.do_OPTIONS()
+
         return {
-            'statusCode': 200,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-File-Name, X-Language, X-Price, X-Token'
-            },
-            'body': ''
+            'statusCode': mock_response.status_code,
+            'headers': mock_response.headers,
+            'body': mock_response.body,
         }
 
-    return {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
-
-def handler(event, context):
-    return asyncio.run(handle_request(event, context))
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(async_handler(event, context))

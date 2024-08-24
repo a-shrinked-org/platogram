@@ -478,6 +478,7 @@ async def handle_cron(event, context):
         logfire.exception(f"Error in cron job: {str(e)}")
         return {'statusCode': 500, 'body': json.dumps({"error": "An error occurred during the cron job execution"})}
 
+# This is the entry point for Vercel
 async def handle_request(event, context):
     logger.info(f"Received request: {event}")
 
@@ -516,29 +517,5 @@ async def handle_request(event, context):
 
     return {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
 
-# This is the entry point for Vercel
-def vercel_handler(event, context):
-    async def async_handler():
-        global db_pool
-        try:
-            if db_pool is None:
-                db_pool = await get_db_pool()
-            # Create table if it doesn't exist
-            async with db_pool.acquire() as conn:
-                await conn.execute('''
-                    CREATE TABLE IF NOT EXISTS tasks (
-                        id TEXT PRIMARY KEY,
-                        data JSONB NOT NULL
-                    )
-                ''')
-
-            return await handle_request(event, context)
-        except Exception as e:
-            logger.exception(f"Error in async_handler: {str(e)}")
-            return {
-                'statusCode': 500,
-                'body': json.dumps({"error": "An internal server error occurred"})
-            }
-
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(async_handler())
+def handler(event, context):
+    return asyncio.run(handle_request(event, context))

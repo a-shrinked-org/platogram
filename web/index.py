@@ -1,12 +1,6 @@
-import sys
-import os
+from web.main import handler
 
-# Add the parent directory to sys.path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from web.main import vercel_handler
-
-def handle_vercel_request(request):
+def handle(request):
     # Convert Vercel request to the format expected by our handler
     event = {
         'httpMethod': request.method,
@@ -15,9 +9,12 @@ def handle_vercel_request(request):
         'body': request.body.decode() if request.body else ''
     }
 
-    # Call the vercel_handler from main.py
-    return vercel_handler(event, None)
+    # Call the handler function from main.py
+    result = handler(event, None)
 
-# This is the handler function that Vercel will call
-def handler(request):
-    return handle_vercel_request(request)
+    # Convert the result to the format expected by Vercel
+    return {
+        'statusCode': result['statusCode'],
+        'headers': result.get('headers', {}),
+        'body': result['body']
+    }

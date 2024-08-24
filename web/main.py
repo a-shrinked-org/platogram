@@ -521,46 +521,38 @@ async def handle_request(event, context):
     else:
         return {'statusCode': 405, 'body': json.dumps({"error": "Method Not Allowed"})}
 
-def handler(event, context):
-    return asyncio.get_event_loop().run_until_complete(handle_request(event, context))
-
 # This is the entry point for Vercel
-def handler(event, context):
-    return asyncio.get_event_loop().run_until_complete(handle_request(event, context))
+def handler(request, context):
+    async def async_handler():
+        path = request.url.path
+        method = request.method
+        headers = dict(request.headers)
+        body = await request.body()
 
-async def handle_request(event, context):
-    logger.info(f"Received request: {event}")
+        if method == 'GET':
+            if path.startswith('/task_status/'):
+                task_id = path.split('/')[-1]
+                return await handle_task_status(task_id)
+            elif path == '/status':
+                return await handle_status(headers)
+            elif path == '/reset':
+                return await handle_reset(headers)
+            elif path == '/api/cron':
+                return await handle_cron(None, None)
+        elif method == 'POST':
+            if path == '/convert':
+                return await handle_convert(headers, body)
+        elif method == 'OPTIONS':
+            return {
+                'statusCode': 200,
+                'headers': {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-File-Name, X-Language, X-Price, X-Token'
+                },
+                'body': ''
+            }
 
-    path = event.get('path', '')
-    method = event.get('httpMethod', '')
-    headers = event.get('headers', {})
-    body = event.get('body', '')
+        return {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
 
-    logger.info(f"Processing {method} request to {path}")
-
-    if method == 'GET':
-        if path.startswith('/task_status/'):
-            task_id = path.split('/')[-1]
-            return await handle_task_status(task_id)
-        elif path == '/status':
-            return await handle_status(headers)
-        elif path == '/reset':
-            return await handle_reset(headers)
-        elif path == '/api/cron':
-            return await handle_cron(event, context)
-    elif method == 'POST':
-        if path == '/convert':
-            return await handle_convert(headers, body)
-    elif method == 'OPTIONS':
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-File-Name, X-Language, X-Price, X-Token'
-            },
-            'body': ''
-        }
-
-    return {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
-
+    return asyncio.run(async_handler())

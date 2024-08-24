@@ -375,17 +375,21 @@ async function pollStatus(token) {
     const response = await fetch("/status", {
       headers: { Authorization: `Bearer ${token}` },
     });
-
     console.log("Status response:", response);
-
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-
-    const result = await response.json();
+    const text = await response.text();
+    console.log("Raw response text:", text);
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch (error) {
+      console.error("Error parsing JSON:", error);
+      throw new Error("Invalid JSON response from server");
+    }
     console.log("Polling status response:", result);
     debugLog("Polling status response: " + JSON.stringify(result));
-
     switch (result.status) {
       case "running":
         updateUIStatus("running", "Processing your request...");

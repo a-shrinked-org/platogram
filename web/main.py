@@ -418,7 +418,6 @@ async def handle_status(headers):
     except Exception as e:
         logger.exception(f"Error in handle_status for task {task_id}: {str(e)}")
         return {'statusCode': 500, 'body': json.dumps({"error": "An unexpected error occurred while checking status."})}
-
 async def handle_reset(headers):
     user_email = verify_token_and_get_email(headers.get('Authorization', '').split(' ')[1])
     if not user_email:
@@ -522,12 +521,12 @@ async def handle_request(event, context):
         return {'statusCode': 405, 'body': json.dumps({"error": "Method Not Allowed"})}
 
 # This is the entry point for Vercel
-def handler(request, context):
+def handler(event, context):
     async def async_handler():
-        path = request.url.path
-        method = request.method
-        headers = dict(request.headers)
-        body = await request.body()
+        path = event['path']
+        method = event['httpMethod']
+        headers = event['headers']
+        body = event['body']
 
         if method == 'GET':
             if path.startswith('/task_status/'):
@@ -538,7 +537,7 @@ def handler(request, context):
             elif path == '/reset':
                 return await handle_reset(headers)
             elif path == '/api/cron':
-                return await handle_cron(None, None)
+                return await handle_cron(event, context)
         elif method == 'POST':
             if path == '/convert':
                 return await handle_convert(headers, body)

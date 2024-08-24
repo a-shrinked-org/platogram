@@ -525,54 +525,34 @@ def handler(event, context):
     return asyncio.get_event_loop().run_until_complete(handle_request(event, context))
 
 # This is the entry point for Vercel
-class VercelRequest:
-    def __init__(self, method, path, headers, body):
-        self.method = method
-        self.path = path
-        self.headers = headers
-        self.body = body
+def handler(event, context):
+    return asyncio.get_event_loop().run_until_complete(handle_request(event, context))
 
-class VercelResponse:
-    def __init__(self):
-        self.status_code = 200
-        self.headers = {}
-        self._body = BytesIO()
+async def handle_request(event, context):
+    logger.info(f"Received request: {event}")
 
-    def write(self, data):
-        self._body.write(data.encode())
+    path = event.get('path', '')
+    method = event.get('httpMethod', '')
+    headers = event.get('headers', {})
+    body = event.get('body', '')
 
-    @property
-    def body(self):
-        return self._body.getvalue().decode()
+    logger.info(f"Processing {method} request to {path}")
 
-async def vercel_handler(event, context):
-    request = VercelRequest(
-        method=event['httpMethod'],
-        path=event['path'],
-        headers=event['headers'],
-        body=event.get('body', '')
-    )
-    response = VercelResponse()
-
-    if request.method == 'GET':
-        if request.path.startswith('/task_status/'):
-            task_id = request.path.split('/')[-1]
-            result = await handle_task_status(task_id)
-        elif request.path == '/status':
-            result = await handle_status(request.headers)
-        elif request.path == '/reset':
-            result = await handle_reset(request.headers)
-        elif request.path == '/api/cron':
-            result = await handle_cron(event, context)
-        else:
-            result = {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
-    elif request.method == 'POST':
-        if request.path == '/convert':
-            result = await handle_convert(request.headers, request.body)
-        else:
-            result = {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
-    elif request.method == 'OPTIONS':
-        result = {
+    if method == 'GET':
+        if path.startswith('/task_status/'):
+            task_id = path.split('/')[-1]
+            return await handle_task_status(task_id)
+        elif path == '/status':
+            return await handle_status(headers)
+        elif path == '/reset':
+            return await handle_reset(headers)
+        elif path == '/api/cron':
+            return await handle_cron(event, context)
+    elif method == 'POST':
+        if path == '/convert':
+            return await handle_convert(headers, body)
+    elif method == 'OPTIONS':
+        return {
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
@@ -581,15 +561,6 @@ async def vercel_handler(event, context):
             },
             'body': ''
         }
-    else:
-        result = {'statusCode': 405, 'body': json.dumps({"error": "Method Not Allowed"})}
 
-    response.status_code = result['statusCode']
-    response.headers.update(result.get('headers', {}))
-    response.write(result['body'])
+    return {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
 
-    return {
-        'statusCode': response.status_code,
-        'headers': response.headers,
-        'body': response.body
-    }

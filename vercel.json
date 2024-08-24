@@ -2,14 +2,6 @@
   "version": 2,
   "builds": [
     {
-      "src": "web/main.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "15mb",
-        "runtime": "python3.12"
-      }
-    },
-    {
       "src": "web/index.py",
       "use": "@vercel/python",
       "config": {
@@ -36,12 +28,8 @@
       "dest": "/web/$1"
     },
     {
-      "src": "/api/(.*)",
-      "dest": "/web/index.py"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/web/main.py"
+      "dest": "/web/index.py"
     }
   ],
   "crons": [
@@ -50,5 +38,11 @@
       "schedule": "*/5 * * * *"
     }
   ],
+  "functions": {
+    "web/index.py": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  },
   "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e ."
 }

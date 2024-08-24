@@ -18,8 +18,8 @@ import asyncio
 import aiofiles
 import aiofiles.tempfile
 import aiohttp
-from http.server import BaseHTTPRequestHandler
-from io import BytesIO
+# from http.server import BaseHTTPRequestHandler
+# from io import BytesIO
 
 import platogram as plato
 from anthropic import AnthropicError

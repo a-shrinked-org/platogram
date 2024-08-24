@@ -10,16 +10,14 @@
       }
     },
     {
-      "src": "web/index.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "15mb",
-        "runtime": "python3.12"
-      }
-    },
-    {
       "src": "web/**",
       "use": "@vercel/static"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron",
+      "schedule": "*/5 * * * *"
     }
   ],
   "routes": [
@@ -36,18 +34,8 @@
       "dest": "/web/$1"
     },
     {
-      "src": "/api/(.*)",
-      "dest": "/web/index.py"
-    },
-    {
       "src": "/(.*)",
       "dest": "/web/main.py"
-    }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron",
-      "schedule": "*/5 * * * *"
     }
   ],
   "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e ."

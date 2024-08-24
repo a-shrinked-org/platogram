@@ -491,10 +491,11 @@ async def handle_request(event, context):
 
     if method == 'GET':
         if path.startswith('/task_status/'):
-            logger.info("Handling /status request")
+            logger.info("Handling /task_status request")
             task_id = path.split('/')[-1]
             return await handle_task_status(task_id)
-        elif path == '/status':
+        elif path == '/status' or path == '/api/status':
+            logger.info("Handling /status or /api/status request")
             return await handle_status(headers)
         elif path == '/reset':
             return await handle_reset(headers)

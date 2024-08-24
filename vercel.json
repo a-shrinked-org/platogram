@@ -14,6 +14,7 @@
     }
   ],
   "routes": [
+    { "src": "/api/status", "dest": "web/index.py" },
     { "src": "/status", "dest": "web/index.py" },
     { "src": "/reset", "dest": "web/index.py" },
     { "src": "/convert", "dest": "web/index.py" },

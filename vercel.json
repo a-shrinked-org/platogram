@@ -22,12 +22,6 @@
       "use": "@vercel/static"
     }
   ],
-  "crons": [
-    {
-      "path": "/api/cron",
-      "schedule": "*/5 * * * *"
-    }
-  ],
   "routes": [
     {
       "src": "/",
@@ -48,6 +42,12 @@
     {
       "src": "/(.*)",
       "dest": "/web/main.py"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron",
+      "schedule": "*/5 * * * *"
     }
   ],
   "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e ."

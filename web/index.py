@@ -1,4 +1,10 @@
-from main import vercel_handler
+import sys
+import os
+
+# Add the parent directory to sys.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from web.main import vercel_handler
 
 def handle_vercel_request(request):
     # Convert Vercel request to the format expected by our handler

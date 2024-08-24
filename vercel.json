@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "index.py",
+      "src": "web/index.py",
       "use": "@vercel/python",
       "config": {
         "runtime": "python3.12"
@@ -13,14 +13,28 @@
       "use": "@vercel/static"
     }
   ],
-  "routes": [
-    { "src": "/api/.*", "dest": "index.py" },
-    { "src": "/(.*)", "dest": "/web/$1" }
-  ],
   "crons": [
     {
       "path": "/api/cron",
       "schedule": "*/5 * * * *"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/",
+      "dest": "/web/index.html"
+    },
+    {
+      "src": "/web",
+      "dest": "/web/index.html"
+    },
+    {
+      "src": "/web/(.*)",
+      "dest": "/web/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/web/main.py"
     }
   ],
   "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e ."

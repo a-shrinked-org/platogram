@@ -18,6 +18,8 @@ import asyncio
 import aiofiles
 import aiofiles.tempfile
 import aiohttp
+from http.server import BaseHTTPRequestHandler
+from io import BytesIO
 
 import platogram as plato
 from anthropic import AnthropicError
@@ -523,20 +525,71 @@ def handler(event, context):
     return asyncio.get_event_loop().run_until_complete(handle_request(event, context))
 
 # This is the entry point for Vercel
-def vercel_handler(request):
-    # Convert the Vercel request to the format expected by your handler
-    event = {
-        'httpMethod': request.method,
-        'path': request.url.path,
-        'headers': dict(request.headers),
-        'body': request.body.decode() if request.body else ''
-    }
+class VercelRequest:
+    def __init__(self, method, path, headers, body):
+        self.method = method
+        self.path = path
+        self.headers = headers
+        self.body = body
 
-    result = handler(event, {})
+class VercelResponse:
+    def __init__(self):
+        self.status_code = 200
+        self.headers = {}
+        self._body = BytesIO()
 
-    # Convert the result back to what Vercel expects
+    def write(self, data):
+        self._body.write(data.encode())
+
+    @property
+    def body(self):
+        return self._body.getvalue().decode()
+
+async def vercel_handler(event, context):
+    request = VercelRequest(
+        method=event['httpMethod'],
+        path=event['path'],
+        headers=event['headers'],
+        body=event.get('body', '')
+    )
+    response = VercelResponse()
+
+    if request.method == 'GET':
+        if request.path.startswith('/task_status/'):
+            task_id = request.path.split('/')[-1]
+            result = await handle_task_status(task_id)
+        elif request.path == '/status':
+            result = await handle_status(request.headers)
+        elif request.path == '/reset':
+            result = await handle_reset(request.headers)
+        elif request.path == '/api/cron':
+            result = await handle_cron(event, context)
+        else:
+            result = {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
+    elif request.method == 'POST':
+        if request.path == '/convert':
+            result = await handle_convert(request.headers, request.body)
+        else:
+            result = {'statusCode': 404, 'body': json.dumps({"error": "Not Found"})}
+    elif request.method == 'OPTIONS':
+        result = {
+            'statusCode': 200,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-File-Name, X-Language, X-Price, X-Token'
+            },
+            'body': ''
+        }
+    else:
+        result = {'statusCode': 405, 'body': json.dumps({"error": "Method Not Allowed"})}
+
+    response.status_code = result['statusCode']
+    response.headers.update(result.get('headers', {}))
+    response.write(result['body'])
+
     return {
-        'statusCode': result['statusCode'],
-        'headers': result.get('headers', {}),
-        'body': result['body']
+        'statusCode': response.status_code,
+        'headers': response.headers,
+        'body': response.body
     }

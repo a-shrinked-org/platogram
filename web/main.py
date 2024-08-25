@@ -17,7 +17,7 @@ import subprocess
 import asyncio
 import aiofiles
 import aiofiles.tempfile
-
+import logfire
 
 import platogram as plato
 from anthropic import AnthropicError
@@ -29,6 +29,9 @@ from nltk.tokenize import sent_tokenize
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+# Configure logfire at the top of your file
+logfire.configure()
 
 # In-memory storage (Note: This will reset on each function invocation)
 tasks = {}
@@ -155,34 +158,32 @@ async def send_email_with_resend(to_email, subject, body, attachments):
                 logger.debug(f"Failed payload: {json.dumps(payload, default=str)}")
             return response
 async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
-    logger.info(f"Processing audio from: {url}")
+    logfire.info("Starting audio to paper conversion", extra={"url": url, "lang": lang})
 
-    # Check for required API keys
     if not os.getenv('ANTHROPIC_API_KEY'):
+        logfire.error("ANTHROPIC_API_KEY not set")
         raise EnvironmentError("ANTHROPIC_API_KEY is not set")
 
-    # Initialize Platogram models
     language_model = plato.llm.get_model(
         "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
     )
+    logfire.info("Language model initialized")
 
-    # Handle local file paths
     if url.startswith("file://"):
-        file_path = url[7:]  # Remove "file://" prefix
+        file_path = url[7:]
         if not os.path.exists(file_path):
+            logfire.error("Local file not found", extra={"file_path": file_path})
             raise FileNotFoundError(f"Local file not found: {file_path}")
-        url = file_path  # Use the local file path directly
+        url = file_path
 
-    # Transcribe or index content
     if os.getenv('ASSEMBLYAI_API_KEY'):
-        logger.info("Transcribing audio to text using AssemblyAI...")
+        logfire.info("Transcribing audio using AssemblyAI")
         await plato.index(url, llm=language_model, assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY'), lang=lang)
     else:
-        logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
+        logfire.warning("ASSEMBLYAI_API_KEY not set, retrieving text from URL")
         await plato.index(url, llm=language_model, lang=lang)
 
-    # Generate content
-    logger.info("Generating content...")
+    logfire.info("Generating content")
     title = await plato.get_title(url, lang=lang)
     abstract = await plato.get_abstract(url, lang=lang)
     passages = await plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
@@ -283,6 +284,7 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
         logger.error(f"Error generating documents: {str(e)}")
         raise
 
+    logfire.info("PDF files generated", extra={"title": title})
     return title, abstract
 
 import asyncio
@@ -328,49 +330,50 @@ class handler(BaseHTTPRequestHandler):
         else:
             json_response(self, 404, {"error": "Not Found"})
 
- async def handle_convert(self):
-    logger.debug("Handling /convert request")
-    content_length = int(self.headers['Content-Length'])
-    content_type = self.headers.get('Content-Type')
-    user_email = self.get_user_email()
-    logger.debug(f"User email for conversion: {user_email}")
+    async def handle_convert(self):
+        logger.debug("Handling /convert request")
+        content_length = int(self.headers['Content-Length'])
+        content_type = self.headers.get('Content-Type')
+        user_email = self.get_user_email()
+        logfire.info("Conversion request received",
+                     extra={"user_email": user_email, "content_type": content_type})
 
-    try:
-        task_id = str(uuid4())
-        if content_type == 'application/octet-stream':
-            body = self.rfile.read(content_length)  # Read raw bytes
-            file_name = self.headers.get('X-File-Name')
-            lang = self.headers.get('X-Language', 'en')
+        try:
+            task_id = str(uuid4())
+            if content_type == 'application/octet-stream':
+                body = self.rfile.read(content_length)
+                file_name = self.headers.get('X-File-Name')
+                lang = self.headers.get('X-Language', 'en')
 
-            # Save the file to a temporary location
-            temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
-            temp_dir.mkdir(parents=True, exist_ok=True)
-            temp_file = temp_dir / f"{task_id}_{file_name}"
-            with open(temp_file, 'wb') as f:
-                f.write(body)
+                temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
+                temp_dir.mkdir(parents=True, exist_ok=True)
+                temp_file = temp_dir / f"{task_id}_{file_name}"
+                with open(temp_file, 'wb') as f:
+                    f.write(body)
 
-            tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
-            logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
-        elif content_type == 'application/json':
-            body = self.rfile.read(content_length).decode('utf-8')
-            data = json.loads(body)
-            url = data.get('url')
-            lang = data.get('lang', 'en')
-            tasks[task_id] = {'status': 'running', 'url': url, 'lang': lang, 'email': user_email}
-            logger.debug(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
-        else:
-            logger.error(f"Invalid content type: {content_type}")
-            json_response(self, 400, {"error": "Invalid content type"})
-            return
+                tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
+                logfire.info("File upload received",
+                             extra={"file_name": file_name, "lang": lang, "task_id": task_id, "user_email": user_email})
+            elif content_type == 'application/json':
+                body = self.rfile.read(content_length).decode('utf-8')
+                data = json.loads(body)
+                url = data.get('url')
+                lang = data.get('lang', 'en')
+                tasks[task_id] = {'status': 'running', 'url': url, 'lang': lang, 'email': user_email}
+                logfire.info("URL conversion request received",
+                             extra={"url": url, "lang": lang, "task_id": task_id, "user_email": user_email})
+            else:
+                logfire.error("Invalid content type", extra={"content_type": content_type})
+                json_response(self, 400, {"error": "Invalid content type"})
+                return
 
-        # Start processing
-        tasks[task_id]['status'] = 'processing'
-        asyncio.create_task(self.process_and_send_email(task_id))
+            tasks[task_id]['status'] = 'processing'
+            asyncio.create_task(self.process_and_send_email(task_id))
 
-        json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
-    except Exception as e:
-        logger.error(f"Error in handle_convert: {str(e)}", exc_info=True)
-        json_response(self, 500, {"error": str(e)})
+            json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
+        except Exception as e:
+            logfire.exception("Error in handle_convert", extra={"error": str(e)})
+            json_response(self, 500, {"error": str(e)})
 
   async def process_and_send_email(self, task_id):
     try:
@@ -504,27 +507,27 @@ Suggested donation: $2 per hour of content converted."""
             logger.error(f"Error in handle_status for task {task_id}: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    def handle_reset(self):
-    user_email = self.get_user_email()
-    logger.info(f"Handling reset request for user: {user_email}")
+   def handle_reset(self):
+        user_email = self.get_user_email()
+        logger.info(f"Handling reset request for user: {user_email}")
 
-    if not user_email:
-        logger.warning("Reset attempt without valid user email")
-        json_response(self, 401, {"error": "Unauthorized"})
-        return
+        if not user_email:
+            logger.warning("Reset attempt without valid user email")
+            json_response(self, 401, {"error": "Unauthorized"})
+            return
 
-    try:
-        # Remove all tasks associated with this user
-        tasks_to_remove = [task_id for task_id, task in tasks.items() if task.get('email') == user_email]
-        for task_id in tasks_to_remove:
-            logger.info(f"Removing task {task_id} for user {user_email}")
-            del tasks[task_id]
+        try:
+            # Remove all tasks associated with this user
+            tasks_to_remove = [task_id for task_id, task in tasks.items() if task.get('email') == user_email]
+            for task_id in tasks_to_remove:
+                logger.info(f"Removing task {task_id} for user {user_email}")
+                del tasks[task_id]
 
-        logger.info(f"Reset {len(tasks_to_remove)} tasks for user {user_email}")
-        json_response(self, 200, {"message": f"Reset {len(tasks_to_remove)} tasks for user"})
-    except Exception as e:
-        logger.error(f"Error in handle_reset for user {user_email}: {str(e)}", exc_info=True)
-        json_response(self, 500, {"error": f"An error occurred while resetting tasks: {str(e)}"})
+            logger.info(f"Reset {len(tasks_to_remove)} tasks for user {user_email}")
+            json_response(self, 200, {"message": f"Reset {len(tasks_to_remove)} tasks for user"})
+        except Exception as e:
+            logger.error(f"Error in handle_reset for user {user_email}: {str(e)}", exc_info=True)
+            json_response(self, 500, {"error": f"An error occurred while resetting tasks: {str(e)}"})
 
 # Vercel handler
 def vercel_handler(event, context):

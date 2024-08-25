@@ -294,24 +294,24 @@ import aiofiles.tempfile
 # ... (other imports remain the same)
 
 class handler(BaseHTTPRequestHandler):
-    def do_OPTIONS(self):
+    async def do_OPTIONS(self):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language')
         self.end_headers()
 
-    def do_GET(self):
+    async def do_GET(self):
         if self.path.startswith('/task_status'):
-            self.handle_task_status()
+            await self.handle_task_status()
         elif self.path == '/status':
-            self.handle_status()
+            await self.handle_status()
         elif self.path == '/reset':
-            self.handle_reset()
+            await self.handle_reset()
         else:
             json_response(self, 404, {"error": "Not Found"})
 
-    def handle_task_status(self):
+    async def handle_task_status(self):
         task_id = self.path.split('/')[-1]
         if task_id in tasks:
             task = tasks[task_id]
@@ -324,9 +324,9 @@ class handler(BaseHTTPRequestHandler):
         else:
             json_response(self, 404, {"error": "Task not found"})
 
-    def do_POST(self):
+    async def do_POST(self):
         if self.path == '/convert':
-            asyncio.run(self.handle_convert())
+            await self.handle_convert()
         else:
             json_response(self, 404, {"error": "Not Found"})
 
@@ -334,7 +334,7 @@ class handler(BaseHTTPRequestHandler):
         logger.debug("Handling /convert request")
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
-        user_email = self.get_user_email()
+        user_email = await self.get_user_email()
         logfire.info("Conversion request received",
                      extra={"user_email": user_email, "content_type": content_type})
 
@@ -374,8 +374,8 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             logfire.exception("Error in handle_convert", extra={"error": str(e)})
             json_response(self, 500, {"error": str(e)})
-
-  async def process_and_send_email(self, task_id):
+\
+   async def process_and_send_email(self, task_id):
         try:
             task = tasks[task_id]
             user_email = task.get('email')
@@ -472,7 +472,7 @@ class handler(BaseHTTPRequestHandler):
             tasks[task_id]['status'] = 'failed'
             tasks[task_id]['error'] = str(e)
 
-    def get_user_email(self):
+   async def get_user_email(self):
         auth_header = self.headers.get('Authorization', '')
         logger.debug(f"Authorization header: {auth_header}")
         if not auth_header:
@@ -487,7 +487,7 @@ class handler(BaseHTTPRequestHandler):
             logger.error("Malformed Authorization header")
             return None
 
-    def handle_status(self):
+    async def handle_status(self):
         task_id = self.headers.get('X-Task-ID')
         if not task_id:
             json_response(self, 200, {"status": "idle"})
@@ -507,8 +507,8 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_status for task {task_id}: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-   def handle_reset(self):
-        user_email = self.get_user_email()
+    async def handle_reset(self):
+        user_email = await self.get_user_email()
         logger.info(f"Handling reset request for user: {user_email}")
 
         if not user_email:
@@ -578,5 +578,11 @@ def vercel_handler(event, context):
             'body': mock_response.body,
         }
 
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(async_handler(event, context))
+    return asyncio.run(async_handler(event, context))
+
+# Vercel entry point
+def entrypoint(event, context):
+    return vercel_handler(event, context)
+
+if __name__ == "__main__":
+    print("This script is intended to be imported, not run directly.")

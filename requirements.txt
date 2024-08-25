@@ -13,6 +13,7 @@ anyio==4.4.0
     #   anthropic
     #   httpx
     #   starlette
+aiofiles==22.1.0
 assemblyai==0.26.0
     # via platogram (setup.py)
 authlib==1.3.1

@@ -374,7 +374,7 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             logfire.exception("Error in handle_convert", extra={"error": str(e)})
             json_response(self, 500, {"error": str(e)})
-\
+
    async def process_and_send_email(self, task_id):
         try:
             task = tasks[task_id]

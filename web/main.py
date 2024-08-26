@@ -17,6 +17,7 @@ import subprocess
 import asyncio
 import aiofiles
 import aiofiles.tempfile
+import aiohttp
 import logfire
 
 import platogram as plato
@@ -287,12 +288,6 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
     logfire.info("PDF files generated", extra={"title": title})
     return title, abstract
 
-import asyncio
-import aiofiles
-import aiofiles.tempfile
-
-# ... (other imports remain the same)
-
 class handler(BaseHTTPRequestHandler):
     async def do_OPTIONS(self):
         self.send_response(200)
@@ -375,7 +370,7 @@ class handler(BaseHTTPRequestHandler):
             logfire.exception("Error in handle_convert", extra={"error": str(e)})
             json_response(self, 500, {"error": str(e)})
 
-   async def process_and_send_email(self, task_id):
+    async def process_and_send_email(self, task_id):
         try:
             task = tasks[task_id]
             user_email = task.get('email')
@@ -472,7 +467,7 @@ class handler(BaseHTTPRequestHandler):
             tasks[task_id]['status'] = 'failed'
             tasks[task_id]['error'] = str(e)
 
-   async def get_user_email(self):
+    async def get_user_email(self):
         auth_header = self.headers.get('Authorization', '')
         logger.debug(f"Authorization header: {auth_header}")
         if not auth_header:
@@ -560,23 +555,30 @@ def vercel_handler(event, context):
                         self.body += data.decode('utf-8') if isinstance(data, bytes) else data
                 return MockWFile()
 
-        mock_request = MockRequest(event)
-        mock_response = MockResponse()
+        try:
+            mock_request = MockRequest(event)
+            mock_response = MockResponse()
 
-        server = handler(mock_request, mock_request.path, mock_response)
+            server = handler(mock_request, mock_request.path, mock_response)
 
-        if mock_request.method == 'GET':
-            server.do_GET()
-        elif mock_request.method == 'POST':
-            await server.do_POST()
-        elif mock_request.method == 'OPTIONS':
-            server.do_OPTIONS()
+            if mock_request.method == 'GET':
+                await server.do_GET()
+            elif mock_request.method == 'POST':
+                await server.do_POST()
+            elif mock_request.method == 'OPTIONS':
+                await server.do_OPTIONS()
 
-        return {
-            'statusCode': mock_response.status_code,
-            'headers': mock_response.headers,
-            'body': mock_response.body,
-        }
+            return {
+                'statusCode': mock_response.status_code,
+                'headers': mock_response.headers,
+                'body': mock_response.body,
+            }
+        except Exception as e:
+            logger.error(f"Error in vercel_handler: {str(e)}", exc_info=True)
+            return {
+                'statusCode': 500,
+                'body': json.dumps({"error": "Internal server error"}),
+            }
 
     return asyncio.run(async_handler(event, context))
 

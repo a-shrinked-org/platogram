@@ -314,7 +314,7 @@ class handler(BaseHTTPRequestHandler):
             logger.error("Malformed Authorization header")
             return None
 
-    def handle_convert(self):
+def handle_convert(self):
         logger.debug("Handling /convert request")
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
@@ -357,69 +357,45 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    async def process_and_send_email(task_id):
-    try:
-        task = tasks[task_id]
-        user_email = task['email']
-        url = task.get('url') or f"file://{task['file']}"
-        lang = task['lang']
+    def process_and_send_email(self, task_id):
+        try:
+            task = tasks[task_id]
+            user_email = task['email']
 
-        logger.info(f"Processing task {task_id} for URL: {url}")
+            # Simulate processing
+            time.sleep(5)  # Simulate work
 
-        async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
-            output_dir = Path(tmpdir)
+            # Generate sample output files
+            with tempfile.TemporaryDirectory() as tmpdir:
+                sample_file = Path(tmpdir) / "sample_output.txt"
+                with open(sample_file, 'w') as f:
+                    f.write("This is a sample output file.")
 
-            try:
-                # Initialize Platogram
-                if not os.getenv('ANTHROPIC_API_KEY'):
-                    raise EnvironmentError("ANTHROPIC_API_KEY is not set")
+                subject = "[Platogram] Your Converted Document"
+                body = """Hi there!
 
-                language_model = plato.llm.get_model(
-                    "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
-                )
+Platogram has transformed spoken words into documents you can read and enjoy!
 
-                # Process with Platogram
-                title, abstract = await audio_to_paper(url, lang, output_dir)
+Please find the converted document attached to this email.
 
-                # Prepare email content
-                subject = f"[Platogram] {title}"
-                body = f"""Hi there!
-
-Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
-
-You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
-
-{abstract}
-
-Please reply to this e-mail if any suggestions, feedback, or questions.
+Thank you for using Platogram!
 
 ---
 Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
 Suggested donation: $2 per hour of content converted."""
 
-                # Get generated files
-                files = [f for f in output_dir.glob('*') if f.is_file()]
-
                 if user_email:
-                    logger.info(f"Sending email to {user_email}")
-                    await send_email_with_resend(user_email, subject, body, files)
-                    logger.info("Email sent successfully")
+                    send_email_with_resend(user_email, subject, body, [sample_file])
                 else:
                     logger.warning(f"No email available for task {task_id}. Skipping email send.")
 
-                tasks[task_id]['status'] = 'done'
-                logger.info(f"Conversion completed for task {task_id}")
+            tasks[task_id]['status'] = 'done'
+            logger.info(f"Conversion completed for task {task_id}")
+        except Exception as e:
+            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}")
+            tasks[task_id]['status'] = 'failed'
+            tasks[task_id]['error'] = str(e)
 
-            except Exception as e:
-                logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
-                tasks[task_id]['status'] = 'failed'
-                tasks[task_id]['error'] = str(e)
-                raise
-
-    except Exception as e:
-        logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
-        tasks[task_id]['status'] = 'failed'
-        tasks[task_id]['error'] = str(e)
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')
 

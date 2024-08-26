@@ -3,6 +3,7 @@ import json
 import os
 import logging
 import re
+import subprocess
 import tempfile
 from pathlib import Path
 import base64
@@ -149,7 +150,7 @@ async def send_email_with_resend(to_email, subject, body, attachments):
                 logger.debug(f"Failed payload: {json.dumps(payload, default=str)}")
             return response
 
-async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
+def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
     logger.info(f"Processing audio from: {url}")
 
     # Check for required API keys
@@ -171,18 +172,18 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
     # Transcribe or index content
     if os.getenv('ASSEMBLYAI_API_KEY'):
         logger.info("Transcribing audio to text using AssemblyAI...")
-        await plato.index(url, llm=language_model, assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY'), lang=lang)
+        plato.index(url, llm=language_model, assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY'), lang=lang)
     else:
         logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
-        await plato.index(url, llm=language_model, lang=lang)
+        plato.index(url, llm=language_model, lang=lang)
 
     # Generate content
     logger.info("Generating content...")
-    title = await plato.get_title(url, lang=lang)
-    abstract = await plato.get_abstract(url, lang=lang)
-    passages = await plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
-    references = await plato.get_references(url, lang=lang)
-    chapters = await plato.get_chapters(url, lang=lang)
+    title = plato.get_title(url, lang=lang)
+    abstract = plato.get_abstract(url, lang=lang)
+    passages = plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
+    references = plato.get_references(url, lang=lang)
+    chapters = plato.get_chapters(url, lang=lang)
 
     # Set language-specific prompts
     if lang == "en":

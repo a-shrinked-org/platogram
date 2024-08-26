@@ -13,13 +13,12 @@ import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
-import threading
 import asyncio
 import aiofiles
-import aiohttp
 import aiofiles.tempfile
 
 import platogram as plato
+from anthropic import AnthropicError
 import assemblyai as aai
 
 # Setup logging
@@ -177,7 +176,6 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
         transcriber = aai.Transcriber()
         transcript = transcriber.transcribe(url)
         text = transcript.text
-        logger.info(f"Transcription completed. Text length: {len(text)} characters")
         # Now index the transcribed text
         plato.index(text, llm=language_model, lang=lang)
     else:
@@ -327,7 +325,6 @@ class handler(BaseHTTPRequestHandler):
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
         user_email = self.get_user_email()
-        logger.info(f"Received conversion request. Content-Type: {content_type}, User email: {user_email}")
 
         try:
             task_id = str(uuid4())
@@ -357,10 +354,9 @@ class handler(BaseHTTPRequestHandler):
                 json_response(self, 400, {"error": "Invalid content type"})
                 return
 
-            # Start processing in a separate thread
+            # Start processing
             tasks[task_id]['status'] = 'processing'
-            logger.info(f"Starting processing thread for task {task_id}")
-            threading.Thread(target=self.process_and_send_email, args=(task_id,)).start()
+            self.process_and_send_email(task_id)
 
             json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
         except Exception as e:
@@ -387,24 +383,24 @@ class handler(BaseHTTPRequestHandler):
                     subject = f"[Platogram] {title}"
                     body = f"""Hi there!
 
-Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
+    Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
 
-You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
+    You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
 
-{abstract}
+    {abstract}
 
-Please reply to this e-mail if any suggestions, feedback, or questions.
+    Please reply to this e-mail if any suggestions, feedback, or questions.
 
----
-Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
-Suggested donation: $2 per hour of content converted."""
+    ---
+    Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
+    Suggested donation: $2 per hour of content converted."""
 
                     # Get generated files
                     files = [f for f in output_dir.glob('*') if f.is_file()]
 
                     if user_email:
                         logger.info(f"Sending email to {user_email}")
-                        asyncio.run(send_email_with_resend(user_email, subject, body, files))
+                        send_email_with_resend(user_email, subject, body, files)
                         logger.info("Email sent successfully")
                     else:
                         logger.warning(f"No email available for task {task_id}. Skipping email send.")

@@ -1,8 +1,6 @@
-from http.server import BaseHTTPRequestHandler
 import json
 import os
 import logging
-import re
 import tempfile
 from pathlib import Path
 import base64
@@ -12,57 +10,34 @@ import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
-import subprocess
 import asyncio
 import aiofiles
-import aiofiles.tempfile
 import aiohttp
-import logfire
-import io
+import re
+import subprocess
 
 import platogram as plato
-from anthropic import AnthropicError
 import assemblyai as aai
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Configure logfire
-logfire.configure()
-
 # In-memory storage (Note: This will reset on each function invocation)
 tasks = {}
 
-# Resend API key
+# Load environment variables
 RESEND_API_KEY = os.getenv('RESEND_API_KEY')
-if not RESEND_API_KEY:
-    raise EnvironmentError("RESEND_API_KEY not set in environment")
-
-# Auth0 Configuration
 AUTH0_DOMAIN = os.getenv('AUTH0_DOMAIN')
 API_AUDIENCE = os.getenv('API_AUDIENCE')
 ALGORITHMS = ["RS256"]
 JWKS_URL = f"https://{AUTH0_DOMAIN}/.well-known/jwks.json"
 
-# Cache for the Auth0 public key
-auth0_public_key_cache = {
-    "key": None,
-    "last_updated": 0,
-    "expires_in": 3600,  # Cache expiration time in seconds (1 hour)
-}
-
 # Configure AssemblyAI
 aai.settings.api_key = os.getenv('ASSEMBLYAI_API_KEY')
 
-def json_response(handler, status_code, data):
-    handler.send_response(status_code)
-    handler.send_header('Content-type', 'application/json')
-    handler.send_header('Access-Control-Allow-Origin', '*')
-    handler.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    handler.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language')
-    handler.end_headers()
-    handler.wfile.write(json.dumps(data).encode('utf-8'))
+# Auth0 public key cache
+auth0_public_key_cache = {"key": None, "last_updated": 0, "expires_in": 3600}
 
 def get_auth0_public_key():
     current_time = time.time()
@@ -157,32 +132,32 @@ async def send_email_with_resend(to_email, subject, body, attachments):
             return response
 
 async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
-    logfire.info("Starting audio to paper conversion", extra={"url": url, "lang": lang})
+    logger.info("Starting audio to paper conversion", extra={"url": url, "lang": lang})
 
     if not os.getenv('ANTHROPIC_API_KEY'):
-        logfire.error("ANTHROPIC_API_KEY not set")
+        logger.error("ANTHROPIC_API_KEY not set")
         raise EnvironmentError("ANTHROPIC_API_KEY is not set")
 
     language_model = plato.llm.get_model(
         "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
     )
-    logfire.info("Language model initialized")
+    logger.info("Language model initialized")
 
     if url.startswith("file://"):
         file_path = url[7:]
         if not os.path.exists(file_path):
-            logfire.error("Local file not found", extra={"file_path": file_path})
+            logger.error("Local file not found", extra={"file_path": file_path})
             raise FileNotFoundError(f"Local file not found: {file_path}")
         url = file_path
 
     if os.getenv('ASSEMBLYAI_API_KEY'):
-        logfire.info("Transcribing audio using AssemblyAI")
+        logger.info("Transcribing audio using AssemblyAI")
         await plato.index(url, llm=language_model, assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY'), lang=lang)
     else:
-        logfire.warning("ASSEMBLYAI_API_KEY not set, retrieving text from URL")
+        logger.warning("ASSEMBLYAI_API_KEY not set, retrieving text from URL")
         await plato.index(url, llm=language_model, lang=lang)
 
-    logfire.info("Generating content")
+    logger.info("Generating content")
     title = await plato.get_title(url, lang=lang)
     abstract = await plato.get_abstract(url, lang=lang)
     passages = await plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
@@ -283,55 +258,122 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
         logger.error(f"Error generating documents: {str(e)}")
         raise
 
-    logfire.info("PDF files generated", extra={"title": title})
+    logger.info("PDF files generated", extra={"title": title})
     return title, abstract
 
-class LambdaHandler:
-    def __init__(self, event):
-        self.event = event
-        self.method = event['httpMethod']
-        self.path = event['path']
-        self.headers = {k.lower(): v for k, v in event['headers'].items()}
-        self.body = event.get('body', '')
-        self.response = {
+async def process_and_send_email(task_id):
+    try:
+        task = tasks[task_id]
+        user_email = task.get('email')
+        logger.info(f"Starting processing for task {task_id}. User email: {user_email}")
+
+        async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+
+            if 'url' in task:
+                url = task['url']
+            else:
+                url = f"file://{task['file']}"
+
+            logger.info(f"Processing URL: {url}")
+
+            try:
+                title, abstract = await audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
+                logger.info(f"audio_to_paper completed. Title: {title}")
+
+                files = [f for f in output_dir.glob('*') if f.is_file()]
+                logger.info(f"Generated {len(files)} files: {[f.name for f in files]}")
+
+                subject = f"[Platogram] {title}"
+                body = f"""Hi there!
+
+Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
+
+You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
+
+{abstract}
+
+Please reply to this e-mail if any suggestions, feedback, or questions.
+
+---
+Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
+Suggested donation: $2 per hour of content converted."""
+
+                if user_email:
+                    logger.info(f"Attempting to send email to {user_email}")
+                    email_response = await send_email_with_resend(user_email, subject, body, files)
+                    logger.info(f"Email sent. Response status: {email_response.status}")
+                    logger.debug(f"Email response body: {await email_response.text()}")
+                else:
+                    logger.warning(f"No email available for task {task_id}. Skipping email send.")
+
+                tasks[task_id]['status'] = 'done'
+                logger.info(f"Conversion completed for task {task_id}")
+
+            except Exception as e:
+                logger.error(f"Error in audio processing for task {task_id}: {str(e)}", exc_info=True)
+                tasks[task_id]['status'] = 'failed'
+                tasks[task_id]['error'] = str(e)
+                raise
+
+    except Exception as e:
+        logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
+        tasks[task_id]['status'] = 'failed'
+        tasks[task_id]['error'] = str(e)
+
+async def handle_request(event, context):
+    method = event['httpMethod']
+    path = event['path']
+    headers = event['headers']
+    body = event.get('body', '')
+
+    if method == 'OPTIONS':
+        return {
             'statusCode': 200,
             'headers': {
-                'Content-Type': 'application/json',
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-File-Name, X-Language'
+                'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-File-Name, X-Language',
             },
-            'body': ''
         }
 
-    def send_response(self, status_code, data):
-        self.response['statusCode'] = status_code
-        self.response['body'] = json.dumps(data)
+    if method == 'POST' and path == '/convert':
+        content_type = headers.get('Content-Type')
+        auth_header = headers.get('Authorization', '')
+        user_email = verify_token_and_get_email(auth_header.split(' ')[1] if auth_header else None)
 
-    async def handle_request(self):
-        if self.method == 'OPTIONS':
-            return self.response
-        elif self.method == 'GET':
-            if self.path.startswith('/task_status'):
-                await self.handle_task_status()
-            elif self.path == '/status':
-                await self.handle_status()
-            elif self.path == '/reset':
-                await self.handle_reset()
-            else:
-                self.send_response(404, {"error": "Not Found"})
-        elif self.method == 'POST':
-            if self.path == '/convert':
-                await self.handle_convert()
-            else:
-                self.send_response(404, {"error": "Not Found"})
+        task_id = str(uuid4())
+
+        if content_type == 'application/octet-stream':
+            file_name = headers.get('X-File-Name')
+            lang = headers.get('X-Language', 'en')
+
+            temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_file = temp_dir / f"{task_id}_{file_name}"
+            with open(temp_file, 'wb') as f:
+                f.write(body.encode('utf-8') if isinstance(body, str) else body)
+            url = f"file://{temp_file}"
+        elif content_type == 'application/json':
+            data = json.loads(body)
+            url = data.get('url')
+            lang = data.get('lang', 'en')
         else:
-            self.send_response(405, {"error": "Method Not Allowed"})
+            return {
+                'statusCode': 400,
+                'body': json.dumps({"error": "Invalid content type"}),
+            }
 
-        return self.response
+        tasks[task_id] = {'status': 'processing', 'url': url, 'lang': lang, 'email': user_email}
+        asyncio.create_task(process_and_send_email(task_id))
 
-    async def handle_task_status(self):
-        task_id = self.path.split('/')[-1]
+        return {
+            'statusCode': 200,
+            'body': json.dumps({"message": "Conversion started", "task_id": task_id}),
+        }
+
+    if method == 'GET' and path.startswith('/task_status/'):
+        task_id = path.split('/')[-1]
         if task_id in tasks:
             task = tasks[task_id]
             response = {
@@ -339,171 +381,20 @@ class LambdaHandler:
                 "status": task['status'],
                 "error": task.get('error') if task['status'] == "failed" else None
             }
-            self.send_response(200, response)
+            return {
+                'statusCode': 200,
+                'body': json.dumps(response),
+            }
         else:
-            self.send_response(404, {"error": "Task not found"})
+            return {
+                'statusCode': 404,
+                'body': json.dumps({"error": "Task not found"}),
+            }
 
-    async def handle_convert(self):
-        logger.debug("Handling /convert request")
-        content_type = self.headers.get('content-type')
-        user_email = await self.get_user_email()
-        logfire.info("Conversion request received",
-                     extra={"user_email": user_email, "content_type": content_type})
-        
-        try:
-            task_id = str(uuid4())
-            if content_type == 'application/octet-stream':
-                body = self.body.encode() if isinstance(self.body, str) else self.body
-                file_name = self.headers.get('x-file-name')
-                lang = self.headers.get('x-language', 'en')
+    return {
+        'statusCode': 404,
+        'body': json.dumps({"error": "Not Found"}),
+    }
 
-                temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
-                temp_dir.mkdir(parents=True, exist_ok=True)
-                temp_file = temp_dir / f"{task_id}_{file_name}"
-                with open(temp_file, 'wb') as f:
-                    f.write(body)
-
-                tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
-                logfire.info("File upload received",
-                             extra={"file_name": file_name, "lang": lang, "task_id": task_id, "user_email": user_email})
-            elif content_type == 'application/json':
-                data = json.loads(self.body)
-                url = data.get('url')
-                lang = data.get('lang', 'en')
-                tasks[task_id] = {'status': 'running', 'url': url, 'lang': lang, 'email': user_email}
-                logfire.info("URL conversion request received",
-                             extra={"url": url, "lang": lang, "task_id": task_id, "user_email": user_email})
-            else:
-                logfire.error("Invalid content type", extra={"content_type": content_type})
-                self.send_response(400, {"error": "Invalid content type"})
-                return
-
-            tasks[task_id]['status'] = 'processing'
-            asyncio.create_task(self.process_and_send_email(task_id))
-
-            self.send_response(200, {"message": "Conversion started", "task_id": task_id})
-        except Exception as e:
-            logfire.exception("Error in handle_convert", extra={"error": str(e)})
-            self.send_response(500, {"error": str(e)})
-
-    async def process_and_send_email(self, task_id):
-        try:
-            task = tasks[task_id]
-            user_email = task.get('email')
-            logger.info(f"Starting processing for task {task_id}. User email: {user_email}")
-
-            async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
-                output_dir = Path(tmpdir)
-
-                if 'url' in task:
-                    url = task['url']
-                else:
-                    url = f"file://{task['file']}"
-
-                logger.info(f"Processing URL: {url}")
-
-                try:
-                    title, abstract = await audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
-                    logger.info(f"audio_to_paper completed. Title: {title}")
-
-                    files = [f for f in output_dir.glob('*') if f.is_file()]
-                    logger.info(f"Generated {len(files)} files: {[f.name for f in files]}")
-
-                    subject = f"[Platogram] {title}"
-                    body = f"""Hi there!
-
-    Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
-
-    You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
-
-    {abstract}
-
-    Please reply to this e-mail if any suggestions, feedback, or questions.
-
-    ---
-    Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
-    Suggested donation: $2 per hour of content converted."""
-
-                    if user_email:
-                        logger.info(f"Attempting to send email to {user_email}")
-                        email_response = await send_email_with_resend(user_email, subject, body, files)
-                        logger.info(f"Email sent. Response status: {email_response.status}")
-                        logger.debug(f"Email response body: {await email_response.text()}")
-                    else:
-                        logger.warning(f"No email available for task {task_id}. Skipping email send.")
-
-                    tasks[task_id]['status'] = 'done'
-                    logger.info(f"Conversion completed for task {task_id}")
-
-                except Exception as e:
-                    logger.error(f"Error in audio processing for task {task_id}: {str(e)}", exc_info=True)
-                    tasks[task_id]['status'] = 'failed'
-                    tasks[task_id]['error'] = str(e)
-                    raise
-
-        except Exception as e:
-            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
-            tasks[task_id]['status'] = 'failed'
-            tasks[task_id]['error'] = str(e)
-
-    async def get_user_email(self):
-        auth_header = self.headers.get('authorization', '')
-        logger.debug(f"Authorization header: {auth_header}")
-        if not auth_header:
-            logger.warning("No Authorization header found")
-            return None
-        try:
-            token = auth_header.split(' ')[1]
-            email = verify_token_and_get_email(token)
-            logger.debug(f"User email extracted: {email}")
-            return email
-        except IndexError:
-            logger.error("Malformed Authorization header")
-            return None
-
-    async def handle_status(self):
-        task_id = self.headers.get('x-task-id')
-        if not task_id:
-            self.send_response(200, {"status": "idle"})
-            return
-
-        try:
-            if task_id not in tasks:
-                response = {"status": "not_found"}
-            else:
-                task = tasks[task_id]
-                response = {
-                    "status": task['status'],
-                    "error": task.get('error') if task['status'] == "failed" else None
-                }
-            self.send_response(200, response)
-        except Exception as e:
-            logger.error(f"Error in handle_status for task {task_id}: {str(e)}")
-            self.send_response(500, {"error": str(e)})
-
-    async def handle_reset(self):
-        user_email = await self.get_user_email()
-        logger.info(f"Handling reset request for user: {user_email}")
-
-        if not user_email:
-            logger.warning("Reset attempt without valid user email")
-            self.send_response(401, {"error": "Unauthorized"})
-            return
-
-        try:
-            tasks_to_remove = [task_id for task_id, task in tasks.items() if task.get('email') == user_email]
-            for task_id in tasks_to_remove:
-                logger.info(f"Removing task {task_id} for user {user_email}")
-                del tasks[task_id]
-
-            logger.info(f"Reset {len(tasks_to_remove)} tasks for user {user_email}")
-            self.send_response(200, {"message": f"Reset {len(tasks_to_remove)} tasks for user"})
-        except Exception as e:
-            logger.error(f"Error in handle_reset for user {user_email}: {str(e)}", exc_info=True)
-            self.send_response(500, {"error": f"An error occurred while resetting tasks: {str(e)}"})
-async def handler(event, context):
-    lambda_handler = LambdaHandler(event)
-    return await lambda_handler.handle_request()
-
-def entrypoint(event, context):
-    return asyncio.run(handler(event, context))
+def handler(event, context):
+    return asyncio.run(handle_request(event, context))

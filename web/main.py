@@ -399,7 +399,7 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-   def process_and_send_email(self, task_id):
+ def process_and_send_email(self, task_id):
     try:
         task = tasks[task_id]
         user_email = task['email']
@@ -454,6 +454,7 @@ Suggested donation: $2 per hour of content converted."""
         logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
         tasks[task_id]['status'] = 'failed'
         tasks[task_id]['error'] = str(e)
+
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')
 

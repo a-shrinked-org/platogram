@@ -286,62 +286,50 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
     logfire.info("PDF files generated", extra={"title": title})
     return title, abstract
 
-class handler(BaseHTTPRequestHandler):
-    def __init__(self, request, client_address, server):
-        if isinstance(request, dict):  # Serverless environment
-            self.rfile = io.BytesIO(request.get('body', '').encode())
-            self.wfile = io.BytesIO()
-            self.request = request
-            self.client_address = client_address
-            self.server = server
-            self.requestline = f"{request['httpMethod']} {request['path']} HTTP/1.1"
-            self.headers = {k.lower(): v for k, v in request['headers'].items()}
-            self.response_status = 200
-            self.response_headers = {}
-            self.response_content = ''
-            self.setup()
-            self.handle()
-        else:  # Traditional environment
-            super().__init__(request, client_address, server)
+class LambdaHandler:
+    def __init__(self, event):
+        self.event = event
+        self.method = event['httpMethod']
+        self.path = event['path']
+        self.headers = {k.lower(): v for k, v in event['headers'].items()}
+        self.body = event.get('body', '')
+        self.response = {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-File-Name, X-Language'
+            },
+            'body': ''
+        }
 
-    def send_response(self, code, message=None):
-        if hasattr(self, 'response_status'):
-            self.response_status = code
+    def send_response(self, status_code, data):
+        self.response['statusCode'] = status_code
+        self.response['body'] = json.dumps(data)
+
+    async def handle_request(self):
+        if self.method == 'OPTIONS':
+            return self.response
+        elif self.method == 'GET':
+            if self.path.startswith('/task_status'):
+                await self.handle_task_status()
+            elif self.path == '/status':
+                await self.handle_status()
+            elif self.path == '/reset':
+                await self.handle_reset()
+            else:
+                self.send_response(404, {"error": "Not Found"})
+        elif self.method == 'POST':
+            if self.path == '/convert':
+                await self.handle_convert()
+            else:
+                self.send_response(404, {"error": "Not Found"})
         else:
-            super().send_response(code, message)
+            self.send_response(405, {"error": "Method Not Allowed"})
 
-    def send_header(self, keyword, value):
-        if hasattr(self, 'response_headers'):
-            self.response_headers[keyword] = value
-        else:
-            super().send_header(keyword, value)
+        return self.response
 
-    def end_headers(self):
-        if not hasattr(self, 'response_headers'):
-            super().end_headers()
-
-    def write(self, data):
-        if hasattr(self, 'response_content'):
-            self.response_content += data.decode() if isinstance(data, bytes) else data
-        else:
-            self.wfile.write(data)
-
-    async def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language')
-        self.end_headers()
-
-    async def do_GET(self):
-        if self.path.startswith('/task_status'):
-            await self.handle_task_status()
-        elif self.path == '/status':
-            await self.handle_status()
-        elif self.path == '/reset':
-            await self.handle_reset()
-        else:
-            json_response(self, 404, {"error": "Not Found"})
     async def handle_task_status(self):
         task_id = self.path.split('/')[-1]
         if task_id in tasks:
@@ -351,20 +339,13 @@ class handler(BaseHTTPRequestHandler):
                 "status": task['status'],
                 "error": task.get('error') if task['status'] == "failed" else None
             }
-            json_response(self, 200, response)
+            self.send_response(200, response)
         else:
-            json_response(self, 404, {"error": "Task not found"})
-
-    async def do_POST(self):
-        if self.path == '/convert':
-            await self.handle_convert()
-        else:
-            json_response(self, 404, {"error": "Not Found"})
+            self.send_response(404, {"error": "Task not found"})
 
     async def handle_convert(self):
         logger.debug("Handling /convert request")
-        content_length = int(self.headers['Content-Length'])
-        content_type = self.headers.get('Content-Type')
+        content_type = self.headers.get('content-type')
         user_email = await self.get_user_email()
         logfire.info("Conversion request received",
                      extra={"user_email": user_email, "content_type": content_type})
@@ -372,9 +353,9 @@ class handler(BaseHTTPRequestHandler):
         try:
             task_id = str(uuid4())
             if content_type == 'application/octet-stream':
-                body = self.rfile.read(content_length)
-                file_name = self.headers.get('X-File-Name')
-                lang = self.headers.get('X-Language', 'en')
+                body = self.body.encode() if isinstance(self.body, str) else self.body
+                file_name = self.headers.get('x-file-name')
+                lang = self.headers.get('x-language', 'en')
 
                 temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
                 temp_dir.mkdir(parents=True, exist_ok=True)
@@ -386,8 +367,7 @@ class handler(BaseHTTPRequestHandler):
                 logfire.info("File upload received",
                              extra={"file_name": file_name, "lang": lang, "task_id": task_id, "user_email": user_email})
             elif content_type == 'application/json':
-                body = self.rfile.read(content_length).decode('utf-8')
-                data = json.loads(body)
+                data = json.loads(self.body)
                 url = data.get('url')
                 lang = data.get('lang', 'en')
                 tasks[task_id] = {'status': 'running', 'url': url, 'lang': lang, 'email': user_email}
@@ -395,16 +375,16 @@ class handler(BaseHTTPRequestHandler):
                              extra={"url": url, "lang": lang, "task_id": task_id, "user_email": user_email})
             else:
                 logfire.error("Invalid content type", extra={"content_type": content_type})
-                json_response(self, 400, {"error": "Invalid content type"})
+                self.send_response(400, {"error": "Invalid content type"})
                 return
 
             tasks[task_id]['status'] = 'processing'
             asyncio.create_task(self.process_and_send_email(task_id))
 
-            json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
+            self.send_response(200, {"message": "Conversion started", "task_id": task_id})
         except Exception as e:
             logfire.exception("Error in handle_convert", extra={"error": str(e)})
-            json_response(self, 500, {"error": str(e)})
+            self.send_response(500, {"error": str(e)})
 
     async def process_and_send_email(self, task_id):
         try:
@@ -466,8 +446,8 @@ class handler(BaseHTTPRequestHandler):
             tasks[task_id]['status'] = 'failed'
             tasks[task_id]['error'] = str(e)
 
-    async def get_user_email(self):
-        auth_header = self.headers.get('Authorization', '')
+   async def get_user_email(self):
+        auth_header = self.headers.get('authorization', '')
         logger.debug(f"Authorization header: {auth_header}")
         if not auth_header:
             logger.warning("No Authorization header found")
@@ -482,9 +462,9 @@ class handler(BaseHTTPRequestHandler):
             return None
 
     async def handle_status(self):
-        task_id = self.headers.get('X-Task-ID')
+        task_id = self.headers.get('x-task-id')
         if not task_id:
-            json_response(self, 200, {"status": "idle"})
+            self.send_response(200, {"status": "idle"})
             return
 
         try:
@@ -496,10 +476,10 @@ class handler(BaseHTTPRequestHandler):
                     "status": task['status'],
                     "error": task.get('error') if task['status'] == "failed" else None
                 }
-            json_response(self, 200, response)
+            self.send_response(200, response)
         except Exception as e:
             logger.error(f"Error in handle_status for task {task_id}: {str(e)}")
-            json_response(self, 500, {"error": str(e)})
+            self.send_response(500, {"error": str(e)})
 
     async def handle_reset(self):
         user_email = await self.get_user_email()
@@ -507,7 +487,7 @@ class handler(BaseHTTPRequestHandler):
 
         if not user_email:
             logger.warning("Reset attempt without valid user email")
-            json_response(self, 401, {"error": "Unauthorized"})
+            self.send_response(401, {"error": "Unauthorized"})
             return
 
         try:
@@ -517,29 +497,14 @@ class handler(BaseHTTPRequestHandler):
                 del tasks[task_id]
 
             logger.info(f"Reset {len(tasks_to_remove)} tasks for user {user_email}")
-            json_response(self, 200, {"message": f"Reset {len(tasks_to_remove)} tasks for user"})
+            self.send_response(200, {"message": f"Reset {len(tasks_to_remove)} tasks for user"})
         except Exception as e:
             logger.error(f"Error in handle_reset for user {user_email}: {str(e)}", exc_info=True)
-            json_response(self, 500, {"error": f"An error occurred while resetting tasks: {str(e)}"})
+            self.send_response(500, {"error": f"An error occurred while resetting tasks: {str(e)}"})
 
-# Vercel handler
+async def handler(event, context):
+    lambda_handler = LambdaHandler(event)
+    return await lambda_handler.handle_request()
 
-async def vercel_handler(event, context):
-    h = handler(event, None, None)
-
-    if event['httpMethod'] == 'GET':
-        await h.do_GET()
-    elif event['httpMethod'] == 'POST':
-        await h.do_POST()
-    elif event['httpMethod'] == 'OPTIONS':
-        await h.do_OPTIONS()
-
-    return {
-        'statusCode': h.response_status,
-        'headers': h.response_headers,
-        'body': h.response_content
-    }
-
-# Vercel entry point
 def entrypoint(event, context):
-    return asyncio.run(vercel_handler(event, context))
+    return asyncio.run(handler(event, context))

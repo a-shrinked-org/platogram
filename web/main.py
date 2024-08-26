@@ -323,7 +323,7 @@ class handler(BaseHTTPRequestHandler):
             logger.error("Malformed Authorization header")
             return None
 
-    def handle_convert(self):
+     def handle_convert(self):
         logger.debug("Handling /convert request")
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
@@ -357,9 +357,9 @@ class handler(BaseHTTPRequestHandler):
                 json_response(self, 400, {"error": "Invalid content type"})
                 return
 
-            # Start processing
+            # Start processing in a separate thread
             tasks[task_id]['status'] = 'processing'
-            self.process_and_send_email(task_id)
+            threading.Thread(target=self.process_and_send_email, args=(task_id,)).start()
 
             json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
         except Exception as e:

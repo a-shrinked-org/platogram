@@ -510,37 +510,69 @@ class CustomResponse:
     def wfile(self):
         return type('MockWFile', (), {'write': lambda self, data: setattr(self, 'body', self.body + data.decode('utf-8'))})()
 
-class handler(BaseHTTPRequestHandler):
-    # ... (keep all methods as they are)
+class MockHandler:
+    def __init__(self, event):
+        self.headers = {k.lower(): v for k, v in event['headers'].items()}
+        self.method = event['httpMethod']
+        self.path = event['path']
+        self.body = event.get('body', '')
+        self.rfile = type('MockFile', (), {'read': lambda self, n: self.body.encode()})()
+        self.response_status = 200
+        self.response_headers = {}
+        self.response_content = ''
 
-    def __init__(self, request, client_address, server):
-        self.request = request
-        self.client_address = client_address
-        self.server = server
-        self.setup()
+    def send_response(self, status_code):
+        self.response_status = status_code
+
+    def send_header(self, key, value):
+        self.response_headers[key] = value
+
+    def end_headers(self):
+        pass
+
+    def wfile(self):
+        return type('MockWFile', (), {'write': lambda self, data: setattr(self, 'response_content', self.response_content + data.decode('utf-8'))})()
+
+class handler(MockHandler):
+    async def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language')
+        self.end_headers()
+
+    async def do_GET(self):
+        if self.path.startswith('/task_status'):
+            await self.handle_task_status()
+        elif self.path == '/status':
+            await self.handle_status()
+        elif self.path == '/reset':
+            await self.handle_reset()
+        else:
+            json_response(self, 404, {"error": "Not Found"})
+
+    async def do_POST(self):
+        if self.path == '/convert':
+            await self.handle_convert()
+        else:
+            json_response(self, 404, {"error": "Not Found"})
 
 async def vercel_handler(event, context):
-    request = CustomRequest(event)
-    response = CustomResponse()
+    h = handler(event)
 
-    server = handler(request, None, None)
-
-    if request.method == 'GET':
-        await server.do_GET()
-    elif request.method == 'POST':
-        await server.do_POST()
-    elif request.method == 'OPTIONS':
-        await server.do_OPTIONS()
+    if h.method == 'GET':
+        await h.do_GET()
+    elif h.method == 'POST':
+        await h.do_POST()
+    elif h.method == 'OPTIONS':
+        await h.do_OPTIONS()
 
     return {
-        'statusCode': response.status_code,
-        'headers': response.headers,
-        'body': response.body,
+        'statusCode': h.response_status,
+        'headers': h.response_headers,
+        'body': h.response_content
     }
 
 # Vercel entry point
 def entrypoint(event, context):
     return asyncio.run(vercel_handler(event, context))
-
-if __name__ == "__main__":
-    print("This script is intended to be imported, not run directly.")

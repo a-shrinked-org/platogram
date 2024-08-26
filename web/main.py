@@ -170,9 +170,14 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
         url = file_path  # Use the local file path directly
 
     # Transcribe or index content
-    if os.getenv('ASSEMBLYAI_API_KEY'):
+    assemblyai_api_key = os.getenv('ASSEMBLYAI_API_KEY')
+    if assemblyai_api_key:
         logger.info("Transcribing audio to text using AssemblyAI...")
-        plato.index(url, llm=language_model, assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY'), lang=lang)
+        transcriber = aai.Transcriber()
+        transcript = transcriber.transcribe(url)
+        text = transcript.text
+        # Now index the transcribed text
+        plato.index(text, llm=language_model, lang=lang)
     else:
         logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
         plato.index(url, llm=language_model, lang=lang)
@@ -184,7 +189,7 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
     passages = plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
     references = plato.get_references(url, lang=lang)
     chapters = plato.get_chapters(url, lang=lang)
-
+    
     # Set language-specific prompts
     if lang == "en":
         CONTRIBUTORS_PROMPT = "Thoroughly review the <context> and identify the list of contributors. Output as Markdown list: First Name, Last Name, Title, Organization. Output \"Unknown\" if the contributors are not known. In the end of the list always add \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Start with \"## Contributors, Acknowledgements, Mentions\""

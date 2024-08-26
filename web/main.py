@@ -412,7 +412,7 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    def process_and_send_email(self, task_id):
+   def process_and_send_email(self, task_id):
     try:
         task = tasks[task_id]
         user_email = task.get('email')

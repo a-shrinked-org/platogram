@@ -314,7 +314,7 @@ class handler(BaseHTTPRequestHandler):
             logger.error("Malformed Authorization header")
             return None
 
-def handle_convert(self):
+    def handle_convert(self):
         logger.debug("Handling /convert request")
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
@@ -326,18 +326,10 @@ def handle_convert(self):
                 body = self.rfile.read(content_length)  # Read raw bytes
                 file_name = self.headers.get('X-File-Name')
                 lang = self.headers.get('X-Language', 'en')
-
-                # Save the file to a temporary location
-                temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
-                temp_dir.mkdir(parents=True, exist_ok=True)
-                temp_file = temp_dir / f"{task_id}_{file_name}"
-                with open(temp_file, 'wb') as f:
-                    f.write(body)
-
-                tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
+                tasks[task_id] = {'status': 'running', 'file': file_name, 'lang': lang, 'email': user_email}
                 logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}")
             elif content_type == 'application/json':
-                body = self.rfile.read(content_length).decode('utf-8')
+                body = self.rfile.read(content_length).decode('utf-8')  # JSON should be UTF-8
                 data = json.loads(body)
                 url = data.get('url')
                 lang = data.get('lang', 'en')
@@ -350,7 +342,7 @@ def handle_convert(self):
 
             # Start processing
             tasks[task_id]['status'] = 'processing'
-            asyncio.create_task(process_and_send_email(task_id))
+            self.process_and_send_email(task_id)
 
             json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
         except Exception as e:
@@ -435,4 +427,52 @@ Suggested donation: $2 per hour of content converted."""
 
 # Vercel handler
 def vercel_handler(event, context):
-    return handler.handle_request(event, context)
+    async def async_handler(event, context):
+        class MockRequest:
+            def __init__(self, event):
+                self.headers = event['headers']
+                self.method = event['httpMethod']
+                self.path = event['path']
+                self.body = event.get('body', '')
+
+        class MockResponse:
+            def __init__(self):
+                self.status_code = 200
+                self.headers = {}
+                self.body = ''
+
+            def send_response(self, status_code):
+                self.status_code = status_code
+
+            def send_header(self, key, value):
+                self.headers[key] = value
+
+            def end_headers(self):
+                pass
+
+            def wfile(self):
+                class MockWFile:
+                    def write(self, data):
+                        self.body += data.decode('utf-8') if isinstance(data, bytes) else data
+                return MockWFile()
+
+        mock_request = MockRequest(event)
+        mock_response = MockResponse()
+
+        server = handler(mock_request, mock_request.path, mock_response)
+
+        if mock_request.method == 'GET':
+            server.do_GET()
+        elif mock_request.method == 'POST':
+            await server.do_POST()
+        elif mock_request.method == 'OPTIONS':
+            server.do_OPTIONS()
+
+        return {
+            'statusCode': mock_response.status_code,
+            'headers': mock_response.headers,
+            'body': mock_response.body,
+        }
+
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(async_handler(event, context))

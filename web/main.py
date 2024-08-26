@@ -6,10 +6,6 @@ import re
 import subprocess
 import tempfile
 from pathlib import Path
-from docx import Document
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
 import base64
 import time
 import requests
@@ -17,16 +13,22 @@ import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
-import asyncio
-import aiofiles
-import aiofiles.tempfile
 import threading
 
 import platogram as plato
-from reportlab.pdfgen import canvas
-from io import BytesIO
-from anthropic import AnthropicError
 import assemblyai as aai
+
+# Removed imports:
+# from docx import Document
+# from reportlab.lib.pagesizes import letter
+# from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+# from reportlab.lib.styles import getSampleStyleSheet
+# import asyncio
+# import aiofiles
+# import aiofiles.tempfile
+# from reportlab.pdfgen import canvas
+# from io import BytesIO
+# from anthropic import AnthropicError
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)

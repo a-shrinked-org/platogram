@@ -149,7 +149,7 @@ async def send_email_with_resend(to_email, subject, body, attachments):
                 logger.debug(f"Failed payload: {json.dumps(payload, default=str)}")
             return response
 
-async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
+def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
     logger.info(f"Processing audio from: {url}")
 
     # Check for required API keys
@@ -171,18 +171,18 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
     # Transcribe or index content
     if os.getenv('ASSEMBLYAI_API_KEY'):
         logger.info("Transcribing audio to text using AssemblyAI...")
-        await plato.index(url, llm=language_model, assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY'), lang=lang)
+        plato.index(url, llm=language_model, assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY'), lang=lang)
     else:
         logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
-        await plato.index(url, llm=language_model, lang=lang)
+        plato.index(url, llm=language_model, lang=lang)
 
     # Generate content
     logger.info("Generating content...")
-    title = await plato.get_title(url, lang=lang)
-    abstract = await plato.get_abstract(url, lang=lang)
-    passages = await plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
-    references = await plato.get_references(url, lang=lang)
-    chapters = await plato.get_chapters(url, lang=lang)
+    title = plato.get_title(url, lang=lang)
+    abstract = plato.get_abstract(url, lang=lang)
+    passages = plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
+    references = plato.get_references(url, lang=lang)
+    chapters = plato.get_chapters(url, lang=lang)
 
     # Set language-specific prompts
     if lang == "en":
@@ -314,7 +314,7 @@ class handler(BaseHTTPRequestHandler):
             logger.error("Malformed Authorization header")
             return None
 
-    def handle_convert(self):
+     def handle_convert(self):
         logger.debug("Handling /convert request")
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
@@ -326,10 +326,18 @@ class handler(BaseHTTPRequestHandler):
                 body = self.rfile.read(content_length)  # Read raw bytes
                 file_name = self.headers.get('X-File-Name')
                 lang = self.headers.get('X-Language', 'en')
-                tasks[task_id] = {'status': 'running', 'file': file_name, 'lang': lang, 'email': user_email}
+
+                # Save the file to a temporary location
+                temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
+                temp_dir.mkdir(parents=True, exist_ok=True)
+                temp_file = temp_dir / f"{task_id}_{file_name}"
+                with open(temp_file, 'wb') as f:
+                    f.write(body)
+
+                tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
                 logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}")
             elif content_type == 'application/json':
-                body = self.rfile.read(content_length).decode('utf-8')  # JSON should be UTF-8
+                body = self.rfile.read(content_length).decode('utf-8')
                 data = json.loads(body)
                 url = data.get('url')
                 lang = data.get('lang', 'en')
@@ -353,126 +361,58 @@ class handler(BaseHTTPRequestHandler):
         try:
             task = tasks[task_id]
             user_email = task['email']
+            url = task.get('url') or f"file://{task['file']}"
+            lang = task['lang']
 
-            # Simulate processing
-            time.sleep(5)  # Simulate work
+            logger.info(f"Processing task {task_id} for URL: {url}")
 
-            # Generate sample output files
             with tempfile.TemporaryDirectory() as tmpdir:
-                sample_file = Path(tmpdir) / "sample_output.txt"
-                with open(sample_file, 'w') as f:
-                    f.write("This is a sample output file.")
+                output_dir = Path(tmpdir)
 
-                subject = "[Platogram] Your Converted Document"
-                body = """Hi there!
+                try:
+                    # Process with Platogram
+                    title, abstract = audio_to_paper(url, lang, output_dir)
 
-Platogram has transformed spoken words into documents you can read and enjoy!
+                    # Prepare email content
+                    subject = f"[Platogram] {title}"
+                    body = f"""Hi there!
 
-Please find the converted document attached to this email.
+Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
 
-Thank you for using Platogram!
+You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
+
+{abstract}
+
+Please reply to this e-mail if any suggestions, feedback, or questions.
 
 ---
 Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
 Suggested donation: $2 per hour of content converted."""
 
-                if user_email:
-                    send_email_with_resend(user_email, subject, body, [sample_file])
-                else:
-                    logger.warning(f"No email available for task {task_id}. Skipping email send.")
+                    # Get generated files
+                    files = [f for f in output_dir.glob('*') if f.is_file()]
 
-            tasks[task_id]['status'] = 'done'
-            logger.info(f"Conversion completed for task {task_id}")
+                    if user_email:
+                        logger.info(f"Sending email to {user_email}")
+                        send_email_with_resend(user_email, subject, body, files)
+                        logger.info("Email sent successfully")
+                    else:
+                        logger.warning(f"No email available for task {task_id}. Skipping email send.")
+
+                    tasks[task_id]['status'] = 'done'
+                    logger.info(f"Conversion completed for task {task_id}")
+
+                except Exception as e:
+                    logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
+                    tasks[task_id]['status'] = 'failed'
+                    tasks[task_id]['error'] = str(e)
+                    raise
+
         except Exception as e:
-            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}")
+            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
             tasks[task_id]['status'] = 'failed'
             tasks[task_id]['error'] = str(e)
 
-    def handle_status(self):
-        task_id = self.headers.get('X-Task-ID')
-
-        if not task_id:
-            # If no task ID is provided, return a general status
-            json_response(self, 200, {"status": "idle"})
-            return
-
-        try:
-            if task_id not in tasks:
-                response = {"status": "not_found"}
-            else:
-                task = tasks[task_id]
-                response = {
-                    "status": task['status'],
-                    "error": task.get('error') if task['status'] == "failed" else None
-                }
-            json_response(self, 200, response)
-        except Exception as e:
-            logger.error(f"Error in handle_status for task {task_id}: {str(e)}")
-            json_response(self, 500, {"error": str(e)})
-
-    def handle_reset(self):
-        task_id = self.headers.get('X-Task-ID')
-
-        if not task_id:
-            json_response(self, 400, {"error": "Task ID required"})
-            return
-
-        try:
-            if task_id in tasks:
-                del tasks[task_id]
-            json_response(self, 200, {"message": "Task reset"})
-        except Exception as e:
-            logger.error(f"Error in handle_reset for task {task_id}: {str(e)}")
-            json_response(self, 500, {"error": str(e)})
-
 # Vercel handler
 def vercel_handler(event, context):
-    async def async_handler(event, context):
-        class MockRequest:
-            def __init__(self, event):
-                self.headers = event['headers']
-                self.method = event['httpMethod']
-                self.path = event['path']
-                self.body = event.get('body', '')
-
-        class MockResponse:
-            def __init__(self):
-                self.status_code = 200
-                self.headers = {}
-                self.body = ''
-
-            def send_response(self, status_code):
-                self.status_code = status_code
-
-            def send_header(self, key, value):
-                self.headers[key] = value
-
-            def end_headers(self):
-                pass
-
-            def wfile(self):
-                class MockWFile:
-                    def write(self, data):
-                        self.body += data.decode('utf-8') if isinstance(data, bytes) else data
-                return MockWFile()
-
-        mock_request = MockRequest(event)
-        mock_response = MockResponse()
-
-        server = handler(mock_request, mock_request.path, mock_response)
-
-        if mock_request.method == 'GET':
-            server.do_GET()
-        elif mock_request.method == 'POST':
-            await server.do_POST()
-        elif mock_request.method == 'OPTIONS':
-            server.do_OPTIONS()
-
-        return {
-            'statusCode': mock_response.status_code,
-            'headers': mock_response.headers,
-            'body': mock_response.body,
-        }
-
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(async_handler(event, context))
+    return handler.handle_request(event, context)

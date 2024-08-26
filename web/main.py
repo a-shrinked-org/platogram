@@ -17,6 +17,7 @@ import threading
 import asyncio
 import aiofiles
 import aiohttp
+import aiofiles.tempfile
 
 import platogram as plato
 import assemblyai as aai
@@ -498,7 +499,7 @@ def vercel_handler(event, context):
         if mock_request.method == 'GET':
             server.do_GET()
         elif mock_request.method == 'POST':
-            server.do_POST()
+            await server.do_POST()
         elif mock_request.method == 'OPTIONS':
             server.do_OPTIONS()
 

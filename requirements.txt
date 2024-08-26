@@ -178,3 +178,4 @@ zipp==3.20.0
     # via importlib-metadata
 
 nltk==3.9.1
+aiohttp==3.10.5

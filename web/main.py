@@ -322,12 +322,11 @@ class handler(BaseHTTPRequestHandler):
             logger.error("Malformed Authorization header")
             return None
 
-   def handle_convert(self):
+    def handle_convert(self):
         logger.debug("Handling /convert request")
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
         user_email = self.get_user_email()
-        logger.debug(f"User email for conversion: {user_email}")
 
         try:
             task_id = str(uuid4())
@@ -344,35 +343,35 @@ class handler(BaseHTTPRequestHandler):
                     f.write(body)
 
                 tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
-                logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+                logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}")
             elif content_type == 'application/json':
                 body = self.rfile.read(content_length).decode('utf-8')
                 data = json.loads(body)
                 url = data.get('url')
                 lang = data.get('lang', 'en')
                 tasks[task_id] = {'status': 'running', 'url': url, 'lang': lang, 'email': user_email}
-                logger.debug(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
+                logger.debug(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}")
             else:
                 logger.error(f"Invalid content type: {content_type}")
                 json_response(self, 400, {"error": "Invalid content type"})
                 return
 
-            # Start processing in a separate thread
+            # Start processing
             tasks[task_id]['status'] = 'processing'
-            threading.Thread(target=self.process_and_send_email, args=(task_id,)).start()
+            self.process_and_send_email(task_id)
 
             json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
         except Exception as e:
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    def process_and_send_email(self, task_id):
+    async def process_and_send_email(self, task_id):
         try:
             task = tasks[task_id]
             user_email = task.get('email')
             logger.info(f"Starting processing for task {task_id}. User email: {user_email}")
 
-            with tempfile.TemporaryDirectory() as tmpdir:
+            async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
                 output_dir = Path(tmpdir)
 
                 # Process audio
@@ -386,7 +385,7 @@ class handler(BaseHTTPRequestHandler):
                 try:
                     # Call audio_to_paper function
                     logger.info("Calling audio_to_paper function...")
-                    title, abstract = audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
+                    title, abstract = await audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
                     logger.info(f"audio_to_paper completed. Title: {title}")
 
                     files = [f for f in output_dir.glob('*') if f.is_file()]
@@ -409,7 +408,7 @@ class handler(BaseHTTPRequestHandler):
 
                     if user_email:
                         logger.info(f"Sending email to {user_email}")
-                        send_email_with_resend(user_email, subject, body, files)
+                        await send_email_with_resend(user_email, subject, body, files)
                         logger.info("Email sent successfully")
                     else:
                         logger.warning(f"No email available for task {task_id}. Skipping email send.")

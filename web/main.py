@@ -323,7 +323,7 @@ class handler(BaseHTTPRequestHandler):
             logger.error("Malformed Authorization header")
             return None
 
-     def handle_convert(self):
+    def handle_convert(self):
         logger.debug("Handling /convert request")
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')

@@ -18,6 +18,7 @@ import aiofiles
 import aiofiles.tempfile
 import aiohttp
 import logfire
+import io
 
 import platogram as plato
 from anthropic import AnthropicError
@@ -286,6 +287,45 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
     return title, abstract
 
 class handler(BaseHTTPRequestHandler):
+    def __init__(self, request, client_address, server):
+        if isinstance(request, dict):  # Serverless environment
+            self.rfile = io.BytesIO(request.get('body', '').encode())
+            self.wfile = io.BytesIO()
+            self.request = request
+            self.client_address = client_address
+            self.server = server
+            self.requestline = f"{request['httpMethod']} {request['path']} HTTP/1.1"
+            self.headers = {k.lower(): v for k, v in request['headers'].items()}
+            self.response_status = 200
+            self.response_headers = {}
+            self.response_content = ''
+            self.setup()
+            self.handle()
+        else:  # Traditional environment
+            super().__init__(request, client_address, server)
+
+    def send_response(self, code, message=None):
+        if hasattr(self, 'response_status'):
+            self.response_status = code
+        else:
+            super().send_response(code, message)
+
+    def send_header(self, keyword, value):
+        if hasattr(self, 'response_headers'):
+            self.response_headers[keyword] = value
+        else:
+            super().send_header(keyword, value)
+
+    def end_headers(self):
+        if not hasattr(self, 'response_headers'):
+            super().end_headers()
+
+    def write(self, data):
+        if hasattr(self, 'response_content'):
+            self.response_content += data.decode() if isinstance(data, bytes) else data
+        else:
+            self.wfile.write(data)
+
     async def do_OPTIONS(self):
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -302,7 +342,6 @@ class handler(BaseHTTPRequestHandler):
             await self.handle_reset()
         else:
             json_response(self, 404, {"error": "Not Found"})
-
     async def handle_task_status(self):
         task_id = self.path.split('/')[-1]
         if task_id in tasks:
@@ -484,87 +523,15 @@ class handler(BaseHTTPRequestHandler):
             json_response(self, 500, {"error": f"An error occurred while resetting tasks: {str(e)}"})
 
 # Vercel handler
-class CustomRequest:
-    def __init__(self, event):
-        self.headers = {k.lower(): v for k, v in event['headers'].items()}
-        self.method = event['httpMethod']
-        self.path = event['path']
-        self.body = event.get('body', '')
-        self.rfile = type('MockFile', (), {'read': lambda self, n: self.body.encode()})()
-
-class CustomResponse:
-    def __init__(self):
-        self.status_code = 200
-        self.headers = {}
-        self.body = ''
-
-    def send_response(self, status_code):
-        self.status_code = status_code
-
-    def send_header(self, key, value):
-        self.headers[key] = value
-
-    def end_headers(self):
-        pass
-
-    def wfile(self):
-        return type('MockWFile', (), {'write': lambda self, data: setattr(self, 'body', self.body + data.decode('utf-8'))})()
-
-class MockHandler:
-    def __init__(self, event):
-        self.headers = {k.lower(): v for k, v in event['headers'].items()}
-        self.method = event['httpMethod']
-        self.path = event['path']
-        self.body = event.get('body', '')
-        self.rfile = type('MockFile', (), {'read': lambda self, n: self.body.encode()})()
-        self.response_status = 200
-        self.response_headers = {}
-        self.response_content = ''
-
-    def send_response(self, status_code):
-        self.response_status = status_code
-
-    def send_header(self, key, value):
-        self.response_headers[key] = value
-
-    def end_headers(self):
-        pass
-
-    def wfile(self):
-        return type('MockWFile', (), {'write': lambda self, data: setattr(self, 'response_content', self.response_content + data.decode('utf-8'))})()
-
-class handler(MockHandler):
-    async def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language')
-        self.end_headers()
-
-    async def do_GET(self):
-        if self.path.startswith('/task_status'):
-            await self.handle_task_status()
-        elif self.path == '/status':
-            await self.handle_status()
-        elif self.path == '/reset':
-            await self.handle_reset()
-        else:
-            json_response(self, 404, {"error": "Not Found"})
-
-    async def do_POST(self):
-        if self.path == '/convert':
-            await self.handle_convert()
-        else:
-            json_response(self, 404, {"error": "Not Found"})
 
 async def vercel_handler(event, context):
-    h = handler(event)
+    h = handler(event, None, None)
 
-    if h.method == 'GET':
+    if event['httpMethod'] == 'GET':
         await h.do_GET()
-    elif h.method == 'POST':
+    elif event['httpMethod'] == 'POST':
         await h.do_POST()
-    elif h.method == 'OPTIONS':
+    elif event['httpMethod'] == 'OPTIONS':
         await h.do_OPTIONS()
 
     return {

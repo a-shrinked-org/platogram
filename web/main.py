@@ -16,6 +16,7 @@ from uuid import uuid4
 import asyncio
 import aiofiles
 import aiofiles.tempfile
+import threading
 
 import platogram as plato
 from anthropic import AnthropicError
@@ -190,7 +191,7 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
     abstract = plato.get_abstract(url, lang=lang)
     passages = plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
     references = plato.get_references(url, lang=lang)
-    chapters = plato.get_chapters(url, lang=lang)
+    chapters = plato.get_chapters(url, lang=lang)2
     
     # Set language-specific prompts
     if lang == "en":
@@ -365,13 +366,13 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    async def process_and_send_email(self, task_id):
+    def process_and_send_email(self, task_id):
         try:
             task = tasks[task_id]
             user_email = task.get('email')
             logger.info(f"Starting processing for task {task_id}. User email: {user_email}")
 
-            async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
+            with tempfile.TemporaryDirectory() as tmpdir:
                 output_dir = Path(tmpdir)
 
                 # Process audio
@@ -385,7 +386,7 @@ class handler(BaseHTTPRequestHandler):
                 try:
                     # Call audio_to_paper function
                     logger.info("Calling audio_to_paper function...")
-                    title, abstract = await audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
+                    title, abstract = audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
                     logger.info(f"audio_to_paper completed. Title: {title}")
 
                     files = [f for f in output_dir.glob('*') if f.is_file()]
@@ -408,8 +409,30 @@ class handler(BaseHTTPRequestHandler):
 
                     if user_email:
                         logger.info(f"Sending email to {user_email}")
-                        await send_email_with_resend(user_email, subject, body, files)
-                        logger.info("Email sent successfully")
+                        # Use requests instead of aiohttp for synchronous operation
+                        response = requests.post(
+                            "https://api.resend.com/emails",
+                            headers={
+                                "Authorization": f"Bearer {RESEND_API_KEY}",
+                                "Content-Type": "application/json"
+                            },
+                            json={
+                                "from": "Platogram <onboarding@resend.dev>",
+                                "to": user_email,
+                                "subject": subject,
+                                "text": body,
+                                "attachments": [
+                                    {
+                                        "filename": Path(f).name,
+                                        "content": base64.b64encode(Path(f).read_bytes()).decode('utf-8')
+                                    } for f in files
+                                ]
+                            }
+                        )
+                        if response.status_code == 200:
+                            logger.info("Email sent successfully")
+                        else:
+                            logger.error(f"Failed to send email. Status: {response.status_code}, Error: {response.text}")
                     else:
                         logger.warning(f"No email available for task {task_id}. Skipping email send.")
 

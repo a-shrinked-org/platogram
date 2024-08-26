@@ -179,6 +179,8 @@ async def send_email_with_resend(to_email, subject, body, attachments):
         }
 def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False, verbose: bool = False) -> tuple[str, str]:
     logger.info(f"Starting audio_to_paper processing for URL: {url}")
+    logger.info(f"Language: {lang}, Images: {images}, Verbose: {verbose}")
+    logger.info(f"Output directory: {output_dir}")
 
     # Check for required API keys
     if not os.getenv('ANTHROPIC_API_KEY'):
@@ -211,14 +213,16 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False, 
         logger.info("Transcribing audio to text using AssemblyAI...")
         try:
             transcriber = aai.Transcriber()
-            transcript = transcriber.transcribe(url)
+            if url.startswith("file://"):
+                with open(url[7:], "rb") as audio_file:
+                    transcript = transcriber.transcribe(audio_file)
+            else:
+                transcript = transcriber.transcribe(url)
             text = transcript.text
             logger.info("Audio transcription completed successfully")
-            # Create a list of objects with a 'text' attribute
-            transcript_objects = [type('obj', (), {'text': text})]
             # Now index the transcribed text
             logger.info("Indexing transcribed text with Platogram...")
-            plato.index(transcript_objects, llm=language_model, lang=lang, images=images)
+            plato.index(text, llm=language_model, lang=lang, images=images)
             logger.info("Indexing completed successfully")
         except Exception as e:
             logger.error(f"Error in transcription or indexing: {str(e)}")
@@ -388,7 +392,7 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False, 
         print(abstract)
         print("</abstract>")
 
-    logger.info("audio_to_paper processing completed successfully")
+    logger.info(f"audio_to_paper completed. Title: {title}")
     return title, abstract
 
 def remove_references(content):
@@ -435,6 +439,7 @@ class handler(BaseHTTPRequestHandler):
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
         user_email = self.get_user_email()
+        logger.info(f"Received conversion request. Content-Type: {content_type}, User email: {user_email}")
 
         try:
             task_id = str(uuid4())
@@ -466,6 +471,7 @@ class handler(BaseHTTPRequestHandler):
 
             # Start processing in a separate thread
             tasks[task_id]['status'] = 'processing'
+            logger.info(f"Starting processing thread for task {task_id}")
             threading.Thread(target=self.process_and_send_email, args=(task_id,)).start()
 
             json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
@@ -481,14 +487,15 @@ class handler(BaseHTTPRequestHandler):
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 output_dir = Path(tmpdir)
+                logger.info(f"Created temporary directory: {output_dir}")
 
                 # Process audio
                 if 'url' in task:
                     url = task['url']
+                    logger.info(f"Processing URL: {url}")
                 else:
                     url = f"file://{task['file']}"
-
-                logger.info(f"Processing URL: {url}")
+                    logger.info(f"Processing local file: {task['file']}")
 
                 try:
                     # Call audio_to_paper function
@@ -515,7 +522,9 @@ class handler(BaseHTTPRequestHandler):
     Suggested donation: $2 per hour of content converted."""
 
                     if user_email:
-                        logger.info(f"Sending email to {user_email}")
+                        logger.info(f"Preparing to send email to {user_email}")
+                        logger.info(f"Email subject: {subject}")
+                        logger.info(f"Number of attachments: {len(files)}")
                         # Use requests instead of aiohttp for synchronous operation
                         response = requests.post(
                             "https://api.resend.com/emails",

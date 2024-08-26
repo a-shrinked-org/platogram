@@ -489,52 +489,48 @@ class handler(BaseHTTPRequestHandler):
 
 # Vercel handler
 def vercel_handler(event, context):
-    async def async_handler(event, context):
-        class MockRequest:
-            def __init__(self, event):
-                self.headers = event['headers']
-                self.method = event['httpMethod']
-                self.path = event['path']
-                self.body = event.get('body', '')
+    class MockRequest:
+        def __init__(self, event):
+            self.headers = event['headers']
+            self.method = event['httpMethod']
+            self.path = event['path']
+            self.body = event.get('body', '')
 
-        class MockResponse:
-            def __init__(self):
-                self.status_code = 200
-                self.headers = {}
-                self.body = ''
+    class MockResponse:
+        def __init__(self):
+            self.status_code = 200
+            self.headers = {}
+            self.body = ''
 
-            def send_response(self, status_code):
-                self.status_code = status_code
+        def send_response(self, status_code):
+            self.status_code = status_code
 
-            def send_header(self, key, value):
-                self.headers[key] = value
+        def send_header(self, key, value):
+            self.headers[key] = value
 
-            def end_headers(self):
-                pass
+        def end_headers(self):
+            pass
 
-            def wfile(self):
-                class MockWFile:
-                    def write(self, data):
-                        self.body += data.decode('utf-8') if isinstance(data, bytes) else data
-                return MockWFile()
+        def wfile(self):
+            class MockWFile:
+                def write(self, data):
+                    self.body += data.decode('utf-8') if isinstance(data, bytes) else data
+            return MockWFile()
 
-        mock_request = MockRequest(event)
-        mock_response = MockResponse()
+    mock_request = MockRequest(event)
+    mock_response = MockResponse()
 
-        server = handler(mock_request, mock_request.path, mock_response)
+    server = handler(mock_request, mock_request.path, mock_response)
 
-        if mock_request.method == 'GET':
-            server.do_GET()
-        elif mock_request.method == 'POST':
-            await server.do_POST()
-        elif mock_request.method == 'OPTIONS':
-            server.do_OPTIONS()
+    if mock_request.method == 'GET':
+        server.do_GET()
+    elif mock_request.method == 'POST':
+        server.do_POST()
+    elif mock_request.method == 'OPTIONS':
+        server.do_OPTIONS()
 
-        return {
-            'statusCode': mock_response.status_code,
-            'headers': mock_response.headers,
-            'body': mock_response.body,
-        }
-
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(async_handler(event, context))
+    return {
+        'statusCode': mock_response.status_code,
+        'headers': mock_response.headers,
+        'body': mock_response.body,
+    }

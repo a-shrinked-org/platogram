@@ -484,51 +484,58 @@ class handler(BaseHTTPRequestHandler):
             json_response(self, 500, {"error": f"An error occurred while resetting tasks: {str(e)}"})
 
 # Vercel handler
+class CustomRequest:
+    def __init__(self, event):
+        self.headers = {k.lower(): v for k, v in event['headers'].items()}
+        self.method = event['httpMethod']
+        self.path = event['path']
+        self.body = event.get('body', '')
+        self.rfile = type('MockFile', (), {'read': lambda self, n: self.body.encode()})()
+
+class CustomResponse:
+    def __init__(self):
+        self.status_code = 200
+        self.headers = {}
+        self.body = ''
+
+    def send_response(self, status_code):
+        self.status_code = status_code
+
+    def send_header(self, key, value):
+        self.headers[key] = value
+
+    def end_headers(self):
+        pass
+
+    def wfile(self):
+        return type('MockWFile', (), {'write': lambda self, data: setattr(self, 'body', self.body + data.decode('utf-8'))})()
+
+class handler(BaseHTTPRequestHandler):
+    # ... (keep all methods as they are)
+
+    def __init__(self, request, client_address, server):
+        self.request = request
+        self.client_address = client_address
+        self.server = server
+        self.setup()
+
 async def vercel_handler(event, context):
-    class MockRequest:
-        def __init__(self, event):
-            self.headers = event['headers']
-            self.method = event['httpMethod']
-            self.path = event['path']
-            self.body = event.get('body', '')
+    request = CustomRequest(event)
+    response = CustomResponse()
 
-    class MockResponse:
-        def __init__(self):
-            self.status_code = 200
-            self.headers = {}
-            self.body = ''
+    server = handler(request, None, None)
 
-        def send_response(self, status_code):
-            self.status_code = status_code
-
-        def send_header(self, key, value):
-            self.headers[key] = value
-
-        def end_headers(self):
-            pass
-
-        def wfile(self):
-            class MockWFile:
-                def write(self, data):
-                    self.body += data.decode('utf-8') if isinstance(data, bytes) else data
-            return MockWFile()
-
-    mock_request = MockRequest(event)
-    mock_response = MockResponse()
-
-    server = handler(mock_request, mock_request.path, mock_response)
-
-    if mock_request.method == 'GET':
+    if request.method == 'GET':
         await server.do_GET()
-    elif mock_request.method == 'POST':
+    elif request.method == 'POST':
         await server.do_POST()
-    elif mock_request.method == 'OPTIONS':
+    elif request.method == 'OPTIONS':
         await server.do_OPTIONS()
 
     return {
-        'statusCode': mock_response.status_code,
-        'headers': mock_response.headers,
-        'body': mock_response.body,
+        'statusCode': response.status_code,
+        'headers': response.headers,
+        'body': response.body,
     }
 
 # Vercel entry point

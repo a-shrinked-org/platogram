@@ -170,18 +170,22 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
         url = file_path  # Use the local file path directly
 
     # Transcribe or index content
-    assemblyai_api_key = os.getenv('ASSEMBLYAI_API_KEY')
-    if assemblyai_api_key:
-        logger.info("Transcribing audio to text using AssemblyAI...")
-        transcriber = aai.Transcriber()
+assemblyai_api_key = os.getenv('ASSEMBLYAI_API_KEY')
+if assemblyai_api_key:
+    logger.info("Transcribing audio to text using AssemblyAI...")
+    transcriber = aai.Transcriber()
+    try:
         transcript = transcriber.transcribe(url)
         text = transcript.text
+        logger.info(f"Transcription completed successfully. Text length: {len(text)} characters")
         # Now index the transcribed text
         plato.index(text, llm=language_model, lang=lang)
-    else:
-        logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
-        plato.index(url, llm=language_model, lang=lang)
-
+    except Exception as e:
+        logger.error(f"Error during AssemblyAI transcription: {str(e)}")
+        raise
+else:
+    logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
+    plato.index(url, llm=language_model, lang=lang)
     # Generate content
     logger.info("Generating content...")
     title = plato.get_title(url, lang=lang)

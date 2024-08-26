@@ -14,22 +14,12 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
 import threading
+import asyncio
+import aiofiles
+import aiohttp
 
 import platogram as plato
 import assemblyai as aai
-
-import asyncio
-
-# Removed imports:
-# from docx import Document
-# from reportlab.lib.pagesizes import letter
-# from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-# from reportlab.lib.styles import getSampleStyleSheet
-# import aiofiles
-# import aiofiles.tempfile
-# from reportlab.pdfgen import canvas
-# from io import BytesIO
-# from anthropic import AnthropicError
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
@@ -160,24 +150,6 @@ async def send_email_with_resend(to_email, subject, body, attachments):
                 logger.debug(f"Failed payload: {json.dumps(payload, default=str)}")
             return response
 
-        PROMPTS = {
-            "en": {
-                "CONTRIBUTORS_PROMPT": "Thoroughly review the <context> and identify the list of contributors. Output as Markdown list: First Name, Last Name, Title, Organization. Output \"Unknown\" if the contributors are not known. In the end of the list always add \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Start with \"## Contributors, Acknowledgements, Mentions\"",
-                "CONTRIBUTORS_PREFILL": "## Contributors, Acknowledgements, Mentions\n",
-                "INTRODUCTION_PROMPT": "Thoroughly review the <context> and write \"Introduction\" chapter for the paper. Write in the style of the original <context>. Use only words from <context>. Use quotes from <context> when necessary. Make sure to include <markers>. Output as Markdown. Start with \"## Introduction\"",
-                "INTRODUCTION_PREFILL": "## Introduction\n",
-                "CONCLUSION_PROMPT": "Thoroughly review the <context> and write \"Conclusion\" chapter for the paper. Write in the style of the original <context>. Use only words from <context>. Use quotes from <context> when necessary. Make sure to include <markers>. Output as Markdown. Start with \"## Conclusion\"",
-                "CONCLUSION_PREFILL": "## Conclusion\n"
-            },
-            "es": {
-                "CONTRIBUTORS_PROMPT": "Revise a fondo el <context> e identifique la lista de contribuyentes. Salida como lista Markdown: Nombre, Apellido, Título, Organización. Salida \"Desconocido\" si los contribuyentes no se conocen. Al final de la lista, agregue siempre \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Comience con \"## Contribuyentes, Agradecimientos, Menciones\"",
-                "CONTRIBUTORS_PREFILL": "## Contribuyentes, Agradecimientos, Menciones\n",
-                "INTRODUCTION_PROMPT": "Revise a fondo el <context> y escriba el capítulo \"Introducción\" para el artículo. Escriba en el estilo del original <context>. Use solo las palabras de <context>. Use comillas del original <context> cuando sea necesario. Asegúrese de incluir <markers>. Salida como Markdown. Comience con \"## Introducción\"",
-                "INTRODUCTION_PREFILL": "## Introducción\n",
-                "CONCLUSION_PROMPT": "Revise a fondo el <context> y escriba el capítulo \"Conclusión\" para el artículo. Escriba en el estilo del original <context>. Use solo las palabras de <context>. Use comillas del original <context> cuando sea necesario. Asegúrese de incluir <markers>. Salida como Markdown. Comience con \"## Conclusión\"",
-                "CONCLUSION_PREFILL": "## Conclusión\n"
-            }
-        }
 def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
     logger.info(f"Processing audio from: {url}")
 
@@ -315,11 +287,6 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
 
     return title, abstract
 
-def remove_references(content):
-    content = re.sub(r'\[\[([0-9]+)\]\]\([^)]+\)', '', content)
-    content = re.sub(r'\[([0-9]+)\]', '', content)
-    return content
-
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
@@ -399,7 +366,7 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-def process_and_send_email(self, task_id):
+    def process_and_send_email(self, task_id):
         try:
             task = tasks[task_id]
             user_email = task['email']
@@ -490,52 +457,56 @@ Suggested donation: $2 per hour of content converted."""
             json_response(self, 200, {"message": "Task reset"})
         except Exception as e:
             logger.error(f"Error in handle_reset for task {task_id}: {str(e)}")
-            json_response(self, 500, {"error": str(e)}))
+            json_response(self, 500, {"error": str(e)})
 
 # Vercel handler
 def vercel_handler(event, context):
-    class MockRequest:
-        def __init__(self, event):
-            self.headers = event['headers']
-            self.method = event['httpMethod']
-            self.path = event['path']
-            self.body = event.get('body', '')
+    async def async_handler(event, context):
+        class MockRequest:
+            def __init__(self, event):
+                self.headers = event['headers']
+                self.method = event['httpMethod']
+                self.path = event['path']
+                self.body = event.get('body', '')
 
-    class MockResponse:
-        def __init__(self):
-            self.status_code = 200
-            self.headers = {}
-            self.body = ''
+        class MockResponse:
+            def __init__(self):
+                self.status_code = 200
+                self.headers = {}
+                self.body = ''
 
-        def send_response(self, status_code):
-            self.status_code = status_code
+            def send_response(self, status_code):
+                self.status_code = status_code
 
-        def send_header(self, key, value):
-            self.headers[key] = value
+            def send_header(self, key, value):
+                self.headers[key] = value
 
-        def end_headers(self):
-            pass
+            def end_headers(self):
+                pass
 
-        def wfile(self):
-            class MockWFile:
-                def write(self, data):
-                    self.body += data.decode('utf-8') if isinstance(data, bytes) else data
-            return MockWFile()
+            def wfile(self):
+                class MockWFile:
+                    def write(self, data):
+                        self.body += data.decode('utf-8') if isinstance(data, bytes) else data
+                return MockWFile()
 
-    mock_request = MockRequest(event)
-    mock_response = MockResponse()
+        mock_request = MockRequest(event)
+        mock_response = MockResponse()
 
-    server = handler(mock_request, mock_request.path, mock_response)
+        server = handler(mock_request, mock_request.path, mock_response)
 
-    if mock_request.method == 'GET':
-        server.do_GET()
-    elif mock_request.method == 'POST':
-        await server.do_POST()
-    elif mock_request.method == 'OPTIONS':
-        server.do_OPTIONS()
+        if mock_request.method == 'GET':
+            server.do_GET()
+        elif mock_request.method == 'POST':
+            server.do_POST()
+        elif mock_request.method == 'OPTIONS':
+            server.do_OPTIONS()
 
-    return {
-        'statusCode': mock_response.status_code,
-        'headers': mock_response.headers,
-        'body': mock_response.body,
-    }
+        return {
+            'statusCode': mock_response.status_code,
+            'headers': mock_response.headers,
+            'body': mock_response.body,
+        }
+
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(async_handler(event, context))

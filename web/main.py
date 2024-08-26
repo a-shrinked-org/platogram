@@ -150,7 +150,7 @@ async def send_email_with_resend(to_email, subject, body, attachments):
                 logger.debug(f"Failed payload: {json.dumps(payload, default=str)}")
             return response
 
-async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
+def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
     logger.info(f"Processing audio from: {url}")
 
     # Check for required API keys
@@ -174,23 +174,23 @@ async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = F
     if assemblyai_api_key:
         logger.info("Transcribing audio to text using AssemblyAI...")
         transcriber = aai.Transcriber()
-        transcript = await transcriber.transcribe(url)
+        transcript = transcriber.transcribe(url)
         text = transcript.text
         # Create a list of objects with a 'text' attribute
         transcript_objects = [type('obj', (), {'text': text})]
         # Now index the transcribed text
-        await plato.index(transcript_objects, llm=language_model, lang=lang)
+        plato.index(transcript_objects, llm=language_model, lang=lang)
     else:
         logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
-        await plato.index(url, llm=language_model, lang=lang)
+        plato.index(url, llm=language_model, lang=lang)
 
     # Generate content
     logger.info("Generating content...")
-    title = await plato.get_title(url, lang=lang)
-    abstract = await plato.get_abstract(url, lang=lang)
-    passages = await plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
-    references = await plato.get_references(url, lang=lang)
-    chapters = await plato.get_chapters(url, lang=lang)
+    title = plato.get_title(url, lang=lang)
+    abstract = plato.get_abstract(url, lang=lang)
+    passages = plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
+    references = plato.get_references(url, lang=lang)
+    chapters = plato.get_chapters(url, lang=lang)
     
     # Set language-specific prompts
     if lang == "en":
@@ -322,7 +322,7 @@ class handler(BaseHTTPRequestHandler):
             logger.error("Malformed Authorization header")
             return None
 
-   async def handle_convert(self):
+   def handle_convert(self):
         logger.debug("Handling /convert request")
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
@@ -357,22 +357,22 @@ class handler(BaseHTTPRequestHandler):
                 json_response(self, 400, {"error": "Invalid content type"})
                 return
 
-            # Start processing
+            # Start processing in a separate thread
             tasks[task_id]['status'] = 'processing'
-            asyncio.create_task(self.process_and_send_email(task_id))
+            threading.Thread(target=self.process_and_send_email, args=(task_id,)).start()
 
             json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
         except Exception as e:
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    async def process_and_send_email(self, task_id):
+    def process_and_send_email(self, task_id):
         try:
             task = tasks[task_id]
             user_email = task.get('email')
             logger.info(f"Starting processing for task {task_id}. User email: {user_email}")
 
-            async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
+            with tempfile.TemporaryDirectory() as tmpdir:
                 output_dir = Path(tmpdir)
 
                 # Process audio
@@ -386,7 +386,7 @@ class handler(BaseHTTPRequestHandler):
                 try:
                     # Call audio_to_paper function
                     logger.info("Calling audio_to_paper function...")
-                    title, abstract = await audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
+                    title, abstract = audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
                     logger.info(f"audio_to_paper completed. Title: {title}")
 
                     files = [f for f in output_dir.glob('*') if f.is_file()]
@@ -409,7 +409,7 @@ class handler(BaseHTTPRequestHandler):
 
                     if user_email:
                         logger.info(f"Sending email to {user_email}")
-                        await send_email_with_resend(user_email, subject, body, files)
+                        send_email_with_resend(user_email, subject, body, files)
                         logger.info("Email sent successfully")
                     else:
                         logger.warning(f"No email available for task {task_id}. Skipping email send.")

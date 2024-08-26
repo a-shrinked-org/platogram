@@ -176,7 +176,6 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
         transcriber = aai.Transcriber()
         transcript = transcriber.transcribe(url)
         text = transcript.text
-        logger.info(f"Transcription completed. Text length: {len(text)} characters")
         # Now index the transcribed text
         plato.index(text, llm=language_model, lang=lang)
     else:

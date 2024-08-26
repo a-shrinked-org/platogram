@@ -177,155 +177,83 @@ async def send_email_with_resend(to_email, subject, body, attachments):
                 "CONCLUSION_PREFILL": "## Conclusión\n"
             }
         }
-def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False, verbose: bool = False) -> tuple[str, str]:
-    logger.info(f"Starting audio_to_paper processing for URL: {url}")
-    logger.info(f"Language: {lang}, Images: {images}, Verbose: {verbose}")
-    logger.info(f"Output directory: {output_dir}")
+def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
+    logger.info(f"Processing audio from: {url}")
 
     # Check for required API keys
     if not os.getenv('ANTHROPIC_API_KEY'):
-        logger.error("ANTHROPIC_API_KEY is not set")
         raise EnvironmentError("ANTHROPIC_API_KEY is not set")
 
     # Initialize Platogram models
-    try:
-        logger.info("Initializing Platogram language model...")
-        language_model = plato.llm.get_model(
-            "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
-        )
-        logger.info("Platogram language model initialized successfully")
-    except Exception as e:
-        logger.error(f"Error initializing Platogram language model: {str(e)}")
-        raise
+    language_model = plato.llm.get_model(
+        "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
+    )
 
     # Handle local file paths
     if url.startswith("file://"):
         file_path = url[7:]  # Remove "file://" prefix
         if not os.path.exists(file_path):
-            logger.error(f"Local file not found: {file_path}")
             raise FileNotFoundError(f"Local file not found: {file_path}")
         url = file_path  # Use the local file path directly
-        logger.info(f"Using local file: {url}")
 
     # Transcribe or index content
     assemblyai_api_key = os.getenv('ASSEMBLYAI_API_KEY')
     if assemblyai_api_key:
-    logger.info("Transcribing audio to text using AssemblyAI...")
-    try:
+        logger.info("Transcribing audio to text using AssemblyAI...")
         transcriber = aai.Transcriber()
-        if url.startswith("file://"):
-            file_path = url[7:]
-            logger.info(f"Transcribing local file: {file_path}")
-            with open(file_path, "rb") as audio_file:
-                transcript = transcriber.transcribe(audio_file)
-        else:
-            logger.info(f"Transcribing remote URL: {url}")
-            transcript = transcriber.transcribe(url)
-
+        transcript = transcriber.transcribe(url)
         text = transcript.text
-        logger.info("Audio transcription completed successfully")
-        logger.info(f"Transcription length: {len(text)} characters")
-
         # Now index the transcribed text
-        logger.info("Indexing transcribed text with Platogram...")
-        plato.index(text, llm=language_model, lang=lang, images=images)
-        logger.info("Indexing completed successfully")
-    except Exception as e:
-        logger.error(f"Error in transcription or indexing: {str(e)}", exc_info=True)
-        raise
+        plato.index(text, llm=language_model, lang=lang)
     else:
         logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
-        try:
-            logger.info("Indexing content from URL with Platogram...")
-            plato.index(url, llm=language_model, lang=lang, images=images)
-            logger.info("Indexing completed successfully")
-        except Exception as e:
-            logger.error(f"Error indexing content from URL: {str(e)}")
-            raise
+        plato.index(url, llm=language_model, lang=lang)
 
     # Generate content
     logger.info("Generating content...")
-    try:
-        title = plato.get_title(url, lang=lang)
-        abstract = plato.get_abstract(url, lang=lang)
-        passages = plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
-        references = plato.get_references(url, lang=lang)
-        chapters = plato.get_chapters(url, lang=lang)
-        logger.info("Basic content generation completed")
+    title = plato.get_title(url, lang=lang)
+    abstract = plato.get_abstract(url, lang=lang)
+    passages = plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
+    references = plato.get_references(url, lang=lang)
+    chapters = plato.get_chapters(url, lang=lang)
 
-        contributors = plato.generate(
-            query=PROMPTS[lang]["CONTRIBUTORS_PROMPT"],
-            context_size="large",
-            prefill=PROMPTS[lang]["CONTRIBUTORS_PREFILL"],
-            url=url,
-            lang=lang
-        )
-        logger.info("Contributors section generated")
+    # Set language-specific prompts
+    if lang == "en":
+        CONTRIBUTORS_PROMPT = "Thoroughly review the <context> and identify the list of contributors. Output as Markdown list: First Name, Last Name, Title, Organization. Output \"Unknown\" if the contributors are not known. In the end of the list always add \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Start with \"## Contributors, Acknowledgements, Mentions\""
+        INTRODUCTION_PROMPT = "Thoroughly review the <context> and write \"Introduction\" chapter for the paper. Write in the style of the original <context>. Use only words from <context>. Use quotes from <context> when necessary. Make sure to include <markers>. Output as Markdown. Start with \"## Introduction\""
+        CONCLUSION_PROMPT = "Thoroughly review the <context> and write \"Conclusion\" chapter for the paper. Write in the style of the original <context>. Use only words from <context>. Use quotes from <context> when necessary. Make sure to include <markers>. Output as Markdown. Start with \"## Conclusion\""
+    elif lang == "es":
+        CONTRIBUTORS_PROMPT = "Revise a fondo el <context> e identifique la lista de contribuyentes. Salida como lista Markdown: Nombre, Apellido, Título, Organización. Salida \"Desconocido\" si los contribuyentes no se conocen. Al final de la lista, agregue siempre \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Comience con \"## Contribuyentes, Agradecimientos, Menciones\""
+        INTRODUCTION_PROMPT = "Revise a fondo el <context> y escriba el capítulo \"Introducción\" para el artículo. Escriba en el estilo del original <context>. Use solo las palabras de <context>. Use comillas del original <context> cuando sea necesario. Asegúrese de incluir <markers>. Salida como Markdown. Comience con \"## Introducción\""
+        CONCLUSION_PROMPT = "Revise a fondo el <context> y escriba el capítulo \"Conclusión\" para el artículo. Escriba en el estilo del original <context>. Use solo las palabras de <context>. Use comillas del original <context> cuando sea necesario. Asegúrese de incluir <markers>. Salida como Markdown. Comience con \"## Conclusión\""
+    else:
+        raise ValueError(f"Unsupported language: {lang}")
 
-        introduction = plato.generate(
-            query=PROMPTS[lang]["INTRODUCTION_PROMPT"],
-            context_size="large",
-            inline_references=True,
-            prefill=PROMPTS[lang]["INTRODUCTION_PREFILL"],
-            url=url,
-            lang=lang
-        )
-        logger.info("Introduction section generated")
+    contributors = plato.generate(
+        query=CONTRIBUTORS_PROMPT,
+        context_size="large",
+        prefill=f"## Contributors, Acknowledgements, Mentions\n",
+        url=url,
+        lang=lang
+    )
 
-        conclusion = plato.generate(
-            query=PROMPTS[lang]["CONCLUSION_PROMPT"],
-            context_size="large",
-            inline_references=True,
-            prefill=PROMPTS[lang]["CONCLUSION_PREFILL"],
-            url=url,
-            lang=lang
-        )
-        logger.info("Conclusion section generated")
-    except Exception as e:
-        logger.error(f"Error in content generation: {str(e)}")
-        raise
+    introduction = plato.generate(
+        query=INTRODUCTION_PROMPT,
+        context_size="large",
+        inline_references=True,
+        prefill=f"## Introduction\n",
+        url=url,
+        lang=lang
+    )
 
-    # Generate content
-    logger.info("Generating content...")
-    try:
-        title = plato.get_title(url, lang=lang)
-        abstract = plato.get_abstract(url, lang=lang)
-        passages = plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
-        references = plato.get_references(url, lang=lang)
-        chapters = plato.get_chapters(url, lang=lang)
-        logger.info("Basic content generation completed")
-
-        contributors = plato.generate(
-            query=PROMPTS[lang]["CONTRIBUTORS_PROMPT"],
-            context_size="large",
-            prefill=PROMPTS[lang]["CONTRIBUTORS_PREFILL"],
-            url=url,
-            lang=lang
-        )
-        logger.info("Contributors section generated")
-
-        introduction = plato.generate(
-            query=PROMPTS[lang]["INTRODUCTION_PROMPT"],
-            context_size="large",
-            inline_references=True,
-            prefill=PROMPTS[lang]["INTRODUCTION_PREFILL"],
-            url=url,
-            lang=lang
-        )
-        logger.info("Introduction section generated")
-
-        conclusion = plato.generate(
-            query=PROMPTS[lang]["CONCLUSION_PROMPT"],
-            context_size="large",
-            inline_references=True,
-            prefill=PROMPTS[lang]["CONCLUSION_PREFILL"],
-            url=url,
-            lang=lang
-        )
-        logger.info("Conclusion section generated")
-    except Exception as e:
-        logger.error(f"Error in content generation: {str(e)}")
-        raise
+    conclusion = plato.generate(
+        query=CONCLUSION_PROMPT,
+        context_size="large",
+        inline_references=True,
+        prefill=f"## Conclusion\n",
+        url=url,
+        lang=lang
+    )
 
     # Compile the full content
     full_content = f"""# {title}
@@ -356,7 +284,6 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False, 
 
 {references}
 """
-    logger.info("Full content compiled")
 
     # Generate PDF files
     logger.info("Generating PDF files...")
@@ -367,38 +294,23 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False, 
     # Use subprocess to call pandoc for PDF and DOCX generation
     try:
         # With references
-        logger.info(f"Generating PDF with references: {pdf_path}")
         subprocess.run(['pandoc', '-o', str(pdf_path), '--from', 'markdown', '--pdf-engine=xelatex'],
                        input=full_content, text=True, check=True)
-        logger.info("PDF with references generated successfully")
 
         # Without references
-        logger.info(f"Generating PDF without references: {pdf_no_refs_path}")
-        content_no_refs = remove_references(full_content)
+        content_no_refs = re.sub(r'\[\[([0-9]+)\]\]\([^)]+\)', '', full_content)
+        content_no_refs = re.sub(r'\[([0-9]+)\]', '', content_no_refs)
         content_no_refs = content_no_refs.split("## References")[0]
         subprocess.run(['pandoc', '-o', str(pdf_no_refs_path), '--from', 'markdown', '--pdf-engine=xelatex'],
                        input=content_no_refs, text=True, check=True)
-        logger.info("PDF without references generated successfully")
 
         # DOCX version
-        logger.info(f"Generating DOCX: {docx_path}")
         subprocess.run(['pandoc', '-o', str(docx_path), '--from', 'markdown'],
                        input=full_content, text=True, check=True)
-        logger.info("DOCX file generated successfully")
     except subprocess.CalledProcessError as e:
         logger.error(f"Error generating documents: {str(e)}")
         raise
 
-    if verbose:
-        print("<title>")
-        print(title)
-        print("</title>")
-        print()
-        print("<abstract>")
-        print(abstract)
-        print("</abstract>")
-
-    logger.info(f"audio_to_paper completed. Title: {title}")
     return title, abstract
 
 def remove_references(content):

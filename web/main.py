@@ -446,7 +446,7 @@ class LambdaHandler:
             tasks[task_id]['status'] = 'failed'
             tasks[task_id]['error'] = str(e)
 
-   async def get_user_email(self):
+    async def get_user_email(self):
         auth_header = self.headers.get('authorization', '')
         logger.debug(f"Authorization header: {auth_header}")
         if not auth_header:
@@ -501,7 +501,6 @@ class LambdaHandler:
         except Exception as e:
             logger.error(f"Error in handle_reset for user {user_email}: {str(e)}", exc_info=True)
             self.send_response(500, {"error": f"An error occurred while resetting tasks: {str(e)}"})
-
 async def handler(event, context):
     lambda_handler = LambdaHandler(event)
     return await lambda_handler.handle_request()

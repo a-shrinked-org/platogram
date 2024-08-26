@@ -326,10 +326,18 @@ class handler(BaseHTTPRequestHandler):
                 body = self.rfile.read(content_length)  # Read raw bytes
                 file_name = self.headers.get('X-File-Name')
                 lang = self.headers.get('X-Language', 'en')
-                tasks[task_id] = {'status': 'running', 'file': file_name, 'lang': lang, 'email': user_email}
+
+                # Save the file to a temporary location
+                temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
+                temp_dir.mkdir(parents=True, exist_ok=True)
+                temp_file = temp_dir / f"{task_id}_{file_name}"
+                with open(temp_file, 'wb') as f:
+                    f.write(body)
+
+                tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
                 logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}")
             elif content_type == 'application/json':
-                body = self.rfile.read(content_length).decode('utf-8')  # JSON should be UTF-8
+                body = self.rfile.read(content_length).decode('utf-8')
                 data = json.loads(body)
                 url = data.get('url')
                 lang = data.get('lang', 'en')

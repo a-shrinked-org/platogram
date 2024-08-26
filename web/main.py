@@ -176,6 +176,7 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
         transcriber = aai.Transcriber()
         transcript = transcriber.transcribe(url)
         text = transcript.text
+        logger.info(f"Transcription completed. Text length: {len(text)} characters")
         # Now index the transcribed text
         plato.index(text, llm=language_model, lang=lang)
     else:
@@ -363,61 +364,61 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    def process_and_send_email(self, task_id):
-        try:
-            task = tasks[task_id]
-            user_email = task['email']
-            url = task.get('url') or f"file://{task['file']}"
-            lang = task['lang']
+   def process_and_send_email(self, task_id):
+    try:
+        task = tasks[task_id]
+        user_email = task['email']
+        url = task.get('url') or f"file://{task['file']}"
+        lang = task['lang']
 
-            logger.info(f"Processing task {task_id} for URL: {url}")
+        logger.info(f"Processing task {task_id} for URL: {url}")
 
-            with tempfile.TemporaryDirectory() as tmpdir:
-                output_dir = Path(tmpdir)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
 
-                try:
-                    # Process with Platogram
-                    title, abstract = audio_to_paper(url, lang, output_dir)
+            try:
+                # Process with Platogram
+                title, abstract = audio_to_paper(url, lang, output_dir)
 
-                    # Prepare email content
-                    subject = f"[Platogram] {title}"
-                    body = f"""Hi there!
+                # Prepare email content
+                subject = f"[Platogram] {title}"
+                body = f"""Hi there!
 
-    Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
+Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
 
-    You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
+You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
 
-    {abstract}
+{abstract}
 
-    Please reply to this e-mail if any suggestions, feedback, or questions.
+Please reply to this e-mail if any suggestions, feedback, or questions.
 
-    ---
-    Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
-    Suggested donation: $2 per hour of content converted."""
+---
+Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
+Suggested donation: $2 per hour of content converted."""
 
-                    # Get generated files
-                    files = [f for f in output_dir.glob('*') if f.is_file()]
+                # Get generated files
+                files = [f for f in output_dir.glob('*') if f.is_file()]
 
-                    if user_email:
-                        logger.info(f"Sending email to {user_email}")
-                        send_email_with_resend(user_email, subject, body, files)
-                        logger.info("Email sent successfully")
-                    else:
-                        logger.warning(f"No email available for task {task_id}. Skipping email send.")
+                if user_email:
+                    logger.info(f"Sending email to {user_email}")
+                    send_email_with_resend(user_email, subject, body, files)
+                    logger.info("Email sent successfully")
+                else:
+                    logger.warning(f"No email available for task {task_id}. Skipping email send.")
 
-                    tasks[task_id]['status'] = 'done'
-                    logger.info(f"Conversion completed for task {task_id}")
+                tasks[task_id]['status'] = 'done'
+                logger.info(f"Conversion completed for task {task_id}")
 
-                except Exception as e:
-                    logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
-                    tasks[task_id]['status'] = 'failed'
-                    tasks[task_id]['error'] = str(e)
-                    raise
+            except Exception as e:
+                logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
+                tasks[task_id]['status'] = 'failed'
+                tasks[task_id]['error'] = str(e)
+                raise
 
-        except Exception as e:
-            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
-            tasks[task_id]['status'] = 'failed'
-            tasks[task_id]['error'] = str(e)
+    except Exception as e:
+        logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
+        tasks[task_id]['status'] = 'failed'
+        tasks[task_id]['error'] = str(e)
 
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')

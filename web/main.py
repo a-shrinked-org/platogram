@@ -10,6 +10,7 @@ import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
+from http import HTTPStatus
 import asyncio
 import aiofiles
 import aiohttp
@@ -321,29 +322,14 @@ Suggested donation: $2 per hour of content converted."""
         tasks[task_id]['status'] = 'failed'
         tasks[task_id]['error'] = str(e)
 
-async def handle_request(event, context):
-    method = event['httpMethod']
-    path = event['path']
-    headers = event['headers']
-    body = event.get('body', '')
+async def handle_convert(headers, body):
+    content_type = headers.get('Content-Type')
+    auth_header = headers.get('Authorization', '')
+    user_email = verify_token_and_get_email(auth_header.split(' ')[1] if auth_header else None)
 
-    if method == 'OPTIONS':
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-File-Name, X-Language',
-            },
-        }
+    task_id = str(uuid4())
 
-    if method == 'POST' and path == '/convert':
-        content_type = headers.get('Content-Type')
-        auth_header = headers.get('Authorization', '')
-        user_email = verify_token_and_get_email(auth_header.split(' ')[1] if auth_header else None)
-
-        task_id = str(uuid4())
-
+    try:
         if content_type == 'application/octet-stream':
             file_name = headers.get('X-File-Name')
             lang = headers.get('X-Language', 'en')
@@ -360,7 +346,7 @@ async def handle_request(event, context):
             lang = data.get('lang', 'en')
         else:
             return {
-                'statusCode': 400,
+                'statusCode': HTTPStatus.BAD_REQUEST,
                 'body': json.dumps({"error": "Invalid content type"}),
             }
 
@@ -368,33 +354,72 @@ async def handle_request(event, context):
         asyncio.create_task(process_and_send_email(task_id))
 
         return {
-            'statusCode': 200,
+            'statusCode': HTTPStatus.OK,
             'body': json.dumps({"message": "Conversion started", "task_id": task_id}),
         }
+    except Exception as e:
+        logger.error(f"Error in handle_convert: {str(e)}", exc_info=True)
+        return {
+            'statusCode': HTTPStatus.INTERNAL_SERVER_ERROR,
+            'body': json.dumps({"error": "Internal server error"}),
+        }
+
+def handle_task_status(path):
+    task_id = path.split('/')[-1]
+    if task_id in tasks:
+        task = tasks[task_id]
+        response = {
+            "task_id": task_id,
+            "status": task['status'],
+            "error": task.get('error') if task['status'] == "failed" else None
+        }
+        return {
+            'statusCode': 200,
+            'body': json.dumps(response),
+        }
+    else:
+        return {
+            'statusCode': 404,
+            'body': json.dumps({"error": "Task not found"}),
+        }
+
+async def handle_request(event, context):
+    logger.debug(f"Received event: {event}")
+    method = event.get('httpMethod')
+    path = event.get('path')
+    headers = event.get('headers', {})
+    body = event.get('body', '')
+
+    if method == 'OPTIONS':
+        return {
+            'statusCode': HTTPStatus.OK,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-File-Name, X-Language',
+            },
+        }
+
+    if method == 'POST' and path == '/convert':
+        return await handle_convert(headers, body)
 
     if method == 'GET' and path.startswith('/task_status/'):
-        task_id = path.split('/')[-1]
-        if task_id in tasks:
-            task = tasks[task_id]
-            response = {
-                "task_id": task_id,
-                "status": task['status'],
-                "error": task.get('error') if task['status'] == "failed" else None
-            }
-            return {
-                'statusCode': 200,
-                'body': json.dumps(response),
-            }
-        else:
-            return {
-                'statusCode': 404,
-                'body': json.dumps({"error": "Task not found"}),
-            }
+        return handle_task_status(path)
 
     return {
-        'statusCode': 404,
+        'statusCode': HTTPStatus.NOT_FOUND,
         'body': json.dumps({"error": "Not Found"}),
     }
 
 def handler(event, context):
-    return asyncio.run(handle_request(event, context))
+    async def async_handler():
+        try:
+            return await handle_request(event, context)
+        except Exception as e:
+            logger.error(f"Unhandled exception in handler: {str(e)}", exc_info=True)
+            return {
+                'statusCode': HTTPStatus.INTERNAL_SERVER_ERROR,
+                'body': json.dumps({"error": "Internal server error"}),
+            }
+
+    return asyncio.run(async_handler())

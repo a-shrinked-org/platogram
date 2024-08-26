@@ -370,217 +370,149 @@ class handler(BaseHTTPRequestHandler):
             logfire.exception("Error in handle_convert", extra={"error": str(e)})
             json_response(self, 500, {"error": str(e)})
 
-    async def process_and_send_email(self, task_id):
-        try:
-            task = tasks[task_id]
-            user_email = task.get('email')
-            logger.info(f"Starting processing for task {task_id}. User email: {user_email}")
+   async def process_and_send_email(task_id, url, lang, user_email):
+    try:
+        logger.info(f"Starting processing for task {task_id}. User email: {user_email}")
 
-            async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
-                output_dir = Path(tmpdir)
+        async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
 
-                if 'url' in task:
-                    url = task['url']
+            logger.info(f"Processing URL: {url}")
+
+            try:
+                # Initialize language model
+                logger.info("Initializing language model...")
+                language_model = plato.llm.get_model(
+                    "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
+                )
+                logger.info("Language model initialized successfully")
+
+                # Check AssemblyAI API key
+                if os.getenv('ASSEMBLYAI_API_KEY'):
+                    logger.info("AssemblyAI API key found. Preparing for transcription...")
+                    os.environ['ASSEMBLYAI_API_KEY'] = os.getenv('ASSEMBLYAI_API_KEY')
                 else:
-                    url = f"file://{task['file']}"
+                    logger.warning("ASSEMBLYAI_API_KEY is not set. Will attempt to retrieve text from URL.")
 
-                logger.info(f"Processing URL: {url}")
-
+                # Call plato.index()
+                logger.info(f"Calling plato.index() for URL: {url}")
                 try:
-                    # Initialize language model
-                    logger.info("Initializing language model...")
-                    language_model = plato.llm.get_model(
-                        "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
-                    )
-                    logger.info("Language model initialized successfully")
-
-                    # Check AssemblyAI API key
-                    if os.getenv('ASSEMBLYAI_API_KEY'):
-                        logger.info("AssemblyAI API key found. Preparing for transcription...")
-                        os.environ['ASSEMBLYAI_API_KEY'] = os.getenv('ASSEMBLYAI_API_KEY')
+                    await plato.index(url, llm=language_model, lang=lang)
+                    logger.info("plato.index() completed successfully")
+                except AttributeError as e:
+                    logger.warning(f"AttributeError in plato.index(): {str(e)}")
+                    if "'str' object has no attribute 'text'" in str(e):
+                        logger.info("Attempting to process input as string...")
+                        words = url.split()
+                        transcript_objects = [type('obj', (), {'text': w})() for w in words]
+                        await plato.index(transcript_objects, llm=language_model, lang=lang)
+                        logger.info("Processed string input successfully")
                     else:
-                        logger.warning("ASSEMBLYAI_API_KEY is not set. Will attempt to retrieve text from URL.")
-
-                    # Call plato.index()
-                    logger.info(f"Calling plato.index() for URL: {url}")
-                    try:
-                        await plato.index(url, llm=language_model, lang=task['lang'])
-                        logger.info("plato.index() completed successfully")
-                    except AttributeError as e:
-                        logger.warning(f"AttributeError in plato.index(): {str(e)}")
-                        if "'str' object has no attribute 'text'" in str(e):
-                            logger.info("Attempting to process input as string...")
-                            words = url.split()
-                            transcript_objects = [type('obj', (), {'text': w})() for w in words]
-                            await plato.index(transcript_objects, llm=language_model, lang=task['lang'])
-                            logger.info("Processed string input successfully")
-                        else:
-                            raise
-                    except Exception as e:
-                        logger.error(f"Unexpected error in plato.index(): {str(e)}", exc_info=True)
                         raise
-
-                    # Call audio_to_paper function
-                    logger.info("Calling audio_to_paper function...")
-                    title, abstract = await audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
-                    logger.info(f"audio_to_paper completed. Title: {title}")
-
-                    files = [f for f in output_dir.glob('*') if f.is_file()]
-                    logger.info(f"Generated {len(files)} files: {[f.name for f in files]}")
-
-                    # Prepare email
-                    subject = f"[Platogram] {title}"
-                    body = f"""Hi there!
-
-    Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
-
-    You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
-
-    {abstract}
-
-    Please reply to this e-mail if any suggestions, feedback, or questions.
-
-    ---
-    Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
-    Suggested donation: $2 per hour of content converted."""
-
-                    # Send email
-                    if user_email:
-                        logger.info(f"Attempting to send email to {user_email}")
-                        email_response = await send_email_with_resend(user_email, subject, body, files)
-                        logger.info(f"Email sent. Response status: {email_response.status}")
-                        logger.debug(f"Email response body: {await email_response.text()}")
-                    else:
-                        logger.warning(f"No email available for task {task_id}. Skipping email send.")
-
-                    tasks[task_id]['status'] = 'done'
-                    logger.info(f"Conversion completed for task {task_id}")
-
                 except Exception as e:
-                    logger.error(f"Error in audio processing for task {task_id}: {str(e)}", exc_info=True)
-                    tasks[task_id]['status'] = 'failed'
-                    tasks[task_id]['error'] = str(e)
+                    logger.error(f"Unexpected error in plato.index(): {str(e)}", exc_info=True)
                     raise
 
-        except Exception as e:
-            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
-            tasks[task_id]['status'] = 'failed'
-            tasks[task_id]['error'] = str(e)
+                # Call audio_to_paper function
+                logger.info("Calling audio_to_paper function...")
+                title, abstract = await plato.audio_to_paper(url, lang, output_dir, images=False)
+                logger.info(f"audio_to_paper completed. Title: {title}")
 
-    async def get_user_email(self):
-        auth_header = self.headers.get('Authorization', '')
-        logger.debug(f"Authorization header: {auth_header}")
-        if not auth_header:
-            logger.warning("No Authorization header found")
-            return None
-        try:
-            token = auth_header.split(' ')[1]
-            email = verify_token_and_get_email(token)
-            logger.debug(f"User email extracted: {email}")
-            return email
-        except IndexError:
-            logger.error("Malformed Authorization header")
-            return None
+                files = [f for f in output_dir.glob('*') if f.is_file()]
+                logger.info(f"Generated {len(files)} files: {[f.name for f in files]}")
 
-    async def handle_status(self):
-        task_id = self.headers.get('X-Task-ID')
-        if not task_id:
-            json_response(self, 200, {"status": "idle"})
-            return
+                # Prepare email
+                subject = f"[Platogram] {title}"
+                body = f"""Hi there!
 
-        try:
-            if task_id not in tasks:
-                response = {"status": "not_found"}
-            else:
-                task = tasks[task_id]
-                response = {
-                    "status": task['status'],
-                    "error": task.get('error') if task['status'] == "failed" else None
-                }
-            json_response(self, 200, response)
-        except Exception as e:
-            logger.error(f"Error in handle_status for task {task_id}: {str(e)}")
-            json_response(self, 500, {"error": str(e)})
+Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
 
-    async def handle_reset(self):
-        user_email = await self.get_user_email()
-        logger.info(f"Handling reset request for user: {user_email}")
+You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
 
-        if not user_email:
-            logger.warning("Reset attempt without valid user email")
-            json_response(self, 401, {"error": "Unauthorized"})
-            return
+{abstract}
 
-        try:
-            # Remove all tasks associated with this user
-            tasks_to_remove = [task_id for task_id, task in tasks.items() if task.get('email') == user_email]
-            for task_id in tasks_to_remove:
-                logger.info(f"Removing task {task_id} for user {user_email}")
-                del tasks[task_id]
+Please reply to this e-mail if any suggestions, feedback, or questions.
 
-            logger.info(f"Reset {len(tasks_to_remove)} tasks for user {user_email}")
-            json_response(self, 200, {"message": f"Reset {len(tasks_to_remove)} tasks for user"})
-        except Exception as e:
-            logger.error(f"Error in handle_reset for user {user_email}: {str(e)}", exc_info=True)
-            json_response(self, 500, {"error": f"An error occurred while resetting tasks: {str(e)}"})
+---
+Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
+Suggested donation: $2 per hour of content converted."""
 
-# Vercel handler
-def vercel_handler(event, context):
-    async def async_handler(event, context):
-        class MockRequest:
-            def __init__(self, event):
-                self.headers = event['headers']
-                self.method = event['httpMethod']
-                self.path = event['path']
-                self.body = event.get('body', '')
+                # Send email
+                if user_email:
+                    logger.info(f"Attempting to send email to {user_email}")
+                    email_response = await send_email_with_resend(user_email, subject, body, files)
+                    logger.info(f"Email sent. Response status: {email_response.status}")
+                    logger.debug(f"Email response body: {await email_response.text()}")
+                else:
+                    logger.warning(f"No email available for task {task_id}. Skipping email send.")
 
-        class MockResponse:
-            def __init__(self):
-                self.status_code = 200
-                self.headers = {}
-                self.body = ''
+                return {"status": "done", "title": title, "abstract": abstract}
 
-            def send_response(self, status_code):
-                self.status_code = status_code
+            except Exception as e:
+                logger.error(f"Error in audio processing for task {task_id}: {str(e)}", exc_info=True)
+                return {"status": "failed", "error": str(e)}
 
-            def send_header(self, key, value):
-                self.headers[key] = value
+    except Exception as e:
+        logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
+        return {"status": "failed", "error": str(e)}
 
-            def end_headers(self):
-                pass
+async def handle_request(event):
+    method = event['httpMethod']
+    path = event['path']
+    headers = event['headers']
+    body = event.get('body', '')
 
-            def wfile(self):
-                class MockWFile:
-                    def write(self, data):
-                        self.body += data.decode('utf-8') if isinstance(data, bytes) else data
-                return MockWFile()
+    if method == 'OPTIONS':
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-File-Name, X-Language',
+            },
+        }
 
-        try:
-            mock_request = MockRequest(event)
-            mock_response = MockResponse()
+    if method == 'POST' and path == '/convert':
+        content_type = headers.get('Content-Type')
+        user_email = headers.get('Authorization', '').split(' ')[-1]  # Simplified for this example
 
-            server = handler(mock_request, mock_request.path, mock_response)
+        task_id = os.urandom(16).hex()
 
-            if mock_request.method == 'GET':
-                await server.do_GET()
-            elif mock_request.method == 'POST':
-                await server.do_POST()
-            elif mock_request.method == 'OPTIONS':
-                await server.do_OPTIONS()
+        if content_type == 'application/json':
+            data = json.loads(body)
+            url = data.get('url')
+            lang = data.get('lang', 'en')
+        elif content_type == 'application/octet-stream':
+            file_name = headers.get('X-File-Name')
+            lang = headers.get('X-Language', 'en')
 
+            temp_dir = Path(tempfile.gettempdir()) / "platogram_uploads"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            temp_file = temp_dir / f"{task_id}_{file_name}"
+            with open(temp_file, 'wb') as f:
+                f.write(body.encode('utf-8') if isinstance(body, str) else body)
+            url = f"file://{temp_file}"
+        else:
             return {
-                'statusCode': mock_response.status_code,
-                'headers': mock_response.headers,
-                'body': mock_response.body,
-            }
-        except Exception as e:
-            logger.error(f"Error in vercel_handler: {str(e)}", exc_info=True)
-            return {
-                'statusCode': 500,
-                'body': json.dumps({"error": "Internal server error"}),
+                'statusCode': 400,
+                'body': json.dumps({"error": "Invalid content type"}),
             }
 
-    return asyncio.run(async_handler(event, context))
+        # Start processing in the background
+        asyncio.create_task(process_and_send_email(task_id, url, lang, user_email))
+
+        return {
+            'statusCode': 200,
+            'body': json.dumps({"message": "Conversion started", "task_id": task_id}),
+        }
+
+    return {
+        'statusCode': 404,
+        'body': json.dumps({"error": "Not Found"}),
+    }
+
+def handler(event, context):
+    return asyncio.run(handle_request(event))
 
 # Vercel entry point
 def entrypoint(event, context):

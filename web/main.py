@@ -365,23 +365,32 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    def process_and_send_email(self, task_id):
+    async def process_and_send_email(self, task_id):
         try:
             task = tasks[task_id]
-            user_email = task['email']
-            url = task.get('url') or f"file://{task['file']}"
-            lang = task['lang']
+            user_email = task.get('email')
+            logger.info(f"Starting processing for task {task_id}. User email: {user_email}")
 
-            logger.info(f"Processing task {task_id} for URL: {url}")
-
-            with tempfile.TemporaryDirectory() as tmpdir:
+            async with aiofiles.tempfile.TemporaryDirectory() as tmpdir:
                 output_dir = Path(tmpdir)
 
-                try:
-                    # Process with Platogram
-                    title, abstract = audio_to_paper(url, lang, output_dir)
+                # Process audio
+                if 'url' in task:
+                    url = task['url']
+                else:
+                    url = f"file://{task['file']}"
 
-                    # Prepare email content
+                logger.info(f"Processing URL: {url}")
+
+                try:
+                    # Call audio_to_paper function
+                    logger.info("Calling audio_to_paper function...")
+                    title, abstract = await audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
+                    logger.info(f"audio_to_paper completed. Title: {title}")
+
+                    files = [f for f in output_dir.glob('*') if f.is_file()]
+                    logger.info(f"Generated {len(files)} files")
+
                     subject = f"[Platogram] {title}"
                     body = f"""Hi there!
 
@@ -397,12 +406,9 @@ class handler(BaseHTTPRequestHandler):
     Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
     Suggested donation: $2 per hour of content converted."""
 
-                    # Get generated files
-                    files = [f for f in output_dir.glob('*') if f.is_file()]
-
                     if user_email:
                         logger.info(f"Sending email to {user_email}")
-                        send_email_with_resend(user_email, subject, body, files)
+                        await send_email_with_resend(user_email, subject, body, files)
                         logger.info("Email sent successfully")
                     else:
                         logger.warning(f"No email available for task {task_id}. Skipping email send.")

@@ -191,7 +191,7 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
     abstract = plato.get_abstract(url, lang=lang)
     passages = plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
     references = plato.get_references(url, lang=lang)
-    chapters = plato.get_chapters(url, lang=lang)2
+    chapters = plato.get_chapters(url, lang=lang)
     
     # Set language-specific prompts
     if lang == "en":

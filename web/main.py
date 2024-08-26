@@ -18,12 +18,13 @@ import threading
 import platogram as plato
 import assemblyai as aai
 
+import asyncio
+
 # Removed imports:
 # from docx import Document
 # from reportlab.lib.pagesizes import letter
 # from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 # from reportlab.lib.styles import getSampleStyleSheet
-# import asyncio
 # import aiofiles
 # import aiofiles.tempfile
 # from reportlab.pdfgen import canvas
@@ -203,6 +204,7 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
         transcriber = aai.Transcriber()
         transcript = transcriber.transcribe(url)
         text = transcript.text
+        logger.info(f"Transcription completed. Text length: {len(text)} characters")
         # Now index the transcribed text
         plato.index(text, llm=language_model, lang=lang)
     else:
@@ -397,92 +399,61 @@ class handler(BaseHTTPRequestHandler):
             logger.error(f"Error in handle_convert: {str(e)}")
             json_response(self, 500, {"error": str(e)})
 
-    def process_and_send_email(self, task_id):
-        try:
-            task = tasks[task_id]
-            user_email = task.get('email')
-            logger.info(f"Starting processing for task {task_id}. User email: {user_email}")
+   def process_and_send_email(self, task_id):
+    try:
+        task = tasks[task_id]
+        user_email = task['email']
+        url = task.get('url') or f"file://{task['file']}"
+        lang = task['lang']
 
-            with tempfile.TemporaryDirectory() as tmpdir:
-                output_dir = Path(tmpdir)
-                logger.info(f"Created temporary directory: {output_dir}")
+        logger.info(f"Processing task {task_id} for URL: {url}")
 
-                # Process audio
-                if 'url' in task:
-                    url = task['url']
-                    logger.info(f"Processing URL: {url}")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+
+            try:
+                # Process with Platogram
+                title, abstract = audio_to_paper(url, lang, output_dir)
+
+                # Prepare email content
+                subject = f"[Platogram] {title}"
+                body = f"""Hi there!
+
+Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
+
+You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
+
+{abstract}
+
+Please reply to this e-mail if any suggestions, feedback, or questions.
+
+---
+Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
+Suggested donation: $2 per hour of content converted."""
+
+                # Get generated files
+                files = [f for f in output_dir.glob('*') if f.is_file()]
+
+                if user_email:
+                    logger.info(f"Sending email to {user_email}")
+                    asyncio.run(send_email_with_resend(user_email, subject, body, files))
+                    logger.info("Email sent successfully")
                 else:
-                    url = f"file://{task['file']}"
-                    logger.info(f"Processing local file: {task['file']}")
+                    logger.warning(f"No email available for task {task_id}. Skipping email send.")
 
-                try:
-                    # Call audio_to_paper function
-                    logger.info("Calling audio_to_paper function...")
-                    title, abstract = audio_to_paper(url, task['lang'], output_dir, images=task.get('images', False))
-                    logger.info(f"audio_to_paper completed. Title: {title}")
+                tasks[task_id]['status'] = 'done'
+                logger.info(f"Conversion completed for task {task_id}")
 
-                    files = [f for f in output_dir.glob('*') if f.is_file()]
-                    logger.info(f"Generated {len(files)} files: {', '.join(str(f) for f in files)}")
+            except Exception as e:
+                logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
+                tasks[task_id]['status'] = 'failed'
+                tasks[task_id]['error'] = str(e)
+                raise
 
-                    subject = f"[Platogram] {title}"
-                    body = f"""Hi there!
-
-    Platogram transformed spoken words into documents you can read and enjoy, or attach to ChatGPT/Claude/etc and prompt!
-
-    You'll find two PDF documents attached: full version, with original transcript and references, and a simplified version, without the transcript and references. I hope this helps!
-
-    {abstract}
-
-    Please reply to this e-mail if any suggestions, feedback, or questions.
-
-    ---
-    Support Platogram by donating here: https://buy.stripe.com/eVa29p3PK5OXbq84gl
-    Suggested donation: $2 per hour of content converted."""
-
-                    if user_email:
-                        logger.info(f"Preparing to send email to {user_email}")
-                        logger.info(f"Email subject: {subject}")
-                        logger.info(f"Number of attachments: {len(files)}")
-                        # Use requests instead of aiohttp for synchronous operation
-                        response = requests.post(
-                            "https://api.resend.com/emails",
-                            headers={
-                                "Authorization": f"Bearer {RESEND_API_KEY}",
-                                "Content-Type": "application/json"
-                            },
-                            json={
-                                "from": "Platogram <onboarding@resend.dev>",
-                                "to": user_email,
-                                "subject": subject,
-                                "text": body,
-                                "attachments": [
-                                    {
-                                        "filename": Path(f).name,
-                                        "content": base64.b64encode(Path(f).read_bytes()).decode('utf-8')
-                                    } for f in files
-                                ]
-                            }
-                        )
-                        if response.status_code == 200:
-                            logger.info("Email sent successfully")
-                        else:
-                            logger.error(f"Failed to send email. Status: {response.status_code}, Error: {response.text}")
-                    else:
-                        logger.warning(f"No email available for task {task_id}. Skipping email send.")
-
-                    tasks[task_id]['status'] = 'done'
-                    logger.info(f"Conversion completed for task {task_id}")
-
-                except Exception as e:
-                    logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
-                    tasks[task_id]['status'] = 'failed'
-                    tasks[task_id]['error'] = str(e)
-                    raise
-
-        except Exception as e:
-            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
-            tasks[task_id]['status'] = 'failed'
-            tasks[task_id]['error'] = str(e)
+    except Exception as e:
+        logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
+        tasks[task_id]['status'] = 'failed'
+        tasks[task_id]['error'] = str(e)
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')
 
@@ -558,7 +529,7 @@ def vercel_handler(event, context):
     if mock_request.method == 'GET':
         server.do_GET()
     elif mock_request.method == 'POST':
-        server.do_POST()
+        await server.do_POST()
     elif mock_request.method == 'OPTIONS':
         server.do_OPTIONS()
 

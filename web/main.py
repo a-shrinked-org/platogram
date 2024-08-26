@@ -322,11 +322,12 @@ class handler(BaseHTTPRequestHandler):
             logger.error("Malformed Authorization header")
             return None
 
-    def handle_convert(self):
+   async def handle_convert(self):
         logger.debug("Handling /convert request")
         content_length = int(self.headers['Content-Length'])
         content_type = self.headers.get('Content-Type')
         user_email = self.get_user_email()
+        logger.debug(f"User email for conversion: {user_email}")
 
         try:
             task_id = str(uuid4())
@@ -343,14 +344,14 @@ class handler(BaseHTTPRequestHandler):
                     f.write(body)
 
                 tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
-                logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}")
+                logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
             elif content_type == 'application/json':
                 body = self.rfile.read(content_length).decode('utf-8')
                 data = json.loads(body)
                 url = data.get('url')
                 lang = data.get('lang', 'en')
                 tasks[task_id] = {'status': 'running', 'url': url, 'lang': lang, 'email': user_email}
-                logger.debug(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}")
+                logger.debug(f"URL conversion request received: {url}, Language: {lang}, Task ID: {task_id}, User Email: {user_email}")
             else:
                 logger.error(f"Invalid content type: {content_type}")
                 json_response(self, 400, {"error": "Invalid content type"})
@@ -358,7 +359,7 @@ class handler(BaseHTTPRequestHandler):
 
             # Start processing
             tasks[task_id]['status'] = 'processing'
-            self.process_and_send_email(task_id)
+            asyncio.create_task(self.process_and_send_email(task_id))
 
             json_response(self, 200, {"message": "Conversion started", "task_id": task_id})
         except Exception as e:

@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler
 import json
 import os
 import logging
+import re
 import tempfile
 from pathlib import Path
 import base64
@@ -11,6 +12,13 @@ import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509 import load_pem_x509_certificate
 from uuid import uuid4
+import asyncio
+import aiofiles
+import aiofiles.tempfile
+
+import platogram as plato
+from anthropic import AnthropicError
+import assemblyai as aai
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
@@ -37,6 +45,9 @@ auth0_public_key_cache = {
     "expires_in": 3600,  # Cache expiration time in seconds (1 hour)
 }
 
+# Configure AssemblyAI
+aai.settings.api_key = os.getenv('ASSEMBLYAI_API_KEY')
+
 def json_response(handler, status_code, data):
     handler.send_response(status_code)
     handler.send_header('Content-type', 'application/json')
@@ -44,7 +55,7 @@ def json_response(handler, status_code, data):
     handler.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     handler.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-File-Name, X-Language')
     handler.end_headers()
-    handler.wfile.write(json.dumps(data).encode())
+    handler.wfile.write(json.dumps(data).encode('utf-8'))
 
 def get_auth0_public_key():
     current_time = time.time()
@@ -55,7 +66,7 @@ def get_auth0_public_key():
     ):
         return auth0_public_key_cache["key"]
 
-    logger.debug("Fetching new Auth0 public key")
+    logger.info("Fetching new Auth0 public key")
     response = requests.get(JWKS_URL)
     response.raise_for_status()
     jwks = response.json()
@@ -90,7 +101,7 @@ def verify_token_and_get_email(token):
         )
         logger.debug(f"Token payload: {payload}")
         email = payload.get("platogram:user_email") or payload.get("email") or payload.get("https://platogram.com/user_email")
-        logger.debug(f"Extracted email: {email}")
+        logger.debug(f"Extracted email from token: {email}")
         return email
     except jwt.ExpiredSignatureError:
         logger.error("Token has expired")
@@ -102,7 +113,8 @@ def verify_token_and_get_email(token):
         logger.error(f"Couldn't verify token: {str(e)}")
     return None
 
-def send_email_with_resend(to_email, subject, body, attachments):
+async def send_email_with_resend(to_email, subject, body, attachments):
+    logger.info(f"Attempting to send email to: {to_email}")
     url = "https://api.resend.com/emails"
     headers = {
         "Authorization": f"Bearer {RESEND_API_KEY}",
@@ -118,19 +130,155 @@ def send_email_with_resend(to_email, subject, body, attachments):
     }
 
     for attachment in attachments:
-        with open(attachment, "rb") as file:
-            content = file.read()
-            encoded_content = base64.b64encode(content).decode()
+        async with aiofiles.open(attachment, "rb") as file:
+            content = await file.read()
+            encoded_content = base64.b64encode(content).decode('utf-8')
             payload["attachments"].append({
                 "filename": Path(attachment).name,
                 "content": encoded_content
             })
 
-    response = requests.post(url, headers=headers, json=payload)
-    if response.status_code == 200:
-        logger.info(f"Email sent successfully to {to_email}")
+    logger.info(f"Sending email with payload: {json.dumps(payload, default=str)}")
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers, json=payload) as response:
+            if response.status == 200:
+                logger.info(f"Email sent successfully to {to_email}")
+                logger.debug(f"Resend API response: {await response.text()}")
+            else:
+                logger.error(f"Failed to send email. Status: {response.status}, Error: {await response.text()}")
+                logger.debug(f"Failed payload: {json.dumps(payload, default=str)}")
+            return response
+
+async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
+    logger.info(f"Processing audio from: {url}")
+
+    # Check for required API keys
+    if not os.getenv('ANTHROPIC_API_KEY'):
+        raise EnvironmentError("ANTHROPIC_API_KEY is not set")
+
+    # Initialize Platogram models
+    language_model = plato.llm.get_model(
+        "anthropic/claude-3-5-sonnet", os.getenv('ANTHROPIC_API_KEY')
+    )
+
+    # Handle local file paths
+    if url.startswith("file://"):
+        file_path = url[7:]  # Remove "file://" prefix
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Local file not found: {file_path}")
+        url = file_path  # Use the local file path directly
+
+    # Transcribe or index content
+    if os.getenv('ASSEMBLYAI_API_KEY'):
+        logger.info("Transcribing audio to text using AssemblyAI...")
+        await plato.index(url, llm=language_model, assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY'), lang=lang)
     else:
-        logger.error(f"Failed to send email. Status: {response.status_code}, Error: {response.text}")
+        logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
+        await plato.index(url, llm=language_model, lang=lang)
+
+    # Generate content
+    logger.info("Generating content...")
+    title = await plato.get_title(url, lang=lang)
+    abstract = await plato.get_abstract(url, lang=lang)
+    passages = await plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
+    references = await plato.get_references(url, lang=lang)
+    chapters = await plato.get_chapters(url, lang=lang)
+
+    # Set language-specific prompts
+    if lang == "en":
+        CONTRIBUTORS_PROMPT = "Thoroughly review the <context> and identify the list of contributors. Output as Markdown list: First Name, Last Name, Title, Organization. Output \"Unknown\" if the contributors are not known. In the end of the list always add \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Start with \"## Contributors, Acknowledgements, Mentions\""
+        INTRODUCTION_PROMPT = "Thoroughly review the <context> and write \"Introduction\" chapter for the paper. Write in the style of the original <context>. Use only words from <context>. Use quotes from <context> when necessary. Make sure to include <markers>. Output as Markdown. Start with \"## Introduction\""
+        CONCLUSION_PROMPT = "Thoroughly review the <context> and write \"Conclusion\" chapter for the paper. Write in the style of the original <context>. Use only words from <context>. Use quotes from <context> when necessary. Make sure to include <markers>. Output as Markdown. Start with \"## Conclusion\""
+    elif lang == "es":
+        CONTRIBUTORS_PROMPT = "Revise a fondo el <context> e identifique la lista de contribuyentes. Salida como lista Markdown: Nombre, Apellido, Título, Organización. Salida \"Desconocido\" si los contribuyentes no se conocen. Al final de la lista, agregue siempre \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Comience con \"## Contribuyentes, Agradecimientos, Menciones\""
+        INTRODUCTION_PROMPT = "Revise a fondo el <context> y escriba el capítulo \"Introducción\" para el artículo. Escriba en el estilo del original <context>. Use solo las palabras de <context>. Use comillas del original <context> cuando sea necesario. Asegúrese de incluir <markers>. Salida como Markdown. Comience con \"## Introducción\""
+        CONCLUSION_PROMPT = "Revise a fondo el <context> y escriba el capítulo \"Conclusión\" para el artículo. Escriba en el estilo del original <context>. Use solo las palabras de <context>. Use comillas del original <context> cuando sea necesario. Asegúrese de incluir <markers>. Salida como Markdown. Comience con \"## Conclusión\""
+    else:
+        raise ValueError(f"Unsupported language: {lang}")
+
+    contributors = plato.generate(
+        query=CONTRIBUTORS_PROMPT,
+        context_size="large",
+        prefill=f"## Contributors, Acknowledgements, Mentions\n",
+        url=url,
+        lang=lang
+    )
+
+    introduction = plato.generate(
+        query=INTRODUCTION_PROMPT,
+        context_size="large",
+        inline_references=True,
+        prefill=f"## Introduction\n",
+        url=url,
+        lang=lang
+    )
+
+    conclusion = plato.generate(
+        query=CONCLUSION_PROMPT,
+        context_size="large",
+        inline_references=True,
+        prefill=f"## Conclusion\n",
+        url=url,
+        lang=lang
+    )
+
+    # Compile the full content
+    full_content = f"""# {title}
+
+## Origin
+
+{url}
+
+## Abstract
+
+{abstract}
+
+{contributors}
+
+## Chapters
+
+{chapters}
+
+{introduction}
+
+## Discussion
+
+{passages}
+
+{conclusion}
+
+## References
+
+{references}
+"""
+
+    # Generate PDF files
+    logger.info("Generating PDF files...")
+    pdf_path = output_dir / f"{title.replace(' ', '_')}-refs.pdf"
+    pdf_no_refs_path = output_dir / f"{title.replace(' ', '_')}-no-refs.pdf"
+    docx_path = output_dir / f"{title.replace(' ', '_')}-refs.docx"
+
+    # Use subprocess to call pandoc for PDF and DOCX generation
+    try:
+        # With references
+        subprocess.run(['pandoc', '-o', str(pdf_path), '--from', 'markdown', '--pdf-engine=xelatex'],
+                       input=full_content, text=True, check=True)
+
+        # Without references
+        content_no_refs = re.sub(r'\[\[([0-9]+)\]\]\([^)]+\)', '', full_content)
+        content_no_refs = re.sub(r'\[([0-9]+)\]', '', content_no_refs)
+        content_no_refs = content_no_refs.split("## References")[0]
+        subprocess.run(['pandoc', '-o', str(pdf_no_refs_path), '--from', 'markdown', '--pdf-engine=xelatex'],
+                       input=content_no_refs, text=True, check=True)
+
+        # DOCX version
+        subprocess.run(['pandoc', '-o', str(docx_path), '--from', 'markdown'],
+                       input=full_content, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error generating documents: {str(e)}")
+        raise
+
+    return title, abstract
 
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):

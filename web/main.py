@@ -150,7 +150,7 @@ async def send_email_with_resend(to_email, subject, body, attachments):
                 logger.debug(f"Failed payload: {json.dumps(payload, default=str)}")
             return response
 
-def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
+async def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) -> tuple[str, str]:
     logger.info(f"Processing audio from: {url}")
 
     # Check for required API keys
@@ -174,21 +174,23 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
     if assemblyai_api_key:
         logger.info("Transcribing audio to text using AssemblyAI...")
         transcriber = aai.Transcriber()
-        transcript = transcriber.transcribe(url)
+        transcript = await transcriber.transcribe(url)
         text = transcript.text
+        # Create a list of objects with a 'text' attribute
+        transcript_objects = [type('obj', (), {'text': text})]
         # Now index the transcribed text
-        plato.index(text, llm=language_model, lang=lang)
+        await plato.index(transcript_objects, llm=language_model, lang=lang)
     else:
         logger.warning("ASSEMBLYAI_API_KEY is not set. Retrieving text from URL (subtitles, etc).")
-        plato.index(url, llm=language_model, lang=lang)
+        await plato.index(url, llm=language_model, lang=lang)
 
     # Generate content
     logger.info("Generating content...")
-    title = plato.get_title(url, lang=lang)
-    abstract = plato.get_abstract(url, lang=lang)
-    passages = plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
-    references = plato.get_references(url, lang=lang)
-    chapters = plato.get_chapters(url, lang=lang)
+    title = await plato.get_title(url, lang=lang)
+    abstract = await plato.get_abstract(url, lang=lang)
+    passages = await plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
+    references = await plato.get_references(url, lang=lang)
+    chapters = await plato.get_chapters(url, lang=lang)
     
     # Set language-specific prompts
     if lang == "en":

@@ -20,7 +20,7 @@ import aiofiles.tempfile
 
 import platogram as plato
 from anthropic import AnthropicError
-import assemblyai as aai
+import assemblyai as aai  
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)
@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 # Add the project root to the Python path
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
+
+MAX_EXECUTION_TIME = int(os.getenv('MAX_EXECUTION_TIME', 300))
 
 # Platogram initialization and verification
 try:

@@ -235,7 +235,8 @@ async function postToConvert(inputData, lang) {
     const token = await auth0Client.getTokenSilently({
       audience: "https://web.platogram.ai",
     });
-    const response = await fetch("/convert", {
+
+    const response = await fetch("http://98.81.254.244/convert", {
       method: "POST",
       headers: headers,
       body: body,

@@ -345,6 +345,7 @@ class handler(BaseHTTPRequestHandler):
                 with open(temp_file, 'wb') as f:
                     f.write(body)
 
+                url = f"file://{temp_file}"
                 tasks[task_id] = {'status': 'running', 'file': str(temp_file), 'lang': lang, 'email': user_email}
                 logger.debug(f"File upload received: {file_name}, Language: {lang}, Task ID: {task_id}")
             elif content_type == 'application/json':
@@ -372,7 +373,7 @@ class handler(BaseHTTPRequestHandler):
         try:
             task = tasks[task_id]
             user_email = task['email']
-            url = task.get('url') or f"file://{task['file']}"
+            url = task.get('url') or task.get('file')
             lang = task['lang']
 
             logger.info(f"Processing task {task_id} for URL: {url}")
@@ -405,7 +406,7 @@ class handler(BaseHTTPRequestHandler):
 
                     if user_email:
                         logger.info(f"Sending email to {user_email}")
-                        send_email_with_resend(user_email, subject, body, files)
+                        self.send_email_with_resend(user_email, subject, body, files)
                         logger.info("Email sent successfully")
                     else:
                         logger.warning(f"No email available for task {task_id}. Skipping email send.")

@@ -173,8 +173,8 @@ import platogram as plato
 
 Language = Literal["en", "es"]
 
-def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> tuple[str, str]:
-    logger.info(f"Processing audio from: {url} for user {user_id}")
+def audio_to_paper(url_or_file: str, lang: str, output_dir: Path, user_id: str) -> tuple[str, str]:
+    logger.info(f"Processing audio from: {url_or_file} for user {user_id}")
 
     # Check for required API keys
     anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
@@ -189,29 +189,25 @@ def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> 
     if assemblyai_api_key:
         asr = plato.asr.get_model("assembly-ai/best", assemblyai_api_key)
 
-    # Handle local file paths
-    if url.startswith("file://"):
-        file_path = url[7:]  # Remove "file://" prefix
-        if not os.path.exists(file_path):
-            raise FileNotFoundError(f"Local file not found: {file_path}")
-        url = file_path  # Use the local file path directly
-
     # Process audio
     logger.info("Extracting transcript and indexing content...")
     try:
-        transcript = plato.extract_transcript(url, asr)
-    except Exception as e:
-        logger.error(f"Error in extract_transcript: {str(e)}")
-        # If the error is related to yt-dlp, try to read the file directly
-        if "yt-dlp" in str(e) and os.path.exists(url):
-            logger.info("Attempting to read local file directly...")
-            with open(url, 'rb') as f:
+        if url_or_file.startswith(('http://', 'https://')):
+            # It's a URL
+            transcript = plato.extract_transcript(url_or_file, asr)
+        elif url_or_file.startswith('file://'):
+            # It's a local file path
+            file_path = url_or_file[7:]  # Remove "file://" prefix
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"Local file not found: {file_path}")
+            with open(file_path, 'rb') as f:
                 audio_content = f.read()
             transcript = asr.transcribe(audio_content)
         else:
-            raise
+            # It's probably file content
+            transcript = asr.transcribe(url_or_file)
 
-    content = plato.index(transcript, llm, lang=lang)
+        content = plato.index(transcript, llm, lang=lang)
 
     # Set language-specific prompts
     if lang == "en":
@@ -392,17 +388,17 @@ class handler(BaseHTTPRequestHandler):
         try:
             task = tasks[task_id]
             user_email = task['email']
-            url = task.get('url') or task.get('file')
+            url_or_file = task.get('url') or task.get('file')
             lang = task['lang']
 
-            logger.info(f"Processing task {task_id} for URL: {url}")
+            logger.info(f"Processing task {task_id} for input: {url_or_file}")
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 output_dir = Path(tmpdir)
 
                 try:
                     # Process with Platogram
-                    title, abstract = audio_to_paper(url, lang, output_dir, task_id)  # Pass task_id as user_id
+                    title, abstract = audio_to_paper(url_or_file, lang, output_dir, task_id)  # Pass task_id as user_id
 
                     # Prepare email content
                     subject = f"[Platogram] {title}"
@@ -434,15 +430,15 @@ class handler(BaseHTTPRequestHandler):
                     logger.info(f"Conversion completed for task {task_id}")
 
                 except Exception as e:
-                    logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
-                    tasks[task_id]['status'] = 'failed'
-                    tasks[task_id]['error'] = str(e)
-                    raise
+                logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
+                tasks[task_id]['status'] = 'failed'
+                tasks[task_id]['error'] = str(e)
+                raise
 
-        except Exception as e:
-            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
-            tasks[task_id]['status'] = 'failed'
-            tasks[task_id]['error'] = str(e)
+    except Exception as e:
+        logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
+        tasks[task_id]['status'] = 'failed'
+        tasks[task_id]['error'] = str(e)
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')
 

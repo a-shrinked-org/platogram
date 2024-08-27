@@ -151,7 +151,7 @@ async function reset() {
       audience: "https://platogram.vercel.app",
     });
 
-    const response = await fetch("/reset", {
+    const response = await fetch("https://temporary.name/reset", {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -316,7 +316,7 @@ function showLanguageSelectionModal(inputData) {
 async function pollStatus(token) {
   try {
     console.log("Polling status with token:", token);
-    const response = await fetch("/status", {
+    const response = await fetch("https://temporary.name/status", {
       headers: { Authorization: `Bearer ${token}` },
     });
     console.log("Status response:", response);

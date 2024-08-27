@@ -236,7 +236,7 @@ async function postToConvert(inputData, lang) {
       audience: "https://web.platogram.ai",
     });
 
-    const response = await fetch("http://98.81.254.244/convert", {
+    const response = await fetch("https://temporary.name/convert", {
       method: "POST",
       headers: headers,
       body: body,

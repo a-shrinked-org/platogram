@@ -158,6 +158,14 @@ from typing import Literal
 
 Language = Literal["en", "es"]
 
+from typing import Literal
+import os
+import subprocess
+from pathlib import Path
+import platogram as plato
+
+Language = Literal["en", "es"]
+
 def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> tuple[str, str]:
     logger.info(f"Processing audio from: {url}")
 
@@ -168,10 +176,8 @@ def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> 
     if not anthropic_api_key:
         raise EnvironmentError("ANTHROPIC_API_KEY is not set")
 
-    # Initialize Platogram models
+    # Initialize models
     llm = plato.llm.get_model("anthropic/claude-3-5-sonnet", anthropic_api_key)
-
-    # Initialize ASR model if AssemblyAI API key is available
     asr = None
     if assemblyai_api_key:
         asr = plato.asr.get_model("assembly-ai/best", assemblyai_api_key)
@@ -183,12 +189,23 @@ def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> 
             raise FileNotFoundError(f"Local file not found: {file_path}")
         url = file_path  # Use the local file path directly
 
-    # Extract transcript and index content
+    # Process audio
     logger.info("Extracting transcript and indexing content...")
     transcript = plato.extract_transcript(url, asr)
     content = plato.index(transcript, llm, lang=lang)
 
-    # Generate additional content
+    # Set language-specific prompts
+    if lang == "en":
+        CONTRIBUTORS_PROMPT = "Thoroughly review the <context> and identify the list of contributors. Output as Markdown list: First Name, Last Name, Title, Organization. Output \"Unknown\" if the contributors are not known. In the end of the list always add \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Start with \"## Contributors, Acknowledgements, Mentions\""
+        INTRODUCTION_PROMPT = "Thoroughly review the <context> and write \"Introduction\" chapter for the paper. Write in the style of the original <context>. Use only words from <context>. Use quotes from <context> when necessary. Make sure to include <markers>. Output as Markdown. Start with \"## Introduction\""
+        CONCLUSION_PROMPT = "Thoroughly review the <context> and write \"Conclusion\" chapter for the paper. Write in the style of the original <context>. Use only words from <context>. Use quotes from <context> when necessary. Make sure to include <markers>. Output as Markdown. Start with \"## Conclusion\""
+    elif lang == "es":
+        CONTRIBUTORS_PROMPT = "Revise a fondo el <context> e identifique la lista de contribuyentes. Salida como lista Markdown: Nombre, Apellido, Título, Organización. Salida \"Desconocido\" si los contribuyentes no se conocen. Al final de la lista, agregue siempre \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Comience con \"## Contribuyentes, Agradecimientos, Menciones\""
+        INTRODUCTION_PROMPT = "Revise a fondo el <context> y escriba el capítulo \"Introducción\" para el artículo. Escriba en el estilo del original <context>. Use solo las palabras de <context>. Use comillas del original <context> cuando sea necesario. Asegúrese de incluir <markers>. Salida como Markdown. Comience con \"## Introducción\""
+        CONCLUSION_PROMPT = "Revise a fondo el <context> y escriba el capítulo \"Conclusión\" para el artículo. Escriba en el estilo del original <context>. Use solo las palabras de <context>. Use comillas del original <context> cuando sea necesario. Asegúrese de incluir <markers>. Salida como Markdown. Comience con \"## Conclusión\""
+    else:
+        raise ValueError(f"Unsupported language: {lang}")
+
     logger.info("Generating additional content...")
     contributors = plato.generate(
         query=CONTRIBUTORS_PROMPT,

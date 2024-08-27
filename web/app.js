@@ -151,7 +151,7 @@ async function reset() {
       audience: "https://platogram.vercel.app",
     });
 
-    const response = await fetch("https://temporary.name/reset", {
+    const response = await fetch("/reset", {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -209,19 +209,19 @@ function showErrorMessage(message) {
   }
 }
 
-async function postToConvert(inputData, lang, token, price) {
+async function postToConvert(inputData, lang) {
   let body;
   let headers = {
     Authorization: `Bearer ${await auth0Client.getTokenSilently({
-      audience: "https://web.platogram.ai",
+      audience: "https://platogram.vercel.app",
     })}`,
   };
 
   const formData = new FormData();
   formData.append("lang", lang);
 
-  formData.append("price", price);
-  formData.append("token", token);
+  // formData.append("price", price);
+  // formData.append("token", token);
 
   if (inputData instanceof File) {
     formData.append("file", inputData);
@@ -233,7 +233,7 @@ async function postToConvert(inputData, lang, token, price) {
 
   try {
     const token = await auth0Client.getTokenSilently({
-      audience: "https://web.platogram.ai",
+      audience: "https://platogram.vercel.app",
     });
 
     const response = await fetch("https://temporary.name/convert", {
@@ -300,7 +300,7 @@ function showLanguageSelectionModal(inputData) {
   const handleLanguageSelection = async (lang) => {
     debugLog(`Language selected: ${lang}`);
     modal.classList.add("hidden");
-    await postToConvert(inputData, lang, null, 0);
+    await postToConvert(inputData, lang);
   };
 
   document.getElementById("en-btn").onclick = () =>
@@ -316,7 +316,7 @@ function showLanguageSelectionModal(inputData) {
 async function pollStatus(token) {
   try {
     console.log("Polling status with token:", token);
-    const response = await fetch("https://temporary.name/status", {
+    const response = await fetch("/status", {
       headers: { Authorization: `Bearer ${token}` },
     });
     console.log("Status response:", response);

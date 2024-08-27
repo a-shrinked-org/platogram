@@ -245,6 +245,16 @@ def audio_to_paper(url_or_file: str, lang: str, output_dir: Path, user_id: str) 
             # It's probably file content
             transcript = asr.transcribe(url_or_file)
 
+        logger.info(f"Transcript extracted. Length: {len(transcript)}")
+
+        if not transcript:
+            raise ValueError("Extracted transcript is empty")
+
+        # Ensure the transcript has proper markers
+        if '【0】' not in transcript:
+            logger.warning("Transcript doesn't contain markers. Adding a single marker.")
+            transcript = f"【0】{transcript}"
+
         content = plato.index(transcript, llm, lang=lang)
 
         # Set language-specific prompts

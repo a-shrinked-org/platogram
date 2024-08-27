@@ -25,12 +25,17 @@ import assemblyai as aai
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+# Platogram initialization and verification
 try:
-    import platogram
-    logger.debug(f"Platogram successfully imported")
-    logger.debug(f"Platogram version: {platogram.__version__ if hasattr(platogram, '__version__') else 'Unknown'}")
+    logger.info(f"Importing Platogram version: {plato.__version__}")
+    logger.info(f"Platogram package location: {plato.__file__}")
+    # Try to use a Platogram function to verify it's working
+    plato.llm.get_model  # This should not raise an error if Platogram is correctly installed
+    logger.info("Platogram successfully imported and basic functionality verified")
 except ImportError as e:
     logger.error(f"Failed to import Platogram: {str(e)}")
+except AttributeError as e:
+    logger.error(f"Platogram imported but seems to be missing expected functionality: {str(e)}")
 
 # In-memory storage (Note: This will reset on each function invocation)
 tasks = {}
@@ -319,7 +324,6 @@ def audio_to_paper(url_or_file: str, lang: str, output_dir: Path, user_id: str) 
     except Exception as e:
         logger.error(f"Error in audio processing: {str(e)}", exc_info=True)
         raise
-
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)
@@ -449,10 +453,11 @@ class handler(BaseHTTPRequestHandler):
                 tasks[task_id]['error'] = str(e)
                 raise
 
-    except Exception as e:
-        logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
-        tasks[task_id]['status'] = 'failed'
-        tasks[task_id]['error'] = str(e)
+        except Exception as e:
+            logger.error(f"Error in process_and_send_email for task {task_id}: {str(e)}", exc_info=True)
+            tasks[task_id]['status'] = 'failed'
+            tasks[task_id]['error'] = str(e)
+
     def handle_status(self):
         task_id = self.headers.get('X-Task-ID')
 

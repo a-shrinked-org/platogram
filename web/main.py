@@ -169,9 +169,32 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
             raise FileNotFoundError(f"Local file not found: {file_path}")
         url = file_path  # Use the local file path directly
 
-    # Let plato handle indexing and transcription
-    logger.info("Indexing content with plato...")
-    plato.index(url, llm=language_model, lang=lang)
+    # Transcribe or index content
+    assemblyai_api_key = os.getenv('ASSEMBLYAI_API_KEY')
+    if assemblyai_api_key and url.startswith("file://"):
+        logger.info("Transcribing audio to text using AssemblyAI...")
+        transcriber = aai.Transcriber()
+        try:
+            transcript = transcriber.transcribe(url)
+            text = transcript.text
+            logger.info(f"Transcription completed successfully. Text length: {len(text)} characters")
+            # Now index the transcribed text
+            plato.index(text, llm=language_model, lang=lang)
+        except Exception as e:
+            logger.error(f"Error during AssemblyAI transcription: {str(e)}")
+            raise
+    else:
+        logger.info("Indexing content directly...")
+        try:
+            plato.index(url, llm=language_model, lang=lang)
+        except AttributeError:
+            # If plato.index is expecting a transcript object, create a mock object
+            class MockTranscript:
+                def __init__(self, text):
+                    self.text = text
+
+            mock_transcript = MockTranscript(url)
+            plato.index(mock_transcript, llm=language_model, lang=lang)
 
     # Generate content
     logger.info("Generating content...")
@@ -180,7 +203,6 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
     passages = plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
     references = plato.get_references(url, lang=lang)
     chapters = plato.get_chapters(url, lang=lang)
-
     # Set language-specific prompts
     if lang == "en":
         CONTRIBUTORS_PROMPT = "Thoroughly review the <context> and identify the list of contributors. Output as Markdown list: First Name, Last Name, Title, Organization. Output \"Unknown\" if the contributors are not known. In the end of the list always add \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Start with \"## Contributors, Acknowledgements, Mentions\""

@@ -150,7 +150,15 @@ async def send_email_with_resend(to_email, subject, body, attachments):
                 logger.debug(f"Failed payload: {json.dumps(payload, default=str)}")
             return response
 
-async def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> tuple[str, str]:
+from typing import Literal
+
+Language = Literal["en", "es"]
+
+from typing import Literal
+
+Language = Literal["en", "es"]
+
+def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> tuple[str, str]:
     logger.info(f"Processing audio from: {url}")
 
     # Check for required API keys
@@ -265,6 +273,7 @@ async def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: st
         raise
 
     return content.title, content.summary
+
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200)

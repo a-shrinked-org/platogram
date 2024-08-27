@@ -25,6 +25,13 @@ import assemblyai as aai
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+try:
+    import platogram
+    logger.debug(f"Platogram successfully imported")
+    logger.debug(f"Platogram version: {platogram.__version__ if hasattr(platogram, '__version__') else 'Unknown'}")
+except ImportError as e:
+    logger.error(f"Failed to import Platogram: {str(e)}")
+
 # In-memory storage (Note: This will reset on each function invocation)
 tasks = {}
 
@@ -191,7 +198,19 @@ def audio_to_paper(url: str, lang: Language, output_dir: Path, user_id: str) -> 
 
     # Process audio
     logger.info("Extracting transcript and indexing content...")
-    transcript = plato.extract_transcript(url, asr)
+    try:
+        transcript = plato.extract_transcript(url, asr)
+    except Exception as e:
+        logger.error(f"Error in extract_transcript: {str(e)}")
+        # If the error is related to yt-dlp, try to read the file directly
+        if "yt-dlp" in str(e) and os.path.exists(url):
+            logger.info("Attempting to read local file directly...")
+            with open(url, 'rb') as f:
+                audio_content = f.read()
+            transcript = asr.transcribe(audio_content)
+        else:
+            raise
+
     content = plato.index(transcript, llm, lang=lang)
 
     # Set language-specific prompts

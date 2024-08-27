@@ -183,10 +183,6 @@ async function onConvertClick(event) {
     if (!auth0Client) throw new Error("Auth0 client not initialized");
 
     const inputData = getInputData();
-    if (!inputData.url && !inputData.file) {
-      showErrorMessage("Please provide a URL or upload a file");
-      return;
-    }
 
     if (await auth0Client.isAuthenticated()) {
       showLanguageSelectionModal(inputData);

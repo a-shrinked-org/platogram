@@ -25,17 +25,41 @@ import assemblyai as aai
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+# Add the project root to the Python path
+project_root = Path(__file__).parent.parent
+sys.path.append(str(project_root))
+
 # Platogram initialization and verification
 try:
-    logger.info(f"Importing Platogram version: {plato.__version__}")
+    import platogram as plato
+
+    logger.info(f"Platogram successfully imported")
+
+    # Check for __version__ attribute
+    version = getattr(plato, '__version__', 'Unknown')
+    logger.info(f"Platogram version: {version}")
+
     logger.info(f"Platogram package location: {plato.__file__}")
-    # Try to use a Platogram function to verify it's working
-    plato.llm.get_model  # This should not raise an error if Platogram is correctly installed
-    logger.info("Platogram successfully imported and basic functionality verified")
+
+    # Verify Platogram functionality
+    if hasattr(plato, 'llm') and hasattr(plato.llm, 'get_model'):
+        logger.info("Platogram llm.get_model function verified")
+    else:
+        logger.warning("Platogram llm.get_model function not found or not accessible")
+
+    # Verify other essential Platogram functions
+    essential_functions = ['index', 'extract_transcript', 'get_paragraphs']
+    for func in essential_functions:
+        if hasattr(plato, func):
+            logger.info(f"Platogram {func} function verified")
+        else:
+            logger.warning(f"Platogram {func} function not found or not accessible")
+
+    logger.info("Platogram basic functionality verification complete")
 except ImportError as e:
     logger.error(f"Failed to import Platogram: {str(e)}")
-except AttributeError as e:
-    logger.error(f"Platogram imported but seems to be missing expected functionality: {str(e)}")
+except Exception as e:
+    logger.error(f"Unexpected error during Platogram initialization: {str(e)}")
 
 # In-memory storage (Note: This will reset on each function invocation)
 tasks = {}

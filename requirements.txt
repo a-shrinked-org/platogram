@@ -8,7 +8,7 @@
 # Local Platogram package
 -e .
 
-platogram==0.1.0
+# platogram==0.1.0
 
 annotated-types==0.7.0
     # via pydantic

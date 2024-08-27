@@ -169,40 +169,23 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
             raise FileNotFoundError(f"Local file not found: {file_path}")
         url = file_path  # Use the local file path directly
 
-    # Transcribe or index content
-    assemblyai_api_key = os.getenv('ASSEMBLYAI_API_KEY')
-    if assemblyai_api_key and url.startswith("file://"):
-        logger.info("Transcribing audio to text using AssemblyAI...")
-        transcriber = aai.Transcriber()
-        try:
-            transcript = transcriber.transcribe(url)
-            text = transcript.text
-            logger.info(f"Transcription completed successfully. Text length: {len(text)} characters")
-            # Now index the transcribed text
-            plato.index(text, llm=language_model, lang=lang)
-        except Exception as e:
-            logger.error(f"Error during AssemblyAI transcription: {str(e)}")
-            raise
+    # Let plato handle indexing and transcription
+    logger.info("Indexing content with plato...")
+    if os.getenv('ASSEMBLYAI_API_KEY'):
+        logger.info("Using AssemblyAI for transcription...")
+        plato.index(url, llm=language_model, lang=lang, assemblyai_api_key=os.getenv('ASSEMBLYAI_API_KEY'))
     else:
-        logger.info("Indexing content directly...")
-        try:
-            plato.index(url, llm=language_model, lang=lang)
-        except AttributeError:
-            # If plato.index is expecting a transcript object, create a mock object
-            class MockTranscript:
-                def __init__(self, text):
-                    self.text = text
-
-            mock_transcript = MockTranscript(url)
-            plato.index(mock_transcript, llm=language_model, lang=lang)
+        logger.info("AssemblyAI API key not set. Retrieving text from URL (subtitles, etc).")
+        plato.index(url, llm=language_model, lang=lang)
 
     # Generate content
-    logger.info("Generating content...")
+    logger.info("Fetching title, abstract, passages, and references...")
     title = plato.get_title(url, lang=lang)
     abstract = plato.get_abstract(url, lang=lang)
     passages = plato.get_passages(url, chapters=True, inline_references=True, lang=lang)
     references = plato.get_references(url, lang=lang)
     chapters = plato.get_chapters(url, lang=lang)
+
     # Set language-specific prompts
     if lang == "en":
         CONTRIBUTORS_PROMPT = "Thoroughly review the <context> and identify the list of contributors. Output as Markdown list: First Name, Last Name, Title, Organization. Output \"Unknown\" if the contributors are not known. In the end of the list always add \"- [Platogram](https://github.com/code-anyway/platogram), Chief of Stuff, Code Anyway, Inc.\". Start with \"## Contributors, Acknowledgements, Mentions\""
@@ -215,6 +198,7 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
     else:
         raise ValueError(f"Unsupported language: {lang}")
 
+    logger.info("Generating Contributors...")
     contributors = plato.generate(
         query=CONTRIBUTORS_PROMPT,
         context_size="large",
@@ -223,6 +207,7 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
         lang=lang
     )
 
+    logger.info("Generating Introduction...")
     introduction = plato.generate(
         query=INTRODUCTION_PROMPT,
         context_size="large",
@@ -232,6 +217,7 @@ def audio_to_paper(url: str, lang: str, output_dir: Path, images: bool = False) 
         lang=lang
     )
 
+    logger.info("Generating Conclusion...")
     conclusion = plato.generate(
         query=CONCLUSION_PROMPT,
         context_size="large",

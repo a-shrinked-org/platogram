@@ -255,13 +255,10 @@ async function postToConvert(inputData, lang) {
 }
 
 function getInputData() {
-  const urlInput = document.getElementById("url-input");
-  const fileNameElement = document.getElementById("file-name");
-  return {
-    url: urlInput ? urlInput.value.trim() : "",
-    file: fileNameElement && fileNameElement.file ? fileNameElement.file : null,
-  };
-}
+  const urlInput = document.getElementById(“url-input”).value;
+  const fileInput = document.getElementById(“file-upload”).files[0];
+  return urlInput || fileInput;
+} 
 
 async function login() {
   try {

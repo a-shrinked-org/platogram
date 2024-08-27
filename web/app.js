@@ -255,8 +255,8 @@ async function postToConvert(inputData, lang) {
 }
 
 function getInputData() {
-  const urlInput = document.getElementById(“url-input”).value;
-  const fileInput = document.getElementById(“file-upload”).files[0];
+  const urlInput = document.getElementById("url-input").value;
+  const fileInput = document.getElementById("file-upload").files[0];
   return urlInput || fileInput;
 } 
 

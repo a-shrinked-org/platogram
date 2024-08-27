@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
+MAX_EXECUTION_TIME = int(os.getenv('MAX_EXECUTION_TIME', 300))
+
 # Platogram initialization and verification
 try:
     import platogram as plato

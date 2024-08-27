@@ -20,7 +20,7 @@ import aiofiles.tempfile
 
 import platogram as plato
 from anthropic import AnthropicError
-import assemblyai as aai
+import assemblyai as aai  
 
 # Setup logging
 logging.basicConfig(level=logging.DEBUG)

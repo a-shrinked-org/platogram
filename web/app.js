@@ -1,10 +1,16 @@
 let auth0Client = null;
 
 const processingStages = [
-  "Byte Whispering", "Qubit Juggling", "Syntax Gymnastics",
-  "Pixel Wrangling", "Neuron Tickling", "Algorithm Disco",
-  "Data Origami", "Bit Barbecue", "Logic Limbo",
-  "Quantum Knitting"
+  "Byte Whispering",
+  "Qubit Juggling",
+  "Syntax Gymnastics",
+  "Pixel Wrangling",
+  "Neuron Tickling",
+  "Algorithm Disco",
+  "Data Origami",
+  "Bit Barbecue",
+  "Logic Limbo",
+  "Quantum Knitting",
 ];
 let currentStageIndex = 0;
 let processingStageInterval;
@@ -14,29 +20,29 @@ function debugLog(message) {
 }
 
 async function initAuth0() {
-    try {
-        auth0Client = await auth0.createAuth0Client({
-            domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
-            clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
-            authorizationParams: {
-                redirect_uri: window.location.origin,
-                audience: "https://platogram.vercel.app/",
-                scope: "openid profile email",
-            },
-            cacheLocation: "localstorage",
-        });
-        debugLog("Auth0 client initialized successfully");
+  try {
+    auth0Client = await auth0.createAuth0Client({
+      domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
+      clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
+      authorizationParams: {
+        redirect_uri: window.location.origin,
+        audience: "https://platogram.vercel.app/",
+        scope: "openid profile email",
+      },
+      cacheLocation: "localstorage",
+    });
+    debugLog("Auth0 client initialized successfully");
 
-        const query = window.location.search;
-        if (query.includes("code=") && query.includes("state=")) {
-            await auth0Client.handleRedirectCallback();
-            window.history.replaceState({}, document.title, "/");
-        }
-
-        await updateUI();
-    } catch (error) {
-        console.error("Error initializing Auth0:", error);
+    const query = window.location.search;
+    if (query.includes("code=") && query.includes("state=")) {
+      await auth0Client.handleRedirectCallback();
+      window.history.replaceState({}, document.title, "/");
     }
+
+    await updateUI();
+  } catch (error) {
+    console.error("Error initializing Auth0:", error);
+  }
 }
 
 function updateUIStatus(status, errorMessage = "") {
@@ -47,13 +53,15 @@ function updateUIStatus(status, errorMessage = "") {
   const doneSection = document.getElementById("done-section");
   const processingStage = document.getElementById("processing-stage");
 
-  [inputSection, statusSection, errorSection, doneSection].forEach(section => {
-    if (section) {
-      section.classList.add("hidden");
-    } else {
-      console.warn(`Section not found: ${section}`);
+  [inputSection, statusSection, errorSection, doneSection].forEach(
+    (section) => {
+      if (section) {
+        section.classList.add("hidden");
+      } else {
+        console.warn(`Section not found: ${section}`);
+      }
     }
-  });
+  );
 
   switch (status) {
     case "running":
@@ -89,7 +97,8 @@ function updateUIStatus(status, errorMessage = "") {
         errorSection.classList.remove("hidden");
         const errorParagraph = errorSection.querySelector("p");
         if (errorParagraph) {
-          errorParagraph.textContent = errorMessage || "An error occurred. Please try again.";
+          errorParagraph.textContent =
+            errorMessage || "An error occurred. Please try again.";
         } else {
           console.error("Error paragraph not found in error section");
         }
@@ -167,148 +176,80 @@ function onDonateClick() {
 }
 
 async function onConvertClick(event) {
-    if (event) event.preventDefault();
-    debugLog("Convert button clicked");
+  if (event) event.preventDefault();
+  debugLog("Convert button clicked");
 
-    try {
-        if (!auth0Client) throw new Error("Auth0 client not initialized");
+  try {
+    if (!auth0Client) throw new Error("Auth0 client not initialized");
 
-        const inputData = getInputData();
-        if (!inputData.url && !inputData.file) {
-            showErrorMessage("Please provide a URL or upload a file");
-            return;
-        }
-
-        if (await auth0Client.isAuthenticated()) {
-            showLanguageSelectionModal(inputData);
-        } else {
-            login();
-        }
-    } catch (error) {
-        console.error("Error in onConvertClick:", error);
-        updateUIStatus("error", error.message);
+    const inputData = getInputData();
+    if (!inputData.url && !inputData.file) {
+      showErrorMessage("Please provide a URL or upload a file");
+      return;
     }
+
+    if (await auth0Client.isAuthenticated()) {
+      showLanguageSelectionModal(inputData);
+    } else {
+      login();
+    }
+  } catch (error) {
+    console.error("Error in onConvertClick:", error);
+    updateUIStatus("error", error.message);
+  }
 }
 
 function showErrorMessage(message) {
-    const errorElement = document.getElementById('error-message');
-    if (errorElement) {
-        errorElement.textContent = message;
-        errorElement.classList.remove('hidden');
-    } else {
-        console.error("Error message element not found");
-    }
+  const errorElement = document.getElementById("error-message");
+  if (errorElement) {
+    errorElement.textContent = message;
+    errorElement.classList.remove("hidden");
+  } else {
+    console.error("Error message element not found");
+  }
 }
 
 async function postToConvert(inputData, lang) {
-  const chunkSize = 4 * 1024 * 1024; // 4MB chunks
   let body;
-  let headers = {};
+  let headers = {
+    Authorization: `Bearer ${await auth0Client.getTokenSilently({
+      audience: "https://web.platogram.ai",
+    })}`,
+  };
 
-  const maxRetries = 3;   // Number of retries
-  const retryDelay = 2000; // Delay between retries
+  const formData = new FormData();
+  formData.append("lang", lang);
+
+  // formData.append("price", price);
+  // formData.append("token", token);
+
+  if (inputData instanceof File) {
+    formData.append("file", inputData);
+  } else {
+    formData.append("payload", inputData);
+  }
+
+  body = formData;
 
   try {
-    updateUIStatus("running", "Starting conversion process...");
-
     const token = await auth0Client.getTokenSilently({
-      audience: "https://platogram.vercel.app",
+      audience: "https://web.platogram.ai",
     });
-    debugLog("Obtained token for convert");
+    const response = await fetch("/convert", {
+      method: "POST",
+      headers: headers,
+      body: body,
+    });
+    const result = await response.json();
 
-    headers.Authorization = `Bearer ${token}`;
-    headers['Content-Type'] = inputData.file ? 'application/octet-stream' : 'application/json';
-
-    if (inputData.file) {
-      const file = inputData.file;
-      const totalChunks = Math.ceil(file.size / chunkSize);
-
-      for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-        const start = chunkIndex * chunkSize;
-        const end = Math.min(start + chunkSize, file.size);
-        const chunk = file.slice(start, end);
-
-        headers['X-File-Name'] = file.name;
-        headers['X-Chunk-Index'] = chunkIndex.toString();
-        headers['X-Total-Chunks'] = totalChunks.toString();
-        headers['X-Language'] = lang;
-
-        let response;
-        for (let attempt = 0; attempt < maxRetries; attempt++) {
-          try {
-            response = await fetch("/convert", {
-              method: "POST",
-              headers: headers,
-              body: chunk,
-            });
-
-            if (response.ok) break; // Exit loop if request was successful
-
-          } catch (error) {
-            if (attempt < maxRetries - 1) {
-              await new Promise(resolve => setTimeout(resolve, retryDelay)); // Wait before retrying
-            } else {
-              throw error; // Throw error if all retries fail
-            }
-          }
-        }
-
-        if (response) {
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value);
-            debugLog("Received chunk: " + chunk);
-            updateUIStatus("running", chunk);
-          }
-        }
-      }
-    } else if (inputData.url) {
-      body = JSON.stringify({ url: inputData.url, lang: lang });
-
-      let response;
-      for (let attempt = 0; attempt < maxRetries; attempt++) {
-        try {
-          response = await fetch("/convert", {
-            method: "POST",
-            headers: headers,
-            body: body,
-          });
-
-          if (response.ok) break; // Exit loop if request was successful
-
-        } catch (error) {
-          if (attempt < maxRetries - 1) {
-            await new Promise(resolve => setTimeout(resolve, retryDelay)); // Wait before retrying
-          } else {
-            throw error; // Throw error if all retries fail
-          }
-        }
-      }
-
-      if (response) {
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value);
-          debugLog("Received chunk: " + chunk);
-          updateUIStatus("running", chunk);
-        }
-      }
+    if (result.message === "Conversion started") {
+      pollStatus(token);
     } else {
-      throw new Error("No input provided");
+      updateUIStatus("error", "Unexpected response from server");
     }
-
-    updateUIStatus("done", "Conversion process initiated. You will receive an email when it's complete.");
   } catch (error) {
-    console.error("Error in postToConvert:", error);
-    updateUIStatus("error", error.message || "An error occurred during conversion");
+    console.error("Error:", error);
+    updateUIStatus("error", error);
   }
 }
 
@@ -316,8 +257,8 @@ function getInputData() {
   const urlInput = document.getElementById("url-input");
   const fileNameElement = document.getElementById("file-name");
   return {
-    url: urlInput ? urlInput.value.trim() : '',
-    file: fileNameElement && fileNameElement.file ? fileNameElement.file : null
+    url: urlInput ? urlInput.value.trim() : "",
+    file: fileNameElement && fileNameElement.file ? fileNameElement.file : null,
   };
 }
 
@@ -346,26 +287,28 @@ async function logout() {
 }
 
 function showLanguageSelectionModal(inputData) {
-  const modal = document.getElementById('language-modal');
+  const modal = document.getElementById("language-modal");
   if (!modal) {
     console.error("Language modal not found in the DOM");
     return;
   }
 
-  modal.classList.remove('hidden');
-  modal.style.display = 'block'; // or 'flex', depending on your layout
+  modal.classList.remove("hidden");
+  modal.style.display = "block"; // or 'flex', depending on your layout
 
   const handleLanguageSelection = async (lang) => {
     debugLog(`Language selected: ${lang}`);
-    modal.classList.add('hidden');
+    modal.classList.add("hidden");
     await postToConvert(inputData, lang);
   };
 
-  document.getElementById('en-btn').onclick = () => handleLanguageSelection('en');
-  document.getElementById('es-btn').onclick = () => handleLanguageSelection('es');
-  document.getElementById('cancel-btn').onclick = () => {
+  document.getElementById("en-btn").onclick = () =>
+    handleLanguageSelection("en");
+  document.getElementById("es-btn").onclick = () =>
+    handleLanguageSelection("es");
+  document.getElementById("cancel-btn").onclick = () => {
     debugLog("Language selection cancelled");
-    modal.classList.add('hidden');
+    modal.classList.add("hidden");
   };
 }
 
@@ -392,7 +335,10 @@ async function pollStatus(token) {
     // ... rest of the function remains the same
   } catch (error) {
     console.error("Error polling status:", error);
-    updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
+    updateUIStatus(
+      "error",
+      `An error occurred while checking status: ${error.message}`
+    );
   }
 }
 function updateUIStatus(status, message = "") {
@@ -403,13 +349,15 @@ function updateUIStatus(status, message = "") {
   const doneSection = document.getElementById("done-section");
   const processingStage = document.getElementById("processing-stage");
 
-  [inputSection, statusSection, errorSection, doneSection].forEach(section => {
-    if (section) {
-      section.classList.add("hidden");
-    } else {
-      console.warn(`Section not found: ${section}`);
+  [inputSection, statusSection, errorSection, doneSection].forEach(
+    (section) => {
+      if (section) {
+        section.classList.add("hidden");
+      } else {
+        console.warn(`Section not found: ${section}`);
+      }
     }
-  });
+  );
 
   switch (status) {
     case "running":
@@ -445,7 +393,8 @@ function updateUIStatus(status, message = "") {
         errorSection.classList.remove("hidden");
         const errorParagraph = errorSection.querySelector("p");
         if (errorParagraph) {
-          errorParagraph.textContent = message || "An error occurred. Please try again.";
+          errorParagraph.textContent =
+            message || "An error occurred. Please try again.";
         } else {
           console.error("Error paragraph not found in error section");
         }
@@ -468,8 +417,8 @@ function clearProcessingStageInterval() {
 }
 
 function updateProcessingStage() {
-  const statusSection = document.getElementById('status-section');
-  const processingStage = document.getElementById('processing-stage');
+  const statusSection = document.getElementById("status-section");
+  const processingStage = document.getElementById("processing-stage");
 
   if (!statusSection) {
     console.warn("Status section not found");
@@ -485,13 +434,15 @@ function updateProcessingStage() {
   }
   if (currentStageIndex < 0 || currentStageIndex >= processingStages.length) {
     console.error("Invalid currentStageIndex:", currentStageIndex);
-    currentStageIndex = 0;  // Reset to a valid index
+    currentStageIndex = 0; // Reset to a valid index
   }
 
-  if (!statusSection.classList.contains('hidden')) {
+  if (!statusSection.classList.contains("hidden")) {
     processingStage.textContent = processingStages[currentStageIndex];
     currentStageIndex = (currentStageIndex + 1) % processingStages.length;
-    debugLog("Updated processing stage to: " + processingStages[currentStageIndex]);
+    debugLog(
+      "Updated processing stage to: " + processingStages[currentStageIndex]
+    );
   } else {
     console.warn("Status section is hidden. Skipping update.");
   }
@@ -505,30 +456,30 @@ function initializeProcessingStage() {
 
 function safeUpdateProcessingStage() {
   try {
-    if (document.readyState === 'complete') {
+    if (document.readyState === "complete") {
       updateProcessingStage();
     } else {
-      window.addEventListener('load', updateProcessingStage);
+      window.addEventListener("load", updateProcessingStage);
     }
   } catch (error) {
     console.error("Error in safeUpdateProcessingStage:", error);
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener("DOMContentLoaded", () => {
   debugLog("DOM Content Loaded");
 
-  const uploadIcon = document.querySelector('.upload-icon');
-  const fileNameElement = document.getElementById('file-name');
-  const urlInput = document.getElementById('url-input');
+  const uploadIcon = document.querySelector(".upload-icon");
+  const fileNameElement = document.getElementById("file-name");
+  const urlInput = document.getElementById("url-input");
 
   if (uploadIcon && fileNameElement && urlInput) {
     // Add the event listener to the upload icon only once
-    uploadIcon.addEventListener('click', handleFileUpload);
+    uploadIcon.addEventListener("click", handleFileUpload);
 
-    urlInput.addEventListener('input', () => {
-      if (urlInput.value.trim() !== '') {
-        fileNameElement.textContent = ''; // Clear file name when URL is entered
+    urlInput.addEventListener("input", () => {
+      if (urlInput.value.trim() !== "") {
+        fileNameElement.textContent = ""; // Clear file name when URL is entered
         fileNameElement.file = null; // Clear the stored File object
       }
     });
@@ -542,30 +493,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
 let fileInput; // Объявляем переменную для хранения элемента fileInput
 function handleFileUpload() {
-  const fileNameElement = document.getElementById('file-name');
-  const urlInput = document.getElementById('url-input');
+  const fileNameElement = document.getElementById("file-name");
+  const urlInput = document.getElementById("url-input");
   if (!fileInput) {
     // Создаем элемент fileInput только один раз
-    fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a';
-    fileInput.style.display = 'none';
+    fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = ".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a";
+    fileInput.style.display = "none";
     // Добавляем элемент в body
     document.body.appendChild(fileInput);
     // Добавляем обработчик изменения только один раз
-    fileInput.addEventListener('change', (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        fileNameElement.textContent = file.name;
-        fileNameElement.file = file; // Сохраняем объект File
-        urlInput.value = ''; // Очищаем URL input при выборе файла
-        debugLog("File selected: " + file.name);
-      } else {
-        fileNameElement.textContent = '';
-        fileNameElement.file = null; // Очищаем сохраненный объект File
-        debugLog("No file selected");
-      }
-    }, { once: true }); // Обработчик с опцией { once: true } для удаления после первого вызова
+    fileInput.addEventListener(
+      "change",
+      (event) => {
+        const file = event.target.files[0];
+        if (file) {
+          fileNameElement.textContent = file.name;
+          fileNameElement.file = file; // Сохраняем объект File
+          urlInput.value = ""; // Очищаем URL input при выборе файла
+          debugLog("File selected: " + file.name);
+        } else {
+          fileNameElement.textContent = "";
+          fileNameElement.file = null; // Очищаем сохраненный объект File
+          debugLog("No file selected");
+        }
+      },
+      { once: true }
+    ); // Обработчик с опцией { once: true } для удаления после первого вызова
   }
   fileInput.click();
 }

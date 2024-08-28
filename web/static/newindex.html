@@ -640,7 +640,7 @@
 <script src="https://js.stripe.com/v3/"></script>
 <script src="https://platogram.vercel.app/web/app.js"></script>
 <script>
-
+    document.addEventListener('DOMContentLoaded', function() {
 //price logics
 let selectedOption = 'basic';
 let coffeeCount = 1;
@@ -709,20 +709,9 @@ document.getElementById('cancel-btn').addEventListener('click', () => {
 // Initial setup
 updateTotalPrice();
 
+    });
+
 //the rest
-
-document.getElementById('basic-job-button').addEventListener('click', () => handleOptionClick('basic'));
-document.getElementById('coffee-button').addEventListener('click', () => handleOptionClick('coffee'));
-document.getElementById('coffee-1').addEventListener('click', () => handleCoffeeCountClick(1));
-document.getElementById('coffee-2').addEventListener('click', () => handleCoffeeCountClick(2));
-document.getElementById('custom-price').addEventListener('input', handleCustomPriceChange);
-
-document.getElementById('submit-btn').addEventListener('click', () => {
-    // Here you can add the logic to handle the submission
-    console.log('Submitting job with price: $' + totalPrice.toFixed(2));
-    closeLanguageModal();
-});
-
 
 document.addEventListener('DOMContentLoaded', () => {
     const elements = {

@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
     <link rel="stylesheet" href="https://platogram.vercel.app/web/styles.css">
     <link rel="stylesheet" href="./styles.css">
+    <script src="https://unpkg.com/country-flag-emoji@latest/dist/country-flag-emoji.umd.min.js"></script>
     <style>
         @font-face {
             font-family: 'PerfectlyNineties';
@@ -658,8 +659,7 @@
 
     let stripe, elements, card;
 
-    // Add this at the beginning of your file
-    import countryFlagEmoji from "country-flag-emoji";
+    const countryFlagEmoji = window.countryFlagEmoji;
 
     // Add these new functions
     function showLanguageSelectionModal(inputData) {

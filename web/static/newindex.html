@@ -1027,7 +1027,41 @@ function initializeStripeIfNeeded() {
             reset();
           });
         });
+    document.addEventListener('DOMContentLoaded', () => {
+        const userCircle = document.getElementById('user-circle');
+        const logoutTooltip = document.getElementById('logout-tooltip');
+        const loginButton = document.getElementById('login-button');
 
+        if (userCircle && logoutTooltip) {
+            userCircle.addEventListener('click', () => {
+                logoutTooltip.classList.toggle('hidden');
+            });
+
+            // Close the tooltip when clicking outside
+            document.addEventListener('click', (event) => {
+                if (!userCircle.contains(event.target) && !logoutTooltip.contains(event.target)) {
+                    logoutTooltip.classList.add('hidden');
+                }
+            });
+        }
+
+        // Function to update UI based on auth state
+        window.updateAuthUI = (isAuthenticated, user) => {
+            if (isAuthenticated && user) {
+                loginButton.classList.add('hidden');
+                userCircle.classList.remove('hidden');
+                userCircle.textContent = getInitials(user.email);
+            } else {
+                loginButton.classList.remove('hidden');
+                userCircle.classList.add('hidden');
+                logoutTooltip.classList.add('hidden');
+            }
+        };
+
+        function getInitials(email) {
+            return email.split('@')[0].substring(0, 2).toUpperCase();
+        }
+    });
 </script>
 </body>
 </html>

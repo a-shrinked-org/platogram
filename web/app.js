@@ -140,6 +140,12 @@ async function updateUI() {
     });
     pollStatus(token);
     debugLog("Logged in as: " + user.email);
+
+    // Add this line to update the UI with the new design
+    window.updateAuthUI(isAuthenticated, user);
+} else {
+    // Add this line to update the UI when not authenticated
+    window.updateAuthUI(false, null);
   }
 }
 

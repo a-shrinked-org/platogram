@@ -642,12 +642,11 @@
 <script src="https://js.stripe.com/v3/"></script>
 <script src="https://platogram.vercel.app/web/app.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-//price logics
-        let selectedOption = 'coffee'; // Default to coffee option
+    // Price logics
+        let selectedOption = 'coffee';
         let coffeeCount = 1;
         let customPrice = '';
-        let totalPrice = 5; // Default price set to $5
+        let totalPrice = 5;
 
         function updateTotalPrice() {
             if (selectedOption === 'basic') {
@@ -712,98 +711,213 @@
             }
         }
 
-        // Event listeners
-        const basicJobButton = document.getElementById('basic-job-button');
-        if (basicJobButton) basicJobButton.addEventListener('click', () => handleOptionClick('basic'));
+        // Auth-related functions
+        function getInitials(email) {
+            return email.split('@')[0].substring(0, 2).toUpperCase();
+        }
 
-        const coffeeButton = document.getElementById('coffee-button');
-        if (coffeeButton) coffeeButton.addEventListener('click', () => handleOptionClick('coffee'));
+        window.updateAuthUI = function(isAuthenticated, user) {
+            const loginButton = document.getElementById('login-button');
+            const userCircle = document.getElementById('user-circle');
+            const logoutTooltip = document.getElementById('logout-tooltip');
 
-        const coffee1Button = document.getElementById('coffee-1');
-        if (coffee1Button) coffee1Button.addEventListener('click', () => handleCoffeeCountClick(1));
+            if (isAuthenticated && user) {
+                if (loginButton) loginButton.classList.add('hidden');
+                if (userCircle) {
+                    userCircle.classList.remove('hidden');
+                    userCircle.textContent = getInitials(user.email);
+                }
+            } else {
+                if (loginButton) loginButton.classList.remove('hidden');
+                if (userCircle) userCircle.classList.add('hidden');
+                if (logoutTooltip) logoutTooltip.classList.add('hidden');
+            }
+        };
 
-        const coffee2Button = document.getElementById('coffee-2');
-        if (coffee2Button) coffee2Button.addEventListener('click', () => handleCoffeeCountClick(2));
+        function login() {
+            auth0Client.loginWithRedirect();
+        }
 
-        const customPriceInput = document.getElementById('custom-price');
-        if (customPriceInput) customPriceInput.addEventListener('input', handleCustomPriceChange);
+        function logout() {
+            auth0Client.logout({ returnTo: window.location.origin });
+        }
 
-        const cancelButton = document.getElementById('cancel-btn');
-        if (cancelButton) {
-            cancelButton.addEventListener('click', () => {
-                console.log('Modal closed');
-                closeLanguageModal();
+        // Main DOMContentLoaded event listener
+        document.addEventListener('DOMContentLoaded', () => {
+            const elements = {
+                urlInput: document.getElementById('url-input'),
+                uploadFileButton: document.getElementById('upload-file-button'),
+                fileUploadSection: document.getElementById('file-upload-section'),
+                inputSection: document.getElementById('input-section'),
+                backToUrlButton: document.getElementById('back-to-url'),
+                fileDropArea: document.getElementById('file-drop-area'),
+                fileInput: document.querySelector('input[type="file"]'),
+                fileNameDisplay: document.getElementById('file-name-display'),
+                convertButton: document.getElementById('convert-button'),
+                convertFileButton: document.getElementById('convert-file-button'),
+                loginButton: document.getElementById('login-button'),
+                logoutButton: document.getElementById('logout-button'),
+                userCircle: document.getElementById('user-circle'),
+                logoutTooltip: document.getElementById('logout-tooltip'),
+            };
+
+            initializeProcessingStage();
+
+            // URL input listener
+            if (elements.urlInput) {
+                elements.urlInput.addEventListener('input', () => {
+                    toggleConvertButtonState(elements.urlInput.value.trim() !== '', elements.convertButton);
+                });
+            }
+
+            // Upload file button listener
+            if (elements.uploadFileButton) {
+                elements.uploadFileButton.addEventListener('click', () => {
+                    toggleSections(elements.inputSection, elements.fileUploadSection);
+                });
+            }
+
+            // Back to URL button listener
+            if (elements.backToUrlButton) {
+                elements.backToUrlButton.addEventListener('click', () => {
+                    toggleSections(elements.fileUploadSection, elements.inputSection);
+                });
+            }
+
+            // Setup drag and drop
+            if (elements.fileDropArea) {
+                setupDragAndDrop(elements.fileDropArea, handleFiles);
+            }
+
+            // File input change listener
+            if (elements.fileInput) {
+                elements.fileInput.addEventListener('change', (event) => {
+                    handleFiles(event.target.files);
+                });
+            }
+
+            // Language dropdown functionality
+            const languageDropdown = document.getElementById("language-dropdown");
+            const languageOptions = document.getElementById("language-options");
+
+            if (languageDropdown && languageOptions) {
+                languageDropdown.addEventListener("click", (event) => {
+                    event.stopPropagation();
+                    languageOptions.classList.toggle("hidden");
+                });
+
+                document.addEventListener("click", (event) => {
+                    if (!languageDropdown.contains(event.target) && !languageOptions.contains(event.target)) {
+                        languageOptions.classList.add("hidden");
+                    }
+                });
+
+                // Add event listeners for language selection
+                const englishOption = languageOptions.querySelector('button[data-lang="en"]');
+                const spanishOption = languageOptions.querySelector('button[data-lang="es"]');
+
+                if (englishOption) englishOption.addEventListener("click", () => selectLanguage("en"));
+                if (spanishOption) spanishOption.addEventListener("click", () => selectLanguage("es"));
+            }
+
+            // User circle and logout tooltip functionality
+            if (elements.userCircle) {
+                elements.userCircle.addEventListener('click', () => {
+                    elements.logoutTooltip.classList.toggle('hidden');
+                });
+            }
+
+            document.addEventListener('click', (event) => {
+                if (elements.userCircle && elements.logoutTooltip &&
+                    !elements.userCircle.contains(event.target) &&
+                    !elements.logoutTooltip.contains(event.target)) {
+                    elements.logoutTooltip.classList.add('hidden');
+                }
             });
+
+            // Price logic event listeners
+            const basicJobButton = document.getElementById('basic-job-button');
+            if (basicJobButton) basicJobButton.addEventListener('click', () => handleOptionClick('basic'));
+
+            const coffeeButton = document.getElementById('coffee-button');
+            if (coffeeButton) coffeeButton.addEventListener('click', () => handleOptionClick('coffee'));
+
+            const coffee1Button = document.getElementById('coffee-1');
+            if (coffee1Button) coffee1Button.addEventListener('click', () => handleCoffeeCountClick(1));
+
+            const coffee2Button = document.getElementById('coffee-2');
+            if (coffee2Button) coffee2Button.addEventListener('click', () => handleCoffeeCountClick(2));
+
+            const customPriceInput = document.getElementById('custom-price');
+            if (customPriceInput) customPriceInput.addEventListener('input', handleCustomPriceChange);
+
+            const cancelButton = document.getElementById('cancel-btn');
+            if (cancelButton) {
+                cancelButton.addEventListener('click', () => {
+                    console.log('Modal closed');
+                    closeLanguageModal();
+                });
+            }
+
+            // Initial setup for price logic
+            handleOptionClick('coffee');
+            updateTotalPrice();
+
+            // Add event listeners to buttons
+            if (elements.convertButton) {
+                elements.convertButton.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    onConvertClick();
+                });
+            }
+
+            if (elements.loginButton) {
+                elements.loginButton.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    login();
+                });
+            }
+
+            if (elements.logoutButton) {
+                elements.logoutButton.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    logout();
+                });
+            }
+
+            const donateButtons = document.querySelectorAll('[id^="donate-button"]');
+            donateButtons.forEach(button => {
+                button.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    onDonateClick();
+                });
+            });
+
+            const resetButtons = document.querySelectorAll('[id^="reset-button"]');
+            resetButtons.forEach(button => {
+                button.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    reset();
+                });
+            });
+
+            // Initialize Auth0
+            initAuth0().catch((error) => console.error("Error initializing app:", error));
+        });
+
+        // Existing functions (kept as they were)
+        function toggleConvertButtonState(isActive, button) {
+            if (button) {
+                button.disabled = !isActive;
+                button.classList.toggle('opacity-50', !isActive);
+                button.classList.toggle('cursor-not-allowed', !isActive);
+            }
         }
 
-        // Initial setup
-        handleOptionClick('coffee'); // Start with coffee option selected
-        updateTotalPrice();
-    });
-
-//the rest
-
-document.addEventListener('DOMContentLoaded', () => {
-    const elements = {
-        urlInput: document.getElementById('url-input'),
-        uploadFileButton: document.getElementById('upload-file-button'),
-        fileUploadSection: document.getElementById('file-upload-section'),
-        inputSection: document.getElementById('input-section'),
-        backToUrlButton: document.getElementById('back-to-url'),
-        fileDropArea: document.getElementById('file-drop-area'),
-        fileInput: document.querySelector('input[type="file"]'),
-        fileNameDisplay: document.getElementById('file-name-display'),
-        convertButton: document.getElementById('convert-button'),
-        convertFileButton: document.getElementById('convert-file-button'),
-    };
-
-    initializeProcessingStage();
-
-    // URL input listener
-    if (elements.urlInput) {
-        elements.urlInput.addEventListener('input', () => {
-            toggleConvertButtonState(elements.urlInput.value.trim() !== '', elements.convertButton);
-        });
-    }
-
-    // Upload file button listener
-    if (elements.uploadFileButton) {
-        elements.uploadFileButton.addEventListener('click', () => {
-            toggleSections(elements.inputSection, elements.fileUploadSection);
-        });
-    }
-
-    // Back to URL button listener
-    if (elements.backToUrlButton) {
-        elements.backToUrlButton.addEventListener('click', () => {
-            toggleSections(elements.fileUploadSection, elements.inputSection);
-        });
-    }
-
-    // Setup drag and drop
-    if (elements.fileDropArea) {
-        setupDragAndDrop(elements.fileDropArea, handleFiles);
-    }
-
-    // File input change listener
-    if (elements.fileInput) {
-        elements.fileInput.addEventListener('change', (event) => {
-            handleFiles(event.target.files);
-        });
-    }
-
-    function toggleConvertButtonState(isActive, button) {
-        if (button) {
-            button.disabled = !isActive;
-            button.classList.toggle('opacity-50', !isActive);
-            button.classList.toggle('cursor-not-allowed', !isActive);
+        function toggleSections(hiddenSection, visibleSection) {
+            if (hiddenSection) hiddenSection.classList.add('hidden');
+            if (visibleSection) visibleSection.classList.remove('hidden');
         }
-    }
-
-    function toggleSections(hiddenSection, visibleSection) {
-        if (hiddenSection) hiddenSection.classList.add('hidden');
-        if (visibleSection) visibleSection.classList.remove('hidden');
-    }
 
     function setupDragAndDrop(dropArea, filesHandler) {
         if (!dropArea) return;
@@ -826,264 +940,91 @@ document.addEventListener('DOMContentLoaded', () => {
             filesHandler(files);
         });
     }
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
 
-    function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
+        function toggleHighlight(dropArea, isActive) {
+            dropArea.classList.toggle('border-blue-500', isActive);
+            dropArea.classList.toggle('bg-blue-50', isActive);
+        }
 
-    function toggleHighlight(dropArea, isActive) {
-        dropArea.classList.toggle('border-blue-500', isActive);
-        dropArea.classList.toggle('bg-blue-50', isActive);
-    }
-
-    function handleFiles(files) {
+        function handleFiles(files) {
         if (files.length > 0) {
             const file = files[0];
             elements.fileNameDisplay.textContent = file.name;
             toggleConvertButtonState(true, elements.convertFileButton);
         }
-    }
-
-    // Language dropdown functionality
-    const languageDropdown = document.getElementById("language-dropdown");
-    const languageOptions = document.getElementById("language-options");
-
-    if (languageDropdown && languageOptions) {
-        languageDropdown.addEventListener("click", (event) => {
-            event.stopPropagation();
-            languageOptions.classList.toggle("hidden");
-        });
-
-        document.addEventListener("click", (event) => {
-            if (!languageDropdown.contains(event.target) && !languageOptions.contains(event.target)) {
-                languageOptions.classList.add("hidden");
-            }
-        });
-
-        // Add event listeners for language selection
-        const englishOption = languageOptions.querySelector('button[data-lang="en"]');
-        const spanishOption = languageOptions.querySelector('button[data-lang="es"]');
-
-        if (englishOption) englishOption.addEventListener("click", () => selectLanguage("en"));
-        if (spanishOption) spanishOption.addEventListener("click", () => selectLanguage("es"));
-    }
-
-        // New login right corner thing
-
-        // New function to update UI based on auth state
-        function updateAuthUI(isAuthenticated, user) {
-            if (isAuthenticated) {
-                elements.loginButton.classList.add('hidden');
-                elements.userCircle.classList.remove('hidden');
-                elements.userCircle.textContent = getInitials(user.email);
-            } else {
-                elements.loginButton.classList.remove('hidden');
-                elements.userCircle.classList.add('hidden');
-                elements.logoutTooltip.classList.add('hidden');
-            }
         }
 
-        // New function to get user initials
-        function getInitials(email) {
-            return email.split('@')[0].substring(0, 2).toUpperCase();
+        function getInputData() {
+            const urlInput = document.getElementById("url-input").value;
+            const fileInput = document.querySelector('input[type="file"]').files[0];
+            return urlInput || fileInput;
         }
 
-        // Modify the existing login function
-        function login() {
-            auth0Client.loginWithRedirect();
-        }
+    function showLanguageSelectionModal(inputData) {
+        const modal = document.getElementById("language-modal");
+        const userEmailSpan = document.getElementById("user-email");
+        const fileNameSpan = document.getElementById("file-name");
+        const jobIdSpan = document.getElementById("job-id");
 
-        // Modify the existing logout function
-        function logout() {
-            auth0Client.logout({ returnTo: window.location.origin });
-        }
-
-        // Add event listener for user circle click
-        if (elements.userCircle) {
-            elements.userCircle.addEventListener('click', () => {
-                elements.logoutTooltip.classList.toggle('hidden');
-            });
-        }
-
-        // Close the logout tooltip when clicking outside
-        document.addEventListener('click', (event) => {
-            if (!elements.userCircle.contains(event.target) && !elements.logoutTooltip.contains(event.target)) {
-                elements.logoutTooltip.classList.add('hidden');
-            }
-        });
-
-    // Initialize Auth0
-    initAuth0().catch((error) => console.error("Error initializing app:", error));
-});
-
-function getInputData() {
-    const urlInput = document.getElementById("url-input").value;
-    const fileInput = document.querySelector('input[type="file"]').files[0];
-    return urlInput || fileInput;
-}
-
-// New functions for modal functionality
-function showLanguageSelectionModal(inputData) {
-    const modal = document.getElementById("language-modal");
-    const userEmailSpan = document.getElementById("user-email");
-    const fileNameSpan = document.getElementById("file-name");
-    const jobIdSpan = document.getElementById("job-id");
-
-    // Set file name
-    if (inputData instanceof File) {
-        fileNameSpan.textContent = inputData.name;
-    } else if (typeof inputData === 'string') {
-        fileNameSpan.textContent = inputData;
-    } else {
-        fileNameSpan.textContent = "Unknown file";
-    }
-
-    // Get user email from Auth0
-    if (auth0Client) {
-        auth0Client.getUser().then(user => {
-            const email = user.email || user["https://platogram.com/user_email"] || "Unknown email";
-            userEmailSpan.textContent = email;
-        }).catch(error => {
-            console.error("Error getting user email:", error);
-            userEmailSpan.textContent = "Error fetching email";
-        });
-    } else {
-        console.warn("Auth0 client not initialized");
-        userEmailSpan.textContent = "Auth0 not initialized";
-    }
-
-    // Set job ID (you may want to generate this dynamically)
-    jobIdSpan.textContent = "0032";
-
-    modal.classList.remove("hidden");
-}
-
-function selectLanguage(lang) {
-    const selectedLanguageFlag = document.getElementById("selected-language-flag");
-    const selectedLanguage = document.getElementById("selected-language");
-    const languageOptions = document.getElementById("language-options");
-
-    if (lang === 'en') {
-        selectedLanguageFlag.textContent = "🇺🇸";
-        selectedLanguage.textContent = "En";
-    } else if (lang === 'es') {
-        selectedLanguageFlag.textContent = "🇪🇸";
-        selectedLanguage.textContent = "Es";
-    }
-
-    languageOptions.classList.add("hidden");
-}
-
-function closeLanguageModal() {
-    const modal = document.getElementById("language-modal");
-    modal.classList.add("hidden");
-}
-
-function initializeStripeIfNeeded() {
-    if (typeof stripe === 'undefined') {
-        console.warn('Stripe is not defined. Make sure to include Stripe.js');
-        // You might want to initialize Stripe here if it's not already done elsewhere
-    }
-}
-
-// Add event listeners to buttons
-        const convertButton = document.getElementById('convert-button');
-        if (convertButton) {
-          convertButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            onConvertClick();
-          });
-        }
-
-        const loginButton = document.getElementById('login-button');
-        if (loginButton) {
-          loginButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            login();
-          });
-        }
-
-        const logoutButton = document.getElementById('logout-button');
-        if (logoutButton) {
-          logoutButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            logout();
-          });
-        }
-
-        const donateButtons = document.querySelectorAll('[id^="donate-button"]');
-        donateButtons.forEach(button => {
-          button.addEventListener('click', (event) => {
-            event.preventDefault();
-            onDonateClick();
-          });
-        });
-
-        const resetButtons = document.querySelectorAll('[id^="reset-button"]');
-        resetButtons.forEach(button => {
-          button.addEventListener('click', (event) => {
-            event.preventDefault();
-            reset();
-          });
-        });
-    document.addEventListener('DOMContentLoaded', () => {
-        const userCircle = document.getElementById('user-circle');
-        const logoutTooltip = document.getElementById('logout-tooltip');
-        const loginButton = document.getElementById('login-button');
-
-        if (userCircle && logoutTooltip) {
-            userCircle.addEventListener('click', () => {
-                logoutTooltip.classList.toggle('hidden');
-            });
-
-            // Close the tooltip when clicking outside
-            document.addEventListener('click', (event) => {
-                if (!userCircle.contains(event.target) && !logoutTooltip.contains(event.target)) {
-                    logoutTooltip.classList.add('hidden');
-                }
-            });
-        }
-
-        // Function to update UI based on auth state
-         window.updateAuthUI = function(isAuthenticated, user) {
-        const loginButton = document.getElementById('login-button');
-        const userCircle = document.getElementById('user-circle');
-        const logoutTooltip = document.getElementById('logout-tooltip');
-
-        if (isAuthenticated && user) {
-            if (loginButton) loginButton.classList.add('hidden');
-            if (userCircle) {
-                userCircle.classList.remove('hidden');
-                userCircle.textContent = getInitials(user.email);
-            }
+        // Set file name
+        if (inputData instanceof File) {
+            fileNameSpan.textContent = inputData.name;
+        } else if (typeof inputData === 'string') {
+            fileNameSpan.textContent = inputData;
         } else {
-            if (loginButton) loginButton.classList.remove('hidden');
-            if (userCircle) userCircle.classList.add('hidden');
-            if (logoutTooltip) logoutTooltip.classList.add('hidden');
+            fileNameSpan.textContent = "Unknown file";
         }
-    };
 
-    function getInitials(email) {
-        return email.split('@')[0].substring(0, 2).toUpperCase();
+        // Get user email from Auth0
+        if (auth0Client) {
+            auth0Client.getUser().then(user => {
+                const email = user.email || user["https://platogram.com/user_email"] || "Unknown email";
+                userEmailSpan.textContent = email;
+            }).catch(error => {
+                console.error("Error getting user email:", error);
+                userEmailSpan.textContent = "Error fetching email";
+            });
+        } else {
+            console.warn("Auth0 client not initialized");
+            userEmailSpan.textContent = "Auth0 not initialized";
+        }
+
+        // Set job ID (you may want to generate this dynamically)
+        jobIdSpan.textContent = "0032";
+
+        modal.classList.remove("hidden");
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        const userCircle = document.getElementById('user-circle');
-        const logoutTooltip = document.getElementById('logout-tooltip');
+    function selectLanguage(lang) {
+        const selectedLanguageFlag = document.getElementById("selected-language-flag");
+        const selectedLanguage = document.getElementById("selected-language");
+        const languageOptions = document.getElementById("language-options");
 
-        if (userCircle) {
-            userCircle.addEventListener('click', () => {
-                if (logoutTooltip) logoutTooltip.classList.toggle('hidden');
-            });
+        if (lang === 'en') {
+            selectedLanguageFlag.textContent = "🇺🇸";
+            selectedLanguage.textContent = "En";
+        } else if (lang === 'es') {
+            selectedLanguageFlag.textContent = "🇪🇸";
+            selectedLanguage.textContent = "Es";
         }
 
-        document.addEventListener('click', (event) => {
-            if (userCircle && logoutTooltip && !userCircle.contains(event.target) && !logoutTooltip.contains(event.target)) {
-                logoutTooltip.classList.add('hidden');
+        languageOptions.classList.add("hidden");
+    }
+
+        function closeLanguageModal() {
+            const modal = document.getElementById("language-modal");
+            modal.classList.add("hidden");
+        }
+
+        function initializeStripeIfNeeded() {
+            if (typeof stripe === 'undefined') {
+                console.warn('Stripe is not defined. Make sure to include Stripe.js');
             }
-        });
-    });
+        }
 </script>
 </body>
 </html>

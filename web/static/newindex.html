@@ -706,18 +706,57 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (elements.convertButton) {
-        elements.convertButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            onConvertClick();
+    function toggleConvertButtonState(isActive, button) {
+        if (button) {
+            button.disabled = !isActive;
+            button.classList.toggle('opacity-50', !isActive);
+            button.classList.toggle('cursor-not-allowed', !isActive);
+        }
+    }
+
+    function toggleSections(hiddenSection, visibleSection) {
+        if (hiddenSection) hiddenSection.classList.add('hidden');
+        if (visibleSection) visibleSection.classList.remove('hidden');
+    }
+
+    function setupDragAndDrop(dropArea, filesHandler) {
+        if (!dropArea) return;
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, true), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, false), false);
+        });
+
+        dropArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            filesHandler(files);
         });
     }
 
-    if (elements.convertFileButton) {
-        elements.convertFileButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            onConvertClick();
-        });
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    function toggleHighlight(dropArea, isActive) {
+        dropArea.classList.toggle('border-blue-500', isActive);
+        dropArea.classList.toggle('bg-blue-50', isActive);
+    }
+
+    function handleFiles(files) {
+        if (files.length > 0) {
+            const file = files[0];
+            elements.fileNameDisplay.textContent = file.name;
+            toggleConvertButtonState(true, elements.convertFileButton);
+        }
     }
 
     // Language dropdown functionality
@@ -747,80 +786,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize Auth0
     initAuth0().catch((error) => console.error("Error initializing app:", error));
 });
-
-function toggleConvertButtonState(isActive, button) {
-    if (button) {
-        button.disabled = !isActive;
-        button.classList.toggle('opacity-50', !isActive);
-        button.classList.toggle('cursor-not-allowed', !isActive);
-    }
-}
-
-function toggleSections(hiddenSection, visibleSection) {
-    hiddenSection.classList.add('hidden');
-    visibleSection.classList.remove('hidden');
-}
-
-function setupDragAndDrop(dropArea, filesHandler) {
-
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, preventDefaults, false);
-    });
-
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, true), false);
-    });
-
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, false), false);
-    });
-
-    dropArea.addEventListener('drop', (e) => {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        filesHandler(files);
-    });
-}
-
-function preventDefaults(e) {
-    e.preventDefault();
-    e.stopPropagation();
-}
-
-function toggleHighlight(dropArea, isActive) {
-    dropArea.classList.toggle('border-blue-500', isActive);
-    dropArea.classList.toggle('bg-blue-50', isActive);
-}
-
-function handleFiles(files) {
-    const elements = {
-        fileNameDisplay: document.getElementById('file-name-display'),
-        convertFileButton: document.getElementById('convert-file-button'),
-    };
-
-    if (files.length > 0) {
-        const file = files[0];
-        elements.fileNameDisplay.textContent = file.name;
-        toggleConvertButtonState(true, elements.convertFileButton);
-    }
-}
-
-async function onConvertClick() {
-    try {
-        if (!auth0Client) throw new Error("Auth0 client not initialized");
-
-        const inputData = getInputData();
-
-        if (await auth0Client.isAuthenticated()) {
-            showLanguageSelectionModal(inputData);
-        } else {
-            login();
-        }
-    } catch (error) {
-        console.error("Error in onConvertClick:", error);
-        updateUIStatus("error", error.message);
-    }
-}
 
 function getInputData() {
     const urlInput = document.getElementById("url-input").value;
@@ -884,58 +849,6 @@ function closeLanguageModal() {
     const modal = document.getElementById("language-modal");
     modal.classList.add("hidden");
 }
-
-function toggleConvertButtonState(isActive, button) {
-    if (button) {
-        button.disabled = !isActive;
-        button.classList.toggle('opacity-50', !isActive);
-        button.classList.toggle('cursor-not-allowed', !isActive);
-    }
-}
-
-function toggleSections(hiddenSection, visibleSection) {
-    if (hiddenSection) hiddenSection.classList.add('hidden');
-    if (visibleSection) visibleSection.classList.remove('hidden');
-}
-
-function setupDragAndDrop(dropArea, filesHandler) {
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                dropArea.addEventListener(eventName, preventDefaults, false);
-            });
-
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, true), false);
-            });
-
-            ['dragleave', 'drop'].forEach(eventName => {
-                dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, false), false);
-            });
-
-            dropArea.addEventListener('drop', (e) => {
-                const dt = e.dataTransfer;
-                const files = dt.files;
-                filesHandler(files);
-            });
-        }
-
-function preventDefaults(e) {
-    e.preventDefault();
-    e.stopPropagation();
-}
-
-function toggleHighlight(dropArea, isActive) {
-    dropArea.classList.toggle('border-blue-500', isActive);
-    dropArea.classList.toggle('bg-blue-50', isActive);
-}
-
-function handleFiles(files) {
-            if (files.length > 0) {
-                const file = files[0];
-                elements.fileNameDisplay.textContent = file.name;
-                toggleConvertButtonState(true, elements.convertFileButton);
-            }
-        }
-    });
 
 function initializeStripeIfNeeded() {
     if (typeof stripe === 'undefined') {

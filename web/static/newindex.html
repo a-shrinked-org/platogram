@@ -668,16 +668,24 @@
         const fileNameSpan = document.getElementById("file-name");
         const jobIdSpan = document.getElementById("job-id");
 
-        // Set user email
-        auth0Client.getUser().then(user => {
-            userEmailSpan.textContent = user.email;
-        });
+        // Get user email from Auth0
+        try {
+            const token = await auth0Client.getTokenSilently();
+            const user = await auth0Client.getUser();
+            const email = user.email || user["https://platogram.com/user_email"] || "Unknown email";
+            userEmailSpan.textContent = email;
+        } catch (error) {
+            console.error("Error getting user email:", error);
+            userEmailSpan.textContent = "Error fetching email";
+        }
 
         // Set file name
         if (inputData instanceof File) {
             fileNameSpan.textContent = inputData.name;
-        } else {
+        } else if (typeof inputData === 'string') {
             fileNameSpan.textContent = inputData;
+        } else {
+            fileNameSpan.textContent = "Unknown file";
         }
 
         // Set job ID (you may want to generate this dynamically)
@@ -890,38 +898,23 @@
         initializeProcessingStage();
 
 
-       // Add event listener for language dropdown
-document.addEventListener('DOMContentLoaded', () => {
-            const languageDropdown = document.getElementById("language-dropdown");
-            const languageOptions = document.getElementById("language-options");
-
-            languageDropdown.addEventListener("click", () => {
-                languageOptions.classList.toggle("hidden");
-            });
-
-            // Close the dropdown when clicking outside
-            document.addEventListener("click", (event) => {
-                if (!languageDropdown.contains(event.target) && !languageOptions.contains(event.target)) {
-                    languageOptions.classList.add("hidden");
-                }
-            });
-        });
-
         // Add event listener for language dropdown
         document.addEventListener('DOMContentLoaded', () => {
             const languageDropdown = document.getElementById("language-dropdown");
             const languageOptions = document.getElementById("language-options");
 
-            languageDropdown.addEventListener("click", () => {
-                languageOptions.classList.toggle("hidden");
-            });
+            if (languageDropdown && languageOptions) {
+                languageDropdown.addEventListener("click", (event) => {
+                    event.stopPropagation();
+                    languageOptions.classList.toggle("hidden");
+                });
 
-            // Close the dropdown when clicking outside
-            document.addEventListener("click", (event) => {
-                if (!languageDropdown.contains(event.target) && !languageOptions.contains(event.target)) {
-                    languageOptions.classList.add("hidden");
-                }
-            });
+                document.addEventListener("click", (event) => {
+                    if (!languageDropdown.contains(event.target) && !languageOptions.contains(event.target)) {
+                        languageOptions.classList.add("hidden");
+                    }
+                });
+            }
         });
 
         if (elements.convertButton) {

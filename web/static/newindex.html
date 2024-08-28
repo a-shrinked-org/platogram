@@ -782,10 +782,81 @@
     languageOptions.classList.add("hidden");
   }
 
+  elements.urlInput.addEventListener('input', () => {
+            toggleConvertButtonState(elements.urlInput.value.trim() !== '', elements.convertButton);
+        });
+
+
+        elements.uploadFileButton.addEventListener('click', () => {
+            toggleSections(elements.inputSection, elements.fileUploadSection);
+        });
+
+
+        elements.backToUrlButton.addEventListener('click', () => {
+            toggleSections(elements.fileUploadSection, elements.inputSection);
+        });
+
+        // Обработка drag-and-drop
+        setupDragAndDrop(elements.fileDropArea, handleFiles);
+
+
+        elements.fileInput.addEventListener('change', (event) => {
+            handleFiles(event.target.files);
+        });
+
+
+        function initializeStripeIfNeeded() {
+            if (!stripe) {
+                initStripe();
+            }
+        }
+
   function closeLanguageModal() {
     const modal = document.getElementById("language-modal");
     modal.classList.add("hidden");
   }
+
+  function toggleConvertButtonState(isActive, button) {
+            button.disabled = !isActive;
+            button.classList.toggle('opacity-50', !isActive);
+            button.classList.toggle('cursor-not-allowed', !isActive);
+        }
+
+
+        function toggleSections(hiddenSection, visibleSection) {
+            hiddenSection.classList.add('hidden');
+            visibleSection.classList.remove('hidden');
+        }
+
+  function setupDragAndDrop(dropArea, filesHandler) {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, true), false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, false), false);
+            });
+
+            dropArea.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                filesHandler(files);
+            });
+        }
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function toggleHighlight(dropArea, isActive) {
+            dropArea.classList.toggle('border-blue-500', isActive);
+            dropArea.classList.toggle('bg-blue-50', isActive);
+        }
 </script>
 </body>
 </html>

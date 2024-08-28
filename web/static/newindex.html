@@ -150,7 +150,7 @@
             align-items: center;
             justify-content: center;
             font-size: 14px;
-            font-weight: bold;
+            font-weight: 500;
             cursor: pointer;
         }
         .logout-tooltip {
@@ -732,6 +732,21 @@
                 if (userCircle) userCircle.classList.add('hidden');
                 if (logoutTooltip) logoutTooltip.classList.add('hidden');
             }
+
+        if (userCircle && logoutTooltip) {
+            userCircle.addEventListener('click', (event) => {
+                event.stopPropagation(); // Prevent the click from immediately closing the tooltip
+                logoutTooltip.classList.toggle('hidden');
+            });
+
+            // Close the tooltip when clicking outside
+            document.addEventListener('click', (event) => {
+                if (!userCircle.contains(event.target) && !logoutTooltip.contains(event.target)) {
+                    logoutTooltip.classList.add('hidden');
+                }
+            });
+        }
+
         };
 
         function login() {

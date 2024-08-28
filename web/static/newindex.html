@@ -140,7 +140,42 @@
             border: 1px solid rgba(203, 213, 225, 0.4);
             background-color: #faf0e8;
         }
-
+        .user-circle {
+            width: 40px;
+            height: 40px;
+            background-color: #000;
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .logout-tooltip {
+            position: absolute;
+            right: 0;
+            top: 100%;
+            margin-top: 8px;
+            background-color: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: none;
+        }
+        .logout-tooltip button {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 8px 16px;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+        .logout-tooltip button:hover {
+            background-color: #f7fafc;
+        }
        
     </style>
 </head>
@@ -152,9 +187,12 @@
                 <div class="w-6 h-6 bg-slate-900"></div>
                 <span class="font-perfectly-nineties text-3xl">datacapture</span>
             </div>
-            <div class="auth-container">
-                <button id="login-button" class="text-blue-600 hover:underline">Log In</button>
-                <button id="logout-button" class="text-blue-600 hover:underline hidden">Log Out</button>
+            <div class="auth-container relative">
+                <button id="login-button" class="text-blue-600 hover:underline">Sign in</button>
+                <div id="user-circle" class="user-circle hidden"></div>
+                <div id="logout-tooltip" class="logout-tooltip">
+                    <button id="logout-button">Log out</button>
+                </div>
             </div>
         </header>
 
@@ -183,17 +221,21 @@
                 <div class="line"></div>
                 <div class="space-y-2 p-6 pt-4 upload-file-buttons">
                     <button id="upload-file-button"
-                        class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300">
-                        <svg class="w-6 h-6 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                        class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300 flex items-center">
+                        <svg class="w-6 h-6 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" clip-rule="evenodd" d="M10.4932 0C8.9858 0 7.53411 0.609919 6.45815 1.70862C5.59907 2.58611 5.03531 3.71852 4.84338 4.93849C3.66016 5.1281 2.55348 5.69589 1.68933 6.57758C0.61149 7.67734 0 9.17739 0 10.7492C0 12.3209 0.61149 13.821 1.68933 14.9207C2.76518 16.0184 4.21687 16.6293 5.72334 16.6293H6.43028C6.95726 16.6293 7.38482 16.1774 7.38482 15.6181C7.38482 15.0598 6.95726 14.6068 6.43028 14.6068H5.72334C4.70119 14.6068 3.72675 14.1917 3.01372 13.4638C2.30179 12.738 1.90905 11.7605 1.90905 10.7493C1.90905 9.73909 2.30181 8.76153 3.01372 8.03479C3.72665 7.30689 4.70106 6.89183 5.72334 6.89183C6.25131 6.89183 6.67788 6.43887 6.67788 5.88056C6.67788 4.86929 7.07163 3.89278 7.78254 3.16604C8.49547 2.43814 9.46989 2.02308 10.4929 2.02308C11.5161 2.02308 12.4895 2.43814 13.2025 3.16604C13.9145 3.89289 14.3072 4.8694 14.3072 5.88056C14.3072 6.43887 14.7348 6.89183 15.2617 6.89183H15.2767C16.2988 6.89183 17.2733 7.30689 17.9863 8.03479C18.6982 8.76164 19.0909 9.7392 19.0909 10.7493C19.0909 11.7606 18.6982 12.7381 17.9863 13.4638C17.2734 14.1917 16.2989 14.6068 15.2767 14.6068H14.7427C14.2157 14.6068 13.7882 15.0598 13.7882 15.6181C13.7882 16.1774 14.2157 16.6293 14.7427 16.6293H15.2767C16.7831 16.6293 18.2347 16.0184 19.3107 14.9207C20.3885 13.821 21 12.3209 21 10.7492C21 9.17739 20.3885 7.67731 19.3107 6.57758C18.4436 5.69166 17.331 5.12389 16.1429 4.93638C15.95 3.7176 15.3862 2.58624 14.5281 1.70867C13.4522 0.609973 11.9997 0 10.4932 0ZM11.4547 18.9887C11.4547 19.5481 11.0271 20 10.5001 20C9.97315 20 9.54559 19.5481 9.54559 18.9887V10.277L8.00838 11.9824C7.64445 12.3859 7.04091 12.4017 6.65909 12.0151C6.27827 11.6295 6.26335 10.9901 6.62827 10.5856L9.81006 7.0545C9.99003 6.85435 10.2396 6.74162 10.5001 6.74162C10.7606 6.74162 11.0102 6.85434 11.1901 7.0545L14.3719 10.5856C14.7359 10.9901 14.7219 11.6295 14.3411 12.0151C13.9593 12.4017 13.3558 12.3859 12.9918 11.9824L11.4546 10.277L11.4547 18.9887Z" fill="#3D3D3D"/>
-                        </svg> Upload a file
+                        </svg>
+                        <span>Upload a file</span>
                     </button>
                     <button
-                        class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300 opacity-50 cursor-not-allowed">
-                        <svg class="w-6 h-6 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M1.68266 15.9979C1.32719 15.9963 1.03404 15.7191 1.01045 15.3634V15.3617C0.979283 15.3626 1.02983 2.76967 1.00877 2.75626C1.01045 1.78711 1.79385 1.00133 2.76005 1.00049C2.7828 1.00218 7.41328 0.998798 7.43355 1.00049C8.57749 1.00049 8.99867 1.96455 9.27834 2.60418C9.56643 3.26238 9.70964 3.39249 9.90676 3.40263H15.7057L15.7066 3.40179C16.6728 3.40348 17.4562 4.18926 17.457 5.1584V8.15376H19.2512C19.9024 8.16136 20.4979 8.52723 20.7995 9.10683C21.1011 9.68646 21.0598 10.3852 20.6934 10.926L17.334 15.7117C17.2077 15.8908 17.0021 15.9981 16.7831 15.9981C16.7781 16.004 1.68786 15.9939 1.6829 15.9981L1.68266 15.9979ZM2.97991 14.6461H16.4335L19.589 10.1502C19.6766 10.0243 19.6867 9.86041 19.6151 9.72522C19.5444 9.58919 19.4037 9.5047 19.2512 9.50554H6.79677C6.66114 9.5047 6.53394 9.57145 6.4573 9.68383L2.97991 14.6461ZM7.42503 2.35229C7.42588 2.34891 2.76081 2.35483 2.75995 2.35229C2.53757 2.35229 2.35729 2.53311 2.35645 2.75617V13.1843L5.3561 8.90219C5.68461 8.43072 6.22289 8.15104 6.79655 8.15359H16.109V5.15823C16.109 4.93518 15.9288 4.75435 15.7064 4.75351H9.89665C8.74766 4.75351 8.32478 3.7869 8.04513 3.14645C7.75957 2.49585 7.64838 2.35221 7.42598 2.35221L7.42503 2.35229Z" fill="#3D3D3D" stroke="#3D3D3D" stroke-width="0.4"/>
-                        </svg> Add a folder
-                        <span class="float-right text-sm text-gray-500">Coming soon</span>
+                        class="w-full text-left py-2 px-4 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300 opacity-50 cursor-not-allowed flex items-center justify-between">
+                        <div class="flex items-center">
+                            <svg class="w-6 h-6 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M1.68266 15.9979C1.32719 15.9963 1.03404 15.7191 1.01045 15.3634V15.3617C0.979283 15.3626 1.02983 2.76967 1.00877 2.75626C1.01045 1.78711 1.79385 1.00133 2.76005 1.00049C2.7828 1.00218 7.41328 0.998798 7.43355 1.00049C8.57749 1.00049 8.99867 1.96455 9.27834 2.60418C9.56643 3.26238 9.70964 3.39249 9.90676 3.40263H15.7057L15.7066 3.40179C16.6728 3.40348 17.4562 4.18926 17.457 5.1584V8.15376H19.2512C19.9024 8.16136 20.4979 8.52723 20.7995 9.10683C21.1011 9.68646 21.0598 10.3852 20.6934 10.926L17.334 15.7117C17.2077 15.8908 17.0021 15.9981 16.7831 15.9981C16.7781 16.004 1.68786 15.9939 1.6829 15.9981L1.68266 15.9979ZM2.97991 14.6461H16.4335L19.589 10.1502C19.6766 10.0243 19.6867 9.86041 19.6151 9.72522C19.5444 9.58919 19.4037 9.5047 19.2512 9.50554H6.79677C6.66114 9.5047 6.53394 9.57145 6.4573 9.68383L2.97991 14.6461ZM7.42503 2.35229C7.42588 2.34891 2.76081 2.35483 2.75995 2.35229C2.53757 2.35229 2.35729 2.53311 2.35645 2.75617V13.1843L5.3561 8.90219C5.68461 8.43072 6.22289 8.15104 6.79655 8.15359H16.109V5.15823C16.109 4.93518 15.9288 4.75435 15.7064 4.75351H9.89665C8.74766 4.75351 8.32478 3.7869 8.04513 3.14645C7.75957 2.49585 7.64838 2.35221 7.42598 2.35221L7.42503 2.35229Z" fill="#3D3D3D" stroke="#3D3D3D" stroke-width="0.4"/>
+                            </svg>
+                            <span>Add a folder</span>
+                        </div>
+                        <span class="text-sm text-gray-500">Coming soon</span>
                     </button>
                 </div>
             </div>
@@ -826,6 +868,50 @@ document.addEventListener('DOMContentLoaded', () => {
         if (englishOption) englishOption.addEventListener("click", () => selectLanguage("en"));
         if (spanishOption) spanishOption.addEventListener("click", () => selectLanguage("es"));
     }
+
+        // New login right corner thing
+
+        // New function to update UI based on auth state
+        function updateAuthUI(isAuthenticated, user) {
+            if (isAuthenticated) {
+                elements.loginButton.classList.add('hidden');
+                elements.userCircle.classList.remove('hidden');
+                elements.userCircle.textContent = getInitials(user.email);
+            } else {
+                elements.loginButton.classList.remove('hidden');
+                elements.userCircle.classList.add('hidden');
+                elements.logoutTooltip.classList.add('hidden');
+            }
+        }
+
+        // New function to get user initials
+        function getInitials(email) {
+            return email.split('@')[0].substring(0, 2).toUpperCase();
+        }
+
+        // Modify the existing login function
+        function login() {
+            auth0Client.loginWithRedirect();
+        }
+
+        // Modify the existing logout function
+        function logout() {
+            auth0Client.logout({ returnTo: window.location.origin });
+        }
+
+        // Add event listener for user circle click
+        if (elements.userCircle) {
+            elements.userCircle.addEventListener('click', () => {
+                elements.logoutTooltip.classList.toggle('hidden');
+            });
+        }
+
+        // Close the logout tooltip when clicking outside
+        document.addEventListener('click', (event) => {
+            if (!elements.userCircle.contains(event.target) && !elements.logoutTooltip.contains(event.target)) {
+                elements.logoutTooltip.classList.add('hidden');
+            }
+        });
 
     // Initialize Auth0
     initAuth0().catch((error) => console.error("Error initializing app:", error));

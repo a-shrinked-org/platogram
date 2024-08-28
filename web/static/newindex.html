@@ -657,81 +657,126 @@
 <script src="https://js.stripe.com/v3/"></script>
 <script src="https://platogram.vercel.app/web/app.js"></script>
 <script>
-  document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => {
+    // Define elements object
+    const elements = {
+        urlInput: document.getElementById('url-input'),
+        convertButton: document.getElementById('convert-button'),
+        uploadFileButton: document.getElementById('upload-file-button'),
+        backToUrlButton: document.getElementById('back-to-url'),
+        inputSection: document.getElementById('input-section'),
+        fileUploadSection: document.getElementById('file-upload-section'),
+        fileDropArea: document.getElementById('file-drop-area'),
+        fileInput: document.querySelector('input[type="file"]'),
+        fileNameDisplay: document.getElementById('file-name-display')
+    };
+
     // Initialize processing stage updates
     initializeProcessingStage();
 
     // Add event listeners to buttons
-    const convertButton = document.getElementById('convert-button');
-    if (convertButton) {
-      convertButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        onConvertClick();
-      });
+    if (elements.convertButton) {
+        elements.convertButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            onConvertClick();
+        });
     }
 
     const loginButton = document.getElementById('login-button');
     if (loginButton) {
-      loginButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        login();
-      });
+        loginButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            login();
+        });
     }
 
     const logoutButton = document.getElementById('logout-button');
     if (logoutButton) {
-      logoutButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        logout();
-      });
+        logoutButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            logout();
+        });
     }
 
     const donateButtons = document.querySelectorAll('[id^="donate-button"]');
     donateButtons.forEach(button => {
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        onDonateClick();
-      });
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            onDonateClick();
+        });
     });
 
     const resetButtons = document.querySelectorAll('[id^="reset-button"]');
     resetButtons.forEach(button => {
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        reset();
-      });
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            reset();
+        });
     });
+
+    // URL input listener
+    if (elements.urlInput) {
+        elements.urlInput.addEventListener('input', () => {
+            toggleConvertButtonState(elements.urlInput.value.trim() !== '', elements.convertButton);
+        });
+    }
+
+    // Upload file button listener
+    if (elements.uploadFileButton) {
+        elements.uploadFileButton.addEventListener('click', () => {
+            toggleSections(elements.inputSection, elements.fileUploadSection);
+        });
+    }
+
+    // Back to URL button listener
+    if (elements.backToUrlButton) {
+        elements.backToUrlButton.addEventListener('click', () => {
+            toggleSections(elements.fileUploadSection, elements.inputSection);
+        });
+    }
+
+    // Setup drag and drop
+    if (elements.fileDropArea) {
+        setupDragAndDrop(elements.fileDropArea, handleFiles);
+    }
+
+    // File input change listener
+    if (elements.fileInput) {
+        elements.fileInput.addEventListener('change', (event) => {
+            handleFiles(event.target.files);
+        });
+    }
 
     // New modal functionality
     const languageDropdown = document.getElementById("language-dropdown");
     const languageOptions = document.getElementById("language-options");
 
     if (languageDropdown && languageOptions) {
-      languageDropdown.addEventListener("click", (event) => {
-        event.stopPropagation();
-        languageOptions.classList.toggle("hidden");
-      });
+        languageDropdown.addEventListener("click", (event) => {
+            event.stopPropagation();
+            languageOptions.classList.toggle("hidden");
+        });
 
-      document.addEventListener("click", (event) => {
-        if (!languageDropdown.contains(event.target) && !languageOptions.contains(event.target)) {
-          languageOptions.classList.add("hidden");
-        }
-      });
+        document.addEventListener("click", (event) => {
+            if (!languageDropdown.contains(event.target) && !languageOptions.contains(event.target)) {
+                languageOptions.classList.add("hidden");
+            }
+        });
 
-      // Add event listeners for language selection
-      const englishOption = languageOptions.querySelector('button[data-lang="en"]');
-      const spanishOption = languageOptions.querySelector('button[data-lang="es"]');
+        // Add event listeners for language selection
+        const englishOption = languageOptions.querySelector('button[data-lang="en"]');
+        const spanishOption = languageOptions.querySelector('button[data-lang="es"]');
 
-      if (englishOption) englishOption.addEventListener("click", () => selectLanguage("en"));
-      if (spanishOption) spanishOption.addEventListener("click", () => selectLanguage("es"));
+        if (englishOption) englishOption.addEventListener("click", () => selectLanguage("en"));
+        if (spanishOption) spanishOption.addEventListener("click", () => selectLanguage("es"));
     }
 
     // Initialize Auth0
     initAuth0().catch((error) => console.error("Error initializing app:", error));
-  });
+});
 
-  // New functions for modal functionality
-  function showLanguageSelectionModal(inputData) {
+// New functions for modal functionality
+function showLanguageSelectionModal(inputData) {
     const modal = document.getElementById("language-modal");
     const userEmailSpan = document.getElementById("user-email");
     const fileNameSpan = document.getElementById("file-name");
@@ -739,124 +784,110 @@
 
     // Set file name
     if (inputData instanceof File) {
-      fileNameSpan.textContent = inputData.name;
+        fileNameSpan.textContent = inputData.name;
     } else if (typeof inputData === 'string') {
-      fileNameSpan.textContent = inputData;
+        fileNameSpan.textContent = inputData;
     } else {
-      fileNameSpan.textContent = "Unknown file";
+        fileNameSpan.textContent = "Unknown file";
     }
 
     // Get user email from Auth0
     if (auth0Client) {
-      auth0Client.getUser().then(user => {
-        const email = user.email || user["https://platogram.com/user_email"] || "Unknown email";
-        userEmailSpan.textContent = email;
-      }).catch(error => {
-        console.error("Error getting user email:", error);
-        userEmailSpan.textContent = "Error fetching email";
-      });
+        auth0Client.getUser().then(user => {
+            const email = user.email || user["https://platogram.com/user_email"] || "Unknown email";
+            userEmailSpan.textContent = email;
+        }).catch(error => {
+            console.error("Error getting user email:", error);
+            userEmailSpan.textContent = "Error fetching email";
+        });
     } else {
-      console.warn("Auth0 client not initialized");
-      userEmailSpan.textContent = "Auth0 not initialized";
+        console.warn("Auth0 client not initialized");
+        userEmailSpan.textContent = "Auth0 not initialized";
     }
 
     // Set job ID (you may want to generate this dynamically)
     jobIdSpan.textContent = "0032";
 
     modal.classList.remove("hidden");
-  }
+}
 
-  function selectLanguage(lang) {
+function selectLanguage(lang) {
     const selectedLanguageFlag = document.getElementById("selected-language-flag");
     const selectedLanguage = document.getElementById("selected-language");
     const languageOptions = document.getElementById("language-options");
 
     if (lang === 'en') {
-      selectedLanguageFlag.textContent = "🇺🇸";
-      selectedLanguage.textContent = "En";
+        selectedLanguageFlag.textContent = "🇺🇸";
+        selectedLanguage.textContent = "En";
     } else if (lang === 'es') {
-      selectedLanguageFlag.textContent = "🇪🇸";
-      selectedLanguage.textContent = "Es";
+        selectedLanguageFlag.textContent = "🇪🇸";
+        selectedLanguage.textContent = "Es";
     }
 
     languageOptions.classList.add("hidden");
-  }
+}
 
-  elements.urlInput.addEventListener('input', () => {
-            toggleConvertButtonState(elements.urlInput.value.trim() !== '', elements.convertButton);
-        });
-
-
-        elements.uploadFileButton.addEventListener('click', () => {
-            toggleSections(elements.inputSection, elements.fileUploadSection);
-        });
-
-
-        elements.backToUrlButton.addEventListener('click', () => {
-            toggleSections(elements.fileUploadSection, elements.inputSection);
-        });
-
-        // Обработка drag-and-drop
-        setupDragAndDrop(elements.fileDropArea, handleFiles);
-
-
-        elements.fileInput.addEventListener('change', (event) => {
-            handleFiles(event.target.files);
-        });
-
-
-        function initializeStripeIfNeeded() {
-            if (!stripe) {
-                initStripe();
-            }
-        }
-
-  function closeLanguageModal() {
+function closeLanguageModal() {
     const modal = document.getElementById("language-modal");
     modal.classList.add("hidden");
-  }
+}
 
-  function toggleConvertButtonState(isActive, button) {
-            button.disabled = !isActive;
-            button.classList.toggle('opacity-50', !isActive);
-            button.classList.toggle('cursor-not-allowed', !isActive);
-        }
+function toggleConvertButtonState(isActive, button) {
+    if (button) {
+        button.disabled = !isActive;
+        button.classList.toggle('opacity-50', !isActive);
+        button.classList.toggle('cursor-not-allowed', !isActive);
+    }
+}
 
+function toggleSections(hiddenSection, visibleSection) {
+    if (hiddenSection) hiddenSection.classList.add('hidden');
+    if (visibleSection) visibleSection.classList.remove('hidden');
+}
 
-        function toggleSections(hiddenSection, visibleSection) {
-            hiddenSection.classList.add('hidden');
-            visibleSection.classList.remove('hidden');
-        }
+function setupDragAndDrop(dropArea, filesHandler) {
+    if (!dropArea) return;
 
-  function setupDragAndDrop(dropArea, filesHandler) {
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                dropArea.addEventListener(eventName, preventDefaults, false);
-            });
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+    });
 
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, true), false);
-            });
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, true), false);
+    });
 
-            ['dragleave', 'drop'].forEach(eventName => {
-                dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, false), false);
-            });
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, false), false);
+    });
 
-            dropArea.addEventListener('drop', (e) => {
-                const dt = e.dataTransfer;
-                const files = dt.files;
-                filesHandler(files);
-            });
-        }
+    dropArea.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        filesHandler(files);
+    });
+}
 
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
 
-        function toggleHighlight(dropArea, isActive) {
-            dropArea.classList.toggle('border-blue-500', isActive);
-            dropArea.classList.toggle('bg-blue-50', isActive);
-        }
-</script>
+function toggleHighlight(dropArea, isActive) {
+    dropArea.classList.toggle('border-blue-500', isActive);
+    dropArea.classList.toggle('bg-blue-50', isActive);
+}
+
+function handleFiles(files) {
+    // Implement file handling logic here
+    console.log('Files received:', files);
+    // You may want to update UI or process the files here
+}
+
+function initializeStripeIfNeeded() {
+    if (typeof stripe === 'undefined') {
+        console.warn('Stripe is not defined. Make sure to include Stripe.js');
+        // You might want to initialize Stripe here if it's not already done elsewhere
+    }
+}
 </body>
 </html>

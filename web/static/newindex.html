@@ -757,12 +757,11 @@ function toggleConvertButtonState(isActive, button) {
 }
 
 function toggleSections(hiddenSection, visibleSection) {
-    if (hiddenSection) hiddenSection.classList.add('hidden');
-    if (visibleSection) visibleSection.classList.remove('hidden');
+    hiddenSection.classList.add('hidden');
+    visibleSection.classList.remove('hidden');
 }
 
 function setupDragAndDrop(dropArea, filesHandler) {
-    if (!dropArea) return;
 
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         dropArea.addEventListener(eventName, preventDefaults, false);
@@ -900,26 +899,24 @@ function toggleSections(hiddenSection, visibleSection) {
 }
 
 function setupDragAndDrop(dropArea, filesHandler) {
-    if (!dropArea) return;
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
 
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, preventDefaults, false);
-    });
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, true), false);
+            });
 
-    ['dragenter', 'dragover'].forEach(eventName => {
-        dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, true), false);
-    });
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, false), false);
+            });
 
-    ['dragleave', 'drop'].forEach(eventName => {
-        dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, false), false);
-    });
-
-    dropArea.addEventListener('drop', (e) => {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        filesHandler(files);
-    });
-}
+            dropArea.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                filesHandler(files);
+            });
+        }
 
 function preventDefaults(e) {
     e.preventDefault();
@@ -932,10 +929,13 @@ function toggleHighlight(dropArea, isActive) {
 }
 
 function handleFiles(files) {
-    // Implement file handling logic here
-    console.log('Files received:', files);
-    // You may want to update UI or process the files here
-}
+            if (files.length > 0) {
+                const file = files[0];
+                elements.fileNameDisplay.textContent = file.name;
+                toggleConvertButtonState(true, elements.convertFileButton);
+            }
+        }
+    });
 
 function initializeStripeIfNeeded() {
     if (typeof stripe === 'undefined') {

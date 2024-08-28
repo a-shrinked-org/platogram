@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="bg-white">
 
 <head>
     <meta charset="UTF-8">
@@ -190,8 +190,8 @@
             <div class="auth-container relative">
                 <button id="login-button" class="text-blue-600 hover:underline">Sign in</button>
                 <div id="user-circle" class="user-circle hidden"></div>
-                <div id="logout-tooltip" class="logout-tooltip">
-                    <button id="logout-button">Log out</button>
+                <div id="logout-tooltip" class="logout-tooltip hidden">
+                    <button id="logout-button" onclick="logout()">Log out</button>
                 </div>
             </div>
         </header>
@@ -1046,21 +1046,43 @@ function initializeStripeIfNeeded() {
         }
 
         // Function to update UI based on auth state
-        window.updateAuthUI = (isAuthenticated, user) => {
-            if (isAuthenticated && user) {
-                loginButton.classList.add('hidden');
+         window.updateAuthUI = function(isAuthenticated, user) {
+        const loginButton = document.getElementById('login-button');
+        const userCircle = document.getElementById('user-circle');
+        const logoutTooltip = document.getElementById('logout-tooltip');
+
+        if (isAuthenticated && user) {
+            if (loginButton) loginButton.classList.add('hidden');
+            if (userCircle) {
                 userCircle.classList.remove('hidden');
                 userCircle.textContent = getInitials(user.email);
-            } else {
-                loginButton.classList.remove('hidden');
-                userCircle.classList.add('hidden');
+            }
+        } else {
+            if (loginButton) loginButton.classList.remove('hidden');
+            if (userCircle) userCircle.classList.add('hidden');
+            if (logoutTooltip) logoutTooltip.classList.add('hidden');
+        }
+    };
+
+    function getInitials(email) {
+        return email.split('@')[0].substring(0, 2).toUpperCase();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const userCircle = document.getElementById('user-circle');
+        const logoutTooltip = document.getElementById('logout-tooltip');
+
+        if (userCircle) {
+            userCircle.addEventListener('click', () => {
+                if (logoutTooltip) logoutTooltip.classList.toggle('hidden');
+            });
+        }
+
+        document.addEventListener('click', (event) => {
+            if (userCircle && logoutTooltip && !userCircle.contains(event.target) && !logoutTooltip.contains(event.target)) {
                 logoutTooltip.classList.add('hidden');
             }
-        };
-
-        function getInitials(email) {
-            return email.split('@')[0].substring(0, 2).toUpperCase();
-        }
+        });
     });
 </script>
 </body>

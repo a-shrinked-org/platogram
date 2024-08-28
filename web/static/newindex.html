@@ -556,32 +556,47 @@
         </footer>
     </div>
 
-   <div id="language-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-md md:max-w-lg lg:max-w-xl p-6">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="font-perfectly-nineties text-2xl text-gray-800">Knowledge Extraction Job #<span id="job-id">00000</span></h3>
-            <button onclick="closeLanguageModal()" class="text-gray-400 hover:text-gray-600">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-
-        <p class="text-gray-600 mb-6">
-            We'll craft a well-organized, readable document delivered straight to your inbox.
-            Processing time varies based on content length and server load, typically ranging from 15 minutes to a few hours.
-        </p>
-
-        <div class="mb-4">
-            <p class="text-sm text-gray-600 mb-2">Job details for <span id="user-email"></span></p>
-            <div class="flex items-center bg-gray-100 rounded-md p-2">
-                <svg class="w-5 h-5 text-gray-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                </svg>
-                <span id="file-name" class="text-gray-700"></span>
-                <span class="ml-auto bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded">En</span>
+    <div id="language-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-md md:max-w-lg lg:max-w-xl p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-perfectly-nineties text-2xl text-gray-800">Knowledge Extraction Job #<span id="job-id">0032</span></h3>
+                <button onclick="closeLanguageModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
-        </div>
+
+            <p class="text-gray-600 mb-6">
+                We'll craft a well-organized, readable document delivered straight to your inbox.
+                Processing time varies based on content length and server load, typically ranging from 15 minutes to a few hours.
+            </p>
+
+            <div class="mb-4">
+                <p class="text-sm text-gray-600 mb-2">Job details for <span id="user-email"></span></p>
+                <div class="flex items-center bg-gray-100 rounded-md p-2">
+                    <svg class="w-5 h-5 text-gray-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    <span id="file-name" class="text-gray-700"></span>
+                    <div class="ml-auto relative">
+                        <button id="language-dropdown" class="flex items-center bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded">
+                            <span id="selected-language-flag" class="mr-1">🇺🇸</span>
+                            <span id="selected-language">En</span>
+                        </button>
+                        <div id="language-options" class="hidden absolute right-0 mt-2 w-24 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5">
+                            <div class="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                                <button class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left" role="menuitem" onclick="selectLanguage('en')">
+                                    <span class="mr-2">🇺🇸</span>English
+                                </button>
+                                <button class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left" role="menuitem" onclick="selectLanguage('es')">
+                                    <span class="mr-2">🇪🇸</span>Spanish
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
         <div class="mb-6">
             <div class="flex items-center mb-2">
@@ -642,6 +657,34 @@
 <script>
 
     let stripe, elements, card;
+
+    // Add this at the beginning of your file
+    import countryFlagEmoji from "country-flag-emoji";
+
+    // Add these new functions
+    function showLanguageSelectionModal(inputData) {
+        const modal = document.getElementById("language-modal");
+        const userEmailSpan = document.getElementById("user-email");
+        const fileNameSpan = document.getElementById("file-name");
+        const jobIdSpan = document.getElementById("job-id");
+
+        // Set user email
+        auth0Client.getUser().then(user => {
+            userEmailSpan.textContent = user.email;
+        });
+
+        // Set file name
+        if (inputData instanceof File) {
+            fileNameSpan.textContent = inputData.name;
+        } else {
+            fileNameSpan.textContent = inputData;
+        }
+
+        // Set job ID (you may want to generate this dynamically)
+        jobIdSpan.textContent = "0032";
+
+        modal.classList.remove("hidden");
+    }
 
     function initStripe() {
         const modal = document.getElementById('language-modal');
@@ -847,12 +890,39 @@
         initializeProcessingStage();
 
 
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') {
-                closeLanguageModal();
-            }
+       // Add event listener for language dropdown
+document.addEventListener('DOMContentLoaded', () => {
+            const languageDropdown = document.getElementById("language-dropdown");
+            const languageOptions = document.getElementById("language-options");
+
+            languageDropdown.addEventListener("click", () => {
+                languageOptions.classList.toggle("hidden");
+            });
+
+            // Close the dropdown when clicking outside
+            document.addEventListener("click", (event) => {
+                if (!languageDropdown.contains(event.target) && !languageOptions.contains(event.target)) {
+                    languageOptions.classList.add("hidden");
+                }
+            });
         });
 
+        // Add event listener for language dropdown
+        document.addEventListener('DOMContentLoaded', () => {
+            const languageDropdown = document.getElementById("language-dropdown");
+            const languageOptions = document.getElementById("language-options");
+
+            languageDropdown.addEventListener("click", () => {
+                languageOptions.classList.toggle("hidden");
+            });
+
+            // Close the dropdown when clicking outside
+            document.addEventListener("click", (event) => {
+                if (!languageDropdown.contains(event.target) && !languageOptions.contains(event.target)) {
+                    languageOptions.classList.add("hidden");
+                }
+            });
+        });
 
         if (elements.convertButton) {
             elements.convertButton.addEventListener('click', (event) => {

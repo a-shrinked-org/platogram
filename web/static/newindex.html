@@ -658,61 +658,20 @@
 <script src="https://platogram.vercel.app/web/app.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // Define elements object
     const elements = {
         urlInput: document.getElementById('url-input'),
-        convertButton: document.getElementById('convert-button'),
         uploadFileButton: document.getElementById('upload-file-button'),
-        backToUrlButton: document.getElementById('back-to-url'),
-        inputSection: document.getElementById('input-section'),
         fileUploadSection: document.getElementById('file-upload-section'),
+        inputSection: document.getElementById('input-section'),
+        backToUrlButton: document.getElementById('back-to-url'),
         fileDropArea: document.getElementById('file-drop-area'),
         fileInput: document.querySelector('input[type="file"]'),
-        fileNameDisplay: document.getElementById('file-name-display')
+        fileNameDisplay: document.getElementById('file-name-display'),
+        convertButton: document.getElementById('convert-button'),
+        convertFileButton: document.getElementById('convert-file-button'),
     };
 
-    // Initialize processing stage updates
     initializeProcessingStage();
-
-    // Add event listeners to buttons
-    if (elements.convertButton) {
-        elements.convertButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            onConvertClick();
-        });
-    }
-
-    const loginButton = document.getElementById('login-button');
-    if (loginButton) {
-        loginButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            login();
-        });
-    }
-
-    const logoutButton = document.getElementById('logout-button');
-    if (logoutButton) {
-        logoutButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            logout();
-        });
-    }
-
-    const donateButtons = document.querySelectorAll('[id^="donate-button"]');
-    donateButtons.forEach(button => {
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            onDonateClick();
-        });
-    });
-
-    const resetButtons = document.querySelectorAll('[id^="reset-button"]');
-    resetButtons.forEach(button => {
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            reset();
-        });
-    });
 
     // URL input listener
     if (elements.urlInput) {
@@ -747,7 +706,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // New modal functionality
+    if (elements.convertButton) {
+        elements.convertButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            onConvertClick();
+        });
+    }
+
+    if (elements.convertFileButton) {
+        elements.convertFileButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            onConvertClick();
+        });
+    }
+
+    // Language dropdown functionality
     const languageDropdown = document.getElementById("language-dropdown");
     const languageOptions = document.getElementById("language-options");
 
@@ -774,6 +747,87 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize Auth0
     initAuth0().catch((error) => console.error("Error initializing app:", error));
 });
+
+function toggleConvertButtonState(isActive, button) {
+    if (button) {
+        button.disabled = !isActive;
+        button.classList.toggle('opacity-50', !isActive);
+        button.classList.toggle('cursor-not-allowed', !isActive);
+    }
+}
+
+function toggleSections(hiddenSection, visibleSection) {
+    if (hiddenSection) hiddenSection.classList.add('hidden');
+    if (visibleSection) visibleSection.classList.remove('hidden');
+}
+
+function setupDragAndDrop(dropArea, filesHandler) {
+    if (!dropArea) return;
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, true), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, false), false);
+    });
+
+    dropArea.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        filesHandler(files);
+    });
+}
+
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+function toggleHighlight(dropArea, isActive) {
+    dropArea.classList.toggle('border-blue-500', isActive);
+    dropArea.classList.toggle('bg-blue-50', isActive);
+}
+
+function handleFiles(files) {
+    const elements = {
+        fileNameDisplay: document.getElementById('file-name-display'),
+        convertFileButton: document.getElementById('convert-file-button'),
+    };
+
+    if (files.length > 0) {
+        const file = files[0];
+        elements.fileNameDisplay.textContent = file.name;
+        toggleConvertButtonState(true, elements.convertFileButton);
+    }
+}
+
+async function onConvertClick() {
+    try {
+        if (!auth0Client) throw new Error("Auth0 client not initialized");
+
+        const inputData = getInputData();
+
+        if (await auth0Client.isAuthenticated()) {
+            showLanguageSelectionModal(inputData);
+        } else {
+            login();
+        }
+    } catch (error) {
+        console.error("Error in onConvertClick:", error);
+        updateUIStatus("error", error.message);
+    }
+}
+
+function getInputData() {
+    const urlInput = document.getElementById("url-input").value;
+    const fileInput = document.querySelector('input[type="file"]').files[0];
+    return urlInput || fileInput;
+}
 
 // New functions for modal functionality
 function showLanguageSelectionModal(inputData) {

@@ -785,17 +785,6 @@
                 logoutTooltip: document.getElementById('logout-tooltip'),
             };
 
-            const submitJobButton = document.getElementById('submit-btn');
-            if (submitJobButton) {
-                submitJobButton.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    handleSubmit(event);
-                });
-                console.log('Submit job button listener added');
-            } else {
-                console.error('Submit job button not found');
-            }
-
             initializeProcessingStage();
 
             // URL input listener

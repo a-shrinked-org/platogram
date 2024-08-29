@@ -179,6 +179,12 @@ function initStripe() {
   return stripePromise;
 }
 
+document.addEventListener("DOMContentLoaded", () => {
+
+  initStripe();
+
+});
+
 function getPriceFromUI() {
   const coffeePrice = document.getElementById('coffee-price').textContent;
   const price = parseFloat(coffeePrice.replace('$', '')) * 100; // Convert to cents
@@ -186,7 +192,7 @@ function getPriceFromUI() {
 }
 
 async function createCheckoutSession(price, lang) {
-  const stripe = await initStripe();
+  const stripe = initStripe();
 
   const response = await fetch('https://platogram.vercel.app/create-checkout-session', {
     method: 'POST',
@@ -218,16 +224,21 @@ async function handleSubmit(event) {
     updateUIStatus("running");
     await postToConvert(inputData, selectedLanguage, null, 0);
   } else {
-    const session = await createCheckoutSession(price, selectedLanguage);
-    if (session) {
-      const stripe = await initStripe();
-      const result = await stripe.redirectToCheckout({
-        sessionId: session.id
-      });
-      if (result.error) {
-        console.error(result.error.message);
-        updateUIStatus('error', result.error.message);
+    try {
+      const stripe = initStripe();
+      const session = await createCheckoutSession(price, selectedLanguage);
+      if (session) {
+        const result = await stripe.redirectToCheckout({
+          sessionId: session.id
+        });
+        if (result.error) {
+          console.error(result.error.message);
+          updateUIStatus('error', result.error.message);
+        }
       }
+    } catch (error) {
+      console.error('Error in handleSubmit:', error);
+      updateUIStatus('error', 'An error occurred while processing your request.');
     }
   }
 }

@@ -568,14 +568,14 @@ document.addEventListener("DOMContentLoaded", () => {
     console.error("One or more elements for file upload not found");
   }
 
-  const submitBtn = document.getElementById("submit-btn");
+  const submitBtn = document.getElementById("submit-job");
   if (submitBtn) {
     submitBtn.addEventListener("click", handleSubmit);
   } else {
     console.error("Submit button not found");
   }
 
-  const cancelBtn = document.getElementById("cancel-btn");
+  const cancelBtn = document.getElementById("cancel-job");
   if (cancelBtn) {
     cancelBtn.addEventListener("click", () => {
       document.getElementById("language-modal").classList.add("hidden");

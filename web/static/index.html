@@ -658,413 +658,413 @@
         let customPrice = '';
         let totalPrice = 5;
 
-        function updateTotalPrice() {
-            if (selectedOption === 'basic') {
-                totalPrice = 0;
-            } else if (selectedOption === 'coffee') {
-                if (customPrice) {
-                    totalPrice = parseFloat(customPrice);
-                } else {
-                    totalPrice = coffeeCount * 5;
+            function updateTotalPrice() {
+                if (selectedOption === 'basic') {
+                    totalPrice = 0;
+                } else if (selectedOption === 'coffee') {
+                    if (customPrice) {
+                        totalPrice = parseFloat(customPrice);
+                    } else {
+                        totalPrice = coffeeCount * 5;
+                    }
                 }
+                const totalPriceElement = document.getElementById('total-price');
+                const coffeePriceElement = document.getElementById('coffee-price');
+                if (totalPriceElement) totalPriceElement.textContent = totalPrice.toFixed(2);
+                if (coffeePriceElement) coffeePriceElement.textContent = totalPrice.toFixed(2);
             }
-            const totalPriceElement = document.getElementById('total-price');
-            const coffeePriceElement = document.getElementById('coffee-price');
-            if (totalPriceElement) totalPriceElement.textContent = totalPrice.toFixed(2);
-            if (coffeePriceElement) coffeePriceElement.textContent = totalPrice.toFixed(2);
-        }
 
-        function handleOptionClick(option) {
-            selectedOption = option;
-            const basicButton = document.getElementById('basic-job-button');
-            const coffeeButton = document.getElementById('coffee-button');
-            if (basicButton) {
-                basicButton.classList.toggle('border-blue-500', option === 'basic');
-                basicButton.classList.toggle('bg-blue-50', option === 'basic');
+            function handleOptionClick(option) {
+                selectedOption = option;
+                const basicButton = document.getElementById('basic-job-button');
+                const coffeeButton = document.getElementById('coffee-button');
+                if (basicButton) {
+                    basicButton.classList.toggle('border-blue-500', option === 'basic');
+                    basicButton.classList.toggle('bg-blue-50', option === 'basic');
+                }
+                if (coffeeButton) {
+                    coffeeButton.classList.toggle('border-blue-500', option === 'coffee');
+                    coffeeButton.classList.toggle('bg-blue-50', option === 'coffee');
+                }
+                if (option === 'coffee') {
+                    coffeeCount = 1;
+                    customPrice = '';
+                    const customPriceInput = document.getElementById('custom-price');
+                    if (customPriceInput) customPriceInput.value = '';
+                }
+                updateTotalPrice();
             }
-            if (coffeeButton) {
-                coffeeButton.classList.toggle('border-blue-500', option === 'coffee');
-                coffeeButton.classList.toggle('bg-blue-50', option === 'coffee');
-            }
-            if (option === 'coffee') {
-                coffeeCount = 1;
+
+            function handleCoffeeCountClick(count) {
+                coffeeCount = count;
                 customPrice = '';
                 const customPriceInput = document.getElementById('custom-price');
                 if (customPriceInput) customPriceInput.value = '';
-            }
-            updateTotalPrice();
-        }
-
-        function handleCoffeeCountClick(count) {
-            coffeeCount = count;
-            customPrice = '';
-            const customPriceInput = document.getElementById('custom-price');
-            if (customPriceInput) customPriceInput.value = '';
-            const coffee1Button = document.getElementById('coffee-1');
-            const coffee2Button = document.getElementById('coffee-2');
-            if (coffee1Button) {
-                coffee1Button.classList.toggle('bg-blue-500', count === 1);
-                coffee1Button.classList.toggle('text-white', count === 1);
-            }
-            if (coffee2Button) {
-                coffee2Button.classList.toggle('bg-blue-500', count === 2);
-                coffee2Button.classList.toggle('text-white', count === 2);
-            }
-            updateTotalPrice();
-        }
-
-        function handleCustomPriceChange(e) {
-            const value = e.target.value;
-            if (value === '' || (/^\d{1,3}(\.\d{0,2})?$/.test(value) && parseFloat(value) <= 999)) {
-                customPrice = value;
+                const coffee1Button = document.getElementById('coffee-1');
+                const coffee2Button = document.getElementById('coffee-2');
+                if (coffee1Button) {
+                    coffee1Button.classList.toggle('bg-blue-500', count === 1);
+                    coffee1Button.classList.toggle('text-white', count === 1);
+                }
+                if (coffee2Button) {
+                    coffee2Button.classList.toggle('bg-blue-500', count === 2);
+                    coffee2Button.classList.toggle('text-white', count === 2);
+                }
                 updateTotalPrice();
             }
-        }
 
-        // Auth-related functions
-        function getInitials(email) {
-            return email.split('@')[0].substring(0, 2).toUpperCase();
-        }
-
-        window.updateAuthUI = function(isAuthenticated, user) {
-            const loginButton = document.getElementById('login-button');
-            const userCircle = document.getElementById('user-circle');
-            const logoutTooltip = document.getElementById('logout-tooltip');
-
-            if (isAuthenticated && user) {
-                if (loginButton) loginButton.classList.add('hidden');
-                if (userCircle) {
-                    userCircle.classList.remove('hidden');
-                    userCircle.textContent = getInitials(user.email);
+            function handleCustomPriceChange(e) {
+                const value = e.target.value;
+                if (value === '' || (/^\d{1,3}(\.\d{0,2})?$/.test(value) && parseFloat(value) <= 999)) {
+                    customPrice = value;
+                    updateTotalPrice();
                 }
-            } else {
-                if (loginButton) loginButton.classList.remove('hidden');
-                if (userCircle) userCircle.classList.add('hidden');
-                if (logoutTooltip) logoutTooltip.classList.add('visible');
             }
 
-        if (userCircle && logoutTooltip) {
-            userCircle.addEventListener('click', (event) => {
-                event.stopPropagation(); // Prevent the click from immediately closing the tooltip
-                logoutTooltip.classList.toggle('visible');
-            });
+            // Auth-related functions
+            function getInitials(email) {
+                return email.split('@')[0].substring(0, 2).toUpperCase();
+            }
 
-            // Close the tooltip when clicking outside
-            document.addEventListener('click', (event) => {
-                if (!userCircle.contains(event.target) && !logoutTooltip.contains(event.target)) {
-                    logoutTooltip.classList.add('visible');
+            window.updateAuthUI = function(isAuthenticated, user) {
+                const loginButton = document.getElementById('login-button');
+                const userCircle = document.getElementById('user-circle');
+                const logoutTooltip = document.getElementById('logout-tooltip');
+
+                if (isAuthenticated && user) {
+                    if (loginButton) loginButton.classList.add('hidden');
+                    if (userCircle) {
+                        userCircle.classList.remove('hidden');
+                        userCircle.textContent = getInitials(user.email);
+                    }
+                } else {
+                    if (loginButton) loginButton.classList.remove('hidden');
+                    if (userCircle) userCircle.classList.add('hidden');
+                    if (logoutTooltip) logoutTooltip.classList.add('visible');
                 }
-            });
-        }
 
-        };
+            if (userCircle && logoutTooltip) {
+                userCircle.addEventListener('click', (event) => {
+                    event.stopPropagation(); // Prevent the click from immediately closing the tooltip
+                    logoutTooltip.classList.toggle('visible');
+                });
 
-        function login() {
-            auth0Client.loginWithRedirect();
-        }
+                // Close the tooltip when clicking outside
+                document.addEventListener('click', (event) => {
+                    if (!userCircle.contains(event.target) && !logoutTooltip.contains(event.target)) {
+                        logoutTooltip.classList.add('visible');
+                    }
+                });
+            }
 
-        function logout() {
-            auth0Client.logout({ returnTo: window.location.origin });
-        }
-
-        // Main DOMContentLoaded event listener
-        document.addEventListener('DOMContentLoaded', () => {
-            elements = {
-                urlInput: document.getElementById('url-input'),
-                uploadFileButton: document.getElementById('upload-file-button'),
-                fileUploadSection: document.getElementById('file-upload-section'),
-                inputSection: document.getElementById('input-section'),
-                backToUrlButton: document.getElementById('back-to-url'),
-                fileDropArea: document.getElementById('file-drop-area'),
-                fileInput: document.querySelector('input[type="file"]'),
-                fileNameDisplay: document.getElementById('file-name-display'),
-                convertButton: document.getElementById('convert-button'),
-                convertFileButton: document.getElementById('convert-file-button'),
-                loginButton: document.getElementById('login-button'),
-                logoutButton: document.getElementById('logout-button'),
-                userCircle: document.getElementById('user-circle'),
-                logoutTooltip: document.getElementById('logout-tooltip'),
             };
 
-            const submitJobButton = document.getElementById('submit-btn');
-            if (submitJobButton) {
-                submitJobButton.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    handleSubmit(event);
-                });
-                console.log('Submit job button listener added');
-            } else {
-                console.error('Submit job button not found');
+            function login() {
+                auth0Client.loginWithRedirect();
             }
 
-            initializeProcessingStage();
-
-            // URL input listener
-            if (elements.urlInput) {
-                elements.urlInput.addEventListener('input', () => {
-                    toggleConvertButtonState(elements.urlInput.value.trim() !== '', elements.convertButton);
-                });
+            function logout() {
+                auth0Client.logout({ returnTo: window.location.origin });
             }
 
-            // Upload file button listener
-            if (elements.uploadFileButton) {
-                elements.uploadFileButton.addEventListener('click', () => {
-                    toggleSections(elements.inputSection, elements.fileUploadSection);
-                });
-            }
+            // Main DOMContentLoaded event listener
+            document.addEventListener('DOMContentLoaded', () => {
+                elements = {
+                    urlInput: document.getElementById('url-input'),
+                    uploadFileButton: document.getElementById('upload-file-button'),
+                    fileUploadSection: document.getElementById('file-upload-section'),
+                    inputSection: document.getElementById('input-section'),
+                    backToUrlButton: document.getElementById('back-to-url'),
+                    fileDropArea: document.getElementById('file-drop-area'),
+                    fileInput: document.querySelector('input[type="file"]'),
+                    fileNameDisplay: document.getElementById('file-name-display'),
+                    convertButton: document.getElementById('convert-button'),
+                    convertFileButton: document.getElementById('convert-file-button'),
+                    loginButton: document.getElementById('login-button'),
+                    logoutButton: document.getElementById('logout-button'),
+                    userCircle: document.getElementById('user-circle'),
+                    logoutTooltip: document.getElementById('logout-tooltip'),
+                };
 
-            // Back to URL button listener
-            if (elements.backToUrlButton) {
-                elements.backToUrlButton.addEventListener('click', () => {
-                    toggleSections(elements.fileUploadSection, elements.inputSection);
-                });
-            }
+                const submitJobButton = document.getElementById('submit-btn');
+                if (submitJobButton) {
+                    submitJobButton.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        handleSubmit(event);
+                    });
+                    console.log('Submit job button listener added');
+                } else {
+                    console.error('Submit job button not found');
+                }
 
-            // Setup drag and drop
-            if (elements.fileDropArea) {
-                setupDragAndDrop(elements.fileDropArea, handleFiles);
-            }
+                initializeProcessingStage();
 
-            // File input change listener
-            if (elements.fileInput) {
-                elements.fileInput.addEventListener('change', (event) => {
-                    handleFiles(event.target.files);
-                });
-            }
+                // URL input listener
+                if (elements.urlInput) {
+                    elements.urlInput.addEventListener('input', () => {
+                        toggleConvertButtonState(elements.urlInput.value.trim() !== '', elements.convertButton);
+                    });
+                }
 
-            // Language dropdown functionality
-            const languageDropdown = document.getElementById("language-dropdown");
-            const languageOptions = document.getElementById("language-options");
+                // Upload file button listener
+                if (elements.uploadFileButton) {
+                    elements.uploadFileButton.addEventListener('click', () => {
+                        toggleSections(elements.inputSection, elements.fileUploadSection);
+                    });
+                }
 
-            if (languageDropdown && languageOptions) {
-                languageDropdown.addEventListener("click", (event) => {
-                    event.stopPropagation();
-                    languageOptions.classList.toggle("hidden");
-                });
+                // Back to URL button listener
+                if (elements.backToUrlButton) {
+                    elements.backToUrlButton.addEventListener('click', () => {
+                        toggleSections(elements.fileUploadSection, elements.inputSection);
+                    });
+                }
 
-                document.addEventListener("click", (event) => {
-                    if (!languageDropdown.contains(event.target) && !languageOptions.contains(event.target)) {
-                        languageOptions.classList.add("hidden");
+                // Setup drag and drop
+                if (elements.fileDropArea) {
+                    setupDragAndDrop(elements.fileDropArea, handleFiles);
+                }
+
+                // File input change listener
+                if (elements.fileInput) {
+                    elements.fileInput.addEventListener('change', (event) => {
+                        handleFiles(event.target.files);
+                    });
+                }
+
+                // Language dropdown functionality
+                const languageDropdown = document.getElementById("language-dropdown");
+                const languageOptions = document.getElementById("language-options");
+
+                if (languageDropdown && languageOptions) {
+                    languageDropdown.addEventListener("click", (event) => {
+                        event.stopPropagation();
+                        languageOptions.classList.toggle("hidden");
+                    });
+
+                    document.addEventListener("click", (event) => {
+                        if (!languageDropdown.contains(event.target) && !languageOptions.contains(event.target)) {
+                            languageOptions.classList.add("hidden");
+                        }
+                    });
+
+                    // Add event listeners for language selection
+                    const englishOption = languageOptions.querySelector('button[data-lang="en"]');
+                    const spanishOption = languageOptions.querySelector('button[data-lang="es"]');
+
+                    if (englishOption) englishOption.addEventListener("click", () => selectLanguage("en"));
+                    if (spanishOption) spanishOption.addEventListener("click", () => selectLanguage("es"));
+                }
+
+                // User circle and logout tooltip functionality
+                if (elements.userCircle) {
+                    elements.userCircle.addEventListener('click', () => {
+                        elements.logoutTooltip.classList.toggle('hidden');
+                    });
+                }
+
+                document.addEventListener('click', (event) => {
+                    if (elements.userCircle && elements.logoutTooltip &&
+                        !elements.userCircle.contains(event.target) &&
+                        !elements.logoutTooltip.contains(event.target)) {
+                        elements.logoutTooltip.classList.add('hidden');
                     }
                 });
 
-                // Add event listeners for language selection
-                const englishOption = languageOptions.querySelector('button[data-lang="en"]');
-                const spanishOption = languageOptions.querySelector('button[data-lang="es"]');
+                // Price logic event listeners
+                const basicJobButton = document.getElementById('basic-job-button');
+                if (basicJobButton) basicJobButton.addEventListener('click', () => handleOptionClick('basic'));
 
-                if (englishOption) englishOption.addEventListener("click", () => selectLanguage("en"));
-                if (spanishOption) spanishOption.addEventListener("click", () => selectLanguage("es"));
-            }
+                const coffeeButton = document.getElementById('coffee-button');
+                if (coffeeButton) coffeeButton.addEventListener('click', () => handleOptionClick('coffee'));
 
-            // User circle and logout tooltip functionality
-            if (elements.userCircle) {
-                elements.userCircle.addEventListener('click', () => {
-                    elements.logoutTooltip.classList.toggle('hidden');
-                });
-            }
+                const coffee1Button = document.getElementById('coffee-1');
+                if (coffee1Button) coffee1Button.addEventListener('click', () => handleCoffeeCountClick(1));
 
-            document.addEventListener('click', (event) => {
-                if (elements.userCircle && elements.logoutTooltip &&
-                    !elements.userCircle.contains(event.target) &&
-                    !elements.logoutTooltip.contains(event.target)) {
-                    elements.logoutTooltip.classList.add('hidden');
+                const coffee2Button = document.getElementById('coffee-2');
+                if (coffee2Button) coffee2Button.addEventListener('click', () => handleCoffeeCountClick(2));
+
+                const customPriceInput = document.getElementById('custom-price');
+                if (customPriceInput) customPriceInput.addEventListener('input', handleCustomPriceChange);
+
+                const cancelButton = document.getElementById('cancel-btn');
+                if (cancelButton) {
+                    cancelButton.addEventListener('click', () => {
+                        console.log('Modal closed');
+                        closeLanguageModal();
+                    });
                 }
+
+                // Initial setup for price logic
+                handleOptionClick('coffee');
+                updateTotalPrice();
+
+                // Add event listeners to buttons
+                if (elements.convertButton) {
+                    elements.convertButton.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        onConvertClick();
+                    });
+                }
+
+                if (elements.loginButton) {
+                    elements.loginButton.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        login();
+                    });
+                }
+
+                if (elements.logoutButton) {
+                    elements.logoutButton.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        logout();
+                    });
+                }
+
+                const donateButtons = document.querySelectorAll('[id^="donate-button"]');
+                donateButtons.forEach(button => {
+                    button.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        onDonateClick();
+                    });
+                });
+
+                const resetButtons = document.querySelectorAll('[id^="reset-button"]');
+                resetButtons.forEach(button => {
+                    button.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        reset();
+                    });
+                });
+
+                // Initialize Auth0
+                initAuth0().catch((error) => console.error("Error initializing app:", error));
             });
 
-            // Price logic event listeners
-            const basicJobButton = document.getElementById('basic-job-button');
-            if (basicJobButton) basicJobButton.addEventListener('click', () => handleOptionClick('basic'));
-
-            const coffeeButton = document.getElementById('coffee-button');
-            if (coffeeButton) coffeeButton.addEventListener('click', () => handleOptionClick('coffee'));
-
-            const coffee1Button = document.getElementById('coffee-1');
-            if (coffee1Button) coffee1Button.addEventListener('click', () => handleCoffeeCountClick(1));
-
-            const coffee2Button = document.getElementById('coffee-2');
-            if (coffee2Button) coffee2Button.addEventListener('click', () => handleCoffeeCountClick(2));
-
-            const customPriceInput = document.getElementById('custom-price');
-            if (customPriceInput) customPriceInput.addEventListener('input', handleCustomPriceChange);
-
-            const cancelButton = document.getElementById('cancel-btn');
-            if (cancelButton) {
-                cancelButton.addEventListener('click', () => {
-                    console.log('Modal closed');
-                    closeLanguageModal();
-                });
+            // Existing functions (kept as they were)
+            function toggleConvertButtonState(isActive, button) {
+                if (button) {
+                    button.disabled = !isActive;
+                    button.classList.toggle('opacity-50', !isActive);
+                    button.classList.toggle('cursor-not-allowed', !isActive);
+                }
             }
 
-            // Initial setup for price logic
-            handleOptionClick('coffee');
-            updateTotalPrice();
-
-            // Add event listeners to buttons
-            if (elements.convertButton) {
-                elements.convertButton.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    onConvertClick();
-                });
+            function toggleSections(hiddenSection, visibleSection) {
+                if (hiddenSection) hiddenSection.classList.add('hidden');
+                if (visibleSection) visibleSection.classList.remove('hidden');
             }
 
-            if (elements.loginButton) {
-                elements.loginButton.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    login();
-                });
-            }
+        function setupDragAndDrop(dropArea, filesHandler) {
+            if (!dropArea) return;
 
-            if (elements.logoutButton) {
-                elements.logoutButton.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    logout();
-                });
-            }
-
-            const donateButtons = document.querySelectorAll('[id^="donate-button"]');
-            donateButtons.forEach(button => {
-                button.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    onDonateClick();
-                });
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
             });
 
-            const resetButtons = document.querySelectorAll('[id^="reset-button"]');
-            resetButtons.forEach(button => {
-                button.addEventListener('click', (event) => {
-                    event.preventDefault();
-                    reset();
-                });
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, true), false);
             });
 
-            // Initialize Auth0
-            initAuth0().catch((error) => console.error("Error initializing app:", error));
-        });
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, false), false);
+            });
 
-        // Existing functions (kept as they were)
-        function toggleConvertButtonState(isActive, button) {
-            if (button) {
-                button.disabled = !isActive;
-                button.classList.toggle('opacity-50', !isActive);
-                button.classList.toggle('cursor-not-allowed', !isActive);
+            dropArea.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                filesHandler(files);
+            });
+        }
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
             }
-        }
 
-        function toggleSections(hiddenSection, visibleSection) {
-            if (hiddenSection) hiddenSection.classList.add('hidden');
-            if (visibleSection) visibleSection.classList.remove('hidden');
-        }
+            function toggleHighlight(dropArea, isActive) {
+                dropArea.classList.toggle('border-blue-500', isActive);
+                dropArea.classList.toggle('bg-blue-50', isActive);
+            }
 
-    function setupDragAndDrop(dropArea, filesHandler) {
-        if (!dropArea) return;
-
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropArea.addEventListener(eventName, preventDefaults, false);
-        });
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, true), false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, false), false);
-        });
-
-        dropArea.addEventListener('drop', (e) => {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            filesHandler(files);
-        });
-    }
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        function toggleHighlight(dropArea, isActive) {
-            dropArea.classList.toggle('border-blue-500', isActive);
-            dropArea.classList.toggle('bg-blue-50', isActive);
-        }
-
-    function handleFiles(files) {
-        if (files.length > 0) {
-          const file = files[0];
-          if (elements.fileNameDisplay) {
-            elements.fileNameDisplay.textContent = file.name;
+        function handleFiles(files) {
+            if (files.length > 0) {
+              const file = files[0];
+              if (elements.fileNameDisplay) {
+                elements.fileNameDisplay.textContent = file.name;
+              }
+              if (elements.convertFileButton) {
+                toggleConvertButtonState(true, elements.convertFileButton);
+              }
+            }
           }
-          if (elements.convertFileButton) {
-            toggleConvertButtonState(true, elements.convertFileButton);
-          }
-        }
-      }
 
-        function getInputData() {
-            const urlInput = document.getElementById("url-input").value;
-            const fileInput = document.querySelector('input[type="file"]').files[0];
-            return urlInput || fileInput;
-        }
+            function getInputData() {
+                const urlInput = document.getElementById("url-input").value;
+                const fileInput = document.querySelector('input[type="file"]').files[0];
+                return urlInput || fileInput;
+            }
 
-    function showLanguageSelectionModal(inputData) {
-        const modal = document.getElementById("language-modal");
-        const userEmailSpan = document.getElementById("user-email");
-        const fileNameSpan = document.getElementById("file-name");
-        const jobIdSpan = document.getElementById("job-id");
-
-        // Set file name
-        if (inputData instanceof File) {
-            fileNameSpan.textContent = inputData.name;
-        } else if (typeof inputData === 'string') {
-            fileNameSpan.textContent = inputData;
-        } else {
-            fileNameSpan.textContent = "Unknown file";
-        }
-
-        // Get user email from Auth0
-        if (auth0Client) {
-            auth0Client.getUser().then(user => {
-                const email = user.email || user["https://platogram.com/user_email"] || "Unknown email";
-                userEmailSpan.textContent = email;
-            }).catch(error => {
-                console.error("Error getting user email:", error);
-                userEmailSpan.textContent = "Error fetching email";
-            });
-        } else {
-            console.warn("Auth0 client not initialized");
-            userEmailSpan.textContent = "Auth0 not initialized";
-        }
-
-        // Set job ID (you may want to generate this dynamically)
-        jobIdSpan.textContent = "0032";
-
-        modal.classList.remove("hidden");
-    }
-
-    function selectLanguage(lang) {
-        const selectedLanguageFlag = document.getElementById("selected-language-flag");
-        const selectedLanguage = document.getElementById("selected-language");
-        const languageOptions = document.getElementById("language-options");
-
-        if (lang === 'en') {
-            selectedLanguageFlag.textContent = "🇺🇸";
-            selectedLanguage.textContent = "En";
-        } else if (lang === 'es') {
-            selectedLanguageFlag.textContent = "🇪🇸";
-            selectedLanguage.textContent = "Es";
-        }
-
-        languageOptions.classList.add("hidden");
-    }
-
-        function closeLanguageModal() {
+        function showLanguageSelectionModal(inputData) {
             const modal = document.getElementById("language-modal");
-            modal.classList.add("hidden");
+            const userEmailSpan = document.getElementById("user-email");
+            const fileNameSpan = document.getElementById("file-name");
+            const jobIdSpan = document.getElementById("job-id");
+
+            // Set file name
+            if (inputData instanceof File) {
+                fileNameSpan.textContent = inputData.name;
+            } else if (typeof inputData === 'string') {
+                fileNameSpan.textContent = inputData;
+            } else {
+                fileNameSpan.textContent = "Unknown file";
+            }
+
+            // Get user email from Auth0
+            if (auth0Client) {
+                auth0Client.getUser().then(user => {
+                    const email = user.email || user["https://platogram.com/user_email"] || "Unknown email";
+                    userEmailSpan.textContent = email;
+                }).catch(error => {
+                    console.error("Error getting user email:", error);
+                    userEmailSpan.textContent = "Error fetching email";
+                });
+            } else {
+                console.warn("Auth0 client not initialized");
+                userEmailSpan.textContent = "Auth0 not initialized";
+            }
+
+            // Set job ID (you may want to generate this dynamically)
+            jobIdSpan.textContent = "0032";
+
+            modal.classList.remove("hidden");
         }
 
-        function initializeStripeIfNeeded() {
-            if (typeof stripe === 'undefined') {
-                console.warn('Stripe is not defined. Make sure to include Stripe.js');
+        function selectLanguage(lang) {
+            const selectedLanguageFlag = document.getElementById("selected-language-flag");
+            const selectedLanguage = document.getElementById("selected-language");
+            const languageOptions = document.getElementById("language-options");
+
+            if (lang === 'en') {
+                selectedLanguageFlag.textContent = "🇺🇸";
+                selectedLanguage.textContent = "En";
+            } else if (lang === 'es') {
+                selectedLanguageFlag.textContent = "🇪🇸";
+                selectedLanguage.textContent = "Es";
             }
+
+            languageOptions.classList.add("hidden");
         }
-</script>
-</body>
-</html>
+
+            function closeLanguageModal() {
+                const modal = document.getElementById("language-modal");
+                modal.classList.add("hidden");
+            }
+
+            function initializeStripeIfNeeded() {
+                if (typeof stripe === 'undefined') {
+                    console.warn('Stripe is not defined. Make sure to include Stripe.js');
+                }
+            }
+    </script>
+    </body>
+    </html>

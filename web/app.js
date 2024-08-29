@@ -256,11 +256,14 @@ async function handleSubmit(event) {
                 throw new Error('Stripe initialization failed');
             }
 
+            const token = await auth0Client.getTokenSilently();
+            console.log('Auth0 token obtained:', token);
+
             const response = await fetch('/create-checkout-session', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${await auth0Client.getTokenSilently()}`
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
                     price: price,
@@ -273,7 +276,7 @@ async function handleSubmit(event) {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                throw new Error('Failed to create checkout session');
+                throw new Error(`Failed to create checkout session: ${response.status} ${errorText}`);
             }
 
             const session = await response.json();

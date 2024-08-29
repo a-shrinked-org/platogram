@@ -1,6 +1,7 @@
 let auth0Client = null;
 let stripePromise = null;
 let selectedLanguage = 'en'; // Default language
+let pollingInterval;
 let elements;
 
 const processingStages = [
@@ -413,97 +414,104 @@ function showLanguageSelectionModal(inputData, price) {
   };
 }
 
-async function pollStatus(token) {
-  try {
-    console.log("Polling status with token:", token);
-    const response = await fetch("https://temporary.name/status", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    console.log("Status response:", response);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const text = await response.text();
-    console.log("Raw response text:", text);
-    let result;
+function pollStatus(token) {
+  clearInterval(pollingInterval);
+
+  async function checkStatus() {
     try {
-      result = JSON.parse(text);
+      const response = await fetch("https://temporary.name/status", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("Polling status response:", result);
+
+      updateUIStatus(result.status);
+
+      if (result.status === "running") {
+        pollingInterval = setTimeout(checkStatus, 5000); // Poll every 5 seconds
+      } else {
+        clearTimeout(pollingInterval);
+      }
     } catch (error) {
-      console.error("Error parsing JSON:", error);
-      throw new Error("Invalid JSON response from server");
+      console.error("Error polling status:", error);
+      updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
+      clearTimeout(pollingInterval);
     }
-    console.log("Polling status response:", result);
-
-  } catch (error) {
-    console.error("Error polling status:", error);
-    updateUIStatus(
-      "error",
-      `An error occurred while checking status: ${error.message}`
-    );
   }
-}
-function updateUIStatus(status, message = "") {
-  debugLog(`Updating UI status: ${status}`);
-  const inputSection = document.getElementById("input-section");
-  const statusSection = document.getElementById("status-section");
-  const errorSection = document.getElementById("error-section");
-  const doneSection = document.getElementById("done-section");
-  const processingStage = document.getElementById("processing-stage");
 
-  // Hide all sections
-  [inputSection, statusSection, doneSection, errorSection].forEach(section => {
+  checkStatus();
+}
+
+function toggleSection(sectionToShow) {
+  const sections = [
+    "input-section",
+    "file-upload-section",
+    "status-section",
+    "error-section",
+    "done-section"
+  ];
+
+  sections.forEach(sectionId => {
+    const section = document.getElementById(sectionId);
     if (section) {
-      section.classList.add("hidden");
+      if (sectionId === sectionToShow) {
+        section.classList.remove("hidden");
+      } else {
+        section.classList.add("hidden");
+      }
     } else {
-      console.warn(`Section not found: ${section}`);
+      console.warn(`Section not found: ${sectionId}`);
     }
   });
+}
 
-   // Show the appropriate section based on status
-  switch (status) {
-    case "idle":
-      if (inputSection) {
-        inputSection.classList.remove("hidden");
-      } else {
-        console.error("Input section not found");
-      }
-      break;
-    case "running":
-      if (statusSection) {
-        statusSection.classList.remove("hidden");
-        updateProcessingStage();
-        if (!processingStageInterval) {
-          processingStageInterval = setInterval(updateProcessingStage, 3000);
-        }
-      } else {
-        console.error("Status section not found");
-      }
-      break;
-    case "done":
-      if (doneSection) {
-        doneSection.classList.remove("hidden");
-      } else {
-        console.error("Done section not found");
-      }
-      clearProcessingStageInterval();
-      break;
-    case "error":
-      if (errorSection) {
-        errorSection.classList.remove("hidden");
-        const errorMessage = errorSection.querySelector("p");
-        if (errorMessage) {
-          errorMessage.textContent = message || "An error occurred. Please try again.";
-        } else {
-          console.error("Error message element not found");
-        }
-      } else {
-        console.error("Error section not found");
-      }
-      clearProcessingStageInterval();
-      break;
-    default:
-      console.error(`Unknown status: ${status}`);
+function updateUIStatus(status, message = "") {
+  debugLog(`Updating UI status: ${status}`);
+  const statusSection = document.getElementById("status-section");
+  const fileName = document.getElementById("file-name").textContent;
+  const userEmail = document.getElementById("user-email").textContent;
+
+  if (statusSection) {
+    statusSection.innerHTML = `
+      <p>File: ${fileName}</p>
+      <p>Email: ${userEmail}</p>
+      <p>Status: ${status}</p>
+      ${message ? `<p>${message}</p>` : ''}
+    `;
   }
+
+  toggleSection(status === "running" ? "status-section" :
+                status === "done" ? "done-section" :
+                status === "error" ? "error-section" : "input-section");
+}
+
+function toggleSection(sectionToShow) {
+  const sections = [
+    "input-section",
+    "file-upload-section",
+    "status-section",
+    "error-section",
+    "done-section"
+  ];
+
+  sections.forEach(sectionId => {
+    const section = document.getElementById(sectionId);
+    if (section) {
+      section.classList.toggle("hidden", sectionId !== sectionToShow);
+    } else {
+      console.warn(`Section not found: ${sectionId}`);
+    }
+  });
+}
+
+// Update these functions to use toggleSection
+function toggleSections(hiddenSection, visibleSection) {
+  toggleSection(visibleSection.id);
 }
 
 function clearProcessingStageInterval() {

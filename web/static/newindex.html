@@ -271,34 +271,29 @@
                 </button>
             </div>
 
-            <div id="done-section" class="max-w-5xl mx-auto bg-green-100 rounded-lg p-6 mb-8 hidden">
-                <div class="text-4xl text-green-500 mb-4 text-center">✔</div>
-                <p class="text-center">Done! Please check your e-mail inbox in a few minutes.</p>
-                <button onclick="reset()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded mx-auto block">Got
-                    it!</button>
+                        <div id="done-section" class="max-w-5xl mx-auto bg-green-100 rounded-lg p-6 mb-8 hidden">
+              <div class="text-4xl text-green-500 mb-4 text-center">
+                ✔
+              </div>
+              <p class="text-center mb-4">Done! Please check your e-mail inbox in a few minutes.</p>
+              <button class="mx-auto block px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600" onclick="reset()">Got it!</button>
             </div>
 
             <div id="status-section" class="max-w-5xl mx-auto bg-blue-100 rounded-lg p-6 mb-8 hidden">
-                <p>Working on it. You will receive an email once ready.</p>
-                <p>Processing time is quick - about 5 mins for each hour of content. Hang tight!</p>
-                <div id="animation-container"
-                    class="w-48 h-48 border-2 border-blue-300 rounded-lg relative mx-auto my-4">
-                    <div id="runner" class="w-4 h-4 bg-blue-500 rounded-full absolute"></div>
-                </div>
-                <div id="processing-stage" class="text-center font-semibold text-blue-800 mb-4"></div>
-                <button onclick="onDonateClick()"
-                    class="bg-green-500 text-white px-4 py-2 rounded mx-auto block">Donate</button>
+              <p class="text-center mb-4">Working on it. You will receive an email once ready.</p>
+              <p class="text-center mb-4">Processing time is quick - about 5 mins for each hour of content. Hang tight!</p>
+              <div id="animation-container" class="w-48 h-48 border-2 border-blue-300 rounded-lg relative mx-auto my-4">
+                <div id="runner" class="w-4 h-4 bg-blue-500 rounded-full absolute"></div>
+              </div>
+              <p id="processing-stage" class="text-center font-semibold text-blue-800 mb-4"></p>
+              <button class="mx-auto block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Donate</button>
             </div>
 
             <div id="error-section" class="max-w-3xl mx-auto bg-red-100 rounded-lg p-6 mb-8 hidden">
-                <p id="error-message">An error occurred. Please try again.</p>
-                <button onclick="reset()" class="mt-4 bg-blue-500 text-white px-4 py-2 rounded">Reset</button>
+              <p class="text-center mb-4">An error occurred. Please try again.</p>
+              <button class="mx-auto block px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600" onclick="reset()">Reset</button>
             </div>
 
-            <div class="p-10 max-w-xl mx-auto text-center text-gray-400 text-sm">
-                Transcription times can vary depending on the file size, length of
-                the content, and how busy our servers are.
-            </div>
 
             <section class="mb-16 max-w-5xl mx-auto bg-transparent">
                 <div class="bg-white">
@@ -634,15 +629,11 @@
                     <input type="text" id="custom-price" style="width:48px!important;border-color:lightgray;border-radius:6px;padding:auto!important;margin-top:10px!important" placeholder="$30" class="w-8 h-8 p-1 border border-gray-300 rounded">
                   </div>
                 </div>
-              
-        <div class="my-3" id="card-element">
-            <!-- Stripe Card Element will be inserted here -->
-        </div>
         <div id="card-errors" role="alert" class="text-red-500 text-sm mb-4"></div>
 
-        <button id="submit-btn" onclick="stripeCheck()" class="w-full bg-black text-white font-bold py-3 px-4 rounded-lg hover:bg-gray-900 transition duration-300 mb-2">
+        <button onclick="onConvertClick()" class="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
             Get your document $<span id="total-price">0.00</span>
-        </button>
+          </button>
         <button id="cancel-btn" onclick="closeLanguageModal()" class="w-full bg-gray-200 text-gray-800 font-bold py-3 px-4 rounded-lg hover:bg-gray-300 transition duration-300">
             Cancel
         </button>

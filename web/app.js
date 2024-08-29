@@ -2,6 +2,7 @@ import { loadStripe } from '@stripe/stripe-js';
 
 let auth0Client = null;
 let stripePromise = null;
+let elements;
 
 const processingStages = [
   "Byte Whispering",
@@ -422,61 +423,58 @@ function updateUIStatus(status, message = "") {
   const doneSection = document.getElementById("done-section");
   const processingStage = document.getElementById("processing-stage");
 
-  [inputSection, statusSection, errorSection, doneSection].forEach(
-    (section) => {
-      if (section) {
-        section.classList.add("hidden");
-      } else {
-        console.warn(`Section not found: ${section}`);
-      }
+  // Hide all sections
+  [inputSection, statusSection, doneSection, errorSection].forEach(section => {
+    if (section) {
+      section.classList.add("hidden");
+    } else {
+      console.warn(`Section not found: ${section}`);
     }
-  );
+  });
 
+   // Show the appropriate section based on status
   switch (status) {
-    case "running":
-      if (statusSection && processingStage) {
-        statusSection.classList.remove("hidden");
-        updateProcessingStage();
-        if (!processingStageInterval) {
-          processingStageInterval = setInterval(updateProcessingStage, 3000);
-        }
-      } else {
-        console.error("Status section or processing stage element not found");
-      }
-      break;
-    case "done":
-      clearProcessingStageInterval();
-      if (doneSection) {
-        doneSection.classList.remove("hidden");
-      } else {
-        console.error("Done section not found");
-      }
-      break;
     case "idle":
-      clearProcessingStageInterval();
       if (inputSection) {
         inputSection.classList.remove("hidden");
       } else {
         console.error("Input section not found");
       }
       break;
-    case "error":
+    case "running":
+      if (statusSection) {
+        statusSection.classList.remove("hidden");
+        updateProcessingStage();
+        if (!processingStageInterval) {
+          processingStageInterval = setInterval(updateProcessingStage, 3000);
+        }
+      } else {
+        console.error("Status section not found");
+      }
+      break;
+    case "done":
+      if (doneSection) {
+        doneSection.classList.remove("hidden");
+      } else {
+        console.error("Done section not found");
+      }
       clearProcessingStageInterval();
+      break;
+    case "error":
       if (errorSection) {
         errorSection.classList.remove("hidden");
-        const errorParagraph = errorSection.querySelector("p");
-        if (errorParagraph) {
-          errorParagraph.textContent =
-            message || "An error occurred. Please try again.";
+        const errorMessage = errorSection.querySelector("p");
+        if (errorMessage) {
+          errorMessage.textContent = message || "An error occurred. Please try again.";
         } else {
-          console.error("Error paragraph not found in error section");
+          console.error("Error message element not found");
         }
       } else {
         console.error("Error section not found");
       }
+      clearProcessingStageInterval();
       break;
     default:
-      clearProcessingStageInterval();
       console.error(`Unknown status: ${status}`);
   }
 }

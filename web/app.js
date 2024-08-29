@@ -583,15 +583,6 @@ function updateProcessingStage() {
     return;
   }
 
-  function updateProcessingStage() {
-  const statusSection = document.getElementById("status-section");
-  let processingStage = document.getElementById("processing-stage");
-
-  if (!statusSection) {
-    debugLog("Status section not found");
-    return;
-  }
-
   if (!processingStage) {
     processingStage = document.createElement("div");
     processingStage.id = "processing-stage";
@@ -740,3 +731,6 @@ window.reset = reset;
 window.handleSubmit = handleSubmit;
 window.initializeProcessingStage = initializeProcessingStage;
 window.updateProcessingStage = updateProcessingStage;
+window.handleStripeRedirect = handleStripeRedirect;
+window.handleStripeSuccess = handleStripeSuccess;
+window.handleStripeCancel = handleStripeCancel;

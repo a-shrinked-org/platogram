@@ -590,6 +590,12 @@ function handleFileUpload() {
   fileInput.click();
 }
 
+function initializeProcessingStage() {
+  debugLog("Initializing processing stage");
+  updateProcessingStage();
+  processingStageInterval = setInterval(updateProcessingStage, 3000);
+}
+
 // Ensure all functions are in global scope
 window.onConvertClick = onConvertClick;
 window.login = login;

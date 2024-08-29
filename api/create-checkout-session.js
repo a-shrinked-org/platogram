@@ -1,11 +1,16 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-export default async function handler(req, res) {
+module.exports = async (req, res) => {
+  console.log('Received request:', req.method);
+
   if (req.method === 'POST') {
     try {
+      console.log('Request body:', req.body);
       const { price, lang } = req.body;
 
-      // Create Checkout Sessions from body params.
+      const amount = Math.round(parseFloat(price) * 100);
+      console.log('Calculated amount:', amount);
+
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [
@@ -15,22 +20,25 @@ export default async function handler(req, res) {
               product_data: {
                 name: 'Content Conversion',
               },
-              unit_amount: price, // price should be in cents
+              unit_amount: amount,
             },
             quantity: 1,
           },
         ],
         mode: 'payment',
-        success_url: `${req.headers.origin}/?success=true&lang=${lang}`,
-        cancel_url: `${req.headers.origin}/?canceled=true`,
+        success_url: `${process.env.NEXT_PUBLIC_URL}/success?session_id={CHECKOUT_SESSION_ID}&lang=${lang}`,
+        cancel_url: `${process.env.NEXT_PUBLIC_URL}/cancel`,
       });
 
+      console.log('Stripe session created:', session.id);
       res.status(200).json({ id: session.id });
     } catch (err) {
+      console.error('Error creating checkout session:', err);
       res.status(500).json({ statusCode: 500, message: err.message });
     }
   } else {
+    console.log('Method not allowed');
     res.setHeader('Allow', 'POST');
     res.status(405).end('Method Not Allowed');
   }
-}
+};

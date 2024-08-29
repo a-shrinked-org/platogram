@@ -268,11 +268,17 @@ async function handleSubmit(event) {
                 }),
             });
 
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+
             if (!response.ok) {
+                const errorText = await response.text();
                 throw new Error('Failed to create checkout session');
             }
 
             const session = await response.json();
+            console.log('Checkout session created:', session);
+
             const result = await stripe.redirectToCheckout({
                 sessionId: session.id,
             });

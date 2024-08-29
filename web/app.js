@@ -305,8 +305,8 @@ function handleStripeRedirect() {
     updateUIStatus('done', 'Payment successful! You will receive an email confirmation.');
   }
   if (query.get('canceled')) {
-    console.log('Order canceled -- continue to shop around and checkout when you're ready.');
-    updateUIStatus('idle', 'Order canceled. You can try again when you're ready.');
+    console.log('Order canceled -- continue to shop around and checkout when you are ready.');
+    updateUIStatus('idle', 'Order canceled. You can try again when you are ready.');
   }
 }
 
@@ -583,6 +583,15 @@ function updateProcessingStage() {
     return;
   }
 
+  function updateProcessingStage() {
+  const statusSection = document.getElementById("status-section");
+  let processingStage = document.getElementById("processing-stage");
+
+  if (!statusSection) {
+    debugLog("Status section not found");
+    return;
+  }
+
   if (!processingStage) {
     processingStage = document.createElement("div");
     processingStage.id = "processing-stage";
@@ -714,6 +723,11 @@ function handleFileUpload() {
 
 function initializeProcessingStage() {
   debugLog("Initializing processing stage");
+  const processingStage = document.getElementById("processing-stage");
+  if (!processingStage) {
+    debugLog("Processing stage element not found. Skipping initialization.");
+    return;
+  }
   updateProcessingStage();
   processingStageInterval = setInterval(updateProcessingStage, 3000);
 }
@@ -724,5 +738,5 @@ window.login = login;
 window.logout = logout;
 window.reset = reset;
 window.handleSubmit = handleSubmit;
-window.updateProcessingStage = updateProcessingStage;
 window.initializeProcessingStage = initializeProcessingStage;
+window.updateProcessingStage = updateProcessingStage;

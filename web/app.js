@@ -237,48 +237,53 @@ async function createCheckoutSession(price, lang) {
   }
 }
 
-function handleSubmit(event) {
+async function handleSubmit(event) {
     event.preventDefault();
     console.log('handleSubmit called');
     const price = getPriceFromUI();
     const inputData = getInputData();
 
     if (price === 0) {
-      document.getElementById('language-modal').classList.add('hidden');
-      updateUIStatus("running");
-      postToConvert(inputData, selectedLanguage, null, 0);
+        document.getElementById('language-modal').classList.add('hidden');
+        updateUIStatus("running");
+        await postToConvert(inputData, selectedLanguage, null, 0);
     } else {
-      try {
-        const stripe = await stripePromise;
-        const response = await fetch('./api/create-checkout-session', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            price: price,
-            lang: selectedLanguage,
-          }),
-        });
+        try {
+            const stripe = initStripe();
+            if (!stripe) {
+                throw new Error('Stripe initialization failed');
+            }
 
-        if (!response.ok) {
-          throw new Error('Failed to create checkout session');
+            const response = await fetch('./api/create-checkout-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${await auth0Client.getTokenSilently()}`
+                },
+                body: JSON.stringify({
+                    price: price,
+                    lang: selectedLanguage,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to create checkout session');
+            }
+
+            const session = await response.json();
+            const result = await stripe.redirectToCheckout({
+                sessionId: session.id,
+            });
+
+            if (result.error) {
+                throw new Error(result.error.message);
+            }
+        } catch (error) {
+            console.error('Error in handleSubmit:', error);
+            updateUIStatus('error', error.message || 'An error occurred while processing your request.');
         }
-
-        const session = await response.json();
-        const result = await stripe.redirectToCheckout({
-          sessionId: session.id,
-        });
-
-        if (result.error) {
-          throw new Error(result.error.message);
-        }
-      } catch (error) {
-        console.error('Error in handleSubmit:', error);
-        updateUIStatus('error', error.message || 'An error occurred while processing your request.');
-      }
     }
-  }
+}
 
 function handleStripeSuccess() {
   const urlParams = new URLSearchParams(window.location.search);

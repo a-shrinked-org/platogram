@@ -254,7 +254,7 @@ async function handleSubmit(event) {
                 throw new Error('Stripe initialization failed');
             }
 
-            const response = await fetch('./api/create-checkout-session', {
+            const response = await fetch('./web/create-checkout-session', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

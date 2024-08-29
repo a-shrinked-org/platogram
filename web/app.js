@@ -1,4 +1,7 @@
+import { loadStripe } from '@stripe/stripe-js';
+
 let auth0Client = null;
+let stripePromise = null;
 
 const processingStages = [
   "Byte Whispering",
@@ -45,69 +48,63 @@ async function initAuth0() {
   }
 }
 
-function updateUIStatus(status, errorMessage = "") {
+function updateUIStatus(status, message = "") {
   debugLog(`Updating UI status: ${status}`);
   const inputSection = document.getElementById("input-section");
-  const statusSection = document.getElementById("status-section");
-  const errorSection = document.getElementById("error-section");
-  const doneSection = document.getElementById("done-section");
-  const processingStage = document.getElementById("processing-stage");
 
-  [inputSection, statusSection, errorSection, doneSection].forEach(
-    (section) => {
-      if (section) {
-        section.classList.add("hidden");
-      } else {
-        console.warn(`Section not found: ${section}`);
-      }
-    }
-  );
+  if (!inputSection) {
+    console.error("Input section not found");
+    return;
+  }
+
+  // Clear the current content of the input section
+  inputSection.innerHTML = '';
 
   switch (status) {
+    case "idle":
+      inputSection.innerHTML = `
+        <h2>Transform Speech into Knowledge</h2>
+        <p>Convert hours of audio into structured, readable documents</p>
+        <div class="input-wrapper">
+          <!-- Your file upload and URL input elements here -->
+        </div>
+        <button id="convert-button" class="cta" onclick="onConvertClick()">Convert</button>
+        <button id="donate-button" class="cta donate" onclick="onDonateClick()">Donate</button>
+      `;
+      break;
     case "running":
-      if (statusSection && processingStage) {
-        statusSection.classList.remove("hidden");
-        updateProcessingStage();
-        if (!processingStageInterval) {
-          processingStageInterval = setInterval(updateProcessingStage, 3000);
-        }
-      } else {
-        console.error("Status section or processing stage element not found");
+      inputSection.innerHTML = `
+        <h2>Processing Your Request</h2>
+        <p>Working on it. You will receive an email once ready.</p>
+        <p>Processing time is quick - about 5 mins for each hour of content. Hang tight!</p>
+        <div id="animation-container">
+          <div id="runner"></div>
+        </div>
+        <p id="processing-stage"></p>
+      `;
+      updateProcessingStage();
+      if (!processingStageInterval) {
+        processingStageInterval = setInterval(updateProcessingStage, 3000);
       }
       break;
     case "done":
+      inputSection.innerHTML = `
+        <div class="success-icon">✔</div>
+        <h2>Success!</h2>
+        <p>Done! Please check your e-mail inbox in a few minutes.</p>
+        <button class="cta" onclick="reset()">Got it!</button>
+      `;
       clearProcessingStageInterval();
-      if (doneSection) {
-        doneSection.classList.remove("hidden");
-      } else {
-        console.error("Done section not found");
-      }
-      break;
-    case "idle":
-      clearProcessingStageInterval();
-      if (inputSection) {
-        inputSection.classList.remove("hidden");
-      } else {
-        console.error("Input section not found");
-      }
       break;
     case "error":
+      inputSection.innerHTML = `
+        <h2>Oops! Something went wrong</h2>
+        <p>${message || "An error occurred. Please try again."}</p>
+        <button class="cta" onclick="reset()">Reset</button>
+      `;
       clearProcessingStageInterval();
-      if (errorSection) {
-        errorSection.classList.remove("hidden");
-        const errorParagraph = errorSection.querySelector("p");
-        if (errorParagraph) {
-          errorParagraph.textContent =
-            errorMessage || "An error occurred. Please try again.";
-        } else {
-          console.error("Error paragraph not found in error section");
-        }
-      } else {
-        console.error("Error section not found");
-      }
       break;
     default:
-      clearProcessingStageInterval();
       console.error(`Unknown status: ${status}`);
   }
 }
@@ -177,8 +174,85 @@ async function reset() {
   }
 }
 
-function onDonateClick() {
-  window.open("https://buy.stripe.com/eVa29p3PK5OXbq84gl", "_blank");
+let stripePromise;
+
+function initStripe() {
+  if (!stripePromise) {
+    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+  }
+  return stripePromise;
+}
+
+function getPriceFromUI() {
+  const coffeePrice = document.getElementById('coffee-price').textContent;
+  const price = parseFloat(coffeePrice.replace('$', '')) * 100; // Convert to cents
+  return price;
+}
+
+async function createCheckoutSession(price, lang) {
+  const stripe = await initStripe();
+
+  const response = await fetch('https://platogram.vercel.app/create-checkout-session', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${await auth0Client.getTokenSilently()}`,
+    },
+    body: JSON.stringify({ price, lang }),
+  });
+
+  const session = await response.json();
+
+  if (session.error) {
+    console.error('Error creating checkout session:', session.error);
+    updateUIStatus('error', 'Failed to create checkout session');
+    return null;
+  }
+
+  return session;
+}
+
+async function handlePaymentAndConversion(inputData, lang, price) {
+  if (price === 0) {
+    updateUIStatus("running");
+    await postToConvert(inputData, lang);
+  } else {
+    const session = await createCheckoutSession(price, lang);
+    if (session) {
+      const stripe = await initStripe();
+      const result = await stripe.redirectToCheckout({
+        sessionId: session.id,
+      });
+      if (result.error) {
+        console.error(result.error.message);
+        updateUIStatus('error', result.error.message);
+      }
+    }
+  }
+}
+
+function handleStripeSuccess() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const sessionId = urlParams.get('session_id');
+  const lang = urlParams.get('lang');
+
+  if (sessionId && lang) {
+    // Payment was successful, start the conversion
+    postToConvert(getInputData(), lang);
+  } else {
+    updateUIStatus('error', 'Invalid success parameters');
+  }
+}
+
+function handleStripeCancel() {
+  updateUIStatus('idle');
+}
+
+// Add these to your DOMContentLoaded event listener
+if (window.location.pathname === '/success') {
+  handleStripeSuccess();
+} else if (window.location.pathname === '/cancel') {
+  handleStripeCancel();
 }
 
 async function onConvertClick(event) {
@@ -189,9 +263,10 @@ async function onConvertClick(event) {
     if (!auth0Client) throw new Error("Auth0 client not initialized");
 
     const inputData = getInputData();
+    const price = getPriceFromUI();
 
     if (await auth0Client.isAuthenticated()) {
-      showLanguageSelectionModal(inputData);
+      showLanguageSelectionModal(inputData, price);
     } else {
       login();
     }
@@ -286,7 +361,7 @@ async function logout() {
   }
 }
 
-function showLanguageSelectionModal(inputData) {
+function showLanguageSelectionModal(inputData, price) {
   const modal = document.getElementById("language-modal");
   if (!modal) {
     console.error("Language modal not found in the DOM");
@@ -294,18 +369,16 @@ function showLanguageSelectionModal(inputData) {
   }
 
   modal.classList.remove("hidden");
-  modal.style.display = "block"; // or 'flex', depending on your layout
+  modal.style.display = "block";
 
   const handleLanguageSelection = async (lang) => {
     debugLog(`Language selected: ${lang}`);
     modal.classList.add("hidden");
-    await postToConvert(inputData, lang);
+    await handlePaymentAndConversion(inputData, lang, price);
   };
 
-  document.getElementById("en-btn").onclick = () =>
-    handleLanguageSelection("en");
-  document.getElementById("es-btn").onclick = () =>
-    handleLanguageSelection("es");
+  document.getElementById("en-btn").onclick = () => handleLanguageSelection("en");
+  document.getElementById("es-btn").onclick = () => handleLanguageSelection("es");
   document.getElementById("cancel-btn").onclick = () => {
     debugLog("Language selection cancelled");
     modal.classList.add("hidden");

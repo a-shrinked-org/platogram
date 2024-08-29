@@ -1,18 +1,8 @@
-// Import statements
-import { loadStripe } from '@stripe/stripe-js';
-
 // Constants
 const PROCESSING_STAGES = [
-  "Byte Whispering",
-  "Qubit Juggling",
-  "Syntax Gymnastics",
-  "Pixel Wrangling",
-  "Neuron Tickling",
-  "Algorithm Disco",
-  "Data Origami",
-  "Bit Barbecue",
-  "Logic Limbo",
-  "Quantum Knitting",
+  "Byte Whispering", "Qubit Juggling", "Syntax Gymnastics",
+  "Pixel Wrangling", "Neuron Tickling", "Algorithm Disco",
+  "Data Origami", "Bit Barbecue", "Logic Limbo", "Quantum Knitting"
 ];
 
 // Global variables
@@ -347,7 +337,7 @@ async function pollStatus(token) {
       throw new Error("Invalid JSON response from server");
     }
     console.log("Polling status response:", result);
-    // ... rest of the function remains the same
+
   } catch (error) {
     console.error("Error polling status:", error);
     updateUIStatus(
@@ -458,6 +448,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   } else {
     console.error("One or more elements for file upload not found");
+  }
+
+  function initializeProcessingStage() {
+    debugLog("Initializing processing stage");
+    updateProcessingStage();
+    processingStageInterval = setInterval(updateProcessingStage, 3000);
   }
 
   initAuth0().catch((error) => console.error("Error initializing app:", error));

@@ -64,14 +64,17 @@ async function initAuth0() {
 function updateUIStatus(status, message = "") {
   debugLog(`Updating UI status: ${status}`);
   const inputSection = document.getElementById("input-section");
+  const statusSection = document.getElementById("status-section");
+  const doneSection = document.getElementById("done-section");
+  const errorSection = document.getElementById("error-section");
 
-  if (!inputSection) {
-    console.error("Input section not found");
-    return;
-  }
+  const fileName = document.getElementById("file-name")?.textContent || "Unknown file";
+  const userEmail = document.getElementById("user-email")?.textContent || "Unknown email";
 
-  // Clear the current content of the input section
-  inputSection.innerHTML = '';
+  // Hide all sections first
+  [inputSection, statusSection, doneSection, errorSection].forEach(section => {
+    if (section) section.classList.add("hidden");
+  });
 
   // Show the appropriate section based on status
   switch (status) {
@@ -85,10 +88,14 @@ function updateUIStatus(status, message = "") {
     case "running":
       if (statusSection) {
         statusSection.classList.remove("hidden");
-        updateProcessingStage();
-        if (!processingStageInterval) {
-          processingStageInterval = setInterval(updateProcessingStage, 3000);
-        }
+        statusSection.innerHTML = `
+          <p>File: ${fileName}</p>
+          <p>Email: ${userEmail}</p>
+          <p>Status: ${status}</p>
+          ${message ? `<p>${message}</p>` : ''}
+          <div id="processing-stage"></div>
+        `;
+        initializeProcessingStage();
       } else {
         console.error("Status section not found");
       }
@@ -96,6 +103,12 @@ function updateUIStatus(status, message = "") {
     case "done":
       if (doneSection) {
         doneSection.classList.remove("hidden");
+        doneSection.innerHTML = `
+          <p>File: ${fileName}</p>
+          <p>Email: ${userEmail}</p>
+          <p>Status: Completed</p>
+          ${message ? `<p>${message}</p>` : ''}
+        `;
       } else {
         console.error("Done section not found");
       }
@@ -104,12 +117,12 @@ function updateUIStatus(status, message = "") {
     case "error":
       if (errorSection) {
         errorSection.classList.remove("hidden");
-        const errorMessage = errorSection.querySelector("p");
-        if (errorMessage) {
-          errorMessage.textContent = message || "An error occurred. Please try again.";
-        } else {
-          console.error("Error message element not found");
-        }
+        errorSection.innerHTML = `
+          <p>File: ${fileName}</p>
+          <p>Email: ${userEmail}</p>
+          <p>Status: Error</p>
+          <p>${message || "An error occurred. Please try again."}</p>
+        `;
       } else {
         console.error("Error section not found");
       }
@@ -531,11 +544,11 @@ function updateProcessingStage() {
   const processingStage = document.getElementById("processing-stage");
 
   if (!statusSection) {
-    console.warn("Status section not found");
+    debugLog("Status section not found");
     return;
   }
   if (!processingStage) {
-    console.warn("Processing stage element not found");
+    debugLog("Processing stage element not found");
     return;
   }
   if (!Array.isArray(processingStages) || processingStages.length === 0) {
@@ -550,16 +563,19 @@ function updateProcessingStage() {
   if (!statusSection.classList.contains("hidden")) {
     processingStage.textContent = processingStages[currentStageIndex];
     currentStageIndex = (currentStageIndex + 1) % processingStages.length;
-    debugLog(
-      "Updated processing stage to: " + processingStages[currentStageIndex]
-    );
+    debugLog("Updated processing stage to: " + processingStages[currentStageIndex]);
   } else {
-    console.warn("Status section is hidden. Skipping update.");
+    debugLog("Status section is hidden. Skipping update.");
   }
 }
 
 function initializeProcessingStage() {
   debugLog("Initializing processing stage");
+  const processingStage = document.getElementById("processing-stage");
+  if (!processingStage) {
+    debugLog("Processing stage element not found. Skipping initialization.");
+    return;
+  }
   updateProcessingStage();
   processingStageInterval = setInterval(updateProcessingStage, 3000);
 }

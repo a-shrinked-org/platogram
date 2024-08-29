@@ -244,34 +244,41 @@ function handleSubmit(event) {
     const inputData = getInputData();
 
     if (price === 0) {
-        document.getElementById('language-modal').classList.add('hidden');
-        updateUIStatus("running");
-        postToConvert(inputData, selectedLanguage, null, 0);
+      document.getElementById('language-modal').classList.add('hidden');
+      updateUIStatus("running");
+      postToConvert(inputData, selectedLanguage, null, 0);
     } else {
-        // For paid conversions
-        createCheckoutSession(price, selectedLanguage)
-            .then(session => {
-                if (session) {
-                    const stripeInstance = initStripe();
-                    if (!stripeInstance) {
-                        throw new Error('Stripe initialization failed');
-                    }
-                    return stripeInstance.redirectToCheckout({ sessionId: session.id });
-                } else {
-                    throw new Error('Failed to create checkout session');
-                }
-            })
-            .then(result => {
-                if (result && result.error) {
-                    throw new Error(result.error.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error in handleSubmit:', error);
-                updateUIStatus('error', error.message || 'An error occurred while processing your request.');
-            });
+      try {
+        const stripe = await stripePromise;
+        const response = await fetch('./api/create-checkout-session', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            price: price,
+            lang: selectedLanguage,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create checkout session');
+        }
+
+        const session = await response.json();
+        const result = await stripe.redirectToCheckout({
+          sessionId: session.id,
+        });
+
+        if (result.error) {
+          throw new Error(result.error.message);
+        }
+      } catch (error) {
+        console.error('Error in handleSubmit:', error);
+        updateUIStatus('error', error.message || 'An error occurred while processing your request.');
+      }
     }
-}
+  }
 
 function handleStripeSuccess() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -283,6 +290,18 @@ function handleStripeSuccess() {
     postToConvert(getInputData(), lang, sessionId, null);
   } else {
     updateUIStatus('error', 'Invalid success parameters');
+  }
+}
+
+function handleStripeRedirect() {
+  const query = new URLSearchParams(window.location.search);
+  if (query.get('success')) {
+    console.log('Payment successful! You will receive an email confirmation.');
+    updateUIStatus('done', 'Payment successful! You will receive an email confirmation.');
+  }
+  if (query.get('canceled')) {
+    console.log('Order canceled -- continue to shop around and checkout when you're ready.');
+    updateUIStatus('idle', 'Order canceled. You can try again when you're ready.');
   }
 }
 
@@ -611,6 +630,7 @@ function safeUpdateProcessingStage() {
 document.addEventListener("DOMContentLoaded", () => {
   debugLog("DOM Content Loaded");
   initStripe();
+  handleStripeRedirect();
 
   const uploadIcon = document.querySelector(".upload-icon");
   const fileNameElement = document.getElementById("file-name");

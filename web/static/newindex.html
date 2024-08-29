@@ -920,7 +920,7 @@
             });
 
             // Initialize Auth0
-        initApp().catch((error) => console.error("Error initializing app:", error));
+            initAuth0().catch((error) => console.error("Error initializing app:", error));
         });
 
         // Existing functions (kept as they were)
@@ -987,36 +987,39 @@
         }
 
     function showLanguageSelectionModal(inputData) {
-    const modal = document.getElementById("language-modal");
-    const userEmailSpan = document.getElementById("user-email");
-    const fileNameSpan = document.getElementById("file-name");
-    const jobIdSpan = document.getElementById("job-id");
+        const modal = document.getElementById("language-modal");
+        const userEmailSpan = document.getElementById("user-email");
+        const fileNameSpan = document.getElementById("file-name");
+        const jobIdSpan = document.getElementById("job-id");
 
-    if (inputData instanceof File) {
-        fileNameSpan.textContent = inputData.name;
-    } else if (typeof inputData === 'string') {
-        fileNameSpan.textContent = inputData;
-    } else {
-        fileNameSpan.textContent = "Unknown file";
+        // Set file name
+        if (inputData instanceof File) {
+            fileNameSpan.textContent = inputData.name;
+        } else if (typeof inputData === 'string') {
+            fileNameSpan.textContent = inputData;
+        } else {
+            fileNameSpan.textContent = "Unknown file";
+        }
+
+        // Get user email from Auth0
+        if (auth0Client) {
+            auth0Client.getUser().then(user => {
+                const email = user.email || user["https://platogram.com/user_email"] || "Unknown email";
+                userEmailSpan.textContent = email;
+            }).catch(error => {
+                console.error("Error getting user email:", error);
+                userEmailSpan.textContent = "Error fetching email";
+            });
+        } else {
+            console.warn("Auth0 client not initialized");
+            userEmailSpan.textContent = "Auth0 not initialized";
+        }
+
+        // Set job ID (you may want to generate this dynamically)
+        jobIdSpan.textContent = "0032";
+
+        modal.classList.remove("hidden");
     }
-
-    if (auth0Client) {
-        auth0Client.getUser().then(user => {
-            const email = user.email || user["https://platogram.com/user_email"] || "Unknown email";
-            userEmailSpan.textContent = email;
-        }).catch(error => {
-            console.error("Error getting user email:", error);
-            userEmailSpan.textContent = "Error fetching email";
-        });
-    } else {
-        console.warn("Auth0 client not initialized");
-        userEmailSpan.textContent = "Auth0 not initialized";
-    }
-
-    jobIdSpan.textContent = "0032"; // You may want to generate this dynamically
-
-    modal.classList.remove("hidden");
-}
 
     function selectLanguage(lang) {
         const selectedLanguageFlag = document.getElementById("selected-language-flag");

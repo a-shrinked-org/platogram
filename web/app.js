@@ -219,6 +219,7 @@ async function createCheckoutSession(price, lang) {
 
 async function handleSubmit(event) {
   event.preventDefault();
+  debugLog("handleSubmit called");
   const price = getPriceFromUI();
   const inputData = getInputData();
 
@@ -597,18 +598,21 @@ document.addEventListener("DOMContentLoaded", () => {
     console.error("One or more elements for file upload not found");
   }
 
-  const submitBtn = document.getElementById("submit-job");
+  const submitBtn = document.getElementById("submit-btn"); // Changed from "submit-job" to "submit-btn"
   if (submitBtn) {
     submitBtn.addEventListener("click", handleSubmit);
+    debugLog("Submit button listener added");
   } else {
     console.error("Submit button not found");
   }
 
-  const cancelBtn = document.getElementById("cancel-job");
+  const cancelBtn = document.getElementById("cancel-btn"); // Changed from "cancel-job" to "cancel-btn"
   if (cancelBtn) {
     cancelBtn.addEventListener("click", () => {
+      debugLog("Cancel button clicked");
       document.getElementById("language-modal").classList.add("hidden");
     });
+    debugLog("Cancel button listener added");
   } else {
     console.error("Cancel button not found");
   }
@@ -662,5 +666,6 @@ window.onConvertClick = onConvertClick;
 window.login = login;
 window.logout = logout;
 window.reset = reset;
+window.handleSubmit = handleSubmit;
 window.updateProcessingStage = updateProcessingStage;
 window.initializeProcessingStage = initializeProcessingStage;

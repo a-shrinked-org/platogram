@@ -539,20 +539,25 @@ function clearProcessingStageInterval() {
 
 function updateProcessingStage() {
   const statusSection = document.getElementById("status-section");
-  const processingStage = document.getElementById("processing-stage");
+  let processingStage = document.getElementById("processing-stage");
 
   if (!statusSection) {
     debugLog("Status section not found");
     return;
   }
+
   if (!processingStage) {
-    debugLog("Processing stage element not found");
-    return;
+    processingStage = document.createElement("div");
+    processingStage.id = "processing-stage";
+    statusSection.appendChild(processingStage);
+    debugLog("Created processing stage element");
   }
+
   if (!Array.isArray(processingStages) || processingStages.length === 0) {
     console.error("processingStages is not properly defined");
     return;
   }
+
   if (currentStageIndex < 0 || currentStageIndex >= processingStages.length) {
     console.error("Invalid currentStageIndex:", currentStageIndex);
     currentStageIndex = 0; // Reset to a valid index

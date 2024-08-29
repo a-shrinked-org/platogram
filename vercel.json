@@ -10,14 +10,12 @@
       }
     },
     {
+      "src": "api/*.js",
+      "use": "@vercel/node"
+    },
+    {
       "src": "web/**",
       "use": "@vercel/static"
-    }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron",
-      "schedule": "*/5 * * * *"
     }
   ],
   "routes": [
@@ -35,7 +33,7 @@
     },
     {
       "src": "/api/(.*)",
-      "dest": "/web/main.py"
+      "dest": "/api/$1.js"
     },
     {
       "src": "/(.*)",

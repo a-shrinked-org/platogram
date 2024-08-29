@@ -207,16 +207,22 @@ async function createCheckoutSession(price, lang) {
   return session;
 }
 
-async function handlePaymentAndConversion(inputData, lang, price) {
+async function handleSubmit(event) {
+  event.preventDefault();
+  const price = getPriceFromUI();
+  const language = document.getElementById('lang-select').value;
+  const inputData = getInputData();
+
   if (price === 0) {
+    document.getElementById('language-modal').classList.add('hidden');
     updateUIStatus("running");
-    await postToConvert(inputData, lang);
+    await postToConvert(inputData, language, null, 0);
   } else {
-    const session = await createCheckoutSession(price, lang);
+    const session = await createCheckoutSession(price, language);
     if (session) {
       const stripe = await initStripe();
       const result = await stripe.redirectToCheckout({
-        sessionId: session.id,
+        sessionId: session.id
       });
       if (result.error) {
         console.error(result.error.message);
@@ -233,7 +239,7 @@ function handleStripeSuccess() {
 
   if (sessionId && lang) {
     // Payment was successful, start the conversion
-    postToConvert(getInputData(), lang);
+    postToConvert(getInputData(), lang, sessionId, null);
   } else {
     updateUIStatus('error', 'Invalid success parameters');
   }
@@ -243,7 +249,7 @@ function handleStripeCancel() {
   updateUIStatus('idle');
 }
 
-// Add these to your DOMContentLoaded event listener
+// Add these to your initialization code
 if (window.location.pathname === '/success') {
   handleStripeSuccess();
 } else if (window.location.pathname === '/cancel') {
@@ -271,17 +277,26 @@ async function onConvertClick(event) {
   }
 }
 
-function showErrorMessage(message) {
-  const errorElement = document.getElementById("error-message");
-  if (errorElement) {
-    errorElement.textContent = message;
-    errorElement.classList.remove("hidden");
-  } else {
-    console.error("Error message element not found");
+function showLanguageSelectionModal(inputData, price) {
+  const modal = document.getElementById("language-modal");
+  if (!modal) {
+    console.error("Language modal not found in the DOM");
+    return;
   }
+
+  modal.classList.remove("hidden");
+  modal.style.display = "block";
+
+  // Update modal content with inputData and price if needed
+
+  document.getElementById("submit-btn").onclick = handleSubmit;
+  document.getElementById("cancel-btn").onclick = () => {
+    debugLog("Language selection cancelled");
+    modal.classList.add("hidden");
+  };
 }
 
-async function postToConvert(inputData, lang) {
+async function postToConvert(inputData, lang, sessionId, price) {
   let body;
   let headers = {
     Authorization: `Bearer ${await auth0Client.getTokenSilently({
@@ -292,8 +307,11 @@ async function postToConvert(inputData, lang) {
   const formData = new FormData();
   formData.append("lang", lang);
 
-  // formData.append("price", price);
-  // formData.append("token", token);
+  if (sessionId) {
+    formData.append('session_id', sessionId);
+  } else {
+    formData.append('price', price);
+  }
 
   if (inputData instanceof File) {
     formData.append("file", inputData);
@@ -304,10 +322,6 @@ async function postToConvert(inputData, lang) {
   body = formData;
 
   try {
-    const token = await auth0Client.getTokenSilently({
-      audience: "https://platogram.vercel.app",
-    });
-
     const response = await fetch("https://temporary.name/convert", {
       method: "POST",
       headers: headers,
@@ -315,16 +329,18 @@ async function postToConvert(inputData, lang) {
     });
     const result = await response.json();
 
-    if (result.message === "Conversion started") {
-      pollStatus(token);
+    if (result.message === "Conversion started" || result.status === "processing") {
+      updateUIStatus("running");
+      pollStatus(await auth0Client.getTokenSilently());
     } else {
       updateUIStatus("error", "Unexpected response from server");
     }
   } catch (error) {
     console.error("Error:", error);
-    updateUIStatus("error", error);
+    updateUIStatus("error", error.message);
   }
 }
+
 
 function getInputData() {
   const urlInput = document.getElementById("url-input").value;
@@ -550,6 +566,22 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   } else {
     console.error("One or more elements for file upload not found");
+  }
+
+  const submitBtn = document.getElementById("submit-btn");
+  if (submitBtn) {
+    submitBtn.addEventListener("click", handleSubmit);
+  } else {
+    console.error("Submit button not found");
+  }
+
+  const cancelBtn = document.getElementById("cancel-btn");
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", () => {
+      document.getElementById("language-modal").classList.add("hidden");
+    });
+  } else {
+    console.error("Cancel button not found");
   }
 
   // Initialize other parts of your application

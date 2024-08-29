@@ -243,8 +243,10 @@ async function handleSubmit(event) {
     const price = getPriceFromUI();
     const inputData = getInputData();
 
-    if (price === 0) {
-        document.getElementById('language-modal').classList.add('hidden');
+    // Close the modal immediately
+    document.getElementById('language-modal').classList.add('hidden');
+
+     if (price === 0) {
         updateUIStatus("running");
         await postToConvert(inputData, selectedLanguage, null, 0);
     } else {
@@ -254,7 +256,7 @@ async function handleSubmit(event) {
                 throw new Error('Stripe initialization failed');
             }
 
-            const response = await fetch('./web/create-checkout-session', {
+            const response = await fetch('/create-checkout-session', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

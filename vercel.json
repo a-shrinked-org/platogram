@@ -10,12 +10,14 @@
       }
     },
     {
-      "src": "api/*.js",
-      "use": "@vercel/node"
-    },
-    {
       "src": "web/**",
       "use": "@vercel/static"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron",
+      "schedule": "*/5 * * * *"
     }
   ],
   "routes": [
@@ -32,8 +34,8 @@
       "dest": "/web/$1"
     },
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1.js"
+      "src": "/create-checkout-session",
+      "dest": "/web/create-checkout-session.js"
     },
     {
       "src": "/(.*)",

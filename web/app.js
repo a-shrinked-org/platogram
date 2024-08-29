@@ -1,20 +1,13 @@
 let auth0Client = null;
-let stripePromise = null;
+let stripe = null;
 let selectedLanguage = 'en'; // Default language
-let pollingInterval;
+let currentJobDetails = null;
 let elements;
 
 const processingStages = [
-  "Byte Whispering",
-  "Qubit Juggling",
-  "Syntax Gymnastics",
-  "Pixel Wrangling",
-  "Neuron Tickling",
-  "Algorithm Disco",
-  "Data Origami",
-  "Bit Barbecue",
-  "Logic Limbo",
-  "Quantum Knitting",
+  "Byte Whispering", "Qubit Juggling", "Syntax Gymnastics",
+  "Pixel Wrangling", "Neuron Tickling", "Algorithm Disco",
+  "Data Origami", "Bit Barbecue", "Logic Limbo", "Quantum Knitting"
 ];
 let currentStageIndex = 0;
 let processingStageInterval;
@@ -52,23 +45,17 @@ async function initAuth0() {
 function updateUIStatus(status, message = "") {
   debugLog(`Updating UI status: ${status}`);
   const inputSection = document.getElementById("input-section");
+  const statusSection = document.getElementById("status-section");
+  const errorSection = document.getElementById("error-section");
+  const doneSection = document.getElementById("done-section");
 
-  if (!inputSection) {
-    console.error("Input section not found");
-    return;
-  }
+  [inputSection, statusSection, errorSection, doneSection].forEach(section => {
+    if (section) section.classList.add("hidden");
+  });
 
-  // Clear the current content of the input section
-  inputSection.innerHTML = '';
-
-  // Show the appropriate section based on status
   switch (status) {
     case "idle":
-      if (inputSection) {
-        inputSection.classList.remove("hidden");
-      } else {
-        console.error("Input section not found");
-      }
+      if (inputSection) inputSection.classList.remove("hidden");
       break;
     case "running":
       if (statusSection) {
@@ -77,16 +64,10 @@ function updateUIStatus(status, message = "") {
         if (!processingStageInterval) {
           processingStageInterval = setInterval(updateProcessingStage, 3000);
         }
-      } else {
-        console.error("Status section not found");
       }
       break;
     case "done":
-      if (doneSection) {
-        doneSection.classList.remove("hidden");
-      } else {
-        console.error("Done section not found");
-      }
+      if (doneSection) doneSection.classList.remove("hidden");
       clearProcessingStageInterval();
       break;
     case "error":
@@ -95,11 +76,7 @@ function updateUIStatus(status, message = "") {
         const errorMessage = errorSection.querySelector("p");
         if (errorMessage) {
           errorMessage.textContent = message || "An error occurred. Please try again.";
-        } else {
-          console.error("Error message element not found");
         }
-      } else {
-        console.error("Error section not found");
       }
       clearProcessingStageInterval();
       break;
@@ -136,11 +113,8 @@ async function updateUI() {
     });
     pollStatus(token);
     debugLog("Logged in as: " + user.email);
-
-    // Add this line to update the UI with the new design
     window.updateAuthUI(isAuthenticated, user);
-} else {
-    // Add this line to update the UI when not authenticated
+  } else {
     window.updateAuthUI(false, null);
   }
 }
@@ -216,32 +190,32 @@ async function createCheckoutSession(price, lang) {
 }
 
 async function handleSubmit(event) {
-  event.preventDefault();
-  const price = getPriceFromUI();
-  const inputData = getInputData();
+    event.preventDefault();
+    const price = getPriceFromUI();
+    const inputData = getInputData();
 
-  if (price === 0) {
-    document.getElementById('language-modal').classList.add('hidden');
-    updateUIStatus("running");
-    await postToConvert(inputData, selectedLanguage, null, 0);
-  } else {
-    try {
-      const stripe = initStripe();
-      const session = await createCheckoutSession(price, selectedLanguage);
-      if (session) {
-        const result = await stripe.redirectToCheckout({
-          sessionId: session.id
-        });
-        if (result.error) {
-          console.error(result.error.message);
-          updateUIStatus('error', result.error.message);
+    if (price === 0) {
+        document.getElementById('language-modal').classList.add('hidden');
+        updateUIStatus("running");
+        await postToConvert(inputData, selectedLanguage, null, 0);
+    } else {
+        try {
+            const stripe = initStripe();
+            const session = await createCheckoutSession(price, selectedLanguage);
+            if (session) {
+                const result = await stripe.redirectToCheckout({
+                    sessionId: session.id
+                });
+                if (result.error) {
+                    console.error(result.error.message);
+                    updateUIStatus('error', result.error.message);
+                }
+            }
+        } catch (error) {
+            console.error('Error in handleSubmit:', error);
+            updateUIStatus('error', 'An error occurred while processing your request.');
         }
-      }
-    } catch (error) {
-      console.error('Error in handleSubmit:', error);
-      updateUIStatus('error', 'An error occurred while processing your request.');
     }
-  }
 }
 
 
@@ -347,9 +321,11 @@ async function postToConvert(inputData, lang, sessionId, price) {
     });
     const result = await response.json();
 
-    if (result.message === "Conversion started" || result.status === "processing") {
-      updateUIStatus("running");
-      pollStatus(await auth0Client.getTokenSilently());
+     if (result.message === "Conversion started" || result.status === "processing") {
+    const user = await auth0Client.getUser();
+    storeJobDetails(inputData instanceof File ? inputData.name : inputData, user.email);
+    updateUIStatus("running");
+    pollStatus(await auth0Client.getTokenSilently());
     } else {
       updateUIStatus("error", "Unexpected response from server");
     }
@@ -359,6 +335,24 @@ async function postToConvert(inputData, lang, sessionId, price) {
   }
 }
 
+function storeJobDetails(fileName, userEmail) {
+  currentJobDetails = { fileName, userEmail };
+  localStorage.setItem('jobDetails', JSON.stringify(currentJobDetails));
+}
+
+function retrieveJobDetails() {
+  const storedDetails = localStorage.getItem('jobDetails');
+  if (storedDetails) {
+    currentJobDetails = JSON.parse(storedDetails);
+    return currentJobDetails;
+  }
+  return null;
+}
+
+function clearJobDetails() {
+  currentJobDetails = null;
+  localStorage.removeItem('jobDetails');
+}
 
 function getInputData() {
   const urlInput = document.getElementById("url-input").value;
@@ -414,37 +408,27 @@ function showLanguageSelectionModal(inputData, price) {
   };
 }
 
-function pollStatus(token) {
-  clearInterval(pollingInterval);
+async function pollStatus(token) {
+  try {
+    const response = await fetch("https://temporary.name/status", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
-  async function checkStatus() {
-    try {
-      const response = await fetch("https://temporary.name/status", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+    const result = await response.json();
+    console.log("Polling status response:", result);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+    updateUIStatus(result.status, "", currentJobDetails?.fileName, currentJobDetails?.userEmail);
 
-      const result = await response.json();
-      console.log("Polling status response:", result);
-
-      updateUIStatus(result.status);
-
-      if (result.status === "running") {
-        pollingInterval = setTimeout(checkStatus, 5000); // Poll every 5 seconds
-      } else {
-        clearTimeout(pollingInterval);
-      }
-    } catch (error) {
-      console.error("Error polling status:", error);
-      updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
-      clearTimeout(pollingInterval);
+    if (result.status === "running") {
+      setTimeout(() => pollStatus(token), 5000);
+    } else {
+      clearJobDetails();
     }
+  } catch (error) {
+    console.error("Error polling status:", error);
+    updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
   }
-
-  checkStatus();
 }
 
 function toggleSection(sectionToShow) {
@@ -470,20 +454,37 @@ function toggleSection(sectionToShow) {
   });
 }
 
-function updateUIStatus(status, message = "") {
-  debugLog(`Updating UI status: ${status}`);
+function updateUIStatus(status, errorMessage = "", fileName = "", userEmail = "") {
+  const inputSection = document.getElementById("input-section");
   const statusSection = document.getElementById("status-section");
-  const fileName = document.getElementById("file-name").textContent;
-  const userEmail = document.getElementById("user-email").textContent;
+  const errorSection = document.getElementById("error-section");
+  const doneSection = document.getElementById("done-section");
 
-  if (statusSection) {
-    statusSection.innerHTML = `
-      <p>File: ${fileName}</p>
-      <p>Email: ${userEmail}</p>
-      <p>Status: ${status}</p>
-      ${message ? `<p>${message}</p>` : ''}
-    `;
+  [inputSection, statusSection, errorSection, doneSection].forEach(section => section.classList.add("hidden"));
+
+  switch (status) {
+    case "running":
+      statusSection.classList.remove("hidden");
+      statusSection.innerHTML = `
+        <p>Working on it. You will receive an email at ${userEmail} once ready.</p>
+        <p>Processing file: ${fileName}</p>
+        <p>Status: ${status}</p>
+        <p>Processing time is quick - about 5 mins for each hour of content. Hang tight!</p>
+      `;
+      break;
+    case "done":
+      doneSection.classList.remove("hidden");
+      break;
+    case "idle":
+      inputSection.classList.remove("hidden");
+      break;
+    case "error":
+    case "failed":
+      errorSection.classList.remove("hidden");
+      errorSection.querySelector("p").textContent = errorMessage || "An error occurred. Please try again.";
+      break;
   }
+}
 
   toggleSection(status === "running" ? "status-section" :
                 status === "done" ? "done-section" :
@@ -612,6 +613,21 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initialize other parts of your application
   initAuth0().catch((error) => console.error("Error initializing app:", error));
 });
+
+async function initApp() {
+  await initAuth0();
+  initStripe();
+  const jobDetails = retrieveJobDetails();
+  if (jobDetails) {
+    const isAuthenticated = await auth0Client.isAuthenticated();
+    if (isAuthenticated) {
+      const token = await auth0Client.getTokenSilently({ audience: "https://platogram.vercel.app" });
+      updateUIStatus("running", "", jobDetails.fileName, jobDetails.userEmail);
+      pollStatus(token);
+    }
+  }
+}
+
 
 let fileInput; // Объявляем переменную для хранения элемента fileInput
 function handleFileUpload() {

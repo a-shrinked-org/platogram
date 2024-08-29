@@ -230,38 +230,36 @@ async function createCheckoutSession(price, lang) {
   return session;
 }
 
-async function handleSubmit(event) {
-  event.preventDefault();
-  debugLog("handleSubmit called");
-  const price = getPriceFromUI();
-  const inputData = getInputData();
+function handleSubmit(event) {
+    event.preventDefault();
+    console.log('handleSubmit called');
+    const price = getPriceFromUI();
+    const inputData = getInputData();
 
-  if (price === 0) {
-    document.getElementById('language-modal').classList.add('hidden');
-    updateUIStatus("running");
-    await postToConvert(inputData, selectedLanguage, null, 0);
-  } else {
-    try {
-      if (!stripe) {
-        initStripe();
-      }
-      const session = await createCheckoutSession(price, selectedLanguage);
-      if (session) {
-        const result = await stripe.redirectToCheckout({
-          sessionId: session.id
-        });
-        if (result.error) {
-          console.error(result.error.message);
-          updateUIStatus('error', result.error.message);
-        }
-      }
-    } catch (error) {
-      console.error('Error in handleSubmit:', error);
-      updateUIStatus('error', 'An error occurred while processing your request.');
+    if (price === 0) {
+        document.getElementById('language-modal').classList.add('hidden');
+        updateUIStatus("running");
+        postToConvert(inputData, selectedLanguage, null, 0);
+    } else {
+        // For paid conversions
+        createCheckoutSession(price, selectedLanguage)
+            .then(session => {
+                if (session) {
+                    return stripe.redirectToCheckout({ sessionId: session.id });
+                }
+            })
+            .then(result => {
+                if (result.error) {
+                    console.error(result.error.message);
+                    updateUIStatus('error', result.error.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error in handleSubmit:', error);
+                updateUIStatus('error', 'An error occurred while processing your request.');
+            });
     }
-  }
 }
-
 function handleStripeSuccess() {
   const urlParams = new URLSearchParams(window.location.search);
   const sessionId = urlParams.get('session_id');

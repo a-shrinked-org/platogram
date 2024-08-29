@@ -1,5 +1,5 @@
 let auth0Client = null;
-let stripePromise = null;
+let stripe = null;
 let selectedLanguage = 'en'; // Default language
 let pollingInterval;
 let elements;
@@ -21,6 +21,18 @@ let processingStageInterval;
 
 function debugLog(message) {
   console.log(`[DEBUG] ${message}`);
+}
+
+function initStripe() {
+  if (!stripe) {
+    const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    if (!stripePublishableKey) {
+      console.error('Stripe publishable key is not set in environment variables');
+      return;
+    }
+    stripe = Stripe(stripePublishableKey);
+  }
+  return stripe;
 }
 
 async function initAuth0() {
@@ -173,19 +185,6 @@ async function reset() {
   }
 }
 
-function initStripe() {
-  if (!stripePromise) {
-    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
-  }
-  return stripePromise;
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-
-  initStripe();
-
-});
-
 function getPriceFromUI() {
   const coffeePrice = document.getElementById('coffee-price').textContent;
   const price = parseFloat(coffeePrice.replace('$', '')) * 100; // Convert to cents
@@ -193,7 +192,10 @@ function getPriceFromUI() {
 }
 
 async function createCheckoutSession(price, lang) {
-  const stripe = initStripe();
+  if (!stripe) {
+    console.error('Stripe has not been initialized');
+    return null;
+  }
 
   const response = await fetch('https://platogram.vercel.app/create-checkout-session', {
     method: 'POST',
@@ -226,7 +228,9 @@ async function handleSubmit(event) {
     await postToConvert(inputData, selectedLanguage, null, 0);
   } else {
     try {
-      const stripe = initStripe();
+      if (!stripe) {
+        initStripe();
+      }
       const session = await createCheckoutSession(price, selectedLanguage);
       if (session) {
         const result = await stripe.redirectToCheckout({
@@ -243,7 +247,6 @@ async function handleSubmit(event) {
     }
   }
 }
-
 
 function handleStripeSuccess() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -574,6 +577,7 @@ function safeUpdateProcessingStage() {
 
 document.addEventListener("DOMContentLoaded", () => {
   debugLog("DOM Content Loaded");
+  initStripe();
 
   const uploadIcon = document.querySelector(".upload-icon");
   const fileNameElement = document.getElementById("file-name");

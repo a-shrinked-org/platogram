@@ -1,5 +1,6 @@
 let auth0Client = null;
 let stripePromise = null;
+let selectedLanguage = 'en'; // Default language
 let elements;
 
 const processingStages = [
@@ -210,15 +211,14 @@ async function createCheckoutSession(price, lang) {
 async function handleSubmit(event) {
   event.preventDefault();
   const price = getPriceFromUI();
-  const language = document.getElementById('lang-select').value;
   const inputData = getInputData();
 
   if (price === 0) {
     document.getElementById('language-modal').classList.add('hidden');
     updateUIStatus("running");
-    await postToConvert(inputData, language, null, 0);
+    await postToConvert(inputData, selectedLanguage, null, 0);
   } else {
-    const session = await createCheckoutSession(price, language);
+    const session = await createCheckoutSession(price, selectedLanguage);
     if (session) {
       const stripe = await initStripe();
       const result = await stripe.redirectToCheckout({
@@ -231,6 +231,7 @@ async function handleSubmit(event) {
     }
   }
 }
+
 
 function handleStripeSuccess() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -287,6 +288,11 @@ function showLanguageSelectionModal(inputData, price) {
   modal.classList.remove("hidden");
   modal.style.display = "block";
 
+  const handleLanguageSelection = (lang) => {
+    debugLog(`Language selected: ${lang}`);
+    selectedLanguage = lang;
+    // Update UI to show selected language if needed
+  };
   // Update modal content with inputData and price if needed
 
   document.getElementById("submit-btn").onclick = handleSubmit;

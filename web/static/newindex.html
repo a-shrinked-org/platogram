@@ -266,7 +266,7 @@
                 </div>
                 <button id="convert-file-button"
                     class="w-full mt-4 bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 opacity-50 cursor-not-allowed"
-                    disabled>
+                    disabled class="cta" onclick="onConvertClick()">
                     Convert
                 </button>
             </div>
@@ -762,7 +762,7 @@
 
         // Main DOMContentLoaded event listener
         document.addEventListener('DOMContentLoaded', () => {
-            const elements = {
+            elements = {
                 urlInput: document.getElementById('url-input'),
                 uploadFileButton: document.getElementById('upload-file-button'),
                 fileUploadSection: document.getElementById('file-upload-section'),
@@ -968,13 +968,17 @@
             dropArea.classList.toggle('bg-blue-50', isActive);
         }
 
-        function handleFiles(files) {
+    function handleFiles(files) {
         if (files.length > 0) {
-            const file = files[0];
+          const file = files[0];
+          if (elements.fileNameDisplay) {
             elements.fileNameDisplay.textContent = file.name;
+          }
+          if (elements.convertFileButton) {
             toggleConvertButtonState(true, elements.convertFileButton);
+          }
         }
-        }
+      }
 
         function getInputData() {
             const urlInput = document.getElementById("url-input").value;

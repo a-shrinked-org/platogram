@@ -171,8 +171,6 @@ async function reset() {
   }
 }
 
-let stripePromise;
-
 function initStripe() {
   if (!stripePromise) {
     stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
@@ -402,7 +400,7 @@ async function pollStatus(token) {
       throw new Error("Invalid JSON response from server");
     }
     console.log("Polling status response:", result);
-    // ... rest of the function remains the same
+
   } catch (error) {
     console.error("Error polling status:", error);
     updateUIStatus(

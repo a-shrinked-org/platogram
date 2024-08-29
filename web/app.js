@@ -1,10 +1,8 @@
+// Import statements
 import { loadStripe } from '@stripe/stripe-js';
 
-let auth0Client = null;
-let stripePromise = null;
-let elements;
-
-const processingStages = [
+// Constants
+const PROCESSING_STAGES = [
   "Byte Whispering",
   "Qubit Juggling",
   "Syntax Gymnastics",
@@ -16,13 +14,29 @@ const processingStages = [
   "Logic Limbo",
   "Quantum Knitting",
 ];
+
+// Global variables
+let auth0Client = null;
+let stripePromise = null;
+let elements;
 let currentStageIndex = 0;
 let processingStageInterval;
+let fileInput;
 
+// Helper functions
 function debugLog(message) {
   console.log(`[DEBUG] ${message}`);
 }
 
+function clearProcessingStageInterval() {
+  if (processingStageInterval) {
+    debugLog("Clearing processing stage interval");
+    clearInterval(processingStageInterval);
+    processingStageInterval = null;
+  }
+}
+
+// Auth0 functions
 async function initAuth0() {
   try {
     auth0Client = await auth0.createAuth0Client({
@@ -49,295 +63,6 @@ async function initAuth0() {
   }
 }
 
-function updateUIStatus(status, message = "") {
-  debugLog(`Updating UI status: ${status}`);
-  const inputSection = document.getElementById("input-section");
-
-  if (!inputSection) {
-    console.error("Input section not found");
-    return;
-  }
-
-  // Clear the current content of the input section
-  inputSection.innerHTML = '';
-
-  switch (status) {
-    case "idle":
-      inputSection.innerHTML = `
-        <h2>Transform Speech into Knowledge</h2>
-        <p>Convert hours of audio into structured, readable documents</p>
-        <div class="input-wrapper">
-          <!-- Your file upload and URL input elements here -->
-        </div>
-        <button id="convert-button" class="cta" onclick="onConvertClick()">Convert</button>
-        <button id="donate-button" class="cta donate" onclick="onDonateClick()">Donate</button>
-      `;
-      break;
-    case "running":
-      inputSection.innerHTML = `
-        <h2>Processing Your Request</h2>
-        <p>Working on it. You will receive an email once ready.</p>
-        <p>Processing time is quick - about 5 mins for each hour of content. Hang tight!</p>
-        <div id="animation-container">
-          <div id="runner"></div>
-        </div>
-        <p id="processing-stage"></p>
-      `;
-      updateProcessingStage();
-      if (!processingStageInterval) {
-        processingStageInterval = setInterval(updateProcessingStage, 3000);
-      }
-      break;
-    case "done":
-      inputSection.innerHTML = `
-        <div class="success-icon">✔</div>
-        <h2>Success!</h2>
-        <p>Done! Please check your e-mail inbox in a few minutes.</p>
-        <button class="cta" onclick="reset()">Got it!</button>
-      `;
-      clearProcessingStageInterval();
-      break;
-    case "error":
-      inputSection.innerHTML = `
-        <h2>Oops! Something went wrong</h2>
-        <p>${message || "An error occurred. Please try again."}</p>
-        <button class="cta" onclick="reset()">Reset</button>
-      `;
-      clearProcessingStageInterval();
-      break;
-    default:
-      console.error(`Unknown status: ${status}`);
-  }
-}
-
-function clearProcessingStageInterval() {
-  if (processingStageInterval) {
-    debugLog("Clearing processing stage interval");
-    clearInterval(processingStageInterval);
-    processingStageInterval = null;
-  }
-}
-
-async function updateUI() {
-  if (!auth0Client) {
-    console.error("Auth0 client not initialized");
-    return;
-  }
-
-  const isAuthenticated = await auth0Client.isAuthenticated();
-  const loginButton = document.getElementById("login-button");
-  const logoutButton = document.getElementById("logout-button");
-
-  if (loginButton) loginButton.classList.toggle("hidden", isAuthenticated);
-  if (logoutButton) logoutButton.classList.toggle("hidden", !isAuthenticated);
-
-  if (isAuthenticated) {
-    const user = await auth0Client.getUser();
-    const token = await auth0Client.getTokenSilently({
-      audience: "https://platogram.vercel.app",
-    });
-    pollStatus(token);
-    debugLog("Logged in as: " + user.email);
-
-    // Add this line to update the UI with the new design
-    window.updateAuthUI(isAuthenticated, user);
-} else {
-    // Add this line to update the UI when not authenticated
-    window.updateAuthUI(false, null);
-  }
-}
-
-async function reset() {
-  try {
-    if (!auth0Client) throw new Error("Auth0 client not initialized");
-
-    const token = await auth0Client.getTokenSilently({
-      audience: "https://platogram.vercel.app",
-    });
-
-    const response = await fetch("https://temporary.name/reset", {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (!response.ok) throw new Error("Failed to reset");
-
-    const urlInput = document.getElementById("url-input");
-    const fileNameElement = document.getElementById("file-name");
-
-    if (urlInput) urlInput.value = "";
-    if (fileNameElement) fileNameElement.textContent = "";
-
-    pollStatus(token);
-  } catch (error) {
-    console.error("Error resetting:", error);
-    updateUIStatus("error", "Failed to reset. Please try again.");
-  }
-}
-
-let stripePromise;
-
-function initStripe() {
-  if (!stripePromise) {
-    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
-  }
-  return stripePromise;
-}
-
-function getPriceFromUI() {
-  const coffeePrice = document.getElementById('coffee-price').textContent;
-  const price = parseFloat(coffeePrice.replace('$', '')) * 100; // Convert to cents
-  return price;
-}
-
-async function createCheckoutSession(price, lang) {
-  const stripe = await initStripe();
-
-  const response = await fetch('https://platogram.vercel.app/create-checkout-session', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${await auth0Client.getTokenSilently()}`,
-    },
-    body: JSON.stringify({ price, lang }),
-  });
-
-  const session = await response.json();
-
-  if (session.error) {
-    console.error('Error creating checkout session:', session.error);
-    updateUIStatus('error', 'Failed to create checkout session');
-    return null;
-  }
-
-  return session;
-}
-
-async function handlePaymentAndConversion(inputData, lang, price) {
-  if (price === 0) {
-    updateUIStatus("running");
-    await postToConvert(inputData, lang);
-  } else {
-    const session = await createCheckoutSession(price, lang);
-    if (session) {
-      const stripe = await initStripe();
-      const result = await stripe.redirectToCheckout({
-        sessionId: session.id,
-      });
-      if (result.error) {
-        console.error(result.error.message);
-        updateUIStatus('error', result.error.message);
-      }
-    }
-  }
-}
-
-function handleStripeSuccess() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const sessionId = urlParams.get('session_id');
-  const lang = urlParams.get('lang');
-
-  if (sessionId && lang) {
-    // Payment was successful, start the conversion
-    postToConvert(getInputData(), lang);
-  } else {
-    updateUIStatus('error', 'Invalid success parameters');
-  }
-}
-
-function handleStripeCancel() {
-  updateUIStatus('idle');
-}
-
-// Add these to your DOMContentLoaded event listener
-if (window.location.pathname === '/success') {
-  handleStripeSuccess();
-} else if (window.location.pathname === '/cancel') {
-  handleStripeCancel();
-}
-
-async function onConvertClick(event) {
-  if (event) event.preventDefault();
-  debugLog("Convert button clicked");
-
-  try {
-    if (!auth0Client) throw new Error("Auth0 client not initialized");
-
-    const inputData = getInputData();
-    const price = getPriceFromUI();
-
-    if (await auth0Client.isAuthenticated()) {
-      showLanguageSelectionModal(inputData, price);
-    } else {
-      login();
-    }
-  } catch (error) {
-    console.error("Error in onConvertClick:", error);
-    updateUIStatus("error", error.message);
-  }
-}
-
-function showErrorMessage(message) {
-  const errorElement = document.getElementById("error-message");
-  if (errorElement) {
-    errorElement.textContent = message;
-    errorElement.classList.remove("hidden");
-  } else {
-    console.error("Error message element not found");
-  }
-}
-
-async function postToConvert(inputData, lang) {
-  let body;
-  let headers = {
-    Authorization: `Bearer ${await auth0Client.getTokenSilently({
-      audience: "https://platogram.vercel.app",
-    })}`,
-  };
-
-  const formData = new FormData();
-  formData.append("lang", lang);
-
-  // formData.append("price", price);
-  // formData.append("token", token);
-
-  if (inputData instanceof File) {
-    formData.append("file", inputData);
-  } else {
-    formData.append("payload", inputData);
-  }
-
-  body = formData;
-
-  try {
-    const token = await auth0Client.getTokenSilently({
-      audience: "https://platogram.vercel.app",
-    });
-
-    const response = await fetch("https://temporary.name/convert", {
-      method: "POST",
-      headers: headers,
-      body: body,
-    });
-    const result = await response.json();
-
-    if (result.message === "Conversion started") {
-      pollStatus(token);
-    } else {
-      updateUIStatus("error", "Unexpected response from server");
-    }
-  } catch (error) {
-    console.error("Error:", error);
-    updateUIStatus("error", error);
-  }
-}
-
-function getInputData() {
-  const urlInput = document.getElementById("url-input").value;
-  const fileInput = document.getElementById("file-upload").files[0];
-  return urlInput || fileInput;
-} 
-
 async function login() {
   try {
     if (!auth0Client) throw new Error("Auth0 client not initialized");
@@ -362,59 +87,34 @@ async function logout() {
   }
 }
 
-function showLanguageSelectionModal(inputData, price) {
-  const modal = document.getElementById("language-modal");
-  if (!modal) {
-    console.error("Language modal not found in the DOM");
+// UI update functions
+async function updateUI() {
+  if (!auth0Client) {
+    console.error("Auth0 client not initialized");
     return;
   }
 
-  modal.classList.remove("hidden");
-  modal.style.display = "block";
+  const isAuthenticated = await auth0Client.isAuthenticated();
+  const loginButton = document.getElementById("login-button");
+  const logoutButton = document.getElementById("logout-button");
 
-  const handleLanguageSelection = async (lang) => {
-    debugLog(`Language selected: ${lang}`);
-    modal.classList.add("hidden");
-    await handlePaymentAndConversion(inputData, lang, price);
-  };
+  if (loginButton) loginButton.classList.toggle("hidden", isAuthenticated);
+  if (logoutButton) logoutButton.classList.toggle("hidden", !isAuthenticated);
 
-  document.getElementById("en-btn").onclick = () => handleLanguageSelection("en");
-  document.getElementById("es-btn").onclick = () => handleLanguageSelection("es");
-  document.getElementById("cancel-btn").onclick = () => {
-    debugLog("Language selection cancelled");
-    modal.classList.add("hidden");
-  };
-}
-
-async function pollStatus(token) {
-  try {
-    console.log("Polling status with token:", token);
-    const response = await fetch("https://temporary.name/status", {
-      headers: { Authorization: `Bearer ${token}` },
+  if (isAuthenticated) {
+    const user = await auth0Client.getUser();
+    const token = await auth0Client.getTokenSilently({
+      audience: "https://platogram.vercel.app",
     });
-    console.log("Status response:", response);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const text = await response.text();
-    console.log("Raw response text:", text);
-    let result;
-    try {
-      result = JSON.parse(text);
-    } catch (error) {
-      console.error("Error parsing JSON:", error);
-      throw new Error("Invalid JSON response from server");
-    }
-    console.log("Polling status response:", result);
-    // ... rest of the function remains the same
-  } catch (error) {
-    console.error("Error polling status:", error);
-    updateUIStatus(
-      "error",
-      `An error occurred while checking status: ${error.message}`
-    );
+    pollStatus(token);
+    debugLog("Logged in as: " + user.email);
+
+    window.updateAuthUI(isAuthenticated, user);
+  } else {
+    window.updateAuthUI(false, null);
   }
 }
+
 function updateUIStatus(status, message = "") {
   debugLog(`Updating UI status: ${status}`);
   const inputSection = document.getElementById("input-section");
@@ -432,7 +132,7 @@ function updateUIStatus(status, message = "") {
     }
   });
 
-   // Show the appropriate section based on status
+  // Show the appropriate section based on status
   switch (status) {
     case "idle":
       if (inputSection) {
@@ -479,14 +179,6 @@ function updateUIStatus(status, message = "") {
   }
 }
 
-function clearProcessingStageInterval() {
-  if (processingStageInterval) {
-    debugLog("Clearing processing stage interval");
-    clearInterval(processingStageInterval);
-    processingStageInterval = null;
-  }
-}
-
 function updateProcessingStage() {
   const statusSection = document.getElementById("status-section");
   const processingStage = document.getElementById("processing-stage");
@@ -499,44 +191,255 @@ function updateProcessingStage() {
     console.warn("Processing stage element not found");
     return;
   }
-  if (!Array.isArray(processingStages) || processingStages.length === 0) {
-    console.error("processingStages is not properly defined");
+  if (!Array.isArray(PROCESSING_STAGES) || PROCESSING_STAGES.length === 0) {
+    console.error("PROCESSING_STAGES is not properly defined");
     return;
   }
-  if (currentStageIndex < 0 || currentStageIndex >= processingStages.length) {
+  if (currentStageIndex < 0 || currentStageIndex >= PROCESSING_STAGES.length) {
     console.error("Invalid currentStageIndex:", currentStageIndex);
     currentStageIndex = 0; // Reset to a valid index
   }
 
   if (!statusSection.classList.contains("hidden")) {
-    processingStage.textContent = processingStages[currentStageIndex];
-    currentStageIndex = (currentStageIndex + 1) % processingStages.length;
+    processingStage.textContent = PROCESSING_STAGES[currentStageIndex];
+    currentStageIndex = (currentStageIndex + 1) % PROCESSING_STAGES.length;
     debugLog(
-      "Updated processing stage to: " + processingStages[currentStageIndex]
+      "Updated processing stage to: " + PROCESSING_STAGES[currentStageIndex]
     );
   } else {
     console.warn("Status section is hidden. Skipping update.");
   }
 }
 
-function initializeProcessingStage() {
-  debugLog("Initializing processing stage");
-  updateProcessingStage();
-  processingStageInterval = setInterval(updateProcessingStage, 3000);
+// Stripe integration functions
+function initStripe() {
+  if (!stripePromise) {
+    stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+  }
+  return stripePromise;
 }
 
-function safeUpdateProcessingStage() {
-  try {
-    if (document.readyState === "complete") {
-      updateProcessingStage();
-    } else {
-      window.addEventListener("load", updateProcessingStage);
+function getPriceFromUI() {
+  const coffeePrice = document.getElementById('coffee-price').textContent;
+  const price = parseFloat(coffeePrice.replace('$', '')) * 100; // Convert to cents
+  return price;
+}
+
+async function createCheckoutSession(price, lang) {
+  const stripe = await initStripe();
+
+  const response = await fetch('https://platogram.vercel.app/create-checkout-session', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${await auth0Client.getTokenSilently()}`,
+    },
+    body: JSON.stringify({ price, lang }),
+  });
+
+  const session = await response.json();
+
+  if (session.error) {
+    console.error('Error creating checkout session:', session.error);
+    updateUIStatus('error', 'Failed to create checkout session');
+    return null;
+  }
+
+  return session;
+}
+
+// Payment and conversion handling
+async function handlePaymentAndConversion(inputData, lang, price) {
+  if (price === 0) {
+    updateUIStatus("running");
+    await postToConvert(inputData, lang);
+  } else {
+    const session = await createCheckoutSession(price, lang);
+    if (session) {
+      const stripe = await initStripe();
+      const result = await stripe.redirectToCheckout({
+        sessionId: session.id,
+      });
+      if (result.error) {
+        console.error(result.error.message);
+        updateUIStatus('error', result.error.message);
+      }
     }
-  } catch (error) {
-    console.error("Error in safeUpdateProcessingStage:", error);
   }
 }
 
+function handleStripeSuccess() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const sessionId = urlParams.get('session_id');
+  const lang = urlParams.get('lang');
+
+  if (sessionId && lang) {
+    // Payment was successful, start the conversion
+    postToConvert(getInputData(), lang);
+  } else {
+    updateUIStatus('error', 'Invalid success parameters');
+  }
+}
+
+function handleStripeCancel() {
+  updateUIStatus('idle');
+}
+
+async function postToConvert(inputData, lang) {
+  let body;
+  let headers = {
+    Authorization: `Bearer ${await auth0Client.getTokenSilently({
+      audience: "https://platogram.vercel.app",
+    })}`,
+  };
+
+  const formData = new FormData();
+  formData.append("lang", lang);
+
+  if (inputData instanceof File) {
+    formData.append("file", inputData);
+  } else {
+    formData.append("payload", inputData);
+  }
+
+  body = formData;
+
+  try {
+    const token = await auth0Client.getTokenSilently({
+      audience: "https://platogram.vercel.app",
+    });
+
+    const response = await fetch("https://temporary.name/convert", {
+      method: "POST",
+      headers: headers,
+      body: body,
+    });
+    const result = await response.json();
+
+    if (result.message === "Conversion started") {
+      pollStatus(token);
+    } else {
+      updateUIStatus("error", "Unexpected response from server");
+    }
+  } catch (error) {
+    console.error("Error:", error);
+    updateUIStatus("error", error);
+  }
+}
+
+async function pollStatus(token) {
+  try {
+    console.log("Polling status with token:", token);
+    const response = await fetch("https://temporary.name/status", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    console.log("Status response:", response);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const text = await response.text();
+    console.log("Raw response text:", text);
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch (error) {
+      console.error("Error parsing JSON:", error);
+      throw new Error("Invalid JSON response from server");
+    }
+    console.log("Polling status response:", result);
+    // ... rest of the function remains the same
+  } catch (error) {
+    console.error("Error polling status:", error);
+    updateUIStatus(
+      "error",
+      `An error occurred while checking status: ${error.message}`
+    );
+  }
+}
+
+// Event listeners and DOM manipulation
+async function onConvertClick(event) {
+  if (event) event.preventDefault();
+  debugLog("Convert button clicked");
+
+  try {
+    if (!auth0Client) throw new Error("Auth0 client not initialized");
+
+    const inputData = getInputData();
+    const price = getPriceFromUI();
+
+    if (await auth0Client.isAuthenticated()) {
+      showLanguageSelectionModal(inputData, price);
+    } else {
+      login();
+    }
+  } catch (error) {
+    console.error("Error in onConvertClick:", error);
+    updateUIStatus("error", error.message);
+  }
+}
+
+function showLanguageSelectionModal(inputData, price) {
+  const modal = document.getElementById("language-modal");
+  if (!modal) {
+    console.error("Language modal not found in the DOM");
+    return;
+  }
+
+  modal.classList.remove("hidden");
+  modal.style.display = "block";
+
+  const handleLanguageSelection = async (lang) => {
+    debugLog(`Language selected: ${lang}`);
+    modal.classList.add("hidden");
+    await handlePaymentAndConversion(inputData, lang, price);
+  };
+
+  document.getElementById("en-btn").onclick = () => handleLanguageSelection("en");
+  document.getElementById("es-btn").onclick = () => handleLanguageSelection("es");
+  document.getElementById("cancel-btn").onclick = () => {
+    debugLog("Language selection cancelled");
+    modal.classList.add("hidden");
+  };
+}
+
+function getInputData() {
+  const urlInput = document.getElementById("url-input").value;
+  const fileInput = document.getElementById("file-upload").files[0];
+  return urlInput || fileInput;
+}
+
+function handleFileUpload() {
+  const fileNameElement = document.getElementById("file-name");
+  const urlInput = document.getElementById("url-input");
+  if (!fileInput) {
+    fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = ".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a";
+    fileInput.style.display = "none";
+    document.body.appendChild(fileInput);
+    fileInput.addEventListener(
+      "change",
+      (event) => {
+        const file = event.target.files[0];
+        if (file) {
+          fileNameElement.textContent = file.name;
+          fileNameElement.file = file;
+          urlInput.value = "";
+          debugLog("File selected: " + file.name);
+        } else {
+          fileNameElement.textContent = "";
+          fileNameElement.file = null;
+          debugLog("No file selected");
+        }
+      },
+      { once: true }
+    );
+  }
+  fileInput.click();
+}
+
+// Initialization
 document.addEventListener("DOMContentLoaded", () => {
   debugLog("DOM Content Loaded");
 
@@ -545,56 +448,26 @@ document.addEventListener("DOMContentLoaded", () => {
   const urlInput = document.getElementById("url-input");
 
   if (uploadIcon && fileNameElement && urlInput) {
-    // Add the event listener to the upload icon only once
     uploadIcon.addEventListener("click", handleFileUpload);
 
     urlInput.addEventListener("input", () => {
       if (urlInput.value.trim() !== "") {
-        fileNameElement.textContent = ""; // Clear file name when URL is entered
-        fileNameElement.file = null; // Clear the stored File object
+        fileNameElement.textContent = "";
+        fileNameElement.file = null;
       }
     });
   } else {
     console.error("One or more elements for file upload not found");
   }
 
-  // Initialize other parts of your application
   initAuth0().catch((error) => console.error("Error initializing app:", error));
-});
 
-let fileInput; // Объявляем переменную для хранения элемента fileInput
-function handleFileUpload() {
-  const fileNameElement = document.getElementById("file-name");
-  const urlInput = document.getElementById("url-input");
-  if (!fileInput) {
-    // Создаем элемент fileInput только один раз
-    fileInput = document.createElement("input");
-    fileInput.type = "file";
-    fileInput.accept = ".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a";
-    fileInput.style.display = "none";
-    // Добавляем элемент в body
-    document.body.appendChild(fileInput);
-    // Добавляем обработчик изменения только один раз
-    fileInput.addEventListener(
-      "change",
-      (event) => {
-        const file = event.target.files[0];
-        if (file) {
-          fileNameElement.textContent = file.name;
-          fileNameElement.file = file; // Сохраняем объект File
-          urlInput.value = ""; // Очищаем URL input при выборе файла
-          debugLog("File selected: " + file.name);
-        } else {
-          fileNameElement.textContent = "";
-          fileNameElement.file = null; // Очищаем сохраненный объект File
-          debugLog("No file selected");
-        }
-      },
-      { once: true }
-    ); // Обработчик с опцией { once: true } для удаления после первого вызова
+  if (window.location.pathname === '/success') {
+    handleStripeSuccess();
+  } else if (window.location.pathname === '/cancel') {
+    handleStripeCancel();
   }
-  fileInput.click();
-}
+});
 
 // Ensure all functions are in global scope
 window.onConvertClick = onConvertClick;

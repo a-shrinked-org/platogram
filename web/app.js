@@ -25,10 +25,10 @@ function debugLog(message) {
 
 function initStripe() {
   if (!stripe) {
-    const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    const stripePublishableKey = 'pk_live_51M7o8vFSngJcZDqfHcvpYSTIJ2TKO4SOlRKYrhkCe2HL8oXnoiCcKDuNluTjBwJsjIqBHHIONNAjFn1mC1qQ1HON00kuu0frmg'; // Replace with your actual publishable key
     if (!stripePublishableKey) {
-      console.error('Stripe publishable key is not set in environment variables');
-      return;
+      console.error('Stripe publishable key is not set');
+      return null;
     }
     stripe = Stripe(stripePublishableKey);
   }
@@ -205,29 +205,36 @@ function getPriceFromUI() {
 }
 
 async function createCheckoutSession(price, lang) {
-  if (!stripe) {
+  const stripeInstance = initStripe();
+  if (!stripeInstance) {
     console.error('Stripe has not been initialized');
     return null;
   }
 
-  const response = await fetch('https://platogram.vercel.app/create-checkout-session', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${await auth0Client.getTokenSilently()}`,
-    },
-    body: JSON.stringify({ price, lang }),
-  });
+  try {
+    const response = await fetch('https://platogram.vercel.app/create-checkout-session', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await auth0Client.getTokenSilently()}`,
+      },
+      body: JSON.stringify({ price, lang }),
+    });
 
-  const session = await response.json();
+    const session = await response.json();
 
-  if (session.error) {
-    console.error('Error creating checkout session:', session.error);
+    if (session.error) {
+      console.error('Error creating checkout session:', session.error);
+      updateUIStatus('error', 'Failed to create checkout session');
+      return null;
+    }
+
+    return session;
+  } catch (error) {
+    console.error('Error creating checkout session:', error);
     updateUIStatus('error', 'Failed to create checkout session');
     return null;
   }
-
-  return session;
 }
 
 function handleSubmit(event) {
@@ -245,21 +252,27 @@ function handleSubmit(event) {
         createCheckoutSession(price, selectedLanguage)
             .then(session => {
                 if (session) {
-                    return stripe.redirectToCheckout({ sessionId: session.id });
+                    const stripeInstance = initStripe();
+                    if (!stripeInstance) {
+                        throw new Error('Stripe initialization failed');
+                    }
+                    return stripeInstance.redirectToCheckout({ sessionId: session.id });
+                } else {
+                    throw new Error('Failed to create checkout session');
                 }
             })
             .then(result => {
-                if (result.error) {
-                    console.error(result.error.message);
-                    updateUIStatus('error', result.error.message);
+                if (result && result.error) {
+                    throw new Error(result.error.message);
                 }
             })
             .catch(error => {
                 console.error('Error in handleSubmit:', error);
-                updateUIStatus('error', 'An error occurred while processing your request.');
+                updateUIStatus('error', error.message || 'An error occurred while processing your request.');
             });
     }
 }
+
 function handleStripeSuccess() {
   const urlParams = new URLSearchParams(window.location.search);
   const sessionId = urlParams.get('session_id');

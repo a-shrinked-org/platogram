@@ -1,304 +1,1070 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Platogram - Transform Audio into Actionable Knowledge</title>
-    <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css">
-  </head>
-  <body>
-    <div class="container">
-      <header>
-        <a href="#" class="cta" id="login-button">Log In</a>
-        <a href="#" class="cta" id="logout-button">Log Out</a>
-      </header>
+<html lang="en" class="bg-white">
 
-      <main>
-        <h1>Transform Speech into Knowledge</h1>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>datacapture</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
+    <link rel="stylesheet" href="https://platogram.vercel.app/web/styles.css">
+    <link rel="stylesheet" href="./styles.css">
+    <script src="https://unpkg.com/country-flag-emoji@latest/dist/country-flag-emoji.umd.min.js"></script>
+    <style>
+        @font-face {
+            font-family: 'PerfectlyNineties';
+            src: url('./Assets/PerfectlyNineties-Regular.woff2') format('woff2'),
+                url('./Assets/PerfectlyNineties-Regular.woff') format('woff'),
+                url('./Assets/PerfectlyNineties-Regular.eot');
+            /* IE9 Compat Modes */
+            font-weight: normal;
+            font-style: normal;
+        }
 
-        <div id="input-section" class="cta-container">
-          <p>
-            Convert hours of audio into structured, readable documents
-          </p>
-          <div class="input-wrapper">
-            <input type="text" id="url-input" placeholder="Link to YouTube, Google Drive, audio, transcript, or upload" />
-            <label for="file-upload" class="upload-button">
-              <span class="upload-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="17 8 12 3 7 8"></polyline>
-                  <line x1="12" y1="3" x2="12" y2="15"></line>
-                </svg>
-              </span>
-              <input
-                type="file"
-                id="file-upload"
-                accept=".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a"
-                style="display: none"
-              />
-            </label>
-          </div>
-            <input type="file" id="file-upload" />
-            <span id="file-name"></span> <!-- Ensure this element exists -->
-          <a href="#" class="cta" id="convert-button">Convert</a>
-          <a href="#" class="cta donate" id="donate-button">Donate</a>
-        </div>
+        @font-face {
+            font-family: 'PerfectlyNineties';
+            src: url('./Assets/PerfectlyNineties-Bold.woff2') format('woff2'),
+                url('./Assets/PerfectlyNineties-Bold.woff') format('woff'),
+                url('./Assets/PerfectlyNineties-Bold.eot');
+            /* IE9 Compat Modes */
+            font-weight: bold;
+            font-style: normal;
+        }
 
-        <div id="done-section" class="cta-container hidden">
-          <div class="success-icon">&#10004;</div>
-          <p>
-            Done! Please check your e-mail inbox in a few minutes.
-          </p>
-          <button id="reset-button" class="cta">Got it!</button>
-        </div>
+        @font-face {
+            font-family: 'PerfectlyNineties';
+            src: url('./Assets/PerfectlyNineties-RegularItalic.woff2') format('woff2'),
+                url('./Assets/PerfectlyNineties-RegularItalic.woff') format('woff'),
+                url('./Assets/PerfectlyNineties-RegularItalic.eot');
+            /* IE9 Compat Modes */
+            font-weight: normal;
+            font-style: italic;
+        }
 
-        <div id="status-section" class="cta-container hidden">
-          <p>
-            Working on it. You will receive an email from Artyom Astafurov with
-            PDF, Word, and Markdown documents once ready.
-          </p>
-          <p>
-            Processing time is quick - about 5 mins for each hour of content. Hang tight!
-          </p>
-          <div id="animation-container">
-            <div id="runner"></div>
-            <p id="processing-stage"></p>
-          </div>
-          <button class="cta donate" id="donate-button-status">Donate</button>
-        </div>
+        @font-face {
+            font-family: 'PerfectlyNineties';
+            src: url('./Assets/PerfectlyNineties-BoldItalic.woff2') format('woff2'),
+                url('./Assets/PerfectlyNineties-BoldItalic.woff') format('woff'),
+                url('./Assets/PerfectlyNineties-BoldItalic.eot');
+            /* IE9 Compat Modes */
+            font-weight: bold;
+            font-style: italic;
+        }
 
-        <div id="error-section" class="cta-container hidden">
-          <p>An error occurred. Please try again.</p>
-          <button id="reset-button-error" class="cta">Reset</button>
-        </div>
+        @font-face {
+            font-family: 'PerfectlyNineties';
+            src: url('./Assets/PerfectlyNineties-Semibold.woff2') format('woff2'),
+                url('./Assets/PerfectlyNineties-Semibold.woff') format('woff'),
+                url('./Assets/PerfectlyNineties-Semibold.eot');
+            /* IE9 Compat Modes */
+            font-weight: 600;
+            font-style: normal;
+        }
 
-        <section class="features-section">
-          <div class="features-grid">
-            <div class="feature-card">
-              <h3>Sparks Joy</h3>
-              <p>
-                Platogram doesn't just transcribe - it transforms speech into
-                high-quality, readable documents optimized for knowledge
-                retrieval.
-              </p>
-            </div>
-            <div class="feature-card">
-              <h3>Privacy First</h3>
-              <p>
-                Your data stays yours. We process without storing, ensuring your
-                sensitive information remains confidential.
-              </p>
-            </div>
-            <div class="feature-card">
-              <h3>Just Works</h3>
-              <p>
-                Drop a link or a file with audio or transcript and we will
-                e-mail you a well-organized, readable document.
-              </p>
-            </div>
-          </div>
-        </section>
+        @font-face {
+            font-family: 'PerfectlyNineties';
+            src: url('./Assets/PerfectlyNineties-SemiboldItalic.woff2') format('woff2'),
+                url('./Assets/PerfectlyNineties-SemiboldItalic.woff') format('woff'),
+                url('./Assets/PerfectlyNineties-SemiboldItalic.eot');
+            /* IE9 Compat Modes */
+            font-weight: 600;
+            font-style: italic;
+        }
 
-        <section class="examples-section">
-          <h2>Examples</h2>
-          <div class="examples-grid">
-            <div class="example-card">
-              <h3>John Carmack: From Gaming Pioneer to AI Visionary</h3>
-              <a href="https://drive.google.com/file/d/1_w9mv4_mBVSwK4NSnybGXtRysaT7ROFT/view?usp=drive_link" target="_blank" class="sample-link">View sample output</a>
-              <p class="example-description">Transform a 5-hour podcast into a structured document that sparks joy.</p>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        svg {
+            padding: 0 2px;
+        }
+
+        .font-perfectly-nineties {
+            font-family: 'PerfectlyNineties', sans-serif;
+        }
+
+        .auth-container {
+            border-radius: 35px;
+        }
+
+        .auth-container button {
+            color: white;
+            background-color: #0F172A;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 20px;
+            padding-right: 120px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.3s ease;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .auth-container button:hover {
+            background-color: #000;
+            transform: scale(1.05);
+            text-decoration: none;
+        }
+
+
+        .input-section {
+            border: 1px solid rgba(203, 213, 225, 0.2);
+            border-radius: 14px;
+            background-color: #fafafa;
+            margin-top: 60px;
+            box-shadow: rgba(0, 0, 0, 0.05) 0px 1px 0px -1px, rgba(0, 0, 0, 0.05) 0px 1px 1px -1px, rgba(0, 0, 0, 0.05) 0px 1px 2px -1px, rgba(0, 0, 0, 0.05) 0px 2px 4px -2px, rgba(0, 0, 0, 0.05) 0px 3px 6px -3px;
+        }
+
+        .input-section .line {
+            border-top: 1px solid rgba(203, 213, 225, 0.4);
+        }
+
+        .input-section input {
+
+            background-color: #fafafa;
+            margin-bottom: 0;
+        }
+
+        .input-section #convert-button {
+            width: 86px;
+            height: 40px;
+            color: white;
+            background-color: #0F172A;
+
+            transition: background-color 0.3s ease, transform 0.3s ease;
+            font-family: 'Inter', sans-serif;
+            padding: 6px auto;
+            border-radius: 6px;
+        }
+
+        .input-section #convert-button button:hover {
+            background-color: #000;
+            transform: scale(1.05);
+            text-decoration: none;
+        }
+
+        .upload-file-buttons button {
+            border: 1px solid rgba(203, 213, 225, 0.4);
+            background-color: #faf0e8;
+        }
+        .user-circle {
+            width: 40px;
+            height: 40px;
+            background-color: #000;
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .logout-tooltip {
+            position: absolute;
+            right: 0;
+            top: 100%;
+            margin-top: 8px;
+            background-color: #0F172A;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: none;
+            width:120px !important;
+        }
+        .logout-tooltip.visible {
+            display: block;
+        }
+        .logout-tooltip button {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 8px 16px;
+            background: none;
+            border: none;
+            cursor: pointer;
+        }
+        .logout-tooltip button:hover {
+            background-color: #f7fafc;
+        }
+        #processing-stage {
+            dispay: none !important;
+        }
+
+    </style>
+</head>
+
+<body class="bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 bg-white">
+        <header class="flex justify-between items-center py-4">
+            <div class="flex items-center space-x-2">
+                <div class="w-6 h-6 bg-slate-900"></div>
+                <span class="font-perfectly-nineties text-3xl">datacapture</span>
+            </div>
+            <div class="auth-container relative">
+                <a id="login-button" class="text-blue-600 text-sm hover:underline">Sign in</a>
+                <div id="user-circle" class="user-circle hidden"></div>
+                <div id="logout-tooltip" class="logout-tooltip hidden">
+                    <button id="logout-button" onclick="logout()">Log out</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="mt-16" role="main">
+            <h1
+                class="font-perfectly-nineties text-black text-4xl sm:text-4xl md:text-4xl mb-6 text-center max-w-2xl mx-auto">
+                Transform spoken words into structured knowledge.
+                </br>
+                </br>
+                Unlock insights from audio and video — beyond transcripts, summaries, and scattered notes.
+                </br>
+                </br>
+                10x your content understanding.
+            </h1>
+
+            <div id="input-section" class="max-w-2xl mx-auto input-section">
+                <div class="flex items-center space-x-2 p-6 pb-4">
+                    <input id="url-input" type="text"
+                        placeholder="Paste a link to an YouTube video or Google Drive file?"
+                        class="w-full p-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        style="border:0 !important" />
+                    <button id="convert-button" class="px-2.5" disabled>
+                        Convert
+                    </button>
+                </div>
+                <div class="line"></div>
+                <div class="space-y-2 p-6 pt-4 upload-file-buttons">
+                    <button id="upload-file-button"
+                        class="w-full text-left py-2 px-2 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300 flex items-center">
+                        <svg class="w-6 h-6 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" clip-rule="evenodd" d="M10.4932 0C8.9858 0 7.53411 0.609919 6.45815 1.70862C5.59907 2.58611 5.03531 3.71852 4.84338 4.93849C3.66016 5.1281 2.55348 5.69589 1.68933 6.57758C0.61149 7.67734 0 9.17739 0 10.7492C0 12.3209 0.61149 13.821 1.68933 14.9207C2.76518 16.0184 4.21687 16.6293 5.72334 16.6293H6.43028C6.95726 16.6293 7.38482 16.1774 7.38482 15.6181C7.38482 15.0598 6.95726 14.6068 6.43028 14.6068H5.72334C4.70119 14.6068 3.72675 14.1917 3.01372 13.4638C2.30179 12.738 1.90905 11.7605 1.90905 10.7493C1.90905 9.73909 2.30181 8.76153 3.01372 8.03479C3.72665 7.30689 4.70106 6.89183 5.72334 6.89183C6.25131 6.89183 6.67788 6.43887 6.67788 5.88056C6.67788 4.86929 7.07163 3.89278 7.78254 3.16604C8.49547 2.43814 9.46989 2.02308 10.4929 2.02308C11.5161 2.02308 12.4895 2.43814 13.2025 3.16604C13.9145 3.89289 14.3072 4.8694 14.3072 5.88056C14.3072 6.43887 14.7348 6.89183 15.2617 6.89183H15.2767C16.2988 6.89183 17.2733 7.30689 17.9863 8.03479C18.6982 8.76164 19.0909 9.7392 19.0909 10.7493C19.0909 11.7606 18.6982 12.7381 17.9863 13.4638C17.2734 14.1917 16.2989 14.6068 15.2767 14.6068H14.7427C14.2157 14.6068 13.7882 15.0598 13.7882 15.6181C13.7882 16.1774 14.2157 16.6293 14.7427 16.6293H15.2767C16.7831 16.6293 18.2347 16.0184 19.3107 14.9207C20.3885 13.821 21 12.3209 21 10.7492C21 9.17739 20.3885 7.67731 19.3107 6.57758C18.4436 5.69166 17.331 5.12389 16.1429 4.93638C15.95 3.7176 15.3862 2.58624 14.5281 1.70867C13.4522 0.609973 11.9997 0 10.4932 0ZM11.4547 18.9887C11.4547 19.5481 11.0271 20 10.5001 20C9.97315 20 9.54559 19.5481 9.54559 18.9887V10.277L8.00838 11.9824C7.64445 12.3859 7.04091 12.4017 6.65909 12.0151C6.27827 11.6295 6.26335 10.9901 6.62827 10.5856L9.81006 7.0545C9.99003 6.85435 10.2396 6.74162 10.5001 6.74162C10.7606 6.74162 11.0102 6.85434 11.1901 7.0545L14.3719 10.5856C14.7359 10.9901 14.7219 11.6295 14.3411 12.0151C13.9593 12.4017 13.3558 12.3859 12.9918 11.9824L11.4546 10.277L11.4547 18.9887Z" fill="#3D3D3D"/>
+                        </svg>
+                        <span>Upload a file</span>
+                    </button>
+                    <button
+                        class="w-full text-left py-2 px-2 bg-gray-100 rounded-md hover:bg-gray-200 transition duration-300 opacity-50 cursor-not-allowed flex items-center justify-between">
+                        <div class="flex items-center">
+                            <svg class="w-6 h-6 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M1.68266 15.9979C1.32719 15.9963 1.03404 15.7191 1.01045 15.3634V15.3617C0.979283 15.3626 1.02983 2.76967 1.00877 2.75626C1.01045 1.78711 1.79385 1.00133 2.76005 1.00049C2.7828 1.00218 7.41328 0.998798 7.43355 1.00049C8.57749 1.00049 8.99867 1.96455 9.27834 2.60418C9.56643 3.26238 9.70964 3.39249 9.90676 3.40263H15.7057L15.7066 3.40179C16.6728 3.40348 17.4562 4.18926 17.457 5.1584V8.15376H19.2512C19.9024 8.16136 20.4979 8.52723 20.7995 9.10683C21.1011 9.68646 21.0598 10.3852 20.6934 10.926L17.334 15.7117C17.2077 15.8908 17.0021 15.9981 16.7831 15.9981C16.7781 16.004 1.68786 15.9939 1.6829 15.9981L1.68266 15.9979ZM2.97991 14.6461H16.4335L19.589 10.1502C19.6766 10.0243 19.6867 9.86041 19.6151 9.72522C19.5444 9.58919 19.4037 9.5047 19.2512 9.50554H6.79677C6.66114 9.5047 6.53394 9.57145 6.4573 9.68383L2.97991 14.6461ZM7.42503 2.35229C7.42588 2.34891 2.76081 2.35483 2.75995 2.35229C2.53757 2.35229 2.35729 2.53311 2.35645 2.75617V13.1843L5.3561 8.90219C5.68461 8.43072 6.22289 8.15104 6.79655 8.15359H16.109V5.15823C16.109 4.93518 15.9288 4.75435 15.7064 4.75351H9.89665C8.74766 4.75351 8.32478 3.7869 8.04513 3.14645C7.75957 2.49585 7.64838 2.35221 7.42598 2.35221L7.42503 2.35229Z" fill="#3D3D3D" stroke="#3D3D3D" stroke-width="0.4"/>
+                            </svg>
+                            <span>Add a folder</span>
+                        </div>
+                        <span class="text-sm text-gray-500">Coming soon</span>
+                    </button>
+                </div>
             </div>
 
-            <div class="example-card">
-              <h3>Hair Cells: The Remarkable Sensory Receptors of Hearing</h3>
-              <a href="https://drive.google.com/file/d/1Kswr1tMuS6c0a0tNn9OCuZCuPuP0FLr-/view?usp=drive_link" target="_blank" class="sample-link">View sample output</a>
-              <p class="example-description">Convert this inspiring TED talk into a readable format with key insights highlighted.</p>
+            <div id="file-upload-section" class="max-w-2xl mx-auto p-6 input-section hidden">
+                <div class="flex items-center mb-4">
+                    <button id="back-to-url" class="text-gray-600 hover:text-gray-800">
+                        ← Paste a link
+                    </button>
+                </div>
+                <div id="file-drop-area" class="items-stretch border-2 border-dotted border-gray-200 rounded-lg p-8 text-center">
+                    <p id="file-name-display" class="text-gray-700 mb-2"></p>
+                    <p class="text-gray-500 mb-2">Drag a file here or
+                    <label class="cursor-pointer text-blue-500 hover:underline">
+                        choose a file to upload
+                        <input type="file" class="hidden" accept=".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a" />
+                    </label>
+                    </p>
+                </div>
+                <button id="convert-file-button"
+                    class="w-full mt-4 bg-indigo-900 text-white py-2 px-4 rounded-md hover:bg-indigo-800 transition duration-300 opacity-50 cursor-not-allowed"
+                    disabled class="cta" onclick="onConvertClick()">
+                    Convert
+                </button>
             </div>
 
-            <div class="example-card">
-              <h3>Court Hearing: Data Disclosure and Trial Scheduling</h3>
-              <a href="https://drive.google.com/file/d/1c_70MVz0fb7Zh0teirYt6Pc6S1hMomKV/view?usp=drive_link" target="_blank" class="sample-link">View sample output</a>
-              <p class="example-description">See how Platogram transforms courtroom transcript into a structured document.</p>
+                        <div id="done-section" class="max-w-2xl mx-auto bg-green-100 rounded-lg p-6 mb-8 hidden">
+              <div class="text-4xl text-green-500 mb-4 text-center">
+                ✔
+              </div>
+              <p class="text-center mb-4">Done! Please check your e-mail inbox in a few minutes.</p>
+              <button class="mx-auto block px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600" onclick="reset()">Got it!</button>
             </div>
 
-            <div class="example-card">
-              <h3>Building and Training GPT-2 from Scratch</h3>
-              <a href="https://drive.google.com/file/d/1w98NFdfeSObpgr-Tmm40zB2UOYctWTaS/view?usp=drive_link" target="_blank" class="sample-link">View sample output</a>
-              <p class="example-description">Experience how a complex academic lecture is transformed into a structured, citable document.</p>
+            <div id="status-section" class="max-w-2xl mx-auto bg-blue-100 rounded-lg p-6 mb-8 hidden">
+              <p class="text-center mb-4">Working on it. You will receive an email once ready.</p>
+              <p class="text-center mb-4">Processing time is quick - about 5 mins for each hour of content. Hang tight!</p>
+              <div id="animation-container" class="w-48 h-48 border-2 border-blue-300 rounded-lg relative mx-auto my-4">
+                <div id="runner" class="w-4 h-4 bg-blue-500 rounded-full absolute"></div>
+              </div>
+              <p id="processing-stage" class="text-center font-semibold text-blue-800 mb-4 hidden"></p>
+              <button class="mx-auto block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 hidden">Donate</button>
             </div>
 
-            <div class="example-card">
-              <h3>Intel Q2 2024 Earnings Call: Restructuring and Cost Cutting</h3>
-              <a href="https://drive.google.com/file/d/14HFC36r6xLGBCDrSUdRTi50Z8SXCHD7q/view?usp=drive_link" target="_blank" class="sample-link">View sample output</a>
-              <p class="example-description">Observe how Platogram captures and organizes key points from a business discussion.</p>
+            <div id="error-section" class="max-w-2xl mx-auto bg-red-100 rounded-lg p-6 mb-8 hidden">
+              <p class="text-center mb-4">An error occurred. Please try again.</p>
+              <button class="mx-auto block px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600" onclick="reset()">Reset</button>
             </div>
-            <div class="example-card">
-              <h3>Conversation with Mark Zuckerberg</h3>
-              <a href="https://drive.google.com/file/d/1DbtND485AFmUv4XVb4mgZgXo27JxdkzE/view?usp=drive_link" target="_blank" class="sample-link">View sample output</a>
-              <p class="example-description">Insights on AI, entrepreneurship, and personal growth in a readable format.</p>
-            </div>
-          </div>
-        </section>
 
-        <section class="use-cases-section">
-          <h2>Use Cases</h2>
-          <div class="use-cases-grid">
-            <div class="use-case-card">
-              <h3>Learning</h3>
-              <p>
-                Turn podcasts, lectures, and interviews into readable, searchable,
-                shareable documents.
-              </p>
+            <div class="p-10 max-w-xl mx-auto text-center text-gray-400 text-sm">
+                Transcription times can vary depending on the file size, length of
+                the content, and how busy our servers are.
             </div>
-            <div class="use-case-card">
-              <h3>Drafting</h3>
-              <p>
-                Convert raw ideas and discussions into polished drafts for legal
-                briefs, academic papers, and research proposals, streamlining
-                the writing process.
-              </p>
+
+            <section class="mb-16 max-w-5xl mx-auto bg-transparent">
+                <div class="bg-white">
+                    <img src="https://platogram.vercel.app/web/static/Assets/pdf_example.jpg"
+                        alt="AI-Powered Speech-to-Text and Knowledge Extraction" class="w-full h-auto">
+                </div>
+            </section>
+
+            <section class="grid md:grid-cols-3 gap-8 mb-16 max-w-5xl mx-auto bg-white">
+                <div>
+                    <h3 class="font-perfectly-nineties text-3xl mb-4 bg-white  text-black">Drop a link, get a document
+                    </h3>
+                    <p class="text-gray-600">
+                        Paste any audio/video URL - we'll email you a well-organized, readable document without storing
+                        your content.
+                    </p>
+                </div>
+                <div>
+                    <h3 class="font-perfectly-nineties text-3xl mb-4 bg-white  text-black">References included</h3>
+                    <p class="text-gray-600">
+                        Each response is backed by precise references to the original content, ensuring credibility and
+                        context.
+                    </p>
+                </div>
+                <div>
+                    <h3 class="font-perfectly-nineties text-3xl mb-4 bg-white  text-black">
+                        Build your dataset
+                        <span class="bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full ml-2">Soon</span>
+                    </h3>
+                    <p class="text-gray-600">
+                        Select and combine audio/video links - create your own sharable, AI-ready context storage for
+                        powerful Q&A insights.
+                    </p>
+                </div>
+            </section>
+
+            <section class="section mb-16 max-w-4xl mx-auto bg-grey-500 p-8 rounded-lgg">
+                <h2 class="font-perfectly-nineties text-4xl mb-6 text-center text-black">Check Examples</h2>
+                <div class="divide-y divide-gray-200">
+                    <div class="flex py-4 text-left">
+                        <div class="w-1/2 pr-4">
+                            <a href="https://drive.google.com/file/d/1_w9mv4_mBVSwK4NSnybGXtRysaT7ROFT/view?usp=drive_link"
+                                target="_blank" class="text-black-600 hover:no-underline text-md underline">John
+                                Carmack: From Gaming Pioneer to AI Visionary - A Journey of Innovation and Insight</a>
+                        </div>
+                        <div class="w-1/2 pl-4">
+                            <p class="text-[#3D3D3D] text-base">Transform a 5-hour podcast into a structured document
+                                that sparks joy</p>
+                        </div>
+                    </div>
+                    <div class="flex py-4 text-left">
+                        <div class="w-1/2 pr-4">
+                            <a href="https://drive.google.com/file/d/1Kswr1tMuS6c0a0tNn9OCuZCuPuP0FLr-/view?usp=drive_link"
+                                target="_blank" class="text-black-600 hover:no-underline text-md underline">Hair Cells:
+                                The Remarkable Sensory Receptors of Hearing</a>
+                        </div>
+                        <div class="w-1/2 pl-4">
+                            <p class="text-[#3D3D3D] text-base">Transform a 5-hour podcast into a structured document
+                                that sparks joy</p>
+                        </div>
+                    </div>
+                    <div class="flex py-4 text-left">
+                        <div class="w-1/2 pr-4">
+                            <a href="https://drive.google.com/file/d/1c_70MVz0fb7Zh0teirYt6Pc6S1hMomKV/view?usp=drive_link"
+                                target="_blank" class="text-black-600 hover:no-underline text-md underline">Court
+                                Hearing: Data Disclosure and Trial Scheduling</a>
+                        </div>
+                        <div class="w-1/2 pl-4">
+                            <p class="text-[#3D3D3D] text-base">Transform a 5-hour podcast into a structured document
+                                that sparks joy</p>
+                        </div>
+                    </div>
+                    <div class="flex py-4 text-left">
+                        <div class="w-1/2 pr-4">
+                            <a href="https://drive.google.com/file/d/1w98NFdfeSObpgr-Tmm40zB2UOYctWTaS/view?usp=drive_link"
+                                target="_blank" class="text-black-600 hover:no-underline text-md underline">Building and
+                                Training GPT-2 from Scratch</a>
+                        </div>
+                        <div class="w-1/2 pl-4">
+                            <p class="text-[#3D3D3D] text-base">Transform a 5-hour podcast into a structured document
+                                that sparks joy</p>
+                        </div>
+                    </div>
+                    <div class="flex py-4 text-left">
+                        <div class="w-1/2 pr-4">
+                            <a href="https://drive.google.com/file/d/14HFC36r6xLGBCDrSUdRTi50Z8SXCHD7q/view?usp=drive_link"
+                                target="_blank" class="text-black-600 hover:no-underline text-md underline">Intel Q2
+                                2024 Earnings Call: Restructuring and Cost Cutting</a>
+                        </div>
+                        <div class="w-1/2 pl-4">
+                            <p class="text-[#3D3D3D] text-base">Transform a 5-hour podcast into a structured document
+                                that sparks joy</p>
+                        </div>
+                    </div>
+                    <div class="flex py-4 text-left">
+                        <div class="w-1/2 pr-4">
+                            <a href="https://drive.google.com/file/d/1DbtND485AFmUv4XVb4mgZgXo27JxdkzE/view?usp=drive_link"
+                                target="_blank" class="text-black-600 hover:no-underline text-md underline">Conversation
+                                with Mark Zuckerberg</a>
+                        </div>
+                        <div class="w-1/2 pl-4">
+                            <p class="text-[#3D3D3D] text-base">Transform a 5-hour podcast into a structured document
+                                that sparks joy</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="mb-16 text-center bg-white">
+                <img src="https://platogram.vercel.app/web/static/Assets/268vocabulary-1@2x.png" alt="Person reading"
+                    class="mx-auto mb-6" style="max-width: 350px;">
+                <h2 class="font-perfectly-nineties text-3xl mb-4 bg-white text-black">
+                    [Name] was created by two tech enthusiasts,<br>
+                    <span class="underline">Ivan</span> & <span class="underline">Artyom</span>, who wanted to
+                    rediscover the<br>
+                    magic in spoken stories.
+                </h2>
+                <p class="text-xl mb-6 text-black">
+                    This project transforms spoken words into<br>
+                    structured data. It's a new way to know who said<br>
+                    what — unlike vague AI summaries, with privacy<br>
+                    and attribution at its core.
+                </p>
+                <p class="text-xl font-bold underline text-black">
+                    Try it with your favorite podcast or video.
+                </p>
+            </section>
+
+            <section class="grid md:grid-cols-2 gap-8 mb-16 max-w-6xl mx-auto bg-white">
+                <div class="bg-gray-100 p-8 rounded-xl shadow-sm">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-blue-100 p-2 rounded-lg mr-3">
+                            <svg class="w-6 h-6 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path
+                                    d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z">
+                                </path>
+                            </svg>
+                        </div>
+                        <h3 class="font-perfectly-nineties text-2xl text-gray-800">Generic AI Summaries</h3>
+                    </div>
+                    <p class="text-gray-500 mb-6">You're left with a condensed but often context-lacking summary that
+                        misses crucial details and nuances</p>
+                    <ul class="space-y-3">
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-red-500 mr-2 mt-1 flex-shrink-0" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                            <span class="text-gray-700">Shallow summaries lacking depth</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-red-500 mr-2 mt-1 flex-shrink-0" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                            <span class="text-gray-700">No sources references and timestamps</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-red-500 mr-2 mt-1 flex-shrink-0" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                            <span class="text-gray-700">Not good for RAG - low information density</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-red-500 mr-2 mt-1 flex-shrink-0" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                            <span class="text-gray-700">Limited to text, struggle with audio/video</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-red-500 mr-2 mt-1 flex-shrink-0" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                            <span class="text-gray-700">Privacy concerns with data storage and usage</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="bg-gray-100 p-8 rounded-xl shadow-sm">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-green-100 p-2 rounded-lg mr-3">
+                            <svg class="w-6 h-6 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd"
+                                    d="M3 4a1 1 0 011-1h4a1 1 0 010 2H6.414l2.293 2.293a1 1 0 01-1.414 1.414L5 6.414V8a1 1 0 01-2 0V4zm9 1a1 1 0 010-2h4a1 1 0 011 1v4a1 1 0 01-2 0V6.414l-2.293 2.293a1 1 0 11-1.414-1.414L13.586 5H12zm-9 7a1 1 0 012 0v1.586l2.293-2.293a1 1 0 111.414 1.414L6.414 15H8a1 1 0 010 2H4a1 1 0 01-1-1v-4zm13-1a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 010-2h1.586l-2.293-2.293a1 1 0 111.414-1.414L15 13.586V12a1 1 0 011-1z"
+                                    clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-perfectly-nineties text-2xl text-gray-800">Advantages of structured documents
+                        </h3>
+                    </div>
+                    <p class="text-gray-500 mb-6">[name] transforms spoken word into comprehensive, structured
+                        documents, offering a context-preserving, easily navigable output</p>
+                    <ul class="space-y-3">
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-1 flex-shrink-0" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span class="text-gray-700">Original paraphrased format</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-1 flex-shrink-0" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span class="text-gray-700">Hierarchical auto-generated chapters and sections</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-1 flex-shrink-0" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span class="text-gray-700">RAG-optimized markup with timestamped references</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-1 flex-shrink-0" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span class="text-gray-700">Privacy-first approach - no content storage</span>
+                        </li>
+                        <li class="flex items-start">
+                            <svg class="w-5 h-5 text-green-500 mr-2 mt-1 flex-shrink-0" fill="none"
+                                stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span class="text-gray-700">Unlimited length audio/video input <span class="italic">(in pro
+                                    version)</span></span>
+                        </li>
+                    </ul>
+                </div>
+            </section>
+
+            <section class="text-center mb-16 bg-white">
+                <h2 class="font-perfectly-nineties text-3xl mb-6 text-black">Book a demo</h2>
+                <p class="text-xl mb-6">
+                    If you're an organization or business who's interested in<br>
+                    learning more about how [Name] could work for your<br>
+                    data, book a live demo with us.
+                </p>
+                <button class="bg-black text-white px-6 py-3 rounded-full text-lg">Contact Us</button>
+            </section>
+
+        </main>
+
+        <footer class="mt-16 text-center bg-white">
+            <p>
+                Platogram is built with 💜 in New York and Boston by
+                <a href="https://codeanyway.com" class="text-blue-600 hover:underline" target="_blank"
+                    rel="noopener noreferrer">Code Anyway, Inc</a>
+                in 2023-2024
+            </p>
+            <div class="mt-4">
+                <a href="#" class="text-blue-600 hover:underline mr-4">Privacy</a>
+                <a href="#" class="text-blue-600 hover:underline">Terms</a>
             </div>
-            <div class="use-case-card">
-              <h3>Professional</h3>
-              <p>
-                Capture key insights from business meetings, coaching sessions,
-                and client calls, ensuring no valuable information is lost.
-              </p>
-            </div>
-          </div>
-        </section>
-        <section>
-          <h2>Pricing: Support Our Mission</h2>
-          <p>
-            We believe in making knowledge accessible. That's why Platogram
-            operates on a donation-based model.
-          </p>
-          <div class="pricing">
-            <h3>Suggested Donation: $2 per hour of audio processed</h3>
-            <p>Your donation supports:</p>
-            <ul>
-              <li>AI inference costs</li>
-              <li>Making Platogram accessible for all users</li>
-              <li>Building fully-offline version of Platogram</li>
-            </ul>
-            <div class="donate-button-container">
-              <a href="#" class="cta donate" id="donate-button-pricing">Donate Now</a>
-            </div>
-          </div>
-        </section>
-      </main>
-      <footer>
-        <p>
-          Platogram is built with 💜 in New York and Boston by
-          <a href="https://codeanyway.com" target="_blank" rel="noopener noreferrer">Code Anyway, Inc</a>
-          in 2023-2024
-        </p>
-      </footer>
+        </footer>
     </div>
-    <script src="app.js"></script>
-    <!-- Start of LiveChat (www.livechat.com) code -->
-    <script>
-      window.__lc = window.__lc || {};
-      window.__lc.license = 18397149;
-      window.__lc.integration_name = "manual_onboarding";
-      window.__lc.product_name = "livechat";
-      (function (n, t, c) {
-        function i(n) {
-          return e._h ? e._h.apply(null, n) : e._q.push(n);
+
+    <div id="language-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="modal-content bg-white rounded-lg shadow-xl w-full max-w-md md:max-w-lg lg:max-w-xl p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-perfectly-nineties text-2xl text-gray-800">Knowledge Extraction Job #<span id="job-id">0032</span></h3>
+            </div>
+
+            <p class="text-gray-600 mb-6">
+                We'll craft a well-organized, readable document delivered straight to your inbox.
+                Processing time varies based on content length and server load, typically ranging from 15 minutes to a few hours.
+            </p>
+
+            <div class="mb-4">
+                <p class="text-sm text-gray-600 mb-2">Job details for <span id="user-email"></span></p>
+                <div class="flex items-center bg-gray-100 rounded-md p-2">
+                    <svg class="w-5 h-5 text-gray-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    <span id="file-name" class="text-gray-700"></span>
+                    <div class="ml-auto relative">
+                        <button id="language-dropdown" class="flex items-center bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded">
+                            <span id="selected-language-flag" class="mr-1">🇺🇸</span>
+                            <span id="selected-language">En</span>
+                        </button>
+                        <div id="language-options" class="hidden absolute right-0 mt-2 w-24 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5">
+                            <div class="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                                <button class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left" role="menuitem" onclick="selectLanguage('en')">
+                                    <span class="mr-2">🇺🇸</span>English
+                                </button>
+                                <button class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left" role="menuitem" onclick="selectLanguage('es')">
+                                    <span class="mr-2">🇪🇸</span>Spanish
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="ml-auto text-gray-500 hover:text-gray-700">
+                        <X size={16} />
+                      </button>
+                </div>
+            </div>
+
+            <div class="space-y-2 mb-6">
+                <button id="basic-job-button" class="w-full p-4 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
+                  <div class="flex items-center justify-between">
+                    <span class="font-semibold">Basic Job</span>
+                    <span class="font-semibold">$0</span>
+                  </div>
+                  <p class="text-sm text-left text-gray-600 mt-1">Limitations? Must attribute [name]</p>
+                </button>
+
+                <div id="coffee-button" class="w-full p-4 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors cursor-pointer">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="font-semibold">Buy Us a Coffee</span>
+                    <span class="font-semibold">$<span id="coffee-price">0.00</span></span>
+                  </div>
+                  <div class="flex items-center space-x-2">
+                      <p class="text-sm text-left text-gray-600 mb-2">Name your fare price and support what we do</p>
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path>
+                    </svg>
+                    <button id="coffee-1" class="w-8 h-8 rounded-full bg-gray-200 text-gray-700 hover:bg-blue-600 hover:text-white transition-colors">1</button>
+                    <button id="coffee-2" class="w-8 h-8 rounded-full bg-gray-200 text-gray-700 hover:bg-blue-600 hover:text-white transition-colors">2</button>
+                    <input type="text" id="custom-price" style="width:48px!important;border-color:lightgray;border-radius:6px;padding:auto!important;margin-top:10px!important" placeholder="$30" class="w-8 h-8 p-1 border border-gray-300 rounded">
+                  </div>
+                </div>
+
+                <div id="card-errors" class="text-red-500 text-sm mb-4" role="alert"></div>
+
+                <button id="submit-btn" class="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+                  Get your document $<span id="total-price">0.00</span>
+                </button>
+
+                <button id="cancel-btn" class="w-full mt-2 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors">
+                  Cancel
+                </button>
+    </div>
+</div>
+<script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
+<script src="https://js.stripe.com/v3/"></script>
+<script src="https://platogram.vercel.app/web/app.js"></script>
+<script>
+    // Price logics
+        let selectedOption = 'coffee';
+        let coffeeCount = 1;
+        let customPrice = '';
+        let totalPrice = 5;
+
+        function updateTotalPrice() {
+            if (selectedOption === 'basic') {
+                totalPrice = 0;
+            } else if (selectedOption === 'coffee') {
+                if (customPrice) {
+                    totalPrice = parseFloat(customPrice);
+                } else {
+                    totalPrice = coffeeCount * 5;
+                }
+            }
+            const totalPriceElement = document.getElementById('total-price');
+            const coffeePriceElement = document.getElementById('coffee-price');
+            if (totalPriceElement) totalPriceElement.textContent = totalPrice.toFixed(2);
+            if (coffeePriceElement) coffeePriceElement.textContent = totalPrice.toFixed(2);
         }
-        var e = {
-          _q: [],
-          _h: null,
-          _v: "2.0",
-          on: function () {
-            i(["on", c.call(arguments)]);
-          },
-          once: function () {
-            i(["once", c.call(arguments)]);
-          },
-          off: function () {
-            i(["off", c.call(arguments)]);
-          },
-          get: function () {
-            if (!e._h)
-              throw new Error(
-                "[LiveChatWidget] You can't use getters before load."
-              );
-            return i(["get", c.call(arguments)]);
-          },
-          call: function () {
-            i(["call", c.call(arguments)]);
-          },
-          init: function () {
-            var n = t.createElement("script");
-            (n.async = !0),
-              (n.type = "text/javascript"),
-              (n.src = "https://cdn.livechatinc.com/tracking.js"),
-              t.head.appendChild(n);
-          },
+
+        function handleOptionClick(option) {
+            selectedOption = option;
+            const basicButton = document.getElementById('basic-job-button');
+            const coffeeButton = document.getElementById('coffee-button');
+            if (basicButton) {
+                basicButton.classList.toggle('border-blue-500', option === 'basic');
+                basicButton.classList.toggle('bg-blue-50', option === 'basic');
+            }
+            if (coffeeButton) {
+                coffeeButton.classList.toggle('border-blue-500', option === 'coffee');
+                coffeeButton.classList.toggle('bg-blue-50', option === 'coffee');
+            }
+            if (option === 'coffee') {
+                coffeeCount = 1;
+                customPrice = '';
+                const customPriceInput = document.getElementById('custom-price');
+                if (customPriceInput) customPriceInput.value = '';
+            }
+            updateTotalPrice();
+        }
+
+        function handleCoffeeCountClick(count) {
+            coffeeCount = count;
+            customPrice = '';
+            const customPriceInput = document.getElementById('custom-price');
+            if (customPriceInput) customPriceInput.value = '';
+            const coffee1Button = document.getElementById('coffee-1');
+            const coffee2Button = document.getElementById('coffee-2');
+            if (coffee1Button) {
+                coffee1Button.classList.toggle('bg-blue-500', count === 1);
+                coffee1Button.classList.toggle('text-white', count === 1);
+            }
+            if (coffee2Button) {
+                coffee2Button.classList.toggle('bg-blue-500', count === 2);
+                coffee2Button.classList.toggle('text-white', count === 2);
+            }
+            updateTotalPrice();
+        }
+
+        function handleCustomPriceChange(e) {
+            const value = e.target.value;
+            if (value === '' || (/^\d{1,3}(\.\d{0,2})?$/.test(value) && parseFloat(value) <= 999)) {
+                customPrice = value;
+                updateTotalPrice();
+            }
+        }
+
+        // Auth-related functions
+        function getInitials(email) {
+            return email.split('@')[0].substring(0, 2).toUpperCase();
+        }
+
+        window.updateAuthUI = function(isAuthenticated, user) {
+            const loginButton = document.getElementById('login-button');
+            const userCircle = document.getElementById('user-circle');
+            const logoutTooltip = document.getElementById('logout-tooltip');
+
+            if (isAuthenticated && user) {
+                if (loginButton) loginButton.classList.add('hidden');
+                if (userCircle) {
+                    userCircle.classList.remove('hidden');
+                    userCircle.textContent = getInitials(user.email);
+                }
+            } else {
+                if (loginButton) loginButton.classList.remove('hidden');
+                if (userCircle) userCircle.classList.add('hidden');
+                if (logoutTooltip) logoutTooltip.classList.add('visible');
+            }
+
+        if (userCircle && logoutTooltip) {
+            userCircle.addEventListener('click', (event) => {
+                event.stopPropagation(); // Prevent the click from immediately closing the tooltip
+                logoutTooltip.classList.toggle('visible');
+            });
+
+            // Close the tooltip when clicking outside
+            document.addEventListener('click', (event) => {
+                if (!userCircle.contains(event.target) && !logoutTooltip.contains(event.target)) {
+                    logoutTooltip.classList.add('visible');
+                }
+            });
+        }
+
         };
-        !n.__lc.asyncInit && e.init(),
-          (n.LiveChatWidget = n.LiveChatWidget || e);
-      })(window, document, [].slice);
-    </script>
-    <noscript>
-      <a href="https://www.livechat.com/chat-with/18397149/" rel="nofollow">Chat with us</a>, powered by
-      <a href="https://www.livechat.com/?welcome" rel="noopener nofollow" target="_blank">LiveChat</a>
-    </noscript>
-    <!-- End of LiveChat code -->
-    <script src="https://platogram.vercel.app/web/app.js"></script>
-    <!-- Initialize app.js functionality -->
-    <script>
-      document.addEventListener('DOMContentLoaded', () => {
-        // Initialize processing stage updates
-        initializeProcessingStage();
 
-        // Add event listeners to buttons
-        const convertButton = document.getElementById('convert-button');
-        if (convertButton) {
-          convertButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            onConvertClick();
-          });
+        function login() {
+            auth0Client.loginWithRedirect();
         }
 
-        const loginButton = document.getElementById('login-button');
-        if (loginButton) {
-          loginButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            login();
-          });
+        function logout() {
+            auth0Client.logout({ returnTo: window.location.origin });
         }
 
-        const logoutButton = document.getElementById('logout-button');
-        if (logoutButton) {
-          logoutButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            logout();
-          });
-        }
+        // Main DOMContentLoaded event listener
+        document.addEventListener('DOMContentLoaded', () => {
+            elements = {
+                urlInput: document.getElementById('url-input'),
+                uploadFileButton: document.getElementById('upload-file-button'),
+                fileUploadSection: document.getElementById('file-upload-section'),
+                inputSection: document.getElementById('input-section'),
+                backToUrlButton: document.getElementById('back-to-url'),
+                fileDropArea: document.getElementById('file-drop-area'),
+                fileInput: document.querySelector('input[type="file"]'),
+                fileNameDisplay: document.getElementById('file-name-display'),
+                convertButton: document.getElementById('convert-button'),
+                convertFileButton: document.getElementById('convert-file-button'),
+                loginButton: document.getElementById('login-button'),
+                logoutButton: document.getElementById('logout-button'),
+                userCircle: document.getElementById('user-circle'),
+                logoutTooltip: document.getElementById('logout-tooltip'),
+            };
 
-        const donateButtons = document.querySelectorAll('[id^="donate-button"]');
-        donateButtons.forEach(button => {
-          button.addEventListener('click', (event) => {
-            event.preventDefault();
-            onDonateClick();
-          });
+            const submitJobButton = document.getElementById('submit-btn');
+            if (submitJobButton) {
+                submitJobButton.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    handleSubmit(event);
+                });
+                console.log('Submit job button listener added');
+            } else {
+                console.error('Submit job button not found');
+            }
+
+            initializeProcessingStage();
+
+            // URL input listener
+            if (elements.urlInput) {
+                elements.urlInput.addEventListener('input', () => {
+                    toggleConvertButtonState(elements.urlInput.value.trim() !== '', elements.convertButton);
+                });
+            }
+
+            // Upload file button listener
+            if (elements.uploadFileButton) {
+                elements.uploadFileButton.addEventListener('click', () => {
+                    toggleSections(elements.inputSection, elements.fileUploadSection);
+                });
+            }
+
+            // Back to URL button listener
+            if (elements.backToUrlButton) {
+                elements.backToUrlButton.addEventListener('click', () => {
+                    toggleSections(elements.fileUploadSection, elements.inputSection);
+                });
+            }
+
+            // Setup drag and drop
+            if (elements.fileDropArea) {
+                setupDragAndDrop(elements.fileDropArea, handleFiles);
+            }
+
+            // File input change listener
+            if (elements.fileInput) {
+                elements.fileInput.addEventListener('change', (event) => {
+                    handleFiles(event.target.files);
+                });
+            }
+
+            // Language dropdown functionality
+            const languageDropdown = document.getElementById("language-dropdown");
+            const languageOptions = document.getElementById("language-options");
+
+            if (languageDropdown && languageOptions) {
+                languageDropdown.addEventListener("click", (event) => {
+                    event.stopPropagation();
+                    languageOptions.classList.toggle("hidden");
+                });
+
+                document.addEventListener("click", (event) => {
+                    if (!languageDropdown.contains(event.target) && !languageOptions.contains(event.target)) {
+                        languageOptions.classList.add("hidden");
+                    }
+                });
+
+                // Add event listeners for language selection
+                const englishOption = languageOptions.querySelector('button[data-lang="en"]');
+                const spanishOption = languageOptions.querySelector('button[data-lang="es"]');
+
+                if (englishOption) englishOption.addEventListener("click", () => selectLanguage("en"));
+                if (spanishOption) spanishOption.addEventListener("click", () => selectLanguage("es"));
+            }
+
+            // User circle and logout tooltip functionality
+            if (elements.userCircle) {
+                elements.userCircle.addEventListener('click', () => {
+                    elements.logoutTooltip.classList.toggle('hidden');
+                });
+            }
+
+            document.addEventListener('click', (event) => {
+                if (elements.userCircle && elements.logoutTooltip &&
+                    !elements.userCircle.contains(event.target) &&
+                    !elements.logoutTooltip.contains(event.target)) {
+                    elements.logoutTooltip.classList.add('hidden');
+                }
+            });
+
+            // Price logic event listeners
+            const basicJobButton = document.getElementById('basic-job-button');
+            if (basicJobButton) basicJobButton.addEventListener('click', () => handleOptionClick('basic'));
+
+            const coffeeButton = document.getElementById('coffee-button');
+            if (coffeeButton) coffeeButton.addEventListener('click', () => handleOptionClick('coffee'));
+
+            const coffee1Button = document.getElementById('coffee-1');
+            if (coffee1Button) coffee1Button.addEventListener('click', () => handleCoffeeCountClick(1));
+
+            const coffee2Button = document.getElementById('coffee-2');
+            if (coffee2Button) coffee2Button.addEventListener('click', () => handleCoffeeCountClick(2));
+
+            const customPriceInput = document.getElementById('custom-price');
+            if (customPriceInput) customPriceInput.addEventListener('input', handleCustomPriceChange);
+
+            const cancelButton = document.getElementById('cancel-btn');
+            if (cancelButton) {
+                cancelButton.addEventListener('click', () => {
+                    console.log('Modal closed');
+                    closeLanguageModal();
+                });
+            }
+
+            // Initial setup for price logic
+            handleOptionClick('coffee');
+            updateTotalPrice();
+
+            // Add event listeners to buttons
+            if (elements.convertButton) {
+                elements.convertButton.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    onConvertClick();
+                });
+            }
+
+            if (elements.loginButton) {
+                elements.loginButton.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    login();
+                });
+            }
+
+            if (elements.logoutButton) {
+                elements.logoutButton.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    logout();
+                });
+            }
+
+            const donateButtons = document.querySelectorAll('[id^="donate-button"]');
+            donateButtons.forEach(button => {
+                button.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    onDonateClick();
+                });
+            });
+
+            const resetButtons = document.querySelectorAll('[id^="reset-button"]');
+            resetButtons.forEach(button => {
+                button.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    reset();
+                });
+            });
+
+            // Initialize Auth0
+            initAuth0().catch((error) => console.error("Error initializing app:", error));
         });
 
-        const resetButtons = document.querySelectorAll('[id^="reset-button"]');
-        resetButtons.forEach(button => {
-          button.addEventListener('click', (event) => {
-            event.preventDefault();
-            reset();
-          });
+        // Existing functions (kept as they were)
+        function toggleConvertButtonState(isActive, button) {
+            if (button) {
+                button.disabled = !isActive;
+                button.classList.toggle('opacity-50', !isActive);
+                button.classList.toggle('cursor-not-allowed', !isActive);
+            }
+        }
+
+        function toggleSections(hiddenSection, visibleSection) {
+            if (hiddenSection) hiddenSection.classList.add('hidden');
+            if (visibleSection) visibleSection.classList.remove('hidden');
+        }
+
+    function setupDragAndDrop(dropArea, filesHandler) {
+        if (!dropArea) return;
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
         });
 
-        // Initialize Auth0
-        initAuth0().catch((error) => console.error("Error initializing app:", error));
-      });
-    </script>
-  </body>
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, true), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, false), false);
+        });
+
+        dropArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            filesHandler(files);
+        });
+    }
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function toggleHighlight(dropArea, isActive) {
+            dropArea.classList.toggle('border-blue-500', isActive);
+            dropArea.classList.toggle('bg-blue-50', isActive);
+        }
+
+    function handleFiles(files) {
+        if (files.length > 0) {
+          const file = files[0];
+          if (elements.fileNameDisplay) {
+            elements.fileNameDisplay.textContent = file.name;
+          }
+          if (elements.convertFileButton) {
+            toggleConvertButtonState(true, elements.convertFileButton);
+          }
+        }
+      }
+
+        function getInputData() {
+            const urlInput = document.getElementById("url-input").value;
+            const fileInput = document.querySelector('input[type="file"]').files[0];
+            return urlInput || fileInput;
+        }
+
+    function showLanguageSelectionModal(inputData) {
+        const modal = document.getElementById("language-modal");
+        const userEmailSpan = document.getElementById("user-email");
+        const fileNameSpan = document.getElementById("file-name");
+        const jobIdSpan = document.getElementById("job-id");
+
+        // Set file name
+        if (inputData instanceof File) {
+            fileNameSpan.textContent = inputData.name;
+        } else if (typeof inputData === 'string') {
+            fileNameSpan.textContent = inputData;
+        } else {
+            fileNameSpan.textContent = "Unknown file";
+        }
+
+        // Get user email from Auth0
+        if (auth0Client) {
+            auth0Client.getUser().then(user => {
+                const email = user.email || user["https://platogram.com/user_email"] || "Unknown email";
+                userEmailSpan.textContent = email;
+            }).catch(error => {
+                console.error("Error getting user email:", error);
+                userEmailSpan.textContent = "Error fetching email";
+            });
+        } else {
+            console.warn("Auth0 client not initialized");
+            userEmailSpan.textContent = "Auth0 not initialized";
+        }
+
+        // Set job ID (you may want to generate this dynamically)
+        jobIdSpan.textContent = "0032";
+
+        modal.classList.remove("hidden");
+    }
+
+    function selectLanguage(lang) {
+        const selectedLanguageFlag = document.getElementById("selected-language-flag");
+        const selectedLanguage = document.getElementById("selected-language");
+        const languageOptions = document.getElementById("language-options");
+
+        if (lang === 'en') {
+            selectedLanguageFlag.textContent = "🇺🇸";
+            selectedLanguage.textContent = "En";
+        } else if (lang === 'es') {
+            selectedLanguageFlag.textContent = "🇪🇸";
+            selectedLanguage.textContent = "Es";
+        }
+
+        languageOptions.classList.add("hidden");
+    }
+
+        function closeLanguageModal() {
+            const modal = document.getElementById("language-modal");
+            modal.classList.add("hidden");
+        }
+
+        function initializeStripeIfNeeded() {
+            if (typeof stripe === 'undefined') {
+                console.warn('Stripe is not defined. Make sure to include Stripe.js');
+            }
+        }
+</script>
+</body>
 </html>

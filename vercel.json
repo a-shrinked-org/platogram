@@ -1,21 +1,14 @@
+
 {
   "version": 2,
   "builds": [
     {
       "src": "web/main.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "15mb",
-        "runtime": "python3.12"
-      }
+      "use": "@vercel/python"
     },
     {
       "src": "api/**/*.js",
       "use": "@vercel/node"
-    },
-    {
-      "src": "web/**",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -24,19 +17,12 @@
       "dest": "/api/$1"
     },
     {
-      "src": "^/static/(.*)",
-      "dest": "/web/static/$1"
+      "src": "/[^.]+",
+      "dest": "/web/main.py",
+      "status": 200
     },
     {
-      "src": "^/favicon.ico",
-      "dest": "/web/favicon.ico"
-    },
-    {
-      "src": "^/manifest.json",
-      "dest": "/web/manifest.json"
-    },
-    {
-      "src": "^/((?!api/).*)",
+      "src": "/(.*)",
       "dest": "/web/main.py"
     }
   ],

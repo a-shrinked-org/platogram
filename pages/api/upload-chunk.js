@@ -1,5 +1,4 @@
-// pages/api/upload-chunk.js
-import { Pool } from 'pg';
+const { Pool } = require('pg');
 
 const pool = new Pool({
   connectionString: process.env.POSTGRES_URL,
@@ -7,9 +6,9 @@ const pool = new Pool({
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
-    const { fileId, chunkIndex, chunk, totalChunks } = req.body;
-
     try {
+      const { fileId, chunkIndex, chunk, totalChunks } = req.body;
+
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
@@ -44,7 +43,7 @@ export default async function handler(req, res) {
       }
     } catch (error) {
       console.error('Error uploading chunk:', error);
-      res.status(500).json({ error: 'Failed to upload chunk' });
+      res.status(500).json({ error: 'Failed to upload chunk', details: error.message });
     }
   } else {
     res.setHeader('Allow', ['POST']);

@@ -301,6 +301,14 @@ async function handleSubmit(event) {
                 throw new Error('Stripe initialization failed');
             }
 
+            // Get the user's email from Auth0
+            const user = await auth0Client.getUser();
+            const email = user.email || user["https://platogram.com/user_email"];
+
+            if (!email) {
+                throw new Error('User email not available');
+            }
+
             const response = await fetch('/api/create-checkout-session', {
                 method: 'POST',
                 headers: {

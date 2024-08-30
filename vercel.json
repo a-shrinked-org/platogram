@@ -18,16 +18,15 @@
       "use": "@vercel/python"
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/$1"
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
     },
     {
-      "src": "/(.*)",
-      "dest": "/web/index.html"
+      "source": "/((?!api/).*)",
+      "destination": "/web/index.html"
     }
   ],
-  "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e .",
-  "outputDirectory": "web"
+  "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e ."
 }

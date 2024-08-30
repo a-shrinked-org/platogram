@@ -38,9 +38,9 @@ export default async function handler(req, res) {
   // Run the middleware
   await runMiddleware(req, res, cors);
 
-  if (req.method === 'POST') {
+   if (req.method === 'POST') {
     try {
-      const { price, lang } = req.body;
+      const { price, lang, email } = req.body;  // Add email to the destructured properties
 
       // Ensure HTTPS for the base URL
       const baseUrl = ensureHttps(process.env.NEXT_PUBLIC_URL);
@@ -48,6 +48,7 @@ export default async function handler(req, res) {
       // Create Stripe checkout session
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
+        customer_email: email,  // Add this line to include the customer's email
         line_items: [
           {
             price_data: {

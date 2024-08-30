@@ -309,6 +309,7 @@ async function handleSubmit(event) {
                 body: JSON.stringify({
                     price: price,
                     lang: selectedLanguage,
+                    email: email  // Include the user's email here
                 }),
             });
 

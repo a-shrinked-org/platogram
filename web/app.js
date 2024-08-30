@@ -290,12 +290,8 @@ async function handleSubmit(event) {
             submitButtonText.textContent = "Uploading...";
             console.log('Starting file upload');
             try {
-                const blob = await upload(inputData.name, inputData, {
-                    access: 'public',
-                    handleUploadUrl: '/api/blob-upload',
-                });
-                fileUrl = blob.url;
-                console.log('File uploaded successfully to Vercel Blob, URL:', fileUrl);
+                fileUrl = await uploadFile(inputData);
+                console.log('File uploaded successfully, URL:', fileUrl);
             } catch (uploadError) {
                 throw new Error(`File upload failed: ${uploadError.message}`);
             }
@@ -323,7 +319,7 @@ async function handleSubmit(event) {
                     price: price,
                     lang: selectedLanguage,
                     email: email,
-                    fileUrl: fileUrl  // Include the file URL in the checkout session
+                    fileUrl: fileUrl
                 }),
             });
 
@@ -347,7 +343,7 @@ async function handleSubmit(event) {
         } else {
             console.log('Free conversion, proceeding with postToConvert');
             modal.classList.add('hidden');
-            updateUIStatus("running");
+            updateUIStatus("running", "Starting conversion...");
             await postToConvert(fileUrl, selectedLanguage, null, price);
         }
     } catch (error) {

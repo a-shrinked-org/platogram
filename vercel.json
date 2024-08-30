@@ -34,10 +34,6 @@
       "dest": "/web/$1"
     },
     {
-      "src": "/create-checkout-session",
-      "dest": "/web/create-checkout-session.js"
-    },
-    {
       "src": "/(.*)",
       "dest": "/web/main.py"
     }

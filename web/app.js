@@ -237,6 +237,51 @@ async function createCheckoutSession(price, lang) {
   }
 }
 
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+
+async function uploadLargeFile(file) {
+  const fileId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+    const start = chunkIndex * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    const chunk = file.slice(start, end);
+
+    const chunkArrayBuffer = await chunk.arrayBuffer();
+    const chunkBase64 = btoa(String.fromCharCode(...new Uint8Array(chunkArrayBuffer)));
+
+    const response = await fetch('/api/upload-chunk', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        fileId,
+        chunkIndex,
+        chunk: chunkBase64,
+        totalChunks,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to upload chunk ${chunkIndex + 1} of ${totalChunks}`);
+    }
+
+    updateUploadProgress((chunkIndex + 1) / totalChunks * 100);
+  }
+
+  return fileId;
+}
+
+function updateUploadProgress(percentage) {
+  const progressBar = document.getElementById('upload-progress');
+  if (progressBar) {
+    progressBar.style.width = `${percentage}%`;
+    progressBar.textContent = `${Math.round(percentage)}%`;
+  }
+}
+
 async function handleSubmit(event) {
     event.preventDefault();
     console.log('handleSubmit called');
@@ -330,6 +375,11 @@ async function onConvertClick(event) {
     if (!auth0Client) throw new Error("Auth0 client not initialized");
 
     const inputData = getInputData();
+    if (!inputData) {
+      updateUIStatus("error", "Please provide a valid URL or upload a file to be converted");
+      return;
+    }
+
     const price = getPriceFromUI();
 
     if (await auth0Client.isAuthenticated()) {
@@ -414,9 +464,9 @@ async function postToConvert(inputData, lang, sessionId, price) {
 
 
 function getInputData() {
-  const urlInput = document.getElementById("url-input").value;
+  const urlInput = document.getElementById("url-input").value.trim();
   const fileInput = document.getElementById("file-upload").files[0];
-  return urlInput || fileInput;
+  return urlInput || fileInput || null;
 }
 
 async function login() {

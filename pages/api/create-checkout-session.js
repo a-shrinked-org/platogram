@@ -54,8 +54,6 @@ export default async function handler(req, res) {
               currency: 'usd',
               product_data: {
                 name: 'Content Conversion',
-              },
-              unit_amount: Math.round, // Stripe expects amount in cents
             },
             quantity: 1,
           },

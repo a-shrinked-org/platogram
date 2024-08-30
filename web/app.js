@@ -256,14 +256,10 @@ async function handleSubmit(event) {
                 throw new Error('Stripe initialization failed');
             }
 
-            const token = await auth0Client.getTokenSilently();
-            console.log('Auth0 token obtained:', token);
-
-            const response = await fetch('/create-checkout-session', {
+            const response = await fetch('/api/create-checkout-session', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
                     price: price,
@@ -271,17 +267,11 @@ async function handleSubmit(event) {
                 }),
             });
 
-            console.log('Response status:', response.status);
-            console.log('Response headers:', response.headers);
-
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Failed to create checkout session: ${response.status} ${errorText}`);
+                throw new Error('Failed to create checkout session');
             }
 
             const session = await response.json();
-            console.log('Checkout session created:', session);
-
             const result = await stripe.redirectToCheckout({
                 sessionId: session.id,
             });

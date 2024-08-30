@@ -14,8 +14,8 @@
       "use": "@vercel/static"
     },
     {
-      "src": "api/**/*.js",
-      "use": "@vercel/node"
+      "src": "api/**/*.py",
+      "use": "@vercel/python"
     }
   ],
   "routes": [
@@ -24,22 +24,10 @@
       "dest": "/api/$1"
     },
     {
-      "src": "^/$",
-      "dest": "/web/index.html"
-    },
-    {
-      "src": "/web/(.*)",
-      "dest": "/web/$1"
-    },
-    {
-      "src": "/[^.]+",
-      "dest": "/web/index.html",
-      "status": 200
-    },
-    {
       "src": "/(.*)",
-      "dest": "/web/main.py"
+      "dest": "/web/index.html"
     }
   ],
-  "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e ."
+  "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e .",
+  "outputDirectory": "web"
 }

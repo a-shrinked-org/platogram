@@ -1,10 +1,17 @@
-
 {
   "version": 2,
   "builds": [
     {
       "src": "web/main.py",
-      "use": "@vercel/python"
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "15mb",
+        "runtime": "python3.12"
+      }
+    },
+    {
+      "src": "web/**",
+      "use": "@vercel/static"
     },
     {
       "src": "api/**/*.js",
@@ -17,8 +24,16 @@
       "dest": "/api/$1"
     },
     {
+      "src": "^/$",
+      "dest": "/web/index.html"
+    },
+    {
+      "src": "/web/(.*)",
+      "dest": "/web/$1"
+    },
+    {
       "src": "/[^.]+",
-      "dest": "/web/main.py",
+      "dest": "/web/index.html",
       "status": 200
     },
     {
@@ -26,5 +41,5 @@
       "dest": "/web/main.py"
     }
   ],
-  "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e . && npm install"
+  "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e ."
 }

@@ -288,6 +288,7 @@ async function handleSubmit(event) {
         let fileUrl;
         if (inputData instanceof File) {
             submitButtonText.textContent = "Uploading...";
+            submitSpinner.classList.remove('hidden');
             console.log('Starting file upload');
             try {
                 fileUrl = await uploadFile(inputData);

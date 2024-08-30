@@ -289,8 +289,16 @@ async function handleSubmit(event) {
         if (inputData instanceof File) {
             submitButtonText.textContent = "Uploading...";
             console.log('Starting file upload');
-            fileUrl = await uploadFile(inputData);
-            console.log('File uploaded successfully, URL:', fileUrl);
+            try {
+                const blob = await upload(inputData.name, inputData, {
+                    access: 'public',
+                    handleUploadUrl: '/api/blob-upload',
+                });
+                fileUrl = blob.url;
+                console.log('File uploaded successfully to Vercel Blob, URL:', fileUrl);
+            } catch (uploadError) {
+                throw new Error(`File upload failed: ${uploadError.message}`);
+            }
         } else {
             fileUrl = inputData;
             console.log('Using provided URL:', fileUrl);
@@ -300,8 +308,6 @@ async function handleSubmit(event) {
 
         if (price > 0) {
             console.log('Non-zero price detected, initiating Stripe checkout');
-
-            // Get the user's email from Auth0
             const user = await auth0Client.getUser();
             const email = user.email || user["https://platogram.com/user_email"];
             if (!email) {
@@ -316,7 +322,8 @@ async function handleSubmit(event) {
                 body: JSON.stringify({
                     price: price,
                     lang: selectedLanguage,
-                    email: email // Include the user's email here
+                    email: email,
+                    fileUrl: fileUrl  // Include the file URL in the checkout session
                 }),
             });
 
@@ -340,10 +347,9 @@ async function handleSubmit(event) {
         } else {
             console.log('Free conversion, proceeding with postToConvert');
             modal.classList.add('hidden');
-            updateUIStatus("running", "Starting conversion...");
+            updateUIStatus("running");
             await postToConvert(fileUrl, selectedLanguage, null, price);
         }
-
     } catch (error) {
         console.error('Error in handleSubmit:', error);
         updateUIStatus("error", "Error: " + error.message);

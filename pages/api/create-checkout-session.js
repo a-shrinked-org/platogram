@@ -23,6 +23,17 @@ function runMiddleware(req, res, fn) {
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+// Add this function to ensure HTTPS
+function ensureHttps(url) {
+  if (url.startsWith('http://')) {
+    return url.replace('http://', 'https://');
+  }
+  if (!url.startsWith('https://')) {
+    return `https://${url}`;
+  }
+  return url;
+}
+
 export default async function handler(req, res) {
   // Run the middleware
   await runMiddleware(req, res, cors);
@@ -30,6 +41,9 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
       const { price, lang } = req.body;
+
+      // Ensure HTTPS for the base URL
+      const baseUrl = ensureHttps(process.env.NEXT_PUBLIC_URL);
 
       // Create Stripe checkout session
       const session = await stripe.checkout.sessions.create({
@@ -47,12 +61,13 @@ export default async function handler(req, res) {
           },
         ],
         mode: 'payment',
-        success_url: `${process.env.NEXT_PUBLIC_URL}/success?session_id={CHECKOUT_SESSION_ID}&lang=${lang}`,
-        cancel_url: `${process.env.NEXT_PUBLIC_URL}/cancel`,
+        success_url: `${baseUrl}/success?session_id={CHECKOUT_SESSION_ID}&lang=${lang}`,
+        cancel_url: `${baseUrl}/cancel`,
       });
 
       res.status(200).json({ id: session.id });
     } catch (err) {
+      console.error('Error creating checkout session:', err);
       res.status(500).json({ statusCode: 500, message: err.message });
     }
   } else {

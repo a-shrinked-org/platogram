@@ -10,17 +10,19 @@
       }
     },
     {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    },
+    {
       "src": "web/**",
       "use": "@vercel/static"
     }
   ],
-  "crons": [
-    {
-      "path": "/api/cron",
-      "schedule": "*/5 * * * *"
-    }
-  ],
   "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1.js"
+    },
     {
       "src": "/",
       "dest": "/web/index.html"
@@ -38,5 +40,5 @@
       "dest": "/web/main.py"
     }
   ],
-  "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e ."
+  "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e . && npm install"
 }

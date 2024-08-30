@@ -212,7 +212,7 @@ async function createCheckoutSession(price, lang) {
   }
 
   try {
-    const response = await fetch('https://platogram.vercel.app/create-checkout-session', {
+    const response = await fetch('https://platogram.vercel.app/api/create-checkout-session', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

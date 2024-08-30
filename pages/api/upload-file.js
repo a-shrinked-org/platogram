@@ -1,27 +1,48 @@
-async function uploadFile(file) {
-    console.log('Starting file upload process');
-    const formData = new FormData();
-    formData.append('file', file);
+import { put } from '@vercel/blob';
+import { IncomingForm } from 'formidable';
+import fs from 'fs';
 
-    console.log('File details:', file.name, file.type, file.size);
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
 
-    try {
-        console.log('Sending file to upload endpoint');
-        const response = await fetch('/api/upload-file', {
-            method: 'POST',
-            body: formData,
+export default async function handler(req, res) {
+  if (req.method === 'POST') {
+    const form = new IncomingForm();
+
+    form.parse(req, async (err, fields, files) => {
+      if (err) {
+        console.error('Parsing form error:', err);
+        res.status(500).json({ error: 'File upload failed during parsing' });
+        return;
+      }
+
+      const file = files.file[0];
+      if (!file) {
+        res.status(400).json({ error: 'No file provided' });
+        return;
+      }
+
+      try {
+        const fileContent = await fs.promises.readFile(file.filepath);
+        const blob = await put(file.originalFilename, fileContent, {
+          access: 'public',
         });
 
-        if (!response.ok) {
-            console.error('File upload failed. Status:', response.status);
-            throw new Error('File upload failed');
-        }
-
-        const result = await response.json();
-        console.log('File upload successful. Received URL:', result.fileUrl);
-        return result.fileUrl;
-    } catch (error) {
-        console.error('Error during file upload:', error);
-        throw error;
-    }
+        console.log('File uploaded successfully to Vercel Blob:', blob.url);
+        res.status(200).json({
+          message: 'File uploaded successfully',
+          fileUrl: blob.url
+        });
+      } catch (error) {
+        console.error('Vercel Blob upload error:', error);
+        res.status(500).json({ error: 'File upload failed during Blob upload' });
+      }
+    });
+  } else {
+    res.setHeader('Allow', ['POST']);
+    res.status(405).end(`Method ${req.method} Not Allowed`);
+  }
 }

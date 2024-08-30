@@ -955,45 +955,90 @@
     function setupDragAndDrop(dropArea, filesHandler) {
         if (!dropArea) return;
 
+        const fileNameDisplay = document.querySelector('#file-name-display');
+        const dropAreaText = dropArea.querySelector('p');
+        const cancelLink = document.createElement('a');
+        cancelLink.textContent = 'Cancel';
+        cancelLink.href = '#';
+        cancelLink.style.display = 'none';
+        dropArea.appendChild(cancelLink);
+
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             dropArea.addEventListener(eventName, preventDefaults, false);
         });
 
         ['dragenter', 'dragover'].forEach(eventName => {
-            dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, true), false);
+            dropArea.addEventListener(eventName, () => {
+                if (!dropArea.classList.contains('file-added')) {
+                    toggleHighlight(dropArea, true);
+                }
+            }, false);
         });
 
         ['dragleave', 'drop'].forEach(eventName => {
-            dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, false), false);
+            dropArea.addEventListener(eventName, () => {
+                if (!dropArea.classList.contains('file-added')) {
+                    toggleHighlight(dropArea, false);
+                }
+            }, false);
         });
 
         dropArea.addEventListener('drop', (e) => {
             const dt = e.dataTransfer;
             const files = dt.files;
-            filesHandler(files);
+            handleFiles(files);
         });
-    }
-        function preventDefaults(e) {
+
+        cancelLink.addEventListener('click', (e) => {
             e.preventDefault();
-            e.stopPropagation();
+            resetDropArea();
+        });
+
+        function handleFiles(files) {
+            if (files.length > 0) {
+                const file = files[0];
+                if (fileNameDisplay) {
+                    fileNameDisplay.textContent = file.name;
+                    fileNameDisplay.style.display = 'block';
+                }
+                if (dropAreaText) {
+                    dropAreaText.style.display = 'none';
+                }
+                dropArea.classList.add('file-added');
+                toggleHighlight(dropArea, false);
+                cancelLink.style.display = 'inline';
+                if (elements.convertFileButton) {
+                    toggleConvertButtonState(true, elements.convertFileButton);
+                }
+                filesHandler(files);
+            }
         }
 
-        function toggleHighlight(dropArea, isActive) {
-            dropArea.classList.toggle('border-blue-500', isActive);
-            dropArea.classList.toggle('bg-blue-50', isActive);
+        function resetDropArea() {
+            if (fileNameDisplay) {
+                fileNameDisplay.textContent = '';
+                fileNameDisplay.style.display = 'none';
+            }
+            if (dropAreaText) {
+                dropAreaText.style.display = 'block';
+            }
+            dropArea.classList.remove('file-added');
+            cancelLink.style.display = 'none';
+            if (elements.convertFileButton) {
+                toggleConvertButtonState(false, elements.convertFileButton);
+            }
         }
+    }
 
-    function handleFiles(files) {
-        if (files.length > 0) {
-          const file = files[0];
-          if (elements.fileNameDisplay) {
-            elements.fileNameDisplay.textContent = file.name;
-          }
-          if (elements.convertFileButton) {
-            toggleConvertButtonState(true, elements.convertFileButton);
-          }
-        }
-      }
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    function toggleHighlight(dropArea, isActive) {
+        dropArea.classList.toggle('border-blue-500', isActive);
+        dropArea.classList.toggle('bg-blue-50', isActive);
+    }
 
         function getInputData() {
             const urlInput = document.getElementById("url-input").value;

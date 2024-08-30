@@ -238,20 +238,31 @@ async function createCheckoutSession(price, lang) {
 }
 
 async function uploadFile(file) {
+    console.log('Starting file upload process');
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch('/api/upload-file', {
-        method: 'POST',
-        body: formData,
-    });
+    console.log('File details:', file.name, file.type, file.size);
 
-    if (!response.ok) {
-        throw new Error('File upload failed');
+    try {
+        console.log('Sending file to upload endpoint');
+        const response = await fetch('/api/upload-file', {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            console.error('File upload failed. Status:', response.status);
+            throw new Error('File upload failed');
+        }
+
+        const result = await response.json();
+        console.log('File upload successful. Received URL:', result.fileUrl);
+        return result.fileUrl;
+    } catch (error) {
+        console.error('Error during file upload:', error);
+        throw error;
     }
-
-    const result = await response.json();
-    return result.fileUrl;
 }
 
 async function handleSubmit(event) {
@@ -265,35 +276,78 @@ async function handleSubmit(event) {
     const modal = document.getElementById('language-modal');
 
     if (!inputData) {
+        console.error('No input data provided');
         updateUIStatus("error", "Please provide a URL or upload a file before submitting.");
         return;
     }
 
     try {
+        submitButton.disabled = true;
+        submitSpinner.classList.remove('hidden');
+
         let fileUrl;
         if (inputData instanceof File) {
             submitButtonText.textContent = "Uploading...";
-            submitButton.disabled = true;
-            submitSpinner.classList.remove('hidden');
-
+            console.log('Starting file upload');
             fileUrl = await uploadFile(inputData);
-
-            submitButtonText.textContent = "Processing...";
+            console.log('File uploaded successfully, URL:', fileUrl);
         } else {
-            fileUrl = inputData; // If it's already a URL, use it directly
-            submitButtonText.textContent = "Processing...";
-            submitButton.disabled = true;
-            submitSpinner.classList.remove('hidden');
+            fileUrl = inputData;
+            console.log('Using provided URL:', fileUrl);
         }
 
-        modal.classList.add('hidden');
-        updateUIStatus("running", "Starting conversion...");
+        submitButtonText.textContent = "Processing...";
 
-        await postToConvert(fileUrl, selectedLanguage, null, price);
+        if (price > 0) {
+            console.log('Non-zero price detected, initiating Stripe checkout');
+
+            // Get the user's email from Auth0
+            const user = await auth0Client.getUser();
+            const email = user.email || user["https://platogram.com/user_email"];
+            if (!email) {
+                throw new Error('User email not available');
+            }
+
+            const response = await fetch('/api/create-checkout-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    price: price,
+                    lang: selectedLanguage,
+                    email: email // Include the user's email here
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to create checkout session');
+            }
+
+            const session = await response.json();
+            const stripeInstance = initStripe();
+            if (!stripeInstance) {
+                throw new Error('Failed to initialize Stripe');
+            }
+
+            const result = await stripeInstance.redirectToCheckout({
+                sessionId: session.id,
+            });
+
+            if (result.error) {
+                throw new Error(result.error.message);
+            }
+        } else {
+            console.log('Free conversion, proceeding with postToConvert');
+            modal.classList.add('hidden');
+            updateUIStatus("running", "Starting conversion...");
+            await postToConvert(fileUrl, selectedLanguage, null, price);
+        }
 
     } catch (error) {
         console.error('Error in handleSubmit:', error);
         updateUIStatus("error", "Error: " + error.message);
+    } finally {
         submitButtonText.textContent = "Submit";
         submitButton.disabled = false;
         submitSpinner.classList.add('hidden');

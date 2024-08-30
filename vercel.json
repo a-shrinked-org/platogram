@@ -24,16 +24,19 @@
       "dest": "/api/$1"
     },
     {
-      "src": "/web/(.*)",
-      "dest": "/web/$1"
+      "src": "^/static/(.*)",
+      "dest": "/web/static/$1"
     },
     {
-      "src": "/[^.]+",
-      "dest": "/web/index.html",
-      "status": 200
+      "src": "^/favicon.ico",
+      "dest": "/web/favicon.ico"
     },
     {
-      "src": "/(.*)",
+      "src": "^/manifest.json",
+      "dest": "/web/manifest.json"
+    },
+    {
+      "src": "^/((?!api/).*)",
       "dest": "/web/main.py"
     }
   ],

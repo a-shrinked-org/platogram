@@ -14,17 +14,17 @@
       "use": "@vercel/static"
     },
     {
-      "src": "pages/api/**/*.py",
-      "use": "@vercel/python"
+      "src": "pages/api/**/*.js",
+      "use": "@vercel/node"
     }
   ],
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "/pages/api/:path*"
+      "destination": "/pages/api/:path*.js"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/).*)",
       "destination": "/web/index.html"
     }
   ],

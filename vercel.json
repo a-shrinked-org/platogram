@@ -10,7 +10,7 @@
       }
     },
     {
-      "src": "api/*.js",
+      "src": "api/**/*.js",
       "use": "@vercel/node"
     },
     {
@@ -18,25 +18,19 @@
       "use": "@vercel/static"
     }
   ],
-  "rewrites":  [
-    {"source": "/(.*)", "destination": "/"}
-  ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/$1.js"
-    },
-    {
-      "src": "/",
-      "dest": "/web/index.html"
-    },
-    {
-      "src": "/web",
-      "dest": "/web/index.html"
+      "dest": "/api/$1"
     },
     {
       "src": "/web/(.*)",
       "dest": "/web/$1"
+    },
+    {
+      "src": "/[^.]+",
+      "dest": "/web/index.html",
+      "status": 200
     },
     {
       "src": "/(.*)",

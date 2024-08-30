@@ -24,6 +24,10 @@
       "destination": "/pages/api/:path*.js"
     },
     {
+      "source": "/uploads/(.*)",
+      "destination": "/public/uploads/$1"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/web/index.html"
     }

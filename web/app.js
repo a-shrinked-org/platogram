@@ -237,49 +237,21 @@ async function createCheckoutSession(price, lang) {
   }
 }
 
-const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+async function uploadFile(file) {
+    const formData = new FormData();
+    formData.append('file', file);
 
-async function uploadLargeFile(file) {
-  const fileId = Date.now().toString(36) + Math.random().toString(36).substr(2);
-  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-
-  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-    const start = chunkIndex * CHUNK_SIZE;
-    const end = Math.min(start + CHUNK_SIZE, file.size);
-    const chunk = file.slice(start, end);
-
-    const chunkArrayBuffer = await chunk.arrayBuffer();
-    const chunkBase64 = btoa(String.fromCharCode(...new Uint8Array(chunkArrayBuffer)));
-
-    const response = await fetch('/api/upload-chunk', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        fileId,
-        chunkIndex,
-        chunk: chunkBase64,
-        totalChunks,
-      }),
+    const response = await fetch('/api/upload-file', {
+        method: 'POST',
+        body: formData,
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to upload chunk ${chunkIndex + 1} of ${totalChunks}`);
+        throw new Error('File upload failed');
     }
 
-    updateUploadProgress((chunkIndex + 1) / totalChunks * 100);
-  }
-
-  return fileId;
-}
-
-function updateUploadProgress(percentage) {
-  const progressBar = document.getElementById('upload-progress');
-  if (progressBar) {
-    progressBar.style.width = `${percentage}%`;
-    progressBar.textContent = `${Math.round(percentage)}%`;
-  }
+    const result = await response.json();
+    return result.fileUrl;
 }
 
 async function handleSubmit(event) {
@@ -287,56 +259,44 @@ async function handleSubmit(event) {
     console.log('handleSubmit called');
     const price = getPriceFromUI();
     const inputData = getInputData();
+    const submitButton = document.getElementById('submit-btn');
+    const submitButtonText = document.getElementById('submit-btn-text');
+    const submitSpinner = document.getElementById('submit-spinner');
+    const modal = document.getElementById('language-modal');
 
-    // Close the modal immediately
-    document.getElementById('language-modal').classList.add('hidden');
+    if (!inputData) {
+        updateUIStatus("error", "Please provide a URL or upload a file before submitting.");
+        return;
+    }
 
-     if (price === 0) {
-        updateUIStatus("running");
-        await postToConvert(inputData, selectedLanguage, null, 0);
-    } else {
-        try {
-            const stripe = initStripe();
-            if (!stripe) {
-                throw new Error('Stripe initialization failed');
-            }
+    try {
+        let fileUrl;
+        if (inputData instanceof File) {
+            submitButtonText.textContent = "Uploading...";
+            submitButton.disabled = true;
+            submitSpinner.classList.remove('hidden');
 
-            // Get the user's email from Auth0
-            const user = await auth0Client.getUser();
-            const email = user.email || user["https://platogram.com/user_email"];
+            fileUrl = await uploadFile(inputData);
 
-            if (!email) {
-                throw new Error('User email not available');
-            }
-
-            const response = await fetch('/api/create-checkout-session', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    price: price,
-                    lang: selectedLanguage,
-                    email: email  // Include the user's email here
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to create checkout session');
-            }
-
-            const session = await response.json();
-            const result = await stripe.redirectToCheckout({
-                sessionId: session.id,
-            });
-
-            if (result.error) {
-                throw new Error(result.error.message);
-            }
-        } catch (error) {
-            console.error('Error in handleSubmit:', error);
-            updateUIStatus('error', error.message || 'An error occurred while processing your request.');
+            submitButtonText.textContent = "Processing...";
+        } else {
+            fileUrl = inputData; // If it's already a URL, use it directly
+            submitButtonText.textContent = "Processing...";
+            submitButton.disabled = true;
+            submitSpinner.classList.remove('hidden');
         }
+
+        modal.classList.add('hidden');
+        updateUIStatus("running", "Starting conversion...");
+
+        await postToConvert(fileUrl, selectedLanguage, null, price);
+
+    } catch (error) {
+        console.error('Error in handleSubmit:', error);
+        updateUIStatus("error", "Error: " + error.message);
+        submitButtonText.textContent = "Submit";
+        submitButton.disabled = false;
+        submitSpinner.classList.add('hidden');
     }
 }
 
@@ -427,7 +387,6 @@ function showLanguageSelectionModal(inputData, price) {
 }
 
 async function postToConvert(inputData, lang, sessionId, price) {
-  let body;
   let headers = {
     Authorization: `Bearer ${await auth0Client.getTokenSilently({
       audience: "https://platogram.vercel.app",
@@ -443,20 +402,16 @@ async function postToConvert(inputData, lang, sessionId, price) {
     formData.append('price', price);
   }
 
-  if (inputData instanceof File) {
-    formData.append("file", inputData);
-  } else {
-    formData.append("payload", inputData);
-  }
-
-  body = formData;
+  // inputData is now always a URL (either the original URL or the URL of the uploaded file)
+  formData.append("payload", inputData);
 
   try {
     const response = await fetch("https://temporary.name/convert", {
       method: "POST",
       headers: headers,
-      body: body,
+      body: formData,
     });
+
     const result = await response.json();
 
     if (result.message === "Conversion started" || result.status === "processing") {
@@ -470,7 +425,6 @@ async function postToConvert(inputData, lang, sessionId, price) {
     updateUIStatus("error", error.message);
   }
 }
-
 
 function getInputData() {
   const urlInput = document.getElementById("url-input").value.trim();

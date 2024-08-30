@@ -2,6 +2,7 @@
   "dependencies": {
     "pg": "^8.7.1",
     "cors": "^2.8.5",
-    "stripe": "^8.191.0"
+    "stripe": "^8.191.0",
+    "formidable": "^3.5.1"
   }
 }

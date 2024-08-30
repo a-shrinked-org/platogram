@@ -200,7 +200,7 @@ async function reset() {
 
 function getPriceFromUI() {
   const coffeePrice = document.getElementById('coffee-price').textContent;
-  const price = parseFloat(coffeePrice.replace('$', '')) * 100; // Convert to cents
+  const price = parseFloat(coffeePrice.replace('$', ''));
   return price;
 }
 

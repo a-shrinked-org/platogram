@@ -1,3 +1,5 @@
+import { upload } from '@vercel/blob/client';
+
 let auth0Client = null;
 let stripe = null;
 let selectedLanguage = 'en'; // Default language

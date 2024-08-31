@@ -291,90 +291,94 @@ if (submitButtonText) {
 }
 
 async function handleSubmit(event) {
-  if (event) event.preventDefault();
-  console.log('handleSubmit called');
-  const price = getPriceFromUI();
-  const inputData = getInputData();
-  const submitButton = document.getElementById('submit-btn');
-  const submitButtonText = document.getElementById('submit-btn-text');
-  const submitSpinner = document.getElementById('submit-spinner');
+    if (event) event.preventDefault();
+    console.log('handleSubmit called');
+    const price = getPriceFromUI();
+    const inputData = getInputData();
+    const submitButton = document.getElementById('submit-btn');
+    const submitButtonText = document.getElementById('submit-btn-text');
+    const submitSpinner = document.getElementById('submit-spinner');
 
-  if (!inputData) {
-    console.error('No input data provided');
-    updateUIStatus("error", "Please provide a URL or upload a file before submitting.");
-    return;
-  }
-
-  try {
-    submitButton.disabled = true;
-    submitButtonText.textContent = "Processing...";
-    submitSpinner.classList.remove('hidden');
-
-    let fileUrl;
-    if (inputData instanceof File) {
-      console.log('Starting file upload');
-      try {
-        fileUrl = await uploadFile(inputData);
-        console.log('File uploaded successfully, URL:', fileUrl);
-      } catch (uploadError) {
-        throw new Error(`File upload failed: ${uploadError.message}`);
-      }
-    } else {
-      fileUrl = inputData;
-      console.log('Using provided URL:', fileUrl);
+    if (!inputData) {
+        console.error('No input data provided');
+        updateUIStatus("error", "Please provide a URL or upload a file before submitting.");
+        return;
     }
 
-    // Close the modal
-    const modal = document.getElementById("language-modal");
-    if (modal) modal.classList.add("hidden");
+    try {
+        submitButton.disabled = true;
+        submitButtonText.textContent = "Processing...";
+        submitSpinner.classList.remove('hidden');
 
-    updateUIStatus("running", "Starting conversion...");
+        let fileUrl;
+        if (inputData instanceof File) {
+            console.log('Starting file upload');
+            try {
+                fileUrl = await uploadFile(inputData);
+                console.log('File uploaded successfully, URL:', fileUrl);
+            } catch (uploadError) {
+                throw new Error(`File upload failed: ${uploadError.message}`);
+            }
+        } else {
+            fileUrl = inputData;
+            console.log('Using provided URL:', fileUrl);
+        }
 
-    if (price > 0) {
-      console.log('Non-zero price detected, initiating Stripe checkout');
-      const user = await auth0Client.getUser();
-      const email = user.email || user["https://platogram.com/user_email"];
-      if (!email) {
+        // Close the modal
+        const modal = document.getElementById("language-modal");
+        if (modal) modal.classList.add("hidden");
+
+        updateUIStatus("running", "Starting conversion...");
+
+        if (price > 0) {
+            console.log('Non-zero price detected, initiating Stripe checkout');
+            await handlePaidConversion(fileUrl, price);
+        } else {
+            console.log('Free conversion, proceeding with postToConvert');
+            await postToConvert(fileUrl, selectedLanguage, null, price);
+        }
+    } catch (error) {
+        console.error('Error in handleSubmit:', error);
+        updateUIStatus("error", "Error: " + error.message);
+    } finally {
+        submitButtonText.textContent = "Submit";
+        submitButton.disabled = false;
+        submitSpinner.classList.add('hidden');
+    }
+}
+
+async function handlePaidConversion(fileUrl, price) {
+    const user = await auth0Client.getUser();
+    const email = user.email || user["https://platogram.com/user_email"];
+    if (!email) {
         throw new Error('User email not available');
-      }
+    }
 
-      const response = await fetch('/api/create-checkout-session', {
+    const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+            'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          price: price,
-          lang: selectedLanguage,
-          email: email,
-          fileUrl: fileUrl
+            price: price,
+            lang: selectedLanguage,
+            email: email,
+            fileUrl: fileUrl
         }),
-      });
+    });
 
-      if (!response.ok) {
+    if (!response.ok) {
         throw new Error('Failed to create checkout session');
-      }
-
-      const session = await response.json();
-      const result = await stripe.redirectToCheckout({
-        sessionId: session.id,
-      });
-
-      if (result.error) {
-        throw new Error(result.error.message);
-      }
-    } else {
-      console.log('Free conversion, proceeding with postToConvert');
-      await postToConvert(fileUrl, selectedLanguage, null, price);
     }
-  } catch (error) {
-    console.error('Error in handleSubmit:', error);
-    updateUIStatus("error", "Error: " + error.message);
-  } finally {
-    submitButtonText.textContent = "Submit";
-    submitButton.disabled = false;
-    submitSpinner.classList.add('hidden');
-  }
+
+    const session = await response.json();
+    const result = await stripe.redirectToCheckout({
+        sessionId: session.id,
+    });
+
+    if (result.error) {
+        throw new Error(result.error.message);
+    }
 }
 
 function handleStripeSuccess() {
@@ -829,6 +833,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const uploadIcon = document.querySelector(".upload-icon");
   const fileNameElement = document.getElementById("file-name");
   const urlInput = document.getElementById("url-input");
+  if (urlInput) {
+      urlInput.addEventListener("input", () => {
+          const fileNameElement = document.getElementById("file-name");
+          if (fileNameElement) {
+              fileNameElement.textContent = "";
+          }
+          uploadedFile = null;
+      });
+  }
 
   if (uploadIcon && fileNameElement && urlInput) {
     // Add the event listener to the upload icon only once
@@ -868,6 +881,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 let fileInput;
+
 function handleFileUpload() {
     debugLog("handleFileUpload called");
     const fileNameElement = document.getElementById("file-name");

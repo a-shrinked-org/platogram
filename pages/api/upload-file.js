@@ -1,110 +1,40 @@
-import { handleUpload, put, del } from '@vercel/blob';
-import { IncomingForm } from 'formidable';
-import fs from 'fs';
+import { handleUpload, del } from '@vercel/blob/client';
 
 export const config = {
   api: {
-    bodyParser: false,
+    bodyParser: true,
   },
 };
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
-    const contentType = req.headers['content-type'];
-
-    if (contentType && contentType.includes('multipart/form-data')) {
-      // Handle chunked upload
-      const form = new IncomingForm();
-
-      form.parse(req, async (err, fields, files) => {
-        if (err) {
-          console.error('Parsing form error:', err);
-          return res.status(500).json({ error: 'File upload failed during parsing' });
-        }
-
-        const chunk = files.file[0];
-        const { totalChunks, chunkIndex, fileName } = fields;
-
-        try {
-          console.log(`Processing chunk ${chunkIndex} of ${totalChunks} for file ${fileName}`);
-          const chunkContent = await fs.promises.readFile(chunk.filepath);
-
-          // Ensure fileName is a string
-          const safeFileName = String(fileName);
-
-          if (chunkIndex === '0') {
-            const blob = await put(safeFileName, chunkContent, {
-              access: 'public',
-              addRandomSuffix: false,
-              multipart: {
-                chunks: parseInt(totalChunks),
-              },
-            });
-
-            return res.status(200).json({
-              message: 'Chunk uploaded successfully',
-              fileUrl: blob.url,
-              uploadId: blob.uploadId,
-            });
-          } else {
-            await put(safeFileName, chunkContent, {
-              access: 'public',
-              addRandomSuffix: false,
-              multipart: {
-                uploadId: fields.uploadId,
-                partNumber: parseInt(chunkIndex) + 1,
-              },
-            });
-
-            if (parseInt(chunkIndex) === parseInt(totalChunks) - 1) {
-              const finalBlob = await put(safeFileName, Buffer.from([]), {
-                access: 'public',
-                addRandomSuffix: false,
-                multipart: {
-                  uploadId: fields.uploadId,
-                  isComplete: true,
-                },
-              });
-
-              return res.status(200).json({
-                message: 'File upload completed',
-                fileUrl: finalBlob.url,
-              });
-            }
-
-            return res.status(200).json({ message: 'Chunk uploaded successfully' });
-          }
-        } catch (error) {
-          console.error('Vercel Blob upload error:', error);
-          return res.status(500).json({ error: 'Chunk upload failed', details: error.message });
-        }
+    try {
+      const jsonResponse = await handleUpload({
+        body: req.body,
+        request: req,
+        onBeforeGenerateToken: async (pathname) => {
+          // Authenticate user and check permissions here
+          // You can add your authentication logic here
+          return {
+            allowedContentTypes: ['audio/*', 'video/*'],
+            tokenPayload: JSON.stringify({
+              // Add any custom payload here, like user ID
+              userId: 'example-user-id',
+            }),
+          };
+        },
+        onUploadCompleted: async ({ blob, tokenPayload }) => {
+          // Handle successful upload here
+          console.log('Upload completed', blob);
+          const { userId } = JSON.parse(tokenPayload);
+          console.log('User ID:', userId);
+          // You could update a database here if needed
+        },
       });
-    } else {
-      // Handle direct upload
-      try {
-        const body = await req.json();
-        const jsonResponse = await handleUpload({
-          body,
-          request: req,
-          onBeforeGenerateToken: async (pathname) => {
-            // Authenticate user and check permissions here
-            return {
-              allowedContentTypes: ['audio/*', 'video/*'],
-              tokenPayload: JSON.stringify({
-                // Add any custom payload here
-              }),
-            };
-          },
-          onUploadCompleted: async ({ blob, tokenPayload }) => {
-            console.log('Upload completed', blob, tokenPayload);
-            // You could update a database here if needed
-          },
-        });
-        return res.status(200).json(jsonResponse);
-      } catch (error) {
-        console.error('Error in blob upload:', error);
-        return res.status(400).json({ error: error.message });
-      }
+      return res.status(200).json(jsonResponse);
+    } catch (error) {
+      console.error('Error in blob upload:', error);
+      return res.status(400).json({ error: error.message });
     }
   } else if (req.method === 'DELETE') {
     try {

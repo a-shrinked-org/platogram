@@ -249,48 +249,23 @@ async function uploadFile(file) {
         throw new Error('Upload process section not found');
     }
 
-    // Trigger upload-process-section
+    console.log('Toggling to upload-process-section');
     toggleSection('upload-process-section');
 
-    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-    let uploadedChunks = 0;
-    let uploadUrl = '';
+    try {
+        const blob = await upload(file.name, file, {
+            access: 'public',
+            handleUploadUrl: '/api/upload-handler',
+        });
 
-    for (let start = 0; start < file.size; start += CHUNK_SIZE) {
-        const chunk = file.slice(start, start + CHUNK_SIZE);
-        const formData = new FormData();
-        formData.append('file', chunk, `${file.name}.part${uploadedChunks}`);
-        formData.append('totalChunks', totalChunks);
-        formData.append('chunkIndex', uploadedChunks);
-        formData.append('fileName', file.name);
-
-        try {
-            console.log(`Uploading chunk ${uploadedChunks + 1} of ${totalChunks}`);
-            const response = await fetch('/api/upload-file', {
-                method: 'POST',
-                body: formData,
-            });
-
-            console.log(`Chunk ${uploadedChunks + 1} upload response status:`, response.status);
-
-            if (!response.ok) {
-                throw new Error(`Failed to upload chunk ${uploadedChunks + 1}`);
-            }
-
-            const result = await response.json();
-            uploadUrl = result.fileUrl; // This will be the final URL after the last chunk
-            uploadedChunks++;
-
-            // Update progress
-            const progress = (uploadedChunks / totalChunks) * 100;
-            console.log(`Upload progress: ${progress.toFixed(2)}%`);
-            updateUploadProgress(progress);
-
-        } catch (error) {
-            console.error(`Error uploading chunk ${uploadedChunks + 1}:`, error);
-            throw error;
-        }
+        console.log('File uploaded successfully. URL:', blob.url);
+        updateUploadProgress(100);
+        return blob.url;
+    } catch (error) {
+        console.error('Error uploading file:', error);
+        throw error;
     }
+}
 
     console.log('File upload completed. Final URL:', uploadUrl);
     return uploadUrl;
@@ -304,8 +279,8 @@ function updateUploadProgress(progress) {
         uploadProgressBar.style.width = `${progress}%`;
         uploadProgressText.textContent = `Uploading: ${progress.toFixed(2)}%`;
     } else {
-      console.error('Progress bar or text element not found');
-  }
+        console.error('Progress bar or text element not found');
+    }
 }
 
 async function handleSubmit(event) {

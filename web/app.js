@@ -163,12 +163,11 @@ async function updateUI() {
     debugLog("Logged in as: " + user.email);
 
     // Add this line to update the UI with the new design
-    //window.updateAuthUI(isAuthenticated, user);
-}
-  //else {
+    window.updateAuthUI(isAuthenticated, user);
+} else {
     // Add this line to update the UI when not authenticated
-    // window.updateAuthUI(false, null);
-  // }
+    window.updateAuthUI(false, null);
+  }
 }
 
 async function reset() {
@@ -238,18 +237,199 @@ async function createCheckoutSession(price, lang) {
   }
 }
 
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+
+async function uploadLargeFile(file) {
+  const fileId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+    const start = chunkIndex * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    const chunk = file.slice(start, end);
+
+    const chunkArrayBuffer = await chunk.arrayBuffer();
+    const chunkBase64 = btoa(String.fromCharCode(...new Uint8Array(chunkArrayBuffer)));
+
+    const response = await fetch('/api/upload-chunk', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        fileId,
+        chunkIndex,
+        chunk: chunkBase64,
+        totalChunks,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to upload chunk ${chunkIndex + 1} of ${totalChunks}`);
+    }
+
+    updateUploadProgress((chunkIndex + 1) / totalChunks * 100);
+  }
+
+  return fileId;
+}
+
+function updateUploadProgress(percentage) {
+  const progressBar = document.getElementById('upload-progress');
+  if (progressBar) {
+    progressBar.style.width = `${percentage}%`;
+    progressBar.textContent = `${Math.round(percentage)}%`;
+  }
+}
+
+async function handleSubmit(event) {
+  if (event) event.preventDefault();
+  console.log('handleSubmit called');
+  const price = getPriceFromUI();
+  const inputData = getInputData();
+  const submitButton = document.getElementById('submit-btn');
+  const submitButtonText = document.getElementById('submit-btn-text');
+  const submitSpinner = document.getElementById('submit-spinner');
+
+  if (!inputData) {
+    console.error('No input data provided');
+    updateUIStatus("error", "Please provide a URL or upload a file before submitting.");
+    return;
+  }
+
+  try {
+    submitButton.disabled = true;
+    submitButtonText.textContent = "Processing...";
+    submitSpinner.classList.remove('hidden');
+
+    let fileUrl;
+    if (inputData instanceof File) {
+      console.log('Starting file upload');
+      try {
+        fileUrl = await uploadFile(inputData);
+        console.log('File uploaded successfully, URL:', fileUrl);
+      } catch (uploadError) {
+        throw new Error(`File upload failed: ${uploadError.message}`);
+      }
+    } else {
+      fileUrl = inputData;
+      console.log('Using provided URL:', fileUrl);
+    }
+
+    updateUIStatus("running", "Starting conversion...");
+
+    if (price > 0) {
+      console.log('Non-zero price detected, initiating Stripe checkout');
+      const user = await auth0Client.getUser();
+      const email = user.email || user["https://platogram.com/user_email"];
+      if (!email) {
+        throw new Error('User email not available');
+      }
+
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          price: price,
+          lang: selectedLanguage,
+          email: email,
+          fileUrl: fileUrl
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create checkout session');
+      }
+
+      const session = await response.json();
+      const result = await stripe.redirectToCheckout({
+        sessionId: session.id,
+      });
+
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+    } else {
+      console.log('Free conversion, proceeding with postToConvert');
+      await postToConvert(fileUrl, selectedLanguage, null, price);
+    }
+  } catch (error) {
+    console.error('Error in handleSubmit:', error);
+    updateUIStatus("error", "Error: " + error.message);
+  } finally {
+    submitButtonText.textContent = "Submit";
+    submitButton.disabled = false;
+    submitSpinner.classList.add('hidden');
+  }
+}
+
+function handleStripeSuccess() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const sessionId = urlParams.get('session_id');
+  const lang = urlParams.get('lang');
+
+  if (sessionId && lang) {
+    // Payment was successful, start the conversion
+    postToConvert(getInputData(), lang, sessionId, null);
+  } else {
+    updateUIStatus('error', 'Invalid success parameters');
+  }
+}
+
+function handleStripeRedirect() {
+  const query = new URLSearchParams(window.location.search);
+  if (query.get('success')) {
+    console.log('Payment successful! You will receive an email confirmation.');
+    updateUIStatus('done', 'Payment successful! You will receive an email confirmation.');
+  }
+  if (query.get('canceled')) {
+    console.log('Order canceled -- continue to shop around and checkout when you are ready.');
+    updateUIStatus('idle', 'Order canceled. You can try again when you are ready.');
+  }
+}
+
+function handleStripeCancel() {
+  updateUIStatus('idle');
+}
+
+// Add these to your initialization code
+if (window.location.pathname === '/success') {
+  handleStripeSuccess();
+} else if (window.location.pathname === '/cancel') {
+  handleStripeCancel();
+}
+
+async function onConvertClick(event) {
+  if (event) event.preventDefault();
+  debugLog("Convert button clicked");
+
+  try {
+    if (!auth0Client) throw new Error("Auth0 client not initialized");
+
+    const inputData = getInputData();
+    if (!inputData) {
+      updateUIStatus("error", "Please provide a valid URL or upload a file to be converted");
+      return;
+    }
+
+    const price = getPriceFromUI();
+
+    if (await auth0Client.isAuthenticated()) {
+      showLanguageSelectionModal(inputData, price);
+    } else {
+      login();
+    }
+  } catch (error) {
+    console.error("Error in onConvertClick:", error);
+    updateUIStatus("error", error.message);
+  }
+}
+
 async function uploadFile(file) {
   console.log('Starting file upload process');
   console.log('File details:', file.name, file.type, file.size);
-
-  const uploadProcessSection = document.getElementById('upload-process-section');
-  if (!uploadProcessSection) {
-    console.error('Upload process section not found');
-    throw new Error('Upload process section not found');
-  }
-
-  // Trigger upload-process-section
-  toggleSection('upload-process-section');
 
   try {
     // Step 1: Get the upload URL
@@ -303,189 +483,60 @@ async function uploadFile(file) {
 }
 
 function updateUploadProgress(progress) {
-    const uploadProgressBar = document.getElementById('upload-progress-bar');
-    const uploadProgressText = document.getElementById('upload-progress-text');
-    if (uploadProgressBar && uploadProgressText) {
-        uploadProgressBar.style.width = `${progress}%`;
-        uploadProgressText.textContent = `Uploading: ${progress.toFixed(2)}%`;
-    } else {
-        console.error('Progress bar or text element not found');
-    }
+  const uploadProgressBar = document.getElementById('upload-progress-bar');
+  const uploadProgressText = document.getElementById('upload-progress-text');
+  if (uploadProgressBar && uploadProgressText) {
+    uploadProgressBar.style.width = `${progress}%`;
+    uploadProgressText.textContent = `Uploading: ${progress.toFixed(2)}%`;
+  } else {
+    console.error('Progress bar or text element not found');
+  }
 }
 
 async function deleteFile(fileUrl) {
-    try {
-        const response = await fetch('/api/upload-file', {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ fileUrl: fileUrl })
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to delete file');
-        }
-
-        const result = await response.json();
-        console.log('File deleted successfully:', result.message);
-    } catch (error) {
-        console.error('Error deleting file:', error);
-        throw error;
-    }
-}
-
-async function handleSubmit(event) {
-    event.preventDefault();
-    console.log('handleSubmit called');
-    const price = getPriceFromUI();
-    const inputData = getInputData();
-    const submitButton = document.getElementById('submit-btn');
-    const submitButtonText = document.getElementById('submit-btn-text');
-    const submitSpinner = document.getElementById('submit-spinner');
-    const modal = document.getElementById('language-modal');
-
-    if (!inputData) {
-        console.error('No input data provided');
-        updateUIStatus("error", "Please provide a URL or upload a file before submitting.");
-        return;
-    }
-
-    try {
-        submitButton.disabled = true;
-        submitSpinner.classList.remove('hidden');
-
-        let fileUrl;
-        if (inputData instanceof File) {
-          console.log('Starting file upload');
-          try {
-            fileUrl = await uploadFile(inputData);
-            console.log('File uploaded successfully, URL:', fileUrl);
-          } catch (uploadError) {
-            throw new Error(`File upload failed: ${uploadError.message}`);
-          }
-        } else {
-          fileUrl = inputData;
-          console.log('Using provided URL:', fileUrl);
-        }
-
-        toggleSection('status-section'); // Switch to status section after upload
-        updateUIStatus("running", "Starting conversion...");
-
-        if (price > 0) {
-            console.log('Non-zero price detected, initiating Stripe checkout');
-            const user = await auth0Client.getUser();
-            const email = user.email || user["https://platogram.com/user_email"];
-            if (!email) {
-                throw new Error('User email not available');
-            }
-
-            const response = await fetch('/api/create-checkout-session', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    price: price,
-                    lang: selectedLanguage,
-                    email: email,
-                    fileUrl: fileUrl
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to create checkout session');
-            }
-
-            const session = await response.json();
-            const stripeInstance = initStripe();
-            if (!stripeInstance) {
-                throw new Error('Failed to initialize Stripe');
-            }
-
-            const result = await stripeInstance.redirectToCheckout({
-                sessionId: session.id,
-            });
-
-            if (result.error) {
-                throw new Error(result.error.message);
-            }
-        } else {
-            console.log('Free conversion, proceeding with postToConvert');
-            updateUIStatus("running", "Starting conversion...");
-            await postToConvert(fileUrl, selectedLanguage, null, price);
-        }
-    } catch (error) {
-        console.error('Error in handleSubmit:', error);
-        updateUIStatus("error", "Error: " + error.message);
-    } finally {
-        submitButtonText.textContent = "Submit";
-        submitButton.disabled = false;
-        submitSpinner.classList.add('hidden');
-    }
-}
-
-function handleStripeSuccess() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const sessionId = urlParams.get('session_id');
-  const lang = urlParams.get('lang');
-
-  if (sessionId && lang) {
-    // Payment was successful, start the conversion
-    postToConvert(getInputData(), lang, sessionId, null);
-  } else {
-    updateUIStatus('error', 'Invalid success parameters');
-  }
-}
-
-function handleStripeRedirect() {
-  const query = new URLSearchParams(window.location.search);
-  if (query.get('success')) {
-    console.log('Payment successful! You will receive an email confirmation.');
-    updateUIStatus('done', 'Payment successful! You will receive an email confirmation.');
-  }
-  if (query.get('canceled')) {
-    console.log('Order canceled -- continue to shop around and checkout when you are ready.');
-    updateUIStatus('idle', 'Order canceled. You can try again when you are ready.');
-  }
-}
-
-function handleStripeCancel() {
-  updateUIStatus('idle');
-}
-
-// Add these to your initialization code
-if (window.location.pathname === '/success') {
-  handleStripeSuccess();
-} else if (window.location.pathname === '/cancel') {
-  handleStripeCancel();
-}
-
-async function onConvertClick(event) {
-  if (event) event.preventDefault();
-  debugLog("Convert button clicked");
-
   try {
-    if (!auth0Client) throw new Error("Auth0 client not initialized");
+    const response = await fetch('/api/upload-file', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ fileUrl: fileUrl })
+    });
 
-    const inputData = getInputData();
-    debugLog("Input data:", inputData);
-    if (!inputData) {
-      updateUIStatus("error", "Please provide a valid URL or upload a file to be converted");
-      return;
+    if (!response.ok) {
+      throw new Error('Failed to delete file');
     }
 
-    const price = getPriceFromUI();
-
-    if (await auth0Client.isAuthenticated()) {
-      showLanguageSelectionModal(inputData, price);
-    } else {
-      login();
-    }
+    const result = await response.json();
+    console.log('File deleted successfully:', result.message);
   } catch (error) {
-    console.error("Error in onConvertClick:", error);
-    updateUIStatus("error", error.message);
+    console.error('Error deleting file:', error);
+    throw error;
   }
+}
+
+function showLanguageSelectionModal(inputData, price) {
+  const modal = document.getElementById("language-modal");
+  if (!modal) {
+    console.error("Language modal not found in the DOM");
+    return;
+  }
+
+  modal.classList.remove("hidden");
+  modal.style.display = "block";
+
+  const handleLanguageSelection = (lang) => {
+    debugLog(`Language selected: ${lang}`);
+    selectedLanguage = lang;
+    // Update UI to show selected language if needed
+  };
+  // Update modal content with inputData and price if needed
+
+  document.getElementById("submit-btn").onclick = handleSubmit;
+  document.getElementById("cancel-btn").onclick = () => {
+    debugLog("Language selection cancelled");
+    modal.classList.add("hidden");
+  };
 }
 
 async function postToConvert(inputData, lang, sessionId, price) {
@@ -521,24 +572,12 @@ async function postToConvert(inputData, lang, sessionId, price) {
       updateUIStatus("running");
       pollStatus(await auth0Client.getTokenSilently());
       
-     // Check if the inputData is a Blob URL and trigger cleanup
-     if (inputData.includes('.public.blob.vercel-storage.com/')) {
+      // Check if the inputData is a Blob URL and trigger cleanup
+      if (inputData.includes('.public.blob.vercel-storage.com/')) {
         try {
           console.log("Attempting to delete temporary file");
-          const cleanupResponse = await fetch('https://vercel.platogram.app/blob-upload', {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${await auth0Client.getTokenSilently()}`
-            },
-            body: JSON.stringify({ fileUrl: inputData })
-          });
-
-          if (cleanupResponse.ok) {
-            console.log("Temporary file successfully deleted");
-          } else {
-            console.error("Failed to delete temporary file");
-          }
+          await deleteFile(inputData);
+          console.log("Temporary file successfully deleted");
         } catch (cleanupError) {
           console.error("Error during file cleanup:", cleanupError);
         }
@@ -554,10 +593,10 @@ async function postToConvert(inputData, lang, sessionId, price) {
   }
 }
 
+
 function getInputData() {
   const urlInput = document.getElementById("url-input").value.trim();
-  const fileNameElement = document.getElementById("file-name");
-  const fileInput = fileNameElement && fileNameElement.file;
+  const fileInput = document.getElementById("file-upload").files[0];
   return urlInput || fileInput || null;
 }
 
@@ -586,7 +625,6 @@ async function logout() {
 }
 
 function showLanguageSelectionModal(inputData, price) {
-  debugLog("Showing checkout modal");
   const modal = document.getElementById("language-modal");
   if (!modal) {
     console.error("Language modal not found in the DOM");
@@ -596,38 +634,18 @@ function showLanguageSelectionModal(inputData, price) {
   modal.classList.remove("hidden");
   modal.style.display = "block";
 
-  // Update modal content with inputData and price
-  const fileNameElement = modal.querySelector("#file-name");
-  if (fileNameElement) {
-    fileNameElement.textContent = inputData instanceof File ? inputData.name : inputData;
-  }
-
-  const priceElement = modal.querySelector("#modal-price");
-  if (priceElement) {
-    priceElement.textContent = `$${price.toFixed(2)}`;
-  }
-  
   const handleLanguageSelection = async (lang) => {
     debugLog(`Language selected: ${lang}`);
-    selectedLanguage = lang;
     modal.classList.add("hidden");
-    await handleSubmit(null); // Pass null as the event
+    await handlePaymentAndConversion(inputData, lang, price);
   };
 
-  const enBtn = modal.querySelector("#en-btn");
-  const esBtn = modal.querySelector("#es-btn");
-  const cancelBtn = modal.querySelector("#cancel-btn");
-  const submitBtn = modal.querySelector("#submit-btn");
-
-  if (enBtn) enBtn.onclick = () => handleLanguageSelection("en");
-  if (esBtn) esBtn.onclick = () => handleLanguageSelection("es");
-  if (cancelBtn) {
-    cancelBtn.onclick = () => {
-      debugLog("Language selection cancelled");
-      modal.classList.add("hidden");
-    };
-  }
-  if (submitBtn) submitBtn.onclick = handleSubmit;
+  document.getElementById("en-btn").onclick = () => handleLanguageSelection("en");
+  document.getElementById("es-btn").onclick = () => handleLanguageSelection("es");
+  document.getElementById("cancel-btn").onclick = () => {
+    debugLog("Language selection cancelled");
+    modal.classList.add("hidden");
+  };
 }
 
 function pollStatus(token) {
@@ -710,7 +728,6 @@ function toggleSection(sectionToShow) {
   const sections = [
     "input-section",
     "file-upload-section",
-    "upload-process-section",
     "status-section",
     "error-section",
     "done-section"
@@ -807,17 +824,20 @@ document.addEventListener("DOMContentLoaded", () => {
   const urlInput = document.getElementById("url-input");
 
   if (uploadIcon && fileNameElement && urlInput) {
+    // Add the event listener to the upload icon only once
     uploadIcon.addEventListener("click", handleFileUpload);
 
     urlInput.addEventListener("input", () => {
       if (urlInput.value.trim() !== "") {
-        fileNameElement.textContent = "";
-        fileNameElement.file = null;
+        fileNameElement.textContent = ""; // Clear file name when URL is entered
+        fileNameElement.file = null; // Clear the stored File object
       }
     });
+  } else {
+    console.error("One or more elements for file upload not found");
   }
 
-  const submitBtn = document.getElementById("submit-btn");
+  const submitBtn = document.getElementById("submit-btn"); // Changed from "submit-job" to "submit-btn"
   if (submitBtn) {
     submitBtn.addEventListener("click", handleSubmit);
     debugLog("Submit button listener added");
@@ -825,7 +845,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.error("Submit button not found");
   }
 
-  const cancelBtn = document.getElementById("cancel-btn");
+  const cancelBtn = document.getElementById("cancel-btn"); // Changed from "cancel-job" to "cancel-btn"
   if (cancelBtn) {
     cancelBtn.addEventListener("click", () => {
       debugLog("Cancel button clicked");
@@ -867,8 +887,10 @@ function handleFileUpload() {
           fileNameElement.file = null; // Очищаем сохраненный объект File
           debugLog("No file selected");
         }
-      }
-    );
+      },
+      { once: true }
+    ); // Обработчик с опцией { once: true } для удаления после первого вызова
+  }
   fileInput.click();
 }
 

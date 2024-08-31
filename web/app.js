@@ -409,14 +409,20 @@ async function onConvertClick(event) {
     if (!auth0Client) throw new Error("Auth0 client not initialized");
 
     const inputData = getInputData();
+    debugLog("Input data:", inputData);
+
     if (!inputData) {
-      updateUIStatus("error", "Please provide a valid URL or upload a file to be converted");
-      return;
+      throw new Error("Please provide a valid URL or upload a file to be converted");
     }
 
     const price = getPriceFromUI();
 
     if (await auth0Client.isAuthenticated()) {
+      if (inputData instanceof File) {
+        debugLog("File selected:", inputData.name);
+      } else {
+        debugLog("URL provided:", inputData);
+      }
       showLanguageSelectionModal(inputData, price);
     } else {
       login();
@@ -594,10 +600,21 @@ async function postToConvert(inputData, lang, sessionId, price) {
 }
 
 function getInputData() {
-  const urlInput = document.getElementById("url-input").value.trim();
+  const urlInput = document.getElementById("url-input");
   const fileNameElement = document.getElementById("file-name");
-  const file = fileNameElement && fileNameElement.file;
-  return urlInput || file || null;
+
+  if (urlInput && urlInput.value.trim() !== "") {
+    debugLog("URL input found:", urlInput.value.trim());
+    return urlInput.value.trim();
+  }
+
+  if (fileNameElement && fileNameElement.file) {
+    debugLog("File input found:", fileNameElement.file.name);
+    return fileNameElement.file;
+  }
+
+  debugLog("No input data found");
+  return null;
 }
 
 async function login() {
@@ -864,31 +881,29 @@ let fileInput; // Объявляем переменную для хранени�
 function handleFileUpload() {
   const fileNameElement = document.getElementById("file-name");
   const urlInput = document.getElementById("url-input");
+
   if (!fileInput) {
-    // Создаем элемент fileInput только один раз
     fileInput = document.createElement("input");
     fileInput.type = "file";
     fileInput.accept = ".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a";
     fileInput.style.display = "none";
-    // Добавляем элемент в body
     document.body.appendChild(fileInput);
-    // Добавляем обработчик изменения только один раз
+
     fileInput.addEventListener("change", (event) => {
-        const file = event.target.files[0];
-        if (file) {
-          fileNameElement.textContent = file.name;
-          fileNameElement.file = file; // Store the File object here
-          urlInput.value = ""; // Clear URL input when a file is selected
-          debugLog("File selected: " + file.name);
-        } else {
-          fileNameElement.textContent = "";
-          fileNameElement.file = null; // Clear the stored File object
-          debugLog("No file selected");
-        }
-      },
-      { once: true }
-    ); // Обработчик с опцией { once: true } для удаления после первого вызова
+      const file = event.target.files[0];
+      if (file) {
+        fileNameElement.textContent = file.name;
+        fileNameElement.file = file;
+        urlInput.value = "";
+        debugLog("File selected:", file.name);
+      } else {
+        fileNameElement.textContent = "";
+        fileNameElement.file = null;
+        debugLog("No file selected");
+      }
+    });
   }
+
   fileInput.click();
 }
 

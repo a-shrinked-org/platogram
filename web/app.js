@@ -237,7 +237,7 @@ async function createCheckoutSession(price, lang) {
   }
 }
 
-const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB chunks
 
 async function uploadFile(file) {
     console.log('Starting file upload process');
@@ -271,6 +271,8 @@ async function uploadFile(file) {
                 body: formData,
             });
 
+            console.log(`Chunk ${uploadedChunks + 1} upload response status:`, response.status);
+
             if (!response.ok) {
                 throw new Error(`Failed to upload chunk ${uploadedChunks + 1}`);
             }
@@ -281,6 +283,7 @@ async function uploadFile(file) {
 
             // Update progress
             const progress = (uploadedChunks / totalChunks) * 100;
+            console.log(`Upload progress: ${progress.toFixed(2)}%`);
             updateUploadProgress(progress);
 
         } catch (error) {
@@ -296,10 +299,13 @@ async function uploadFile(file) {
 function updateUploadProgress(progress) {
     const uploadProgressBar = document.getElementById('upload-progress-bar');
     const uploadProgressText = document.getElementById('upload-progress-text');
+    console.log(`Updating progress: ${progress.toFixed(2)}%`);
     if (uploadProgressBar && uploadProgressText) {
         uploadProgressBar.style.width = `${progress}%`;
         uploadProgressText.textContent = `Uploading: ${progress.toFixed(2)}%`;
-    }
+    } else {
+      console.error('Progress bar or text element not found');
+  }
 }
 
 async function handleSubmit(event) {

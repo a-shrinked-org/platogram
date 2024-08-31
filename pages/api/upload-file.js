@@ -22,6 +22,7 @@ export default async function handler(req, res) {
       const { totalChunks, chunkIndex, fileName } = fields;
 
       try {
+        console.log(`Processing chunk ${chunkIndex} of ${totalChunks} for file ${fileName}`);
         const chunkContent = await fs.promises.readFile(chunk.filepath);
 
         // For the first chunk, start a new blob upload
@@ -66,7 +67,7 @@ export default async function handler(req, res) {
               fileUrl: finalBlob.url,
             });
           }
-
+          console.log(`Successfully processed chunk ${chunkIndex}`);
           return res.status(200).json({ message: 'Chunk uploaded successfully' });
         }
       } catch (error) {

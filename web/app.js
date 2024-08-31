@@ -556,10 +556,10 @@ async function postToConvert(inputData, lang, sessionId, price) {
 
 function getInputData() {
   const urlInput = document.getElementById("url-input").value.trim();
-  const fileInput = document.getElementById("file-upload").files[0];
+  const fileNameElement = document.getElementById("file-name");
+  const fileInput = fileNameElement && fileNameElement.file;
   return urlInput || fileInput || null;
 }
-
 
 async function login() {
   try {
@@ -867,10 +867,8 @@ function handleFileUpload() {
           fileNameElement.file = null; // Очищаем сохраненный объект File
           debugLog("No file selected");
         }
-      },
-      { once: true }
-    ); // Обработчик с опцией { once: true } для удаления после первого вызова
-  }
+      }
+    );
   fileInput.click();
 }
 

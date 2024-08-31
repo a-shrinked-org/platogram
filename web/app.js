@@ -242,35 +242,67 @@ async function createCheckoutSession(price, lang) {
 }
 
 async function uploadFile(file) {
-    console.log('Starting file upload process');
-    console.log('File details:', file.name, file.type, file.size);
+  console.log('Starting file upload process');
+  console.log('File details:', file.name, file.type, file.size);
 
-    const uploadProcessSection = document.getElementById('upload-process-section');
-    if (!uploadProcessSection) {
-        console.error('Upload process section not found');
-        throw new Error('Upload process section not found');
+  const uploadProcessSection = document.getElementById('upload-process-section');
+  if (!uploadProcessSection) {
+    console.error('Upload process section not found');
+    throw new Error('Upload process section not found');
+  }
+
+  // Trigger upload-process-section
+  toggleSection('upload-process-section');
+
+  try {
+    // Step 1: Get the upload URL
+    const getUploadUrlResponse = await fetch('/api/upload-file', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ filename: file.name, contentType: file.type }),
+    });
+
+    if (!getUploadUrlResponse.ok) {
+      throw new Error('Failed to get upload URL');
     }
 
-    // Trigger upload-process-section
-    toggleSection('upload-process-section');
+    const { url, headers } = await getUploadUrlResponse.json();
 
-    try {
-        const blob = await upload(file.name, file, {
-            access: 'public',
-            handleUploadUrl: '/api/upload-handler',
-            onProgress: (progress) => {
-                const percentage = (progress.percent * 100).toFixed(2);
-                console.log(`Upload progress: ${percentage}%`);
-                updateUploadProgress(progress.percent * 100);
-            },
-        });
+    // Step 2: Upload the file
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', url, true);
+      Object.keys(headers).forEach(key => xhr.setRequestHeader(key, headers[key]));
 
-        console.log('File upload completed. Final URL:', blob.url);
-        return blob.url;
-    } catch (error) {
-        console.error('Error uploading file:', error);
-        throw error;
-    }
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = (event.loaded / event.total) * 100;
+          updateUploadProgress(percentComplete);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          const fileUrl = url.split('?')[0];  // Remove query parameters to get the file URL
+          console.log('File upload completed. Final URL:', fileUrl);
+          resolve(fileUrl);
+        } else {
+          reject(new Error('Failed to upload file'));
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error('Network error during file upload'));
+      };
+
+      xhr.send(file);
+    });
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    throw error;
+  }
 }
 
 function updateUploadProgress(progress) {
@@ -281,6 +313,28 @@ function updateUploadProgress(progress) {
         uploadProgressText.textContent = `Uploading: ${progress.toFixed(2)}%`;
     } else {
         console.error('Progress bar or text element not found');
+    }
+}
+
+async function deleteFile(fileUrl) {
+    try {
+        const response = await fetch('/api/upload-file', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ fileUrl: fileUrl })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to delete file');
+        }
+
+        const result = await response.json();
+        console.log('File deleted successfully:', result.message);
+    } catch (error) {
+        console.error('Error deleting file:', error);
+        throw error;
     }
 }
 

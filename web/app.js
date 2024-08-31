@@ -406,33 +406,35 @@ if (window.location.pathname === '/success') {
 }
 
 async function onConvertClick(event) {
-  if (event) event.preventDefault();
-  debugLog("Convert button clicked");
+    if (event) event.preventDefault();
+    debugLog("Convert button clicked");
 
-  try {
-    if (!auth0Client) throw new Error("Auth0 client not initialized");
+    try {
+        if (!auth0Client) throw new Error("Auth0 client not initialized");
 
-    const inputData = getInputData();
-    debugLog("Input data type: " + (inputData ? (inputData instanceof File ? "File" : "URL") : "null"));
-    if (inputData instanceof File) {
-      debugLog("File details:", inputData.name, inputData.type, inputData.size);
+        const inputData = getInputData();
+        debugLog("Input data type: " + (inputData ? (inputData instanceof File ? "File" : "URL") : "null"));
+        if (inputData instanceof File) {
+            debugLog("File details:", inputData.name, inputData.type, inputData.size);
+        } else if (typeof inputData === 'string') {
+            debugLog("URL input:", inputData);
+        }
+
+        if (!inputData) {
+            throw new Error("Please provide a valid URL or upload a file to be converted");
+        }
+
+        const price = getPriceFromUI();
+
+        if (await auth0Client.isAuthenticated()) {
+            showLanguageSelectionModal(inputData, price);
+        } else {
+            login();
+        }
+    } catch (error) {
+        console.error("Error in onConvertClick:", error);
+        updateUIStatus("error", error.message);
     }
-
-    if (!inputData) {
-      throw new Error("Please provide a valid URL or upload a file to be converted");
-    }
-
-    const price = getPriceFromUI();
-
-    if (await auth0Client.isAuthenticated()) {
-      showLanguageSelectionModal(inputData, price);
-    } else {
-      login();
-    }
-  } catch (error) {
-    console.error("Error in onConvertClick:", error);
-    updateUIStatus("error", error.message);
-  }
 }
 
 async function uploadFile(file) {
@@ -578,18 +580,20 @@ async function postToConvert(inputData, lang, sessionId, price) {
 }
 
 function getInputData() {
-  const urlInput = document.getElementById("url-input").value.trim();
-  const fileNameElement = document.getElementById("file-name");
-  const file = fileNameElement && fileNameElement.file;
+    const urlInput = document.getElementById("url-input").value.trim();
+    const fileNameElement = document.getElementById("file-name");
+    const file = fileNameElement ? fileNameElement.file : null;
 
-  debugLog("URL input: " + urlInput);
-  debugLog("File name element exists: " + !!fileNameElement);
-  debugLog("File exists: " + !!file);
-  if (file) {
-    debugLog("File name: " + file.name);
-  }
+    debugLog("URL input: " + urlInput);
+    debugLog("File name element exists: " + !!fileNameElement);
+    debugLog("File exists: " + !!file);
+    if (file) {
+        debugLog("File name: " + file.name);
+        debugLog("File size: " + file.size + " bytes");
+        debugLog("File type: " + file.type);
+    }
 
-  return urlInput || file || null;
+    return urlInput || file || null;
 }
 
 async function login() {
@@ -882,12 +886,14 @@ function handleFileUpload() {
             fileNameElement.file = file; // Store the File object
             urlInput.value = ""; // Clear URL input when a file is selected
             debugLog("File selected: " + file.name);
-            toggleConvertButtonState(true, elements.convertFileButton);
+            debugLog("File size: " + file.size + " bytes");
+            debugLog("File type: " + file.type);
+            toggleConvertButtonState(true, document.getElementById('convert-file-button'));
         } else {
             fileNameElement.textContent = "";
             fileNameElement.file = null; // Clear the stored File object
             debugLog("No file selected");
-            toggleConvertButtonState(false, elements.convertFileButton);
+            toggleConvertButtonState(false, document.getElementById('convert-file-button'));
         }
     };
 

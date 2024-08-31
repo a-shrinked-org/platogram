@@ -62,8 +62,6 @@ async function initAuth0() {
   }
 }
 
-auth0Client.on('authenticated', checkPendingConversion);
-
 function updateUIStatus(status, message = "") {
   debugLog(`Updating UI status: ${status}`);
   const inputSection = document.getElementById("input-section");
@@ -906,14 +904,14 @@ function handleFileUpload() {
 }
 
 // Function to check for pending conversion after login
-function checkPendingConversion() {
-    const pendingConversion = sessionStorage.getItem('pendingConversion');
-    if (pendingConversion) {
-        const { inputData, price } = JSON.parse(pendingConversion);
-        sessionStorage.removeItem('pendingConversion');
-        showLanguageSelectionModal(inputData, price);
-    }
-}
+// function checkPendingConversion() {
+  //  const pendingConversion = sessionStorage.getItem('pendingConversion');
+   // if (pendingConversion) {
+   //     const { inputData, price } = JSON.parse(pendingConversion);
+   //     sessionStorage.removeItem('pendingConversion');
+   //     showLanguageSelectionModal(inputData, price);
+   // }
+//}
 
 function initializeProcessingStage() {
   debugLog("Initializing processing stage");

@@ -555,17 +555,11 @@ async function postToConvert(inputData, lang, sessionId, price) {
 }
 
 function getInputData() {
-  const urlInput = document.getElementById("url-input");
-  const fileNameElement = document.getElementById("file-name");
-
-  if (urlInput && urlInput.value.trim() !== "") {
-    return urlInput.value.trim();
-  } else if (fileNameElement && fileNameElement.file) {
-    return fileNameElement.file;
-  } else {
-    return null;
-  }
+  const urlInput = document.getElementById("url-input").value.trim();
+  const fileInput = document.getElementById("file-upload").files[0];
+  return urlInput || fileInput || null;
 }
+
 
 async function login() {
   try {
@@ -821,8 +815,6 @@ document.addEventListener("DOMContentLoaded", () => {
         fileNameElement.file = null;
       }
     });
-  } else {
-    console.error("One or more elements for file upload not found");
   }
 
   const submitBtn = document.getElementById("submit-btn");

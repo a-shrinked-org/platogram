@@ -579,9 +579,16 @@ async function postToConvert(inputData, lang, sessionId, price) {
 }
 
 function getInputData() {
-  const urlInput = document.getElementById("url-input").value.trim();
-  const fileInput = document.getElementById("file-upload").files[0];
-  return urlInput || fileInput || null;
+  const urlInput = document.getElementById("url-input");
+  const fileInput = document.getElementById("file-upload");
+
+  if (urlInput && urlInput.value.trim() !== "") {
+    return urlInput.value.trim();
+  } else if (fileInput && fileInput.files && fileInput.files.length > 0) {
+    return fileInput.files[0];
+  } else {
+    return null;
+  }
 }
 
 async function login() {

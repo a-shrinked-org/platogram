@@ -163,11 +163,12 @@ async function updateUI() {
     debugLog("Logged in as: " + user.email);
 
     // Add this line to update the UI with the new design
-    window.updateAuthUI(isAuthenticated, user);
-} else {
+    //window.updateAuthUI(isAuthenticated, user);
+}
+  //else {
     // Add this line to update the UI when not authenticated
-    window.updateAuthUI(false, null);
-  }
+    // window.updateAuthUI(false, null);
+  // }
 }
 
 async function reset() {
@@ -808,20 +809,19 @@ document.addEventListener("DOMContentLoaded", () => {
   const urlInput = document.getElementById("url-input");
 
   if (uploadIcon && fileNameElement && urlInput) {
-    // Add the event listener to the upload icon only once
     uploadIcon.addEventListener("click", handleFileUpload);
 
     urlInput.addEventListener("input", () => {
       if (urlInput.value.trim() !== "") {
-        fileNameElement.textContent = ""; // Clear file name when URL is entered
-        fileNameElement.file = null; // Clear the stored File object
+        fileNameElement.textContent = "";
+        fileNameElement.file = null;
       }
     });
   } else {
     console.error("One or more elements for file upload not found");
   }
 
-  const submitBtn = document.getElementById("submit-btn"); // Changed from "submit-job" to "submit-btn"
+  const submitBtn = document.getElementById("submit-btn");
   if (submitBtn) {
     submitBtn.addEventListener("click", handleSubmit);
     debugLog("Submit button listener added");
@@ -829,7 +829,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.error("Submit button not found");
   }
 
-  const cancelBtn = document.getElementById("cancel-btn"); // Changed from "cancel-job" to "cancel-btn"
+  const cancelBtn = document.getElementById("cancel-btn");
   if (cancelBtn) {
     cancelBtn.addEventListener("click", () => {
       debugLog("Cancel button clicked");

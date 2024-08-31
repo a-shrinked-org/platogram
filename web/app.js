@@ -296,8 +296,6 @@ async function handleSubmit(event) {
     const price = getPriceFromUI();
     const inputData = getInputData();
     const submitButton = document.getElementById('submit-btn');
-    const submitButtonText = submitButton ? submitButton.querySelector('#submit-btn-text') : null;
-    const submitSpinner = document.getElementById('submit-spinner');
 
     if (!inputData) {
         console.error('No input data provided');
@@ -306,9 +304,10 @@ async function handleSubmit(event) {
     }
 
     try {
-        if (submitButton) submitButton.disabled = true;
-        if (submitButtonText) submitButtonText.textContent = "Processing...";
-        if (submitSpinner) submitSpinner.classList.remove('hidden');
+        if (submitButton) {
+            submitButton.disabled = true;
+            submitButton.textContent = "Processing...";
+        }
 
         let fileUrl;
         if (inputData instanceof File) {
@@ -341,9 +340,10 @@ async function handleSubmit(event) {
         console.error('Error in handleSubmit:', error);
         updateUIStatus("error", "Error: " + error.message);
     } finally {
-        if (submitButtonText) submitButtonText.textContent = "Submit";
-        if (submitButton) submitButton.disabled = false;
-        if (submitSpinner) submitSpinner.classList.add('hidden');
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = "Submit";
+        }
     }
 }
 
@@ -633,7 +633,7 @@ function showLanguageSelectionModal(inputData, price) {
     }
     modal.classList.remove("hidden");
     modal.style.display = "block";
-    const fileNameElement = modal.querySelector("#modal-file-name");
+    const fileNameElement = modal.querySelector("#file-name");
     if (fileNameElement) {
         fileNameElement.textContent = inputData instanceof File ? inputData.name : inputData;
         console.log("Setting modal file name to:", fileNameElement.textContent); // Debug log
@@ -642,12 +642,8 @@ function showLanguageSelectionModal(inputData, price) {
     if (priceElement) {
         priceElement.textContent = `$${price.toFixed(2)}`;
     }
-    const enBtn = document.getElementById("en-btn");
-    const esBtn = document.getElementById("es-btn");
     const submitBtn = document.getElementById("submit-btn");
     const cancelBtn = document.getElementById("cancel-btn");
-    if (enBtn) enBtn.onclick = () => handleLanguageSelection("en");
-    if (esBtn) esBtn.onclick = () => handleLanguageSelection("es");
     if (submitBtn) {
         submitBtn.onclick = handleSubmit;
         console.log("Submit button listener added in modal"); // Debug log
@@ -658,16 +654,36 @@ function showLanguageSelectionModal(inputData, price) {
             modal.classList.add("hidden");
         };
     }
-    if (!enBtn || !esBtn || !submitBtn || !cancelBtn) {
+    if (!submitBtn || !cancelBtn) {
         console.error("One or more modal buttons not found");
+    }
+
+    // Set up language dropdown
+    const languageDropdown = document.getElementById("language-dropdown");
+    const languageOptions = document.getElementById("language-options");
+    if (languageDropdown && languageOptions) {
+        languageDropdown.onclick = () => {
+            languageOptions.classList.toggle("hidden");
+        };
     }
 }
 
 // Add this function to handle language selection
-function handleLanguageSelection(lang) {
+function selectLanguage(lang) {
     selectedLanguage = lang;
     console.log("Selected language:", lang);
-    // You might want to update UI here to show selected language
+    const flagElement = document.getElementById("selected-language-flag");
+    const langElement = document.getElementById("selected-language");
+    if (flagElement && langElement) {
+        if (lang === 'en') {
+            flagElement.textContent = '🇺🇸';
+            langElement.textContent = 'En';
+        } else if (lang === 'es') {
+            flagElement.textContent = '🇪🇸';
+            langElement.textContent = 'Es';
+        }
+    }
+    document.getElementById("language-options").classList.add("hidden");
 }
 
 function pollStatus(token) {
@@ -846,6 +862,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const urlInput = document.getElementById("url-input");
     const convertButton = document.getElementById('convert-button');
 
+  // Set up language selection buttons
+    const enButton = document.querySelector('button[onclick="selectLanguage(\'en\')"]');
+    const esButton = document.querySelector('button[onclick="selectLanguage(\'es\')"]');
+    if (enButton) enButton.onclick = () => selectLanguage('en');
+    if (esButton) esButton.onclick = () => selectLanguage('es');
+
     if (uploadIcon) {
         uploadIcon.addEventListener("click", handleFileUpload);
     }
@@ -937,3 +959,4 @@ window.updateProcessingStage = updateProcessingStage;
 window.handleStripeRedirect = handleStripeRedirect;
 window.handleStripeSuccess = handleStripeSuccess;
 window.handleStripeCancel = handleStripeCancel;
+window.selectLanguage = selectLanguage;

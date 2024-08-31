@@ -831,30 +831,6 @@
                     });
                 }
 
-                // Language dropdown functionality
-                const languageDropdown = document.getElementById("language-dropdown");
-                const languageOptions = document.getElementById("language-options");
-
-                if (languageDropdown && languageOptions) {
-                    languageDropdown.addEventListener("click", (event) => {
-                        event.stopPropagation();
-                        languageOptions.classList.toggle("hidden");
-                    });
-
-                    document.addEventListener("click", (event) => {
-                        if (!languageDropdown.contains(event.target) && !languageOptions.contains(event.target)) {
-                            languageOptions.classList.add("hidden");
-                        }
-                    });
-
-                    // Add event listeners for language selection
-                    const englishOption = languageOptions.querySelector('button[data-lang="en"]');
-                    const spanishOption = languageOptions.querySelector('button[data-lang="es"]');
-
-                    if (englishOption) englishOption.addEventListener("click", () => selectLanguage("en"));
-                    if (spanishOption) spanishOption.addEventListener("click", () => selectLanguage("es"));
-                }
-
                 // User circle and logout tooltip functionality
                 if (elements.userCircle) {
                     elements.userCircle.addEventListener('click', () => {
@@ -993,73 +969,7 @@
                     }
                 }
 
-                function getInputData() {
-                    const urlInput = document.getElementById("url-input").value;
-                    const fileInput = document.querySelector('input[type="file"]').files[0];
-                    return urlInput || fileInput;
-                }
 
-                function showLanguageSelectionModal(inputData) {
-                    const modal = document.getElementById("language-modal");
-                    const userEmailSpan = document.getElementById("user-email");
-                    const fileNameSpan = document.getElementById("file-name");
-                    const jobIdSpan = document.getElementById("job-id");
-
-                    // Set file name
-                    if (inputData instanceof File) {
-                        fileNameSpan.textContent = inputData.name;
-                    } else if (typeof inputData === 'string') {
-                        fileNameSpan.textContent = inputData;
-                    } else {
-                        fileNameSpan.textContent = "Unknown file";
-                    }
-
-                    // Get user email from Auth0
-                    if (auth0Client) {
-                        auth0Client.getUser().then(user => {
-                                const email = user.email || user["https://platogram.com/user_email"] || "Unknown email";
-                                userEmailSpan.textContent = email;
-                            }).catch(error => {
-                                console.error("Error getting user email:", error);
-                                userEmailSpan.textContent = "Error fetching email";
-                            });
-                    } else {
-                        console.warn("Auth0 client not initialized");
-                        userEmailSpan.textContent = "Auth0 not initialized";
-                    }
-
-                    // Set job ID (you may want to generate this dynamically)
-                    jobIdSpan.textContent = "0032";
-
-                    modal.classList.remove("hidden");
-                }
-
-                function selectLanguage(lang) {
-                    const selectedLanguageFlag = document.getElementById("selected-language-flag");
-                    const selectedLanguage = document.getElementById("selected-language");
-                    const languageOptions = document.getElementById("language-options");
-
-                    if (lang === 'en') {
-                        selectedLanguageFlag.textContent = "🇺🇸";
-                        selectedLanguage.textContent = "En";
-                    } else if (lang === 'es') {
-                        selectedLanguageFlag.textContent = "🇪🇸";
-                        selectedLanguage.textContent = "Es";
-                    }
-
-                    languageOptions.classList.add("hidden");
-                }
-
-                function closeLanguageModal() {
-                    const modal = document.getElementById("language-modal");
-                    modal.classList.add("hidden");
-                }
-
-                function initializeStripeIfNeeded() {
-                    if (typeof stripe === 'undefined') {
-                        console.warn('Stripe is not defined. Make sure to include Stripe.js');
-                    }
-                }
     });
 </script>
 </body>

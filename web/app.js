@@ -316,6 +316,10 @@ async function handleSubmit(event) {
       console.log('Using provided URL:', fileUrl);
     }
 
+    // Close the modal
+    const modal = document.getElementById("language-modal");
+    if (modal) modal.classList.add("hidden");
+
     updateUIStatus("running", "Starting conversion...");
 
     if (price > 0) {
@@ -409,11 +413,6 @@ async function onConvertClick(event) {
     if (!auth0Client) throw new Error("Auth0 client not initialized");
 
     const inputData = getInputData();
-    debugLog("Input data type:", inputData ? (inputData instanceof File ? "File" : "URL") : "null");
-    if (inputData instanceof File) {
-      debugLog("File details:", inputData.name, inputData.type, inputData.size);
-    }
-
     if (!inputData) {
       throw new Error("Please provide a valid URL or upload a file to be converted");
     }
@@ -574,21 +573,10 @@ async function postToConvert(inputData, lang, sessionId, price) {
 }
 
 function getInputData() {
-  const urlInput = document.getElementById("url-input");
+  const urlInput = document.getElementById("url-input").value.trim();
   const fileNameElement = document.getElementById("file-name");
-
-  if (urlInput && urlInput.value.trim() !== "") {
-    debugLog("URL input found:", urlInput.value.trim());
-    return urlInput.value.trim();
-  }
-
-  if (fileNameElement && fileNameElement.file) {
-    debugLog("File input found:", fileNameElement.file.name);
-    return fileNameElement.file;
-  }
-
-  debugLog("No input data found");
-  return null;
+  const file = fileNameElement && fileNameElement.file;
+  return urlInput || file || null;
 }
 
 async function login() {
@@ -625,14 +613,24 @@ function showLanguageSelectionModal(inputData, price) {
   modal.classList.remove("hidden");
   modal.style.display = "block";
 
-  const handleLanguageSelection = async (lang) => {
+  const fileNameElement = modal.querySelector("#modal-file-name");
+  if (fileNameElement) {
+    fileNameElement.textContent = inputData instanceof File ? inputData.name : inputData;
+  }
+
+  const priceElement = modal.querySelector("#modal-price");
+  if (priceElement) {
+    priceElement.textContent = `$${price.toFixed(2)}`;
+  }
+
+  const handleLanguageSelection = (lang) => {
     debugLog(`Language selected: ${lang}`);
-    modal.classList.add("hidden");
-    await handlePaymentAndConversion(inputData, lang, price);
+    selectedLanguage = lang;
   };
 
   document.getElementById("en-btn").onclick = () => handleLanguageSelection("en");
   document.getElementById("es-btn").onclick = () => handleLanguageSelection("es");
+  document.getElementById("submit-btn").onclick = handleSubmit;
   document.getElementById("cancel-btn").onclick = () => {
     debugLog("Language selection cancelled");
     modal.classList.add("hidden");

@@ -267,7 +267,7 @@ async function uploadFile(file) {
 
     const { url, headers } = await getUploadUrlResponse.json();
 
-    // Step 2: Upload the file
+    // Step 2: Upload the file with progress tracking
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('PUT', url, true);
@@ -357,17 +357,16 @@ async function handleSubmit(event) {
 
         let fileUrl;
         if (inputData instanceof File) {
-            modal.classList.add('hidden'); // Close the modal before starting upload
-            console.log('Starting file upload');
-            try {
-                fileUrl = await uploadFile(inputData);
-                console.log('File uploaded successfully, URL:', fileUrl);
-            } catch (uploadError) {
-                throw new Error(`File upload failed: ${uploadError.message}`);
-            }
+          console.log('Starting file upload');
+          try {
+            fileUrl = await uploadFile(inputData);
+            console.log('File uploaded successfully, URL:', fileUrl);
+          } catch (uploadError) {
+            throw new Error(`File upload failed: ${uploadError.message}`);
+          }
         } else {
-            fileUrl = inputData;
-            console.log('Using provided URL:', fileUrl);
+          fileUrl = inputData;
+          console.log('Using provided URL:', fileUrl);
         }
 
         toggleSection('status-section'); // Switch to status section after upload
@@ -486,30 +485,6 @@ async function onConvertClick(event) {
     console.error("Error in onConvertClick:", error);
     updateUIStatus("error", error.message);
   }
-}
-
-function showLanguageSelectionModal(inputData, price) {
-  const modal = document.getElementById("language-modal");
-  if (!modal) {
-    console.error("Language modal not found in the DOM");
-    return;
-  }
-
-  modal.classList.remove("hidden");
-  modal.style.display = "block";
-
-  const handleLanguageSelection = (lang) => {
-    debugLog(`Language selected: ${lang}`);
-    selectedLanguage = lang;
-    // Update UI to show selected language if needed
-  };
-  // Update modal content with inputData and price if needed
-
-  document.getElementById("submit-btn").onclick = handleSubmit;
-  document.getElementById("cancel-btn").onclick = () => {
-    debugLog("Language selection cancelled");
-    modal.classList.add("hidden");
-  };
 }
 
 async function postToConvert(inputData, lang, sessionId, price) {
@@ -657,10 +632,6 @@ function showLanguageSelectionModal(inputData, price) {
     };
   }
   if (submitBtn) submitBtn.onclick = handleSubmit;
-
-  if (!enBtn && !esBtn) {
-    console.error("Language selection buttons not found in the modal");
-  }
 }
 
 function pollStatus(token) {

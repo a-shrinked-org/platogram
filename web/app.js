@@ -583,8 +583,9 @@ async function postToConvert(inputData, lang, sessionId, price) {
 function getInputData() {
     const urlInput = document.getElementById("url-input").value.trim();
 
+    debugLog("getInputData called");
     debugLog("URL input: " + urlInput);
-    debugLog("File exists: " + !!uploadedFile);
+    debugLog("uploadedFile exists: " + !!uploadedFile);
     if (uploadedFile) {
         debugLog("File name: " + uploadedFile.name);
         debugLog("File size: " + uploadedFile.size + " bytes");
@@ -864,8 +865,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initAuth0().catch((error) => console.error("Error initializing app:", error));
 });
 
-let fileInput;
 function handleFileUpload() {
+    debugLog("handleFileUpload called");
     const fileNameElement = document.getElementById("file-name");
     const urlInput = document.getElementById("url-input");
 
@@ -875,14 +876,16 @@ function handleFileUpload() {
         fileInput.accept = ".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a";
         fileInput.style.display = "none";
         document.body.appendChild(fileInput);
+        debugLog("File input created");
     }
 
     fileInput.onchange = (event) => {
+        debugLog("File input change event triggered");
         const file = event.target.files[0];
         if (file) {
-            uploadedFile = file; // Store the file in the global variable
+            uploadedFile = file;
             fileNameElement.textContent = file.name;
-            urlInput.value = ""; // Clear URL input when a file is selected
+            urlInput.value = "";
             debugLog("File selected: " + file.name);
             debugLog("File size: " + file.size + " bytes");
             debugLog("File type: " + file.type);
@@ -894,7 +897,7 @@ function handleFileUpload() {
             toggleConvertButtonState(false, document.getElementById('convert-file-button'));
         }
     };
-
+    debugLog("Triggering file input click");
     fileInput.click();
 }
 

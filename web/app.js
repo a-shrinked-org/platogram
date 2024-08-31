@@ -593,11 +593,11 @@ async function postToConvert(inputData, lang, sessionId, price) {
   }
 }
 
-
 function getInputData() {
   const urlInput = document.getElementById("url-input").value.trim();
-  const fileInput = document.getElementById("file-upload").files[0];
-  return urlInput || fileInput || null;
+  const fileNameElement = document.getElementById("file-name");
+  const file = fileNameElement && fileNameElement.file;
+  return urlInput || file || null;
 }
 
 async function login() {
@@ -873,18 +873,16 @@ function handleFileUpload() {
     // Добавляем элемент в body
     document.body.appendChild(fileInput);
     // Добавляем обработчик изменения только один раз
-    fileInput.addEventListener(
-      "change",
-      (event) => {
+    fileInput.addEventListener("change", (event) => {
         const file = event.target.files[0];
         if (file) {
           fileNameElement.textContent = file.name;
-          fileNameElement.file = file; // Сохраняем объект File
-          urlInput.value = ""; // Очищаем URL input при выборе файла
+          fileNameElement.file = file; // Store the File object here
+          urlInput.value = ""; // Clear URL input when a file is selected
           debugLog("File selected: " + file.name);
         } else {
           fileNameElement.textContent = "";
-          fileNameElement.file = null; // Очищаем сохраненный объект File
+          fileNameElement.file = null; // Clear the stored File object
           debugLog("No file selected");
         }
       },

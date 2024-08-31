@@ -477,7 +477,7 @@ async function postToConvert(inputData, lang, sessionId, price) {
       pollStatus(await auth0Client.getTokenSilently());
       
      // Check if the inputData is a Blob URL and trigger cleanup
-     if (inputData.startsWith("https://vercel.platogram.app/")) {
+     if (inputData.includes('.public.blob.vercel-storage.com/')) {
         try {
           console.log("Attempting to delete temporary file");
           const cleanupResponse = await fetch('https://vercel.platogram.app/blob-upload', {

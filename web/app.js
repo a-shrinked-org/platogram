@@ -625,18 +625,42 @@ function showLanguageSelectionModal(inputData, price) {
   modal.classList.remove("hidden");
   modal.style.display = "block";
 
+  // Update modal content with inputData and price
+  const fileNameElement = modal.querySelector("#file-name");
+  if (fileNameElement) {
+    fileNameElement.textContent = inputData instanceof File ? inputData.name : inputData;
+  }
+
+  const priceElement = modal.querySelector("#modal-price");
+  if (priceElement) {
+    priceElement.textContent = `$${price.toFixed(2)}`;
+  }
+  
   const handleLanguageSelection = async (lang) => {
     debugLog(`Language selected: ${lang}`);
+    selectedLanguage = lang;
     modal.classList.add("hidden");
-    await handlePaymentAndConversion(inputData, lang, price);
+    await handleSubmit(null); // Pass null as the event
   };
 
-  document.getElementById("en-btn").onclick = () => handleLanguageSelection("en");
-  document.getElementById("es-btn").onclick = () => handleLanguageSelection("es");
-  document.getElementById("cancel-btn").onclick = () => {
-    debugLog("Language selection cancelled");
-    modal.classList.add("hidden");
-  };
+  const enBtn = modal.querySelector("#en-btn");
+  const esBtn = modal.querySelector("#es-btn");
+  const cancelBtn = modal.querySelector("#cancel-btn");
+  const submitBtn = modal.querySelector("#submit-btn");
+
+  if (enBtn) enBtn.onclick = () => handleLanguageSelection("en");
+  if (esBtn) esBtn.onclick = () => handleLanguageSelection("es");
+  if (cancelBtn) {
+    cancelBtn.onclick = () => {
+      debugLog("Language selection cancelled");
+      modal.classList.add("hidden");
+    };
+  }
+  if (submitBtn) submitBtn.onclick = handleSubmit;
+
+  if (!enBtn && !esBtn) {
+    console.error("Language selection buttons not found in the modal");
+  }
 }
 
 function pollStatus(token) {

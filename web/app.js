@@ -283,6 +283,13 @@ function updateUploadProgress(percentage) {
   }
 }
 
+const submitButtonText = document.getElementById('submit-btn-text');
+if (submitButtonText) {
+    submitButtonText.textContent = "Processing...";
+} else {
+    console.error('Submit button text element not found');
+}
+
 async function handleSubmit(event) {
   if (event) event.preventDefault();
   console.log('handleSubmit called');
@@ -620,37 +627,43 @@ async function logout() {
 }
 
 function showLanguageSelectionModal(inputData, price) {
-  const modal = document.getElementById("language-modal");
-  if (!modal) {
-    console.error("Language modal not found in the DOM");
-    return;
-  }
+    const modal = document.getElementById("language-modal");
+    if (!modal) {
+        console.error("Language modal not found in the DOM");
+        return;
+    }
 
-  modal.classList.remove("hidden");
-  modal.style.display = "block";
+    modal.classList.remove("hidden");
+    modal.style.display = "block";
 
-  const fileNameElement = modal.querySelector("#modal-file-name");
-  if (fileNameElement) {
-    fileNameElement.textContent = inputData instanceof File ? inputData.name : inputData;
-  }
+    const fileNameElement = modal.querySelector("#modal-file-name");
+    if (fileNameElement) {
+        fileNameElement.textContent = inputData instanceof File ? inputData.name : inputData;
+    }
 
-  const priceElement = modal.querySelector("#modal-price");
-  if (priceElement) {
-    priceElement.textContent = `$${price.toFixed(2)}`;
-  }
+    const priceElement = modal.querySelector("#modal-price");
+    if (priceElement) {
+        priceElement.textContent = `$${price.toFixed(2)}`;
+    }
 
-  const handleLanguageSelection = (lang) => {
-    debugLog(`Language selected: ${lang}`);
-    selectedLanguage = lang;
-  };
+    const enBtn = document.getElementById("en-btn");
+    const esBtn = document.getElementById("es-btn");
+    const submitBtn = document.getElementById("submit-btn");
+    const cancelBtn = document.getElementById("cancel-btn");
 
-  document.getElementById("en-btn").onclick = () => handleLanguageSelection("en");
-  document.getElementById("es-btn").onclick = () => handleLanguageSelection("es");
-  document.getElementById("submit-btn").onclick = handleSubmit;
-  document.getElementById("cancel-btn").onclick = () => {
-    debugLog("Language selection cancelled");
-    modal.classList.add("hidden");
-  };
+    if (enBtn) enBtn.onclick = () => handleLanguageSelection("en");
+    if (esBtn) esBtn.onclick = () => handleLanguageSelection("es");
+    if (submitBtn) submitBtn.onclick = handleSubmit;
+    if (cancelBtn) {
+        cancelBtn.onclick = () => {
+            debugLog("Language selection cancelled");
+            modal.classList.add("hidden");
+        };
+    }
+
+    if (!enBtn || !esBtn || !submitBtn || !cancelBtn) {
+        console.error("One or more modal buttons not found");
+    }
 }
 
 function pollStatus(token) {
@@ -865,6 +878,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initAuth0().catch((error) => console.error("Error initializing app:", error));
 });
 
+let fileInput;
 function handleFileUpload() {
     debugLog("handleFileUpload called");
     const fileNameElement = document.getElementById("file-name");
@@ -897,10 +911,10 @@ function handleFileUpload() {
             toggleConvertButtonState(false, document.getElementById('convert-file-button'));
         }
     };
+
     debugLog("Triggering file input click");
     fileInput.click();
 }
-
 function initializeProcessingStage() {
   debugLog("Initializing processing stage");
   const processingStage = document.getElementById("processing-stage");

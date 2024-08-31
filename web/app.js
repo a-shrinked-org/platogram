@@ -296,7 +296,7 @@ async function handleSubmit(event) {
     const price = getPriceFromUI();
     const inputData = getInputData();
     const submitButton = document.getElementById('submit-btn');
-    const submitButtonText = document.getElementById('submit-btn-text');
+    const submitButtonText = submitButton ? submitButton.querySelector('#submit-btn-text') : null;
     const submitSpinner = document.getElementById('submit-spinner');
 
     if (!inputData) {
@@ -306,9 +306,9 @@ async function handleSubmit(event) {
     }
 
     try {
-        submitButton.disabled = true;
-        submitButtonText.textContent = "Processing...";
-        submitSpinner.classList.remove('hidden');
+        if (submitButton) submitButton.disabled = true;
+        if (submitButtonText) submitButtonText.textContent = "Processing...";
+        if (submitSpinner) submitSpinner.classList.remove('hidden');
 
         let fileUrl;
         if (inputData instanceof File) {
@@ -341,9 +341,9 @@ async function handleSubmit(event) {
         console.error('Error in handleSubmit:', error);
         updateUIStatus("error", "Error: " + error.message);
     } finally {
-        submitButtonText.textContent = "Submit";
-        submitButton.disabled = false;
-        submitSpinner.classList.add('hidden');
+        if (submitButtonText) submitButtonText.textContent = "Submit";
+        if (submitButton) submitButton.disabled = false;
+        if (submitSpinner) submitSpinner.classList.add('hidden');
     }
 }
 
@@ -636,6 +636,7 @@ function showLanguageSelectionModal(inputData, price) {
     const fileNameElement = modal.querySelector("#modal-file-name");
     if (fileNameElement) {
         fileNameElement.textContent = inputData instanceof File ? inputData.name : inputData;
+        console.log("Setting modal file name to:", fileNameElement.textContent); // Debug log
     }
     const priceElement = modal.querySelector("#modal-price");
     if (priceElement) {
@@ -647,7 +648,10 @@ function showLanguageSelectionModal(inputData, price) {
     const cancelBtn = document.getElementById("cancel-btn");
     if (enBtn) enBtn.onclick = () => handleLanguageSelection("en");
     if (esBtn) esBtn.onclick = () => handleLanguageSelection("es");
-    if (submitBtn) submitBtn.onclick = handleSubmit;
+    if (submitBtn) {
+        submitBtn.onclick = handleSubmit;
+        console.log("Submit button listener added in modal"); // Debug log
+    }
     if (cancelBtn) {
         cancelBtn.onclick = () => {
             debugLog("Language selection cancelled");
@@ -657,6 +661,13 @@ function showLanguageSelectionModal(inputData, price) {
     if (!enBtn || !esBtn || !submitBtn || !cancelBtn) {
         console.error("One or more modal buttons not found");
     }
+}
+
+// Add this function to handle language selection
+function handleLanguageSelection(lang) {
+    selectedLanguage = lang;
+    console.log("Selected language:", lang);
+    // You might want to update UI here to show selected language
 }
 
 function pollStatus(token) {
@@ -831,53 +842,27 @@ document.addEventListener("DOMContentLoaded", () => {
   handleStripeRedirect();
 
   const uploadIcon = document.querySelector(".upload-icon");
-  const fileNameElement = document.getElementById("file-name");
-  const urlInput = document.getElementById("url-input");
-  if (urlInput) {
-      urlInput.addEventListener("input", () => {
-          const fileNameElement = document.getElementById("file-name");
-          if (fileNameElement) {
-              fileNameElement.textContent = "";
-          }
-          uploadedFile = null;
-      });
-  }
+    const fileNameElement = document.getElementById("file-name");
+    const urlInput = document.getElementById("url-input");
+    const convertButton = document.getElementById('convert-button');
 
-  if (uploadIcon && fileNameElement && urlInput) {
-    // Add the event listener to the upload icon only once
-    uploadIcon.addEventListener("click", handleFileUpload);
+    if (uploadIcon) {
+        uploadIcon.addEventListener("click", handleFileUpload);
+    }
 
-    urlInput.addEventListener("input", () => {
-      if (urlInput.value.trim() !== "") {
-        fileNameElement.textContent = ""; // Clear file name when URL is entered
-        fileNameElement.file = null; // Clear the stored File object
-      }
-    });
-  } else {
-    console.error("One or more elements for file upload not found");
-  }
+    if (urlInput) {
+        urlInput.addEventListener("input", () => {
+            if (fileNameElement) fileNameElement.textContent = "";
+            uploadedFile = null;
+            if (convertButton) convertButton.disabled = urlInput.value.trim() === "";
+        });
+    }
 
-  const submitBtn = document.getElementById("submit-btn"); // Changed from "submit-job" to "submit-btn"
-  if (submitBtn) {
-    submitBtn.addEventListener("click", handleSubmit);
-    debugLog("Submit button listener added");
-  } else {
-    console.error("Submit button not found");
-  }
+    if (convertButton) {
+        convertButton.addEventListener("click", onConvertClick);
+    }
 
-  const cancelBtn = document.getElementById("cancel-btn"); // Changed from "cancel-job" to "cancel-btn"
-  if (cancelBtn) {
-    cancelBtn.addEventListener("click", () => {
-      debugLog("Cancel button clicked");
-      document.getElementById("language-modal").classList.add("hidden");
-    });
-    debugLog("Cancel button listener added");
-  } else {
-    console.error("Cancel button not found");
-  }
-
-  // Initialize other parts of your application
-  initAuth0().catch((error) => console.error("Error initializing app:", error));
+    initAuth0().catch((error) => console.error("Error initializing app:", error));
 });
 
 let fileInput;
@@ -901,14 +886,17 @@ function handleFileUpload() {
         const file = event.target.files[0];
         if (file) {
             uploadedFile = file;
-            fileNameElement.textContent = file.name;
-            urlInput.value = "";
+            if (fileNameElement) fileNameElement.textContent = file.name;
+            if (urlInput) urlInput.value = "";
             debugLog("File selected: " + file.name);
             debugLog("File size: " + file.size + " bytes");
             debugLog("File type: " + file.type);
+            // Enable convert button
+            const convertButton = document.getElementById('convert-button');
+            if (convertButton) convertButton.disabled = false;
         } else {
             uploadedFile = null;
-            fileNameElement.textContent = "";
+            if (fileNameElement) fileNameElement.textContent = "";
             debugLog("No file selected");
         }
     };

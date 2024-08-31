@@ -23,10 +23,6 @@ function debugLog(message) {
   console.log(`[DEBUG] ${message}`);
 }
 
-const upload = createClientUploadHandler({
-    handleUploadUrl: '/api/upload-file',
-});
-
 function initStripe() {
   if (!stripe) {
     const stripePublishableKey = 'pk_live_51M7o8vFSngJcZDqfHcvpYSTIJ2TKO4SOlRKYrhkCe2HL8oXnoiCcKDuNluTjBwJsjIqBHHIONNAjFn1mC1qQ1HON00kuu0frmg'; // Replace with your actual publishable key

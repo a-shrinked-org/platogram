@@ -62,6 +62,8 @@ async function initAuth0() {
   }
 }
 
+auth0Client.on('authenticated', checkPendingConversion);
+
 function updateUIStatus(status, message = "") {
   debugLog(`Updating UI status: ${status}`);
   const inputSection = document.getElementById("input-section");
@@ -416,10 +418,8 @@ if (window.location.pathname === '/success') {
 async function onConvertClick(event) {
     if (event) event.preventDefault();
     debugLog("Convert button clicked");
-
     try {
         if (!auth0Client) throw new Error("Auth0 client not initialized");
-
         const inputData = getInputData();
         debugLog("Input data type: " + (inputData ? (inputData instanceof File ? "File" : "URL") : "null"));
         if (inputData instanceof File) {
@@ -427,16 +427,15 @@ async function onConvertClick(event) {
         } else if (typeof inputData === 'string') {
             debugLog("URL input:", inputData);
         }
-
         if (!inputData) {
             throw new Error("Please provide a valid URL or upload a file to be converted");
         }
-
         const price = getPriceFromUI();
-
         if (await auth0Client.isAuthenticated()) {
             showLanguageSelectionModal(inputData, price);
         } else {
+            // Store the input data and price for use after login
+            sessionStorage.setItem('pendingConversion', JSON.stringify({ inputData, price }));
             login();
         }
     } catch (error) {
@@ -589,7 +588,6 @@ async function postToConvert(inputData, lang, sessionId, price) {
 
 function getInputData() {
     const urlInput = document.getElementById("url-input").value.trim();
-
     debugLog("getInputData called");
     debugLog("URL input: " + urlInput);
     debugLog("uploadedFile exists: " + !!uploadedFile);
@@ -598,7 +596,6 @@ function getInputData() {
         debugLog("File size: " + uploadedFile.size + " bytes");
         debugLog("File type: " + uploadedFile.type);
     }
-
     return urlInput || uploadedFile || null;
 }
 
@@ -632,25 +629,20 @@ function showLanguageSelectionModal(inputData, price) {
         console.error("Language modal not found in the DOM");
         return;
     }
-
     modal.classList.remove("hidden");
     modal.style.display = "block";
-
     const fileNameElement = modal.querySelector("#modal-file-name");
     if (fileNameElement) {
         fileNameElement.textContent = inputData instanceof File ? inputData.name : inputData;
     }
-
     const priceElement = modal.querySelector("#modal-price");
     if (priceElement) {
         priceElement.textContent = `$${price.toFixed(2)}`;
     }
-
     const enBtn = document.getElementById("en-btn");
     const esBtn = document.getElementById("es-btn");
     const submitBtn = document.getElementById("submit-btn");
     const cancelBtn = document.getElementById("cancel-btn");
-
     if (enBtn) enBtn.onclick = () => handleLanguageSelection("en");
     if (esBtn) esBtn.onclick = () => handleLanguageSelection("es");
     if (submitBtn) submitBtn.onclick = handleSubmit;
@@ -660,7 +652,6 @@ function showLanguageSelectionModal(inputData, price) {
             modal.classList.add("hidden");
         };
     }
-
     if (!enBtn || !esBtn || !submitBtn || !cancelBtn) {
         console.error("One or more modal buttons not found");
     }
@@ -903,18 +894,27 @@ function handleFileUpload() {
             debugLog("File selected: " + file.name);
             debugLog("File size: " + file.size + " bytes");
             debugLog("File type: " + file.type);
-            toggleConvertButtonState(true, document.getElementById('convert-file-button'));
         } else {
             uploadedFile = null;
             fileNameElement.textContent = "";
             debugLog("No file selected");
-            toggleConvertButtonState(false, document.getElementById('convert-file-button'));
         }
     };
 
     debugLog("Triggering file input click");
     fileInput.click();
 }
+
+// Function to check for pending conversion after login
+function checkPendingConversion() {
+    const pendingConversion = sessionStorage.getItem('pendingConversion');
+    if (pendingConversion) {
+        const { inputData, price } = JSON.parse(pendingConversion);
+        sessionStorage.removeItem('pendingConversion');
+        showLanguageSelectionModal(inputData, price);
+    }
+}
+
 function initializeProcessingStage() {
   debugLog("Initializing processing stage");
   const processingStage = document.getElementById("processing-stage");

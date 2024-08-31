@@ -469,6 +469,7 @@ async function onConvertClick(event) {
     if (!auth0Client) throw new Error("Auth0 client not initialized");
 
     const inputData = getInputData();
+    debugLog("Input data:", inputData);
     if (!inputData) {
       updateUIStatus("error", "Please provide a valid URL or upload a file to be converted");
       return;
@@ -555,12 +556,12 @@ async function postToConvert(inputData, lang, sessionId, price) {
 
 function getInputData() {
   const urlInput = document.getElementById("url-input");
-  const fileInput = document.getElementById("file-upload");
+  const fileNameElement = document.getElementById("file-name");
 
   if (urlInput && urlInput.value.trim() !== "") {
     return urlInput.value.trim();
-  } else if (fileInput && fileInput.files && fileInput.files.length > 0) {
-    return fileInput.files[0];
+  } else if (fileNameElement && fileNameElement.file) {
+    return fileNameElement.file;
   } else {
     return null;
   }
@@ -591,6 +592,7 @@ async function logout() {
 }
 
 function showLanguageSelectionModal(inputData, price) {
+  debugLog("Showing checkout modal");
   const modal = document.getElementById("language-modal");
   if (!modal) {
     console.error("Language modal not found in the DOM");

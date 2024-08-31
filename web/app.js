@@ -1,5 +1,3 @@
-import { upload } from '@vercel/blob/client';
-
 let auth0Client = null;
 let stripe = null;
 let selectedLanguage = 'en'; // Default language
@@ -24,6 +22,10 @@ let processingStageInterval;
 function debugLog(message) {
   console.log(`[DEBUG] ${message}`);
 }
+
+const upload = createClientUploadHandler({
+    handleUploadUrl: '/api/upload-file',
+});
 
 function initStripe() {
   if (!stripe) {

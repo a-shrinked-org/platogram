@@ -413,6 +413,11 @@ async function onConvertClick(event) {
     if (!auth0Client) throw new Error("Auth0 client not initialized");
 
     const inputData = getInputData();
+    debugLog("Input data type: " + (inputData ? (inputData instanceof File ? "File" : "URL") : "null"));
+    if (inputData instanceof File) {
+      debugLog("File details:", inputData.name, inputData.type, inputData.size);
+    }
+
     if (!inputData) {
       throw new Error("Please provide a valid URL or upload a file to be converted");
     }
@@ -576,6 +581,14 @@ function getInputData() {
   const urlInput = document.getElementById("url-input").value.trim();
   const fileNameElement = document.getElementById("file-name");
   const file = fileNameElement && fileNameElement.file;
+
+  debugLog("URL input: " + urlInput);
+  debugLog("File name element exists: " + !!fileNameElement);
+  debugLog("File exists: " + !!file);
+  if (file) {
+    debugLog("File name: " + file.name);
+  }
+
   return urlInput || file || null;
 }
 
@@ -851,32 +864,34 @@ document.addEventListener("DOMContentLoaded", () => {
 
 let fileInput;
 function handleFileUpload() {
-  const fileNameElement = document.getElementById("file-name");
-  const urlInput = document.getElementById("url-input");
+    const fileNameElement = document.getElementById("file-name");
+    const urlInput = document.getElementById("url-input");
 
-  if (!fileInput) {
-    fileInput = document.createElement("input");
-    fileInput.type = "file";
-    fileInput.accept = ".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a";
-    fileInput.style.display = "none";
-    document.body.appendChild(fileInput);
-  }
-
-  fileInput.onchange = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      fileNameElement.textContent = file.name;
-      fileNameElement.file = file; // Store the File object
-      urlInput.value = ""; // Clear URL input when a file is selected
-      debugLog("File selected: " + file.name);
-    } else {
-      fileNameElement.textContent = "";
-      fileNameElement.file = null; // Clear the stored File object
-      debugLog("No file selected");
+    if (!fileInput) {
+        fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = ".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a";
+        fileInput.style.display = "none";
+        document.body.appendChild(fileInput);
     }
-  };
 
-  fileInput.click();
+    fileInput.onchange = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            fileNameElement.textContent = file.name;
+            fileNameElement.file = file; // Store the File object
+            urlInput.value = ""; // Clear URL input when a file is selected
+            debugLog("File selected: " + file.name);
+            toggleConvertButtonState(true, elements.convertFileButton);
+        } else {
+            fileNameElement.textContent = "";
+            fileNameElement.file = null; // Clear the stored File object
+            debugLog("No file selected");
+            toggleConvertButtonState(false, elements.convertFileButton);
+        }
+    };
+
+    fileInput.click();
 }
 
 function initializeProcessingStage() {

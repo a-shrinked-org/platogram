@@ -3,6 +3,7 @@ let stripe = null;
 let selectedLanguage = 'en'; // Default language
 let pollingInterval;
 let elements;
+let uploadedFile = null;
 
 const processingStages = [
   "Byte Whispering",
@@ -581,19 +582,16 @@ async function postToConvert(inputData, lang, sessionId, price) {
 
 function getInputData() {
     const urlInput = document.getElementById("url-input").value.trim();
-    const fileNameElement = document.getElementById("file-name");
-    const file = fileNameElement ? fileNameElement.file : null;
 
     debugLog("URL input: " + urlInput);
-    debugLog("File name element exists: " + !!fileNameElement);
-    debugLog("File exists: " + !!file);
-    if (file) {
-        debugLog("File name: " + file.name);
-        debugLog("File size: " + file.size + " bytes");
-        debugLog("File type: " + file.type);
+    debugLog("File exists: " + !!uploadedFile);
+    if (uploadedFile) {
+        debugLog("File name: " + uploadedFile.name);
+        debugLog("File size: " + uploadedFile.size + " bytes");
+        debugLog("File type: " + uploadedFile.type);
     }
 
-    return urlInput || file || null;
+    return urlInput || uploadedFile || null;
 }
 
 async function login() {
@@ -882,16 +880,16 @@ function handleFileUpload() {
     fileInput.onchange = (event) => {
         const file = event.target.files[0];
         if (file) {
+            uploadedFile = file; // Store the file in the global variable
             fileNameElement.textContent = file.name;
-            fileNameElement.file = file; // Store the File object
             urlInput.value = ""; // Clear URL input when a file is selected
             debugLog("File selected: " + file.name);
             debugLog("File size: " + file.size + " bytes");
             debugLog("File type: " + file.type);
             toggleConvertButtonState(true, document.getElementById('convert-file-button'));
         } else {
+            uploadedFile = null;
             fileNameElement.textContent = "";
-            fileNameElement.file = null; // Clear the stored File object
             debugLog("No file selected");
             toggleConvertButtonState(false, document.getElementById('convert-file-button'));
         }

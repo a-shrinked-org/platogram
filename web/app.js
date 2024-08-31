@@ -237,7 +237,7 @@ async function createCheckoutSession(price, lang) {
   }
 }
 
-const CHUNK_SIZE = 1 * 1024 * 1024; // 1MB chunks
+import { upload } from '@vercel/blob/client';
 
 async function uploadFile(file) {
     console.log('Starting file upload process');
@@ -249,17 +249,21 @@ async function uploadFile(file) {
         throw new Error('Upload process section not found');
     }
 
-    console.log('Toggling to upload-process-section');
+    // Trigger upload-process-section
     toggleSection('upload-process-section');
 
     try {
         const blob = await upload(file.name, file, {
             access: 'public',
             handleUploadUrl: '/api/upload-handler',
+            onProgress: (progress) => {
+                const percentage = (progress.percent * 100).toFixed(2);
+                console.log(`Upload progress: ${percentage}%`);
+                updateUploadProgress(progress.percent * 100);
+            },
         });
 
-        console.log('File uploaded successfully. URL:', blob.url);
-        updateUploadProgress(100);
+        console.log('File upload completed. Final URL:', blob.url);
         return blob.url;
     } catch (error) {
         console.error('Error uploading file:', error);
@@ -267,14 +271,9 @@ async function uploadFile(file) {
     }
 }
 
-    console.log('File upload completed. Final URL:', uploadUrl);
-    return uploadUrl;
-}
-
 function updateUploadProgress(progress) {
     const uploadProgressBar = document.getElementById('upload-progress-bar');
     const uploadProgressText = document.getElementById('upload-progress-text');
-    console.log(`Updating progress: ${progress.toFixed(2)}%`);
     if (uploadProgressBar && uploadProgressText) {
         uploadProgressBar.style.width = `${progress}%`;
         uploadProgressText.textContent = `Uploading: ${progress.toFixed(2)}%`;

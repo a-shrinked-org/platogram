@@ -237,31 +237,68 @@ async function createCheckoutSession(price, lang) {
   }
 }
 
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+
 async function uploadFile(file) {
     console.log('Starting file upload process');
-    const formData = new FormData();
-    formData.append('file', file);
-
     console.log('File details:', file.name, file.type, file.size);
 
-    try {
-        console.log('Sending file to upload endpoint');
-        const response = await fetch('/api/upload-file', {
-            method: 'POST',
-            body: formData,
-        });
+    const uploadProcessSection = document.getElementById('upload-process-section');
+    if (!uploadProcessSection) {
+        console.error('Upload process section not found');
+        throw new Error('Upload process section not found');
+    }
 
-        if (!response.ok) {
-            console.error('File upload failed. Status:', response.status);
-            throw new Error('File upload failed');
+    // Trigger upload-process-section
+    toggleSection('upload-process-section');
+
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    let uploadedChunks = 0;
+    let uploadUrl = '';
+
+    for (let start = 0; start < file.size; start += CHUNK_SIZE) {
+        const chunk = file.slice(start, start + CHUNK_SIZE);
+        const formData = new FormData();
+        formData.append('file', chunk, `${file.name}.part${uploadedChunks}`);
+        formData.append('totalChunks', totalChunks);
+        formData.append('chunkIndex', uploadedChunks);
+        formData.append('fileName', file.name);
+
+        try {
+            console.log(`Uploading chunk ${uploadedChunks + 1} of ${totalChunks}`);
+            const response = await fetch('/api/upload-file', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to upload chunk ${uploadedChunks + 1}`);
+            }
+
+            const result = await response.json();
+            uploadUrl = result.fileUrl; // This will be the final URL after the last chunk
+            uploadedChunks++;
+
+            // Update progress
+            const progress = (uploadedChunks / totalChunks) * 100;
+            updateUploadProgress(progress);
+
+        } catch (error) {
+            console.error(`Error uploading chunk ${uploadedChunks + 1}:`, error);
+            throw error;
         }
+    }
 
-        const result = await response.json();
-        console.log('File upload successful. Received URL:', result.fileUrl);
-        return result.fileUrl;
-    } catch (error) {
-        console.error('Error during file upload:', error);
-        throw error;
+    console.log('File upload completed. Final URL:', uploadUrl);
+    return uploadUrl;
+}
+
+function updateUploadProgress(progress) {
+    const uploadProgressBar = document.getElementById('upload-progress-bar');
+    const uploadProgressText = document.getElementById('upload-progress-text');
+    if (uploadProgressBar && uploadProgressText) {
+        uploadProgressBar.style.width = `${progress}%`;
+        uploadProgressText.textContent = `Uploading: ${progress.toFixed(2)}%`;
     }
 }
 
@@ -287,8 +324,7 @@ async function handleSubmit(event) {
 
         let fileUrl;
         if (inputData instanceof File) {
-            submitButtonText.textContent = "Uploading...";
-            submitSpinner.classList.remove('hidden');
+            modal.classList.add('hidden'); // Close the modal before starting upload
             console.log('Starting file upload');
             try {
                 fileUrl = await uploadFile(inputData);
@@ -301,7 +337,8 @@ async function handleSubmit(event) {
             console.log('Using provided URL:', fileUrl);
         }
 
-        submitButtonText.textContent = "Processing...";
+        toggleSection('status-section'); // Switch to status section after upload
+        updateUIStatus("running", "Starting conversion...");
 
         if (price > 0) {
             console.log('Non-zero price detected, initiating Stripe checkout');
@@ -343,7 +380,6 @@ async function handleSubmit(event) {
             }
         } else {
             console.log('Free conversion, proceeding with postToConvert');
-            modal.classList.add('hidden');
             updateUIStatus("running", "Starting conversion...");
             await postToConvert(fileUrl, selectedLanguage, null, price);
         }
@@ -643,6 +679,7 @@ function toggleSection(sectionToShow) {
   const sections = [
     "input-section",
     "file-upload-section",
+    "upload-process-section",
     "status-section",
     "error-section",
     "done-section"

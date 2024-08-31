@@ -1,4 +1,4 @@
-import { put } from '@vercel/blob';
+import { handleUpload, del, put } from '@vercel/blob';
 import { IncomingForm } from 'formidable';
 import fs from 'fs';
 
@@ -15,30 +15,63 @@ export default async function handler(req, res) {
     form.parse(req, async (err, fields, files) => {
       if (err) {
         console.error('Parsing form error:', err);
-        res.status(500).json({ error: 'File upload failed during parsing' });
-        return;
+        return res.status(500).json({ error: 'File upload failed during parsing' });
       }
 
-      const file = files.file[0];
-      if (!file) {
-        res.status(400).json({ error: 'No file provided' });
-        return;
-      }
+      const chunk = files.file[0];
+      const { totalChunks, chunkIndex, fileName } = fields;
 
       try {
-        const fileContent = await fs.promises.readFile(file.filepath);
-        const blob = await put(file.originalFilename, fileContent, {
-          access: 'public',
-        });
+        const chunkContent = await fs.promises.readFile(chunk.filepath);
 
-        console.log('File uploaded successfully to Vercel Blob:', blob.url);
-        res.status(200).json({
-          message: 'File uploaded successfully',
-          fileUrl: blob.url
-        });
+        // For the first chunk, start a new blob upload
+        if (chunkIndex === '0') {
+          const blob = await put(fileName, chunkContent, {
+            access: 'public',
+            addRandomSuffix: false,
+            multipart: {
+              chunks: parseInt(totalChunks),
+            },
+          });
+
+          return res.status(200).json({
+            message: 'Chunk uploaded successfully',
+            fileUrl: blob.url,
+            uploadId: blob.uploadId,
+          });
+        } else {
+          // For subsequent chunks, append to the existing blob
+          await put(fileName, chunkContent, {
+            access: 'public',
+            addRandomSuffix: false,
+            multipart: {
+              uploadId: fields.uploadId,
+              partNumber: parseInt(chunkIndex) + 1,
+            },
+          });
+
+          // If this is the last chunk, complete the multipart upload
+          if (parseInt(chunkIndex) === parseInt(totalChunks) - 1) {
+            const finalBlob = await put(fileName, Buffer.from([]), {
+              access: 'public',
+              addRandomSuffix: false,
+              multipart: {
+                uploadId: fields.uploadId,
+                isComplete: true,
+              },
+            });
+
+            return res.status(200).json({
+              message: 'File upload completed',
+              fileUrl: finalBlob.url,
+            });
+          }
+
+          return res.status(200).json({ message: 'Chunk uploaded successfully' });
+        }
       } catch (error) {
         console.error('Vercel Blob upload error:', error);
-        res.status(500).json({ error: 'File upload failed during Blob upload' });
+        return res.status(500).json({ error: 'Chunk upload failed' });
       }
     });
   } else {

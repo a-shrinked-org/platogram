@@ -409,7 +409,10 @@ async function onConvertClick(event) {
     if (!auth0Client) throw new Error("Auth0 client not initialized");
 
     const inputData = getInputData();
-    debugLog("Input data:", inputData);
+    debugLog("Input data type:", inputData ? (inputData instanceof File ? "File" : "URL") : "null");
+    if (inputData instanceof File) {
+      debugLog("File details:", inputData.name, inputData.type, inputData.size);
+    }
 
     if (!inputData) {
       throw new Error("Please provide a valid URL or upload a file to be converted");
@@ -418,11 +421,6 @@ async function onConvertClick(event) {
     const price = getPriceFromUI();
 
     if (await auth0Client.isAuthenticated()) {
-      if (inputData instanceof File) {
-        debugLog("File selected:", inputData.name);
-      } else {
-        debugLog("URL provided:", inputData);
-      }
       showLanguageSelectionModal(inputData, price);
     } else {
       login();
@@ -877,7 +875,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initAuth0().catch((error) => console.error("Error initializing app:", error));
 });
 
-let fileInput; // Объявляем переменную для хранения элемента fileInput
+let fileInput;
 function handleFileUpload() {
   const fileNameElement = document.getElementById("file-name");
   const urlInput = document.getElementById("url-input");
@@ -893,7 +891,7 @@ function handleFileUpload() {
       const file = event.target.files[0];
       if (file) {
         fileNameElement.textContent = file.name;
-        fileNameElement.file = file;
+        fileNameElement.file = file; // Store the File object
         urlInput.value = "";
         debugLog("File selected:", file.name);
       } else {
@@ -903,7 +901,6 @@ function handleFileUpload() {
       }
     });
   }
-
   fileInput.click();
 }
 

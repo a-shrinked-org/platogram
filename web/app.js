@@ -519,30 +519,6 @@ async function deleteFile(fileUrl) {
   }
 }
 
-function showLanguageSelectionModal(inputData, price) {
-  const modal = document.getElementById("language-modal");
-  if (!modal) {
-    console.error("Language modal not found in the DOM");
-    return;
-  }
-
-  modal.classList.remove("hidden");
-  modal.style.display = "block";
-
-  const handleLanguageSelection = (lang) => {
-    debugLog(`Language selected: ${lang}`);
-    selectedLanguage = lang;
-    // Update UI to show selected language if needed
-  };
-  // Update modal content with inputData and price if needed
-
-  document.getElementById("submit-btn").onclick = handleSubmit;
-  document.getElementById("cancel-btn").onclick = () => {
-    debugLog("Language selection cancelled");
-    modal.classList.add("hidden");
-  };
-}
-
 async function postToConvert(inputData, lang, sessionId, price) {
   let headers = {
     Authorization: `Bearer ${await auth0Client.getTokenSilently({
@@ -886,21 +862,22 @@ function handleFileUpload() {
     fileInput.accept = ".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a";
     fileInput.style.display = "none";
     document.body.appendChild(fileInput);
-
-    fileInput.addEventListener("change", (event) => {
-      const file = event.target.files[0];
-      if (file) {
-        fileNameElement.textContent = file.name;
-        fileNameElement.file = file; // Store the File object
-        urlInput.value = "";
-        debugLog("File selected:", file.name);
-      } else {
-        fileNameElement.textContent = "";
-        fileNameElement.file = null;
-        debugLog("No file selected");
-      }
-    });
   }
+
+  fileInput.onchange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      fileNameElement.textContent = file.name;
+      fileNameElement.file = file; // Store the File object
+      urlInput.value = ""; // Clear URL input when a file is selected
+      debugLog("File selected: " + file.name);
+    } else {
+      fileNameElement.textContent = "";
+      fileNameElement.file = null; // Clear the stored File object
+      debugLog("No file selected");
+    }
+  };
+
   fileInput.click();
 }
 

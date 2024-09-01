@@ -699,11 +699,6 @@ function getInitials(email) {
 
 // Main DOMContentLoaded event listener
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize required variables and functions from app.js
-    window.initStripe();
-    window.handleStripeRedirect();
-    window.initAuth0().catch((error) => console.error("Error initializing app:", error));
-    window.initializeProcessingStage();
 
     // Setup essential UI event listeners
     const elements = {
@@ -775,9 +770,6 @@ document.addEventListener('DOMContentLoaded', () => {
             window.logout();
         });
     }
-
-    // Setup price-related UI elements
-    window.setupPriceUI();
 });
 </script>
 </body>

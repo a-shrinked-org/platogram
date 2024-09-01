@@ -136,6 +136,63 @@ function setupPriceUI() {
     updateTotalPrice();
 }
 
+// processing files
+
+function setupDragAndDrop(dropArea, filesHandler) {
+    if (!dropArea) return;
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+    });
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, true), false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, false), false);
+    });
+
+    dropArea.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        filesHandler(files);
+    });
+}
+
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+function toggleHighlight(dropArea, isActive) {
+    dropArea.classList.toggle('border-blue-500', isActive);
+    dropArea.classList.toggle('bg-blue-50', isActive);
+}
+
+function handleFiles(files) {
+    if (files.length > 0) {
+        const file = files[0];
+        uploadedFile = file; // Update the global uploadedFile variable
+        const fileNameDisplay = document.getElementById('file-name-display');
+        const convertFileButton = document.getElementById('convert-file-button');
+        if (fileNameDisplay) {
+            fileNameDisplay.textContent = file.name;
+        }
+        if (convertFileButton) {
+            toggleConvertButtonState(true, convertFileButton);
+        }
+        // Clear URL input if it exists
+        const urlInput = document.getElementById('url-input');
+        if (urlInput) urlInput.value = "";
+
+        debugLog("File selected via drag & drop: " + file.name);
+        debugLog("File size: " + file.size + " bytes");
+        debugLog("File type: " + file.type);
+    }
+}
+
+// Stripe + Auth Init
 
 function initStripe() {
   if (!stripe) {

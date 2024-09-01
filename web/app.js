@@ -4,6 +4,10 @@ let selectedLanguage = 'en'; // Default language
 let pollingInterval;
 let elements;
 let uploadedFile = null;
+let selectedOption = 'coffee';
+let coffeeCount = 1;
+let customPrice = '';
+let totalPrice = 5;
 
 const processingStages = [
   "Byte Whispering",
@@ -23,6 +27,115 @@ let processingStageInterval;
 function debugLog(message) {
   console.log(`[DEBUG] ${message}`);
 }
+
+// coffee counting machine
+
+function updateTotalPrice() {
+    if (selectedOption === 'basic') {
+        totalPrice = 0;
+    } else if (selectedOption === 'coffee') {
+        if (customPrice) {
+            totalPrice = parseFloat(customPrice);
+        } else {
+            totalPrice = coffeeCount * 5;
+        }
+    }
+    const totalPriceElement = document.getElementById('total-price');
+    const coffeePriceElement = document.getElementById('coffee-price');
+    if (totalPriceElement) totalPriceElement.textContent = totalPrice.toFixed(2);
+    if (coffeePriceElement) coffeePriceElement.textContent = totalPrice.toFixed(2);
+}
+
+function handleOptionClick(option) {
+    selectedOption = option;
+    const basicButton = document.getElementById('basic-job-button');
+    const coffeeButton = document.getElementById('coffee-button');
+    if (basicButton) {
+        basicButton.classList.toggle('border-blue-500', option === 'basic');
+        basicButton.classList.toggle('bg-blue-50', option === 'basic');
+    }
+    if (coffeeButton) {
+        coffeeButton.classList.toggle('border-blue-500', option === 'coffee');
+        coffeeButton.classList.toggle('bg-blue-50', option === 'coffee');
+    }
+    if (option === 'coffee') {
+        coffeeCount = 1;
+        customPrice = '';
+        const customPriceInput = document.getElementById('custom-price');
+        if (customPriceInput) customPriceInput.value = '';
+    }
+    updateTotalPrice();
+}
+
+function handleCoffeeCountClick(count) {
+    coffeeCount = count;
+    customPrice = '';
+    const customPriceInput = document.getElementById('custom-price');
+    if (customPriceInput) customPriceInput.value = '';
+    const coffee1Button = document.getElementById('coffee-1');
+    const coffee2Button = document.getElementById('coffee-2');
+    if (coffee1Button) {
+        coffee1Button.classList.toggle('bg-blue-500', count === 1);
+        coffee1Button.classList.toggle('text-white', count === 1);
+    }
+    if (coffee2Button) {
+        coffee2Button.classList.toggle('bg-blue-500', count === 2);
+        coffee2Button.classList.toggle('text-white', count === 2);
+    }
+    updateTotalPrice();
+}
+
+function handleCustomPriceChange(e) {
+    const value = e.target.value;
+    if (value === '' || (/^\d{1,3}(\.\d{0,2})?$/.test(value) && parseFloat(value) <= 999)) {
+        customPrice = value;
+        updateTotalPrice();
+    }
+}
+
+function toggleConvertButtonState(isActive, button) {
+    if (button) {
+        button.disabled = !isActive;
+        button.classList.toggle('opacity-50', !isActive);
+        button.classList.toggle('cursor-not-allowed', !isActive);
+    }
+}
+
+function closeLanguageModal() {
+    const modal = document.getElementById("language-modal");
+    if (modal) {
+        modal.classList.add("hidden");
+    }
+}
+
+function setupPriceUI() {
+    const basicJobButton = document.getElementById('basic-job-button');
+    if (basicJobButton) basicJobButton.addEventListener('click', () => handleOptionClick('basic'));
+
+    const coffeeButton = document.getElementById('coffee-button');
+    if (coffeeButton) coffeeButton.addEventListener('click', () => handleOptionClick('coffee'));
+
+    const coffee1Button = document.getElementById('coffee-1');
+    if (coffee1Button) coffee1Button.addEventListener('click', () => handleCoffeeCountClick(1));
+
+    const coffee2Button = document.getElementById('coffee-2');
+    if (coffee2Button) coffee2Button.addEventListener('click', () => handleCoffeeCountClick(2));
+
+    const customPriceInput = document.getElementById('custom-price');
+    if (customPriceInput) customPriceInput.addEventListener('input', handleCustomPriceChange);
+
+    const cancelButton = document.getElementById('cancel-btn');
+    if (cancelButton) {
+        cancelButton.addEventListener('click', () => {
+            console.log('Modal closed');
+            closeLanguageModal();
+        });
+    }
+
+    handleOptionClick('coffee');
+    updateTotalPrice();
+}
+
 
 function initStripe() {
   if (!stripe) {
@@ -856,6 +969,7 @@ document.addEventListener("DOMContentLoaded", () => {
   debugLog("DOM Content Loaded");
   initStripe();
   handleStripeRedirect();
+  setupPriceUI();
 
   const uploadIcon = document.querySelector(".upload-icon");
     const fileNameElement = document.getElementById("file-name");
@@ -949,6 +1063,10 @@ function initializeProcessingStage() {
 }
 
 // Ensure all functions are in global scope
+window.toggleConvertButtonState = toggleConvertButtonState;
+window.toggleSections = toggleSections;
+window.setupDragAndDrop = setupDragAndDrop;
+window.handleFiles = handleFiles;
 window.onConvertClick = onConvertClick;
 window.login = login;
 window.logout = logout;
@@ -960,3 +1078,4 @@ window.handleStripeRedirect = handleStripeRedirect;
 window.handleStripeSuccess = handleStripeSuccess;
 window.handleStripeCancel = handleStripeCancel;
 window.selectLanguage = selectLanguage;
+window.setupPriceUI = setupPriceUI;

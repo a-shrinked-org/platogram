@@ -661,316 +661,124 @@
 <script src="https://js.stripe.com/v3/"></script>
 <script src="https://platogram.vercel.app/web/app.js"></script>
 <script>
+// Keep only essential UI-related functions in index.js
+window.updateAuthUI = function(isAuthenticated, user) {
+    const loginButton = document.getElementById('login-button');
+    const userCircle = document.getElementById('user-circle');
+    const logoutTooltip = document.getElementById('logout-tooltip');
 
-    // Price logics
-        let selectedOption = 'coffee';
-        let coffeeCount = 1;
-        let customPrice = '';
-        let totalPrice = 5;
-
-        function updateTotalPrice() {
-            if (selectedOption === 'basic') {
-                totalPrice = 0;
-            } else if (selectedOption === 'coffee') {
-                if (customPrice) {
-                    totalPrice = parseFloat(customPrice);
-                } else {
-                    totalPrice = coffeeCount * 5;
-                }
-            }
-            const totalPriceElement = document.getElementById('total-price');
-            const coffeePriceElement = document.getElementById('coffee-price');
-            if (totalPriceElement) totalPriceElement.textContent = totalPrice.toFixed(2);
-            if (coffeePriceElement) coffeePriceElement.textContent = totalPrice.toFixed(2);
+    if (isAuthenticated && user) {
+        if (loginButton) loginButton.classList.add('hidden');
+        if (userCircle) {
+            userCircle.classList.remove('hidden');
+            userCircle.textContent = getInitials(user.email);
         }
+    } else {
+        if (loginButton) loginButton.classList.remove('hidden');
+        if (userCircle) userCircle.classList.add('hidden');
+        if (logoutTooltip) logoutTooltip.classList.add('hidden');
+    }
 
-        function handleOptionClick(option) {
-            selectedOption = option;
-            const basicButton = document.getElementById('basic-job-button');
-            const coffeeButton = document.getElementById('coffee-button');
-            if (basicButton) {
-                basicButton.classList.toggle('border-blue-500', option === 'basic');
-                basicButton.classList.toggle('bg-blue-50', option === 'basic');
+    if (userCircle && logoutTooltip) {
+        userCircle.addEventListener('click', (event) => {
+            event.stopPropagation();
+            logoutTooltip.classList.toggle('hidden');
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!userCircle.contains(event.target) && !logoutTooltip.contains(event.target)) {
+                logoutTooltip.classList.add('hidden');
             }
-            if (coffeeButton) {
-                coffeeButton.classList.toggle('border-blue-500', option === 'coffee');
-                coffeeButton.classList.toggle('bg-blue-50', option === 'coffee');
-            }
-            if (option === 'coffee') {
-                coffeeCount = 1;
-                customPrice = '';
-                const customPriceInput = document.getElementById('custom-price');
-                if (customPriceInput) customPriceInput.value = '';
-            }
-            updateTotalPrice();
-        }
+        });
+    }
+};
 
-        function handleCoffeeCountClick(count) {
-            coffeeCount = count;
-            customPrice = '';
-            const customPriceInput = document.getElementById('custom-price');
-            if (customPriceInput) customPriceInput.value = '';
-            const coffee1Button = document.getElementById('coffee-1');
-            const coffee2Button = document.getElementById('coffee-2');
-            if (coffee1Button) {
-                coffee1Button.classList.toggle('bg-blue-500', count === 1);
-                coffee1Button.classList.toggle('text-white', count === 1);
-            }
-            if (coffee2Button) {
-                coffee2Button.classList.toggle('bg-blue-500', count === 2);
-                coffee2Button.classList.toggle('text-white', count === 2);
-            }
-            updateTotalPrice();
-        }
+function getInitials(email) {
+    return email.split('@')[0].substring(0, 2).toUpperCase();
+}
 
-        function handleCustomPriceChange(e) {
-            const value = e.target.value;
-            if (value === '' || (/^\d{1,3}(\.\d{0,2})?$/.test(value) && parseFloat(value) <= 999)) {
-                customPrice = value;
-                updateTotalPrice();
-            }
-        }
+// Main DOMContentLoaded event listener
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize required variables and functions from app.js
+    window.initStripe();
+    window.handleStripeRedirect();
+    window.initAuth0().catch((error) => console.error("Error initializing app:", error));
+    window.initializeProcessingStage();
 
-        // Auth-related functions
-        function getInitials(email) {
-            return email.split('@')[0].substring(0, 2).toUpperCase();
-        }
+    // Setup essential UI event listeners
+    const elements = {
+        urlInput: document.getElementById('url-input'),
+        uploadFileButton: document.getElementById('upload-file-button'),
+        fileUploadSection: document.getElementById('file-upload-section'),
+        inputSection: document.getElementById('input-section'),
+        backToUrlButton: document.getElementById('back-to-url'),
+        fileDropArea: document.getElementById('file-drop-area'),
+        fileInput: document.querySelector('input[type="file"]'),
+        convertButton: document.getElementById('convert-button'),
+        convertFileButton: document.getElementById('convert-file-button'),
+        loginButton: document.getElementById('login-button'),
+        logoutButton: document.getElementById('logout-button'),
+    };
 
-        window.updateAuthUI = function(isAuthenticated, user) {
-            const loginButton = document.getElementById('login-button');
-            const userCircle = document.getElementById('user-circle');
-            const logoutTooltip = document.getElementById('logout-tooltip');
+    if (elements.urlInput) {
+        elements.urlInput.addEventListener('input', () => {
+            window.toggleConvertButtonState(elements.urlInput.value.trim() !== '', elements.convertButton);
+        });
+    }
 
-            if (isAuthenticated && user) {
-                if (loginButton) loginButton.classList.add('hidden');
-                if (userCircle) {
-                    userCircle.classList.remove('hidden');
-                    userCircle.textContent = getInitials(user.email);
-                }
-            } else {
-                if (loginButton) loginButton.classList.remove('hidden');
-                if (userCircle) userCircle.classList.add('hidden');
-                if (logoutTooltip) logoutTooltip.classList.add('visible');
-            }
+    if (elements.uploadFileButton) {
+        elements.uploadFileButton.addEventListener('click', () => {
+            window.toggleSections(elements.inputSection, elements.fileUploadSection);
+        });
+    }
 
-        if (userCircle && logoutTooltip) {
-            userCircle.addEventListener('click', (event) => {
-                event.stopPropagation(); // Prevent the click from immediately closing the tooltip
-                logoutTooltip.classList.toggle('visible');
-            });
+    if (elements.backToUrlButton) {
+        elements.backToUrlButton.addEventListener('click', () => {
+            window.toggleSections(elements.fileUploadSection, elements.inputSection);
+        });
+    }
 
-            // Close the tooltip when clicking outside
-            document.addEventListener('click', (event) => {
-                if (!userCircle.contains(event.target) && !logoutTooltip.contains(event.target)) {
-                    logoutTooltip.classList.add('visible');
-                }
-            });
-        }
+    if (elements.fileDropArea) {
+        window.setupDragAndDrop(elements.fileDropArea, window.handleFiles);
+    }
 
-        };
+    if (elements.fileInput) {
+        elements.fileInput.addEventListener('change', (event) => {
+            window.handleFiles(event.target.files);
+        });
+    }
 
-        function login() {
-            auth0Client.loginWithRedirect();
-        }
+    if (elements.convertButton) {
+        elements.convertButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            window.onConvertClick();
+        });
+    }
 
-        function logout() {
-            auth0Client.logout({ returnTo: window.location.origin });
-        }
+    if (elements.convertFileButton) {
+        elements.convertFileButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            window.onConvertClick();
+        });
+    }
 
-        // Main DOMContentLoaded event listener
-    document.addEventListener('DOMContentLoaded', () => {
-                elements = {
-                    urlInput: document.getElementById('url-input'),
-                    uploadFileButton: document.getElementById('upload-file-button'),
-                    fileUploadSection: document.getElementById('file-upload-section'),
-                    inputSection: document.getElementById('input-section'),
-                    backToUrlButton: document.getElementById('back-to-url'),
-                    fileDropArea: document.getElementById('file-drop-area'),
-                    fileInput: document.querySelector('input[type="file"]'),
-                    fileNameDisplay: document.getElementById('file-name-display'),
-                    convertButton: document.getElementById('convert-button'),
-                    convertFileButton: document.getElementById('convert-file-button'),
-                    loginButton: document.getElementById('login-button'),
-                    logoutButton: document.getElementById('logout-button'),
-                    userCircle: document.getElementById('user-circle'),
-                    logoutTooltip: document.getElementById('logout-tooltip'),
-                };
+    if (elements.loginButton) {
+        elements.loginButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            window.login();
+        });
+    }
 
-                initializeProcessingStage();
+    if (elements.logoutButton) {
+        elements.logoutButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            window.logout();
+        });
+    }
 
-                // URL input listener
-                if (elements.urlInput) {
-                    elements.urlInput.addEventListener('input', () => {
-                        toggleConvertButtonState(elements.urlInput.value.trim() !== '', elements.convertButton);
-                    });
-                }
-
-                // Upload file button listener
-                if (elements.uploadFileButton) {
-                    elements.uploadFileButton.addEventListener('click', () => {
-                        toggleSections(elements.inputSection, elements.fileUploadSection);
-                    });
-                }
-
-                // Back to URL button listener
-                if (elements.backToUrlButton) {
-                    elements.backToUrlButton.addEventListener('click', () => {
-                        toggleSections(elements.fileUploadSection, elements.inputSection);
-                    });
-                }
-
-                // Setup drag and drop
-                if (elements.fileDropArea) {
-                    setupDragAndDrop(elements.fileDropArea, handleFiles);
-                }
-
-                // File input change listener
-                if (elements.fileInput) {
-                    elements.fileInput.addEventListener('change', (event) => {
-                        handleFiles(event.target.files);
-                    });
-                }
-
-                // User circle and logout tooltip functionality
-                if (elements.userCircle) {
-                    elements.userCircle.addEventListener('click', () => {
-                        elements.logoutTooltip.classList.toggle('hidden');
-                    });
-                }
-
-                document.addEventListener('click', (event) => {
-                    if (elements.userCircle && elements.logoutTooltip &&
-                        !elements.userCircle.contains(event.target) &&
-                        !elements.logoutTooltip.contains(event.target)) {
-                        elements.logoutTooltip.classList.add('hidden');
-                    }
-                });
-
-                // Price logic event listeners
-                const basicJobButton = document.getElementById('basic-job-button');
-                if (basicJobButton) basicJobButton.addEventListener('click', () => handleOptionClick('basic'));
-
-                const coffeeButton = document.getElementById('coffee-button');
-                if (coffeeButton) coffeeButton.addEventListener('click', () => handleOptionClick('coffee'));
-
-                const coffee1Button = document.getElementById('coffee-1');
-                if (coffee1Button) coffee1Button.addEventListener('click', () => handleCoffeeCountClick(1));
-
-                const coffee2Button = document.getElementById('coffee-2');
-                if (coffee2Button) coffee2Button.addEventListener('click', () => handleCoffeeCountClick(2));
-
-                const customPriceInput = document.getElementById('custom-price');
-                if (customPriceInput) customPriceInput.addEventListener('input', handleCustomPriceChange);
-
-                const cancelButton = document.getElementById('cancel-btn');
-                if (cancelButton) {
-                    cancelButton.addEventListener('click', () => {
-                        console.log('Modal closed');
-                        closeLanguageModal();
-                    });
-                }
-
-                // Initial setup for price logic
-                handleOptionClick('coffee');
-                updateTotalPrice();
-
-                // Add event listeners to buttons
-                if (elements.convertButton) {
-                    elements.convertButton.addEventListener('click', (event) => {
-                        event.preventDefault();
-                        onConvertClick();
-                    });
-                }
-
-                if (elements.loginButton) {
-                    elements.loginButton.addEventListener('click', (event) => {
-                        event.preventDefault();
-                        login();
-                    });
-                }
-
-                if (elements.logoutButton) {
-                    elements.logoutButton.addEventListener('click', (event) => {
-                        event.preventDefault();
-                        logout();
-                    });
-                }
-
-                const donateButtons = document.querySelectorAll('[id^="donate-button"]');
-                donateButtons.forEach(button => {
-                    button.addEventListener('click', (event) => {
-                        event.preventDefault();
-                        onDonateClick();
-                    });
-                });
-
-                const resetButtons = document.querySelectorAll('[id^="reset-button"]');
-                resetButtons.forEach(button => {
-                    button.addEventListener('click', (event) => {
-                        event.preventDefault();
-                        reset();
-                    });
-                });
-
-                // Existing functions (kept as they were)
-                function toggleConvertButtonState(isActive, button) {
-                    if (button) {
-                        button.disabled = !isActive;
-                        button.classList.toggle('opacity-50', !isActive);
-                        button.classList.toggle('cursor-not-allowed', !isActive);
-                    }
-                }
-
-                function toggleSections(hiddenSection, visibleSection) {
-                    if (hiddenSection) hiddenSection.classList.add('hidden');
-                    if (visibleSection) visibleSection.classList.remove('hidden');
-                }
-
-                function setupDragAndDrop(dropArea, filesHandler) {
-                    if (!dropArea) return;
-
-                    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                        dropArea.addEventListener(eventName, preventDefaults, false);
-                    });
-
-                    ['dragenter', 'dragover'].forEach(eventName => {
-                        dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, true), false);
-                    });
-
-                    ['dragleave', 'drop'].forEach(eventName => {
-                        dropArea.addEventListener(eventName, () => toggleHighlight(dropArea, false), false);
-                    });
-
-                    dropArea.addEventListener('drop', (e) => {
-                        const dt = e.dataTransfer;
-                        const files = dt.files;
-                        filesHandler(files);
-                    });
-                }
-                function preventDefaults(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                }
-
-                function toggleHighlight(dropArea, isActive) {
-                    dropArea.classList.toggle('border-blue-500', isActive);
-                    dropArea.classList.toggle('bg-blue-50', isActive);
-                }
-
-                function handleFiles(files) {
-                    if (files.length > 0) {
-                        const file = files[0];
-                        if (elements.fileNameDisplay) {
-                            elements.fileNameDisplay.textContent = file.name;
-                        }
-                        if (elements.convertFileButton) {
-                            toggleConvertButtonState(true, elements.convertFileButton);
-                        }
-                    }
-                }
-
-
-    });
+    // Setup price-related UI elements
+    window.setupPriceUI();
+});
 </script>
 </body>
 </html>

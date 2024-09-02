@@ -769,8 +769,9 @@ function getInputData() {
         debugLog("File name: " + uploadedFile.name);
         debugLog("File size: " + uploadedFile.size + " bytes");
         debugLog("File type: " + uploadedFile.type);
+        return uploadedFile;
     }
-    return urlInput || uploadedFile || null;
+    return urlInput || null;
 }
 
 async function login() {

@@ -510,13 +510,7 @@ async function handleSubmit(event) {
 
         updateUIStatus("running", "Starting conversion...");
 
-        if (price > 0) {
-            console.log('Non-zero price detected, initiating Stripe checkout');
-            await handlePaidConversion(inputData, price);
-        } else {
-            console.log('Free conversion, proceeding with postToConvert');
-            await postToConvert(inputData, selectedLanguage, null, price);
-        }
+        await postToConvert(inputData, selectedLanguage, null, price);
     } catch (error) {
         console.error('Error in handleSubmit:', error);
         updateUIStatus("error", "Error: " + error.message);
@@ -701,44 +695,42 @@ async function deleteFile(fileUrl) {
   let headers = {
     Authorization: `Bearer ${await auth0Client.getTokenSilently({
       audience: "https://platogram.vercel.app",
-    })}`,
-    'Content-Type': 'application/json'
+    })}`
   };
 
-  let payload;
+  let body;
+
+  if (typeof inputData === 'string') {
+    // If inputData is a string (URL), use JSON payload
+    headers['Content-Type'] = 'application/json';
+    body = JSON.stringify({
+      lang: lang,
+      payload: inputData,
+      session_id: sessionId,
+      price: price
+    });
+  } else if (inputData instanceof File) {
+    // If inputData is a File object, use FormData
+    const formData = new FormData();
+    formData.append("lang", lang);
+    formData.append("file", inputData);
+    if (sessionId) {
+      formData.append('session_id', sessionId);
+    } else {
+      formData.append('price', price);
+    }
+    body = formData;
+  } else {
+    throw new Error('Invalid input data');
+  }
+
+  console.log("Sending data to Platogram for conversion:", body);
 
   try {
-    if (typeof inputData === 'string') {
-      // If inputData is a string (URL), use it directly
-      payload = {
-        lang: lang,
-        payload: inputData,
-        price: price,
-        session_id: sessionId
-      };
-    } else if (inputData instanceof File) {
-      // If inputData is a File object, upload it to Blob storage first
-      console.log("Uploading file to Blob storage...");
-      const blobUrl = await uploadFile(inputData);
-      console.log("File uploaded successfully. Blob URL:", blobUrl);
-
-      // Use the Blob URL as the payload
-      payload = {
-        lang: lang,
-        payload: blobUrl,
-        price: price,
-        session_id: sessionId
-      };
-    } else {
-      throw new Error('Invalid input data');
-    }
-
-    console.log("Sending data to Platogram for conversion:", payload);
-
     const response = await fetch("https://temporary.name/convert", {
       method: "POST",
       headers: headers,
-      body: JSON.stringify(payload)
+      body: body,
     });
 
     if (!response.ok) {
@@ -757,16 +749,6 @@ async function deleteFile(fileUrl) {
 
         if (finalStatus.status === "failed") {
           throw new Error(finalStatus.error || "Conversion failed");
-        }
-
-        // If the input was a file (Blob URL), attempt to delete it after successful conversion
-        if (inputData instanceof File) {
-          try {
-            await deleteFile(payload.payload);
-            console.log("Temporary file deleted successfully");
-          } catch (deleteError) {
-            console.error("Error deleting temporary file:", deleteError);
-          }
         }
 
         updateUIStatus("done", "Conversion completed successfully");

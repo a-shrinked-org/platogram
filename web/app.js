@@ -733,19 +733,6 @@ async function deleteFile(fileUrl) {
           throw new Error(finalStatus.error || "Conversion failed");
         }
 
-        // Only attempt to delete the file if it's a Blob URL
-        if (payload.payload.includes('.public.blob.vercel-storage.com/')) {
-          try {
-            console.log("Conversion complete. Attempting to delete temporary file");
-            await deleteFile(payload.payload);
-            console.log("Temporary file successfully deleted");
-          } catch (cleanupError) {
-            console.error("Error during file cleanup:", cleanupError);
-          }
-        } else {
-          console.log("Input is not a Blob URL, no cleanup needed");
-        }
-
         updateUIStatus("done", "Conversion completed successfully");
       } catch (pollingError) {
         console.error("Error during conversion:", pollingError);
@@ -768,18 +755,18 @@ function getInputData() {
     debugLog("URL input: " + urlInput);
 
     if (fileNameElement && fileNameElement.file) {
-        debugLog("File input found: " + fileNameElement.file.name);
-        return fileNameElement.file;
+      debugLog("File input found: " + fileNameElement.file.name);
+      return fileNameElement.file;
     }
 
     if (urlInput) {
-        debugLog("URL input found: " + urlInput);
-        return urlInput;
+      debugLog("URL input found: " + urlInput);
+      return urlInput;
     }
 
     debugLog("No input data found");
     return null;
-}
+  }
 
 async function login() {
   try {

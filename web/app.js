@@ -664,26 +664,28 @@ function updateUploadProgress(progress) {
 }
 
 async function deleteFile(fileUrl) {
-  try {
-    const response = await fetch('/api/upload-file', {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ fileUrl: fileUrl })
-    });
+    try {
+      console.log('Attempting to delete file:', fileUrl);
+      const response = await fetch('/api/upload-file', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ fileUrl: fileUrl })
+      });
 
-    if (!response.ok) {
-      throw new Error('Failed to delete file');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to delete file: ${response.status} ${response.statusText}. ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('File deleted successfully:', result.message);
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      throw error;
     }
-
-    const result = await response.json();
-    console.log('File deleted successfully:', result.message);
-  } catch (error) {
-    console.error('Error deleting file:', error);
-    throw error;
   }
-}
 
 async function postToConvert(inputData, lang, sessionId, price) {
   let headers = {
@@ -701,24 +703,34 @@ async function postToConvert(inputData, lang, sessionId, price) {
     formData.append('price', price);
   }
 
-  // inputData is now always a URL (either the original URL or the URL of the uploaded file)
   formData.append("payload", inputData);
 
+  console.log("Sending data to Platogram for conversion:", {
+    lang,
+    sessionId,
+    price,
+    inputData
+  });
+
   try {
-    console.log("Sending data to Platogram for conversion");
     const response = await fetch("https://temporary.name/convert", {
       method: "POST",
       headers: headers,
       body: formData,
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}. ${errorText}`);
+    }
+
     const result = await response.json();
+    console.log("Conversion API response:", result);
 
     if (result.message === "Conversion started" || result.status === "processing") {
       updateUIStatus("running");
       pollStatus(await auth0Client.getTokenSilently());
       
-      // Check if the inputData is a Blob URL and trigger cleanup
       if (inputData.includes('.public.blob.vercel-storage.com/')) {
         try {
           console.log("Attempting to delete temporary file");
@@ -734,7 +746,7 @@ async function postToConvert(inputData, lang, sessionId, price) {
       updateUIStatus("error", "Unexpected response from server");
     }
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error in postToConvert:", error);
     updateUIStatus("error", error.message);
   }
 }

@@ -32,5 +32,5 @@
       "destination": "/web/index.html"
     }
   ],
-  "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e ."
+  "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e . && npm install @vercel/blob"
 }

@@ -671,7 +671,7 @@ async function deleteFile(fileUrl) {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ fileUrl: fileUrl })
+        body: JSON.stringify({ url: fileUrl }) // Change 'fileUrl' to 'url'
       });
 
       if (!response.ok) {
@@ -687,70 +687,78 @@ async function deleteFile(fileUrl) {
     }
   }
 
-  async function postToConvert(inputData, lang, sessionId, price) {
-      let headers = {
-        Authorization: `Bearer ${await auth0Client.getTokenSilently({
-          audience: "https://platogram.vercel.app",
-        })}`,
-      };
+async function postToConvert(inputData, lang, sessionId, price) {
+  let headers = {
+    Authorization: `Bearer ${await auth0Client.getTokenSilently({
+      audience: "https://platogram.vercel.app",
+    })}`,
+    'Content-Type': 'application/json'
+  };
 
-      const formData = new FormData();
-      formData.append("lang", lang);
+  const payload = {
+    lang: lang,
+    payload: inputData // This will be the URL, whether user-entered or Blob URL
+  };
 
-      if (sessionId) {
-        formData.append('session_id', sessionId);
-      } else {
-        formData.append('price', price);
-      }
+  if (sessionId) {
+    payload.session_id = sessionId;
+  } else {
+    payload.price = price;
+  }
 
-      formData.append("payload", inputData);
+  console.log("Sending data to Platogram for conversion:", payload);
 
-      console.log("Sending data to Platogram for conversion:", {
-        lang,
-        sessionId,
-        price,
-        inputData
-      });
+  try {
+    const response = await fetch("https://temporary.name/convert", {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(payload)
+    });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}. ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log("Conversion API response:", result);
+
+    if (result.message === "Conversion started" || result.status === "processing") {
+      updateUIStatus("running");
       try {
-        const response = await fetch("https://temporary.name/convert", {
-          method: "POST",
-          headers: headers,
-          body: formData,
-        });
+        const finalStatus = await pollStatus(await auth0Client.getTokenSilently());
+        console.log("Final conversion status:", finalStatus);
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`HTTP error! status: ${response.status}. ${errorText}`);
+        if (finalStatus.status === "failed") {
+          throw new Error(finalStatus.error || "Conversion failed");
         }
 
-        const result = await response.json();
-        console.log("Conversion API response:", result);
-
-        if (result.message === "Conversion started" || result.status === "processing") {
-          updateUIStatus("running");
-          await pollStatus(await auth0Client.getTokenSilently());
-
-          // Only attempt to delete the file after polling is complete
-          if (inputData.includes('.public.blob.vercel-storage.com/')) {
-            try {
-              console.log("Conversion complete. Attempting to delete temporary file");
-              await deleteFile(inputData);
-              console.log("Temporary file successfully deleted");
-            } catch (cleanupError) {
-              console.error("Error during file cleanup:", cleanupError);
-            }
-          } else {
-            console.log("Input is not a Blob URL, no cleanup needed");
+        // Only attempt to delete the file if it's a Blob URL
+        if (inputData.includes('.public.blob.vercel-storage.com/')) {
+          try {
+            console.log("Conversion complete. Attempting to delete temporary file");
+            await deleteFile(inputData);
+            console.log("Temporary file successfully deleted");
+          } catch (cleanupError) {
+            console.error("Error during file cleanup:", cleanupError);
           }
         } else {
-          updateUIStatus("error", "Unexpected response from server");
+          console.log("Input is not a Blob URL, no cleanup needed");
         }
-      } catch (error) {
-        console.error("Error in postToConvert:", error);
-        updateUIStatus("error", error.message);
+
+        updateUIStatus("done", "Conversion completed successfully");
+      } catch (pollingError) {
+        console.error("Error during conversion:", pollingError);
+        updateUIStatus("error", pollingError.message);
       }
+    } else {
+      updateUIStatus("error", "Unexpected response from server");
     }
+  } catch (error) {
+    console.error("Error in postToConvert:", error);
+    updateUIStatus("error", error.message);
+  }
+}
 
 function getInputData() {
     const urlInput = document.getElementById("url-input").value.trim();

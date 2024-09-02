@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
       // Parse the request body
-      const body = await new Promise((resolve) => {
+      const rawBody = await new Promise((resolve) => {
         let data = '';
         req.on('data', (chunk) => { data += chunk; });
         req.on('end', () => {
@@ -29,22 +29,21 @@ export default async function handler(req, res) {
         });
       });
 
-      debugLog('Request body:', JSON.stringify(body));
+      debugLog('Raw request body:', JSON.stringify(rawBody));
 
-      // Determine the event type based on the body content
-      let eventType;
-      if (body.filename && body.contentType) {
-        eventType = 'blob.generate-client-token';
-      } else if (body.url) {
-        eventType = 'blob.upload-completed';
-      } else {
-        throw new Error('Unable to determine event type from request body');
-      }
+      // Restructure the body to match expected format
+      const body = {
+        type: 'blob.generate-client-token',
+        payload: {
+          pathname: rawBody.filename,
+          contentType: rawBody.contentType,
+        },
+      };
 
-      debugLog('Determined event type:', eventType);
+      debugLog('Restructured body:', JSON.stringify(body));
 
       const jsonResponse = await handleUpload({
-        body: { ...body, type: eventType },
+        body,
         request: req,
         onBeforeGenerateToken: async (pathname) => {
           debugLog('Generating token for:', pathname);

@@ -486,6 +486,7 @@ async function handleSubmit(event) {
                 fileUrl = await uploadFile(inputData);
                 console.log('File uploaded successfully, URL:', fileUrl);
             } catch (uploadError) {
+                console.error('File upload failed:', uploadError);
                 throw new Error(`File upload failed: ${uploadError.message}`);
             }
         } else {
@@ -631,16 +632,28 @@ async function uploadFile(file) {
     });
 
     if (!getUploadUrlResponse.ok) {
-      throw new Error('Failed to get upload URL');
+      throw new Error(`Failed to get upload URL: ${getUploadUrlResponse.status} ${getUploadUrlResponse.statusText}`);
     }
 
-    const { url, headers } = await getUploadUrlResponse.json();
+    const responseData = await getUploadUrlResponse.json();
+    console.log('Upload URL response:', responseData);
+
+    if (!responseData.url || !responseData.headers) {
+      throw new Error('Invalid response from upload URL endpoint');
+    }
+
+    const { url, headers } = responseData;
 
     // Step 2: Upload the file with progress tracking
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('PUT', url, true);
-      Object.keys(headers).forEach(key => xhr.setRequestHeader(key, headers[key]));
+
+      if (headers && typeof headers === 'object') {
+        Object.keys(headers).forEach(key => xhr.setRequestHeader(key, headers[key]));
+      } else {
+        console.warn('Headers are missing or invalid, proceeding without custom headers');
+      }
 
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
@@ -655,7 +668,7 @@ async function uploadFile(file) {
           console.log('File upload completed. Final URL:', fileUrl);
           resolve(fileUrl);
         } else {
-          reject(new Error('Failed to upload file'));
+          reject(new Error(`Failed to upload file: ${xhr.status} ${xhr.statusText}`));
         }
       };
 

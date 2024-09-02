@@ -453,13 +453,6 @@ function updateUploadProgress(percentage) {
   }
 }
 
-const submitButtonText = document.getElementById('submit-btn-text');
-if (submitButtonText) {
-    submitButtonText.textContent = "Processing...";
-} else {
-    console.error('Submit button text element not found');
-}
-
 async function handleSubmit(event) {
     if (event) event.preventDefault();
     console.log('handleSubmit called');
@@ -574,32 +567,32 @@ if (window.location.pathname === '/success') {
 }
 
 async function onConvertClick(event) {
-    if (event) event.preventDefault();
-    debugLog("Convert button clicked");
-    try {
-        if (!auth0Client) throw new Error("Auth0 client not initialized");
-        const inputData = getInputData();
-        debugLog("Input data type: " + (inputData ? (inputData instanceof File ? "File" : "URL") : "null"));
-        if (inputData instanceof File) {
-            debugLog("File details:", inputData.name, inputData.type, inputData.size);
-        } else if (typeof inputData === 'string') {
-            debugLog("URL input:", inputData);
-        }
-        if (!inputData) {
-            throw new Error("Please provide a valid URL or upload a file to be converted");
-        }
-        const price = getPriceFromUI();
-        if (await auth0Client.isAuthenticated()) {
-            showLanguageSelectionModal(inputData, price);
-        } else {
-            // Store the input data and price for use after login
-            sessionStorage.setItem('pendingConversion', JSON.stringify({ inputData, price }));
-            login();
-        }
-    } catch (error) {
-        console.error("Error in onConvertClick:", error);
-        updateUIStatus("error", error.message);
+  if (event) event.preventDefault();
+  debugLog("Convert button clicked");
+  try {
+    if (!auth0Client) throw new Error("Auth0 client not initialized");
+    const inputData = getInputData();
+    debugLog("Input data type: " + (inputData ? (inputData instanceof File ? "File" : "URL") : "null"));
+    if (inputData instanceof File) {
+      debugLog("File details:", inputData.name, inputData.type, inputData.size);
+    } else if (typeof inputData === 'string') {
+      debugLog("URL input:", inputData);
     }
+    if (!inputData) {
+      throw new Error("Please provide a valid URL or upload a file to be converted");
+    }
+    const price = getPriceFromUI();
+    if (await auth0Client.isAuthenticated()) {
+      showLanguageSelectionModal(inputData, price);
+    } else {
+      // Store the input data and price for use after login
+      sessionStorage.setItem('pendingConversion', JSON.stringify({ inputData, price }));
+      login();
+    }
+  } catch (error) {
+    console.error("Error in onConvertClick:", error);
+    updateUIStatus("error", error.message);
+  }
 }
 
 async function uploadFile(file) {
@@ -748,25 +741,25 @@ async function deleteFile(fileUrl) {
 }
 
 function getInputData() {
-    const urlInput = document.getElementById("url-input").value.trim();
-    const fileNameElement = document.getElementById("file-name");
+  const urlInput = document.getElementById("url-input").value.trim();
+  const fileNameElement = document.getElementById("file-name");
 
-    debugLog("getInputData called");
-    debugLog("URL input: " + urlInput);
+  debugLog("getInputData called");
+  debugLog("URL input: " + urlInput);
 
-    if (fileNameElement && fileNameElement.file) {
-      debugLog("File input found: " + fileNameElement.file.name);
-      return fileNameElement.file;
-    }
-
-    if (urlInput) {
-      debugLog("URL input found: " + urlInput);
-      return urlInput;
-    }
-
-    debugLog("No input data found");
-    return null;
+  if (fileNameElement && fileNameElement.file) {
+    debugLog("File input found: " + fileNameElement.file.name);
+    return fileNameElement.file;
   }
+
+  if (urlInput) {
+    debugLog("URL input found: " + urlInput);
+    return urlInput;
+  }
+
+  debugLog("No input data found");
+  return null;
+}
 
 async function login() {
   try {
@@ -1024,40 +1017,43 @@ function safeUpdateProcessingStage() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  debugLog("DOM Content Loaded");
-  initStripe();
-  handleStripeRedirect();
-  setupPriceUI();
+    debugLog("DOM Content Loaded");
+    initStripe();
+    handleStripeRedirect();
+    setupPriceUI();
 
-  const uploadIcon = document.querySelector(".upload-icon");
+    const uploadIcon = document.querySelector(".upload-icon");
     const fileNameElement = document.getElementById("file-name");
     const urlInput = document.getElementById("url-input");
     const convertButton = document.getElementById('convert-button');
 
-  // Set up language selection buttons
+    // Set up language selection buttons
     const enButton = document.querySelector('button[onclick="selectLanguage(\'en\')"]');
     const esButton = document.querySelector('button[onclick="selectLanguage(\'es\')"]');
     if (enButton) enButton.onclick = () => selectLanguage('en');
     if (esButton) esButton.onclick = () => selectLanguage('es');
 
     if (uploadIcon) {
-        uploadIcon.addEventListener("click", handleFileUpload);
+      uploadIcon.addEventListener("click", handleFileUpload);
     }
 
     if (urlInput) {
-        urlInput.addEventListener("input", () => {
-            if (fileNameElement) fileNameElement.textContent = "";
-            uploadedFile = null;
-            if (convertButton) convertButton.disabled = urlInput.value.trim() === "";
-        });
+      urlInput.addEventListener("input", () => {
+        if (fileNameElement) fileNameElement.textContent = "";
+        uploadedFile = null;
+        if (convertButton) convertButton.disabled = urlInput.value.trim() === "";
+      });
     }
 
     if (convertButton) {
-        convertButton.addEventListener("click", onConvertClick);
+      // Remove any existing event listeners
+      convertButton.removeEventListener("click", onConvertClick);
+      // Add the event listener only once
+      convertButton.addEventListener("click", onConvertClick);
     }
 
     initAuth0().catch((error) => console.error("Error initializing app:", error));
-});
+  });
 
 let fileInput;
 

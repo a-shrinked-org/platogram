@@ -1,10 +1,10 @@
 // api/upload-file.js
-import { del } from '@vercel/blob';
+import { put, del, handleUpload } from '@vercel/blob';
 
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '4mb',
+      sizeLimit: '4mb', // For direct uploads
     },
   },
 };
@@ -15,7 +15,6 @@ function debugLog(message, data = '') {
 
 export default async function handler(req, res) {
   debugLog('Received request:', req.method);
-  const { put, handleUpload } = await import('@vercel/blob');
 
   try {
     if (req.method === 'POST') {
@@ -30,18 +29,25 @@ export default async function handler(req, res) {
         const jsonResponse = await handleUpload({
           body,
           request: req,
-          onBeforeGenerateToken: async (pathname) => {
+          onBeforeGenerateToken: async (pathname, clientPayload) => {
             debugLog('Generating token for:', pathname);
-            // You can add additional checks here
+            // Authenticate and authorize users here before generating the token
+            // You can use clientPayload to pass additional data from the client
+
             return {
-              allowedContentTypes: ['audio/*', 'video/*'],
+              allowedContentTypes: ['audio/*', 'video/*', 'image/*'],
               maximumSizeInBytes: 100 * 1024 * 1024, // 100MB for example
+              tokenPayload: JSON.stringify({
+                // You can include user ID or other data here
+                // This will be available in onUploadCompleted
+              }),
             };
           },
           onUploadCompleted: async ({ blob, tokenPayload }) => {
             debugLog('Upload completed:', blob.url);
-            // You can update your database here
-            // For example: await updateDatabase(blob.url, tokenPayload);
+            // Here you can update your database with the blob URL
+            // const { userId } = JSON.parse(tokenPayload);
+            // await db.update({ avatar: blob.url, userId });
           },
         });
 

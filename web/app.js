@@ -705,35 +705,36 @@ async function deleteFile(fileUrl) {
     'Content-Type': 'application/json'
   };
 
-  let payload = {
-    lang: lang
-  };
-
-  if (typeof inputData === 'string') {
-    // If inputData is a string (URL), use it as the payload
-    payload.payload = inputData;
-  } else if (inputData instanceof File) {
-    // If inputData is a File object, we need to upload it first
-    try {
-      const fileUrl = await uploadFile(inputData);
-      payload.payload = fileUrl;
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      throw error;
-    }
-  } else {
-    throw new Error('Invalid input data');
-  }
-
-  if (sessionId) {
-    payload.session_id = sessionId;
-  } else if (price !== null && price !== undefined) {
-    payload.price = price;
-  }
-
-  console.log("Sending data to Platogram for conversion:", payload);
+  let payload;
 
   try {
+    if (typeof inputData === 'string') {
+      // If inputData is a string (URL), use it directly
+      payload = {
+        lang: lang,
+        payload: inputData,
+        price: price,
+        session_id: sessionId
+      };
+    } else if (inputData instanceof File) {
+      // If inputData is a File object, upload it to Blob storage first
+      console.log("Uploading file to Blob storage...");
+      const blobUrl = await uploadFile(inputData);
+      console.log("File uploaded successfully. Blob URL:", blobUrl);
+
+      // Use the Blob URL as the payload
+      payload = {
+        lang: lang,
+        payload: blobUrl,
+        price: price,
+        session_id: sessionId
+      };
+    } else {
+      throw new Error('Invalid input data');
+    }
+
+    console.log("Sending data to Platogram for conversion:", payload);
+
     const response = await fetch("https://temporary.name/convert", {
       method: "POST",
       headers: headers,
@@ -758,6 +759,16 @@ async function deleteFile(fileUrl) {
           throw new Error(finalStatus.error || "Conversion failed");
         }
 
+        // If the input was a file (Blob URL), attempt to delete it after successful conversion
+        if (inputData instanceof File) {
+          try {
+            await deleteFile(payload.payload);
+            console.log("Temporary file deleted successfully");
+          } catch (deleteError) {
+            console.error("Error deleting temporary file:", deleteError);
+          }
+        }
+
         updateUIStatus("done", "Conversion completed successfully");
       } catch (pollingError) {
         console.error("Error during conversion:", pollingError);
@@ -771,27 +782,26 @@ async function deleteFile(fileUrl) {
     updateUIStatus("error", error.message);
   }
 }
+  function getInputData() {
+      const urlInput = document.getElementById("url-input").value.trim();
+      const fileNameElement = document.getElementById("file-name");
 
-function getInputData() {
-  const urlInput = document.getElementById("url-input").value.trim();
-  const fileNameElement = document.getElementById("file-name");
+      debugLog("getInputData called");
+      debugLog("URL input: " + urlInput);
 
-  debugLog("getInputData called");
-  debugLog("URL input: " + urlInput);
+      if (fileNameElement && fileNameElement.file) {
+        debugLog("File input found: " + fileNameElement.file.name);
+        return fileNameElement.file;
+      }
 
-  if (fileNameElement && fileNameElement.file) {
-    debugLog("File input found: " + fileNameElement.file.name);
-    return fileNameElement.file;
-  }
+      if (urlInput) {
+        debugLog("URL input found: " + urlInput);
+        return urlInput;
+      }
 
-  if (urlInput) {
-    debugLog("URL input found: " + urlInput);
-    return urlInput;
-  }
-
-  debugLog("No input data found");
-  return null;
-}
+      debugLog("No input data found");
+      return null;
+    }
 
 async function login() {
   try {

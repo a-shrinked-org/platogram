@@ -512,7 +512,7 @@ async function handleSubmit(event) {
 
         if (price > 0) {
             console.log('Non-zero price detected, initiating Stripe checkout');
-            await handlePaidConversion(inputData, selectedLanguage, price);
+            await handlePaidConversion(inputData, price);
         } else {
             console.log('Free conversion, proceeding with postToConvert');
             await postToConvert(inputData, selectedLanguage, null, price);
@@ -528,16 +528,11 @@ async function handleSubmit(event) {
     }
 }
 
-async function handlePaidConversion(inputData, lang, price) {
+async function handlePaidConversion(fileUrl, price) {
     const user = await auth0Client.getUser();
     const email = user.email || user["https://platogram.com/user_email"];
     if (!email) {
         throw new Error('User email not available');
-    }
-
-    let fileUrl = inputData;
-    if (inputData instanceof File) {
-        fileUrl = await uploadFile(inputData);
     }
 
     const response = await fetch('/api/create-checkout-session', {
@@ -547,7 +542,7 @@ async function handlePaidConversion(inputData, lang, price) {
         },
         body: JSON.stringify({
             price: price,
-            lang: lang,
+            lang: selectedLanguage,
             email: email,
             fileUrl: fileUrl
         }),
@@ -568,17 +563,16 @@ async function handlePaidConversion(inputData, lang, price) {
 }
 
 function handleStripeSuccess() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const sessionId = urlParams.get('session_id');
-    const lang = urlParams.get('lang');
-    const fileUrl = urlParams.get('fileUrl');
+  const urlParams = new URLSearchParams(window.location.search);
+  const sessionId = urlParams.get('session_id');
+  const lang = urlParams.get('lang');
 
-    if (sessionId && lang && fileUrl) {
-        // Payment was successful, start the conversion
-        postToConvert(fileUrl, lang, sessionId, null);
-    } else {
-        updateUIStatus('error', 'Invalid success parameters');
-    }
+  if (sessionId && lang) {
+    // Payment was successful, start the conversion
+    postToConvert(getInputData(), lang, sessionId, null);
+  } else {
+    updateUIStatus('error', 'Invalid success parameters');
+  }
 }
 
 function handleStripeRedirect() {
@@ -704,96 +698,100 @@ async function deleteFile(fileUrl) {
   }
 
   async function postToConvert(inputData, lang, sessionId, price) {
-    let headers = {
-        Authorization: `Bearer ${await auth0Client.getTokenSilently({
-            audience: "https://platogram.vercel.app",
-        })}`,
-        'Content-Type': 'application/json'
-    };
+  let headers = {
+    Authorization: `Bearer ${await auth0Client.getTokenSilently({
+      audience: "https://platogram.vercel.app",
+    })}`,
+    'Content-Type': 'application/json'
+  };
 
-    let payload = {
-        lang: lang,
-        price: price,
-        session_id: sessionId
-    };
+  let payload = {
+    lang: lang
+  };
 
-    if (typeof inputData === 'string') {
-        // If inputData is a string (URL or Blob URL), use it directly
-        payload.payload = inputData;
-    } else if (inputData instanceof File) {
-        // If inputData is a File object, upload it to Blob storage first
-        try {
-            const fileUrl = await uploadFile(inputData);
-            payload.payload = fileUrl;
-        } catch (error) {
-            console.error('Error uploading file:', error);
-            throw error;
-        }
-    } else {
-        throw new Error('Invalid input data');
-    }
-
-    console.log("Sending data to Platogram for conversion:", payload);
-
+  if (typeof inputData === 'string') {
+    // If inputData is a string (URL), use it as the payload
+    payload.payload = inputData;
+  } else if (inputData instanceof File) {
+    // If inputData is a File object, we need to upload it first
     try {
-        const response = await fetch("https://temporary.name/convert", {
-            method: "POST",
-            headers: headers,
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`HTTP error! status: ${response.status}. ${errorText}`);
-        }
-
-        const result = await response.json();
-        console.log("Conversion API response:", result);
-
-        if (result.message === "Conversion started" || result.status === "processing") {
-            updateUIStatus("running");
-            try {
-                const finalStatus = await pollStatus(await auth0Client.getTokenSilently());
-                console.log("Final conversion status:", finalStatus);
-
-                if (finalStatus.status === "failed") {
-                    throw new Error(finalStatus.error || "Conversion failed");
-                }
-
-                updateUIStatus("done", "Conversion completed successfully");
-            } catch (pollingError) {
-                console.error("Error during conversion:", pollingError);
-                updateUIStatus("error", pollingError.message);
-            }
-        } else {
-            updateUIStatus("error", "Unexpected response from server");
-        }
+      const fileUrl = await uploadFile(inputData);
+      payload.payload = fileUrl;
     } catch (error) {
-        console.error("Error in postToConvert:", error);
-        updateUIStatus("error", error.message);
+      console.error('Error uploading file:', error);
+      throw error;
     }
+  } else {
+    throw new Error('Invalid input data');
+  }
+
+  if (sessionId) {
+    payload.session_id = sessionId;
+  } else if (price !== null && price !== undefined) {
+    payload.price = price;
+  }
+
+  console.log("Sending data to Platogram for conversion:", payload);
+
+  try {
+    const response = await fetch("https://temporary.name/convert", {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}. ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log("Conversion API response:", result);
+
+    if (result.message === "Conversion started" || result.status === "processing") {
+      updateUIStatus("running");
+      try {
+        const finalStatus = await pollStatus(await auth0Client.getTokenSilently());
+        console.log("Final conversion status:", finalStatus);
+
+        if (finalStatus.status === "failed") {
+          throw new Error(finalStatus.error || "Conversion failed");
+        }
+
+        updateUIStatus("done", "Conversion completed successfully");
+      } catch (pollingError) {
+        console.error("Error during conversion:", pollingError);
+        updateUIStatus("error", pollingError.message);
+      }
+    } else {
+      updateUIStatus("error", "Unexpected response from server");
+    }
+  } catch (error) {
+    console.error("Error in postToConvert:", error);
+    updateUIStatus("error", error.message);
+  }
 }
 
-  function getInputData() {
-      const urlInput = document.getElementById("url-input").value.trim();
-      const fileNameElement = document.getElementById("file-name");
+function getInputData() {
+  const urlInput = document.getElementById("url-input").value.trim();
+  const fileNameElement = document.getElementById("file-name");
 
-      debugLog("getInputData called");
-      debugLog("URL input: " + urlInput);
+  debugLog("getInputData called");
+  debugLog("URL input: " + urlInput);
 
-      if (fileNameElement && fileNameElement.file) {
-        debugLog("File input found: " + fileNameElement.file.name);
-        return fileNameElement.file;
-      }
+  if (fileNameElement && fileNameElement.file) {
+    debugLog("File input found: " + fileNameElement.file.name);
+    return fileNameElement.file;
+  }
 
-      if (urlInput) {
-        debugLog("URL input found: " + urlInput);
-        return urlInput;
-      }
+  if (urlInput) {
+    debugLog("URL input found: " + urlInput);
+    return urlInput;
+  }
 
-      debugLog("No input data found");
-      return null;
-    }
+  debugLog("No input data found");
+  return null;
+}
 
 async function login() {
   try {

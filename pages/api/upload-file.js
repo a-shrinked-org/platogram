@@ -31,30 +31,48 @@ export default async function handler(req, res) {
 
       debugLog('Request body:', JSON.stringify(body));
 
-      const response = await handleUpload({
-        body,
-        request: req,
-        onBeforeGenerateToken: async (pathname, clientPayload) => {
-          debugLog('Generating token for:', pathname);
-          // Authenticate and authorize users here before generating the token
-          return {
-            allowedContentTypes: ['audio/*', 'video/*', 'image/*'],
-            maximumSizeInBytes: 100 * 1024 * 1024, // 100MB
-            tokenPayload: JSON.stringify({
-              // You can include user ID or other data here
-            }),
-          };
-        },
-        onUploadCompleted: async ({ blob, tokenPayload }) => {
-          debugLog('Upload completed:', blob.url);
-          // Here you can update your database with the blob URL
-          // const { userId } = JSON.parse(tokenPayload);
-          // await db.update({ avatar: blob.url, userId });
-        },
-      });
+      // Check if this is a token request or an upload completion webhook
+      if (body.filename && body.contentType) {
+        // This is likely a token request
+        const response = await handleUpload({
+          body: {
+            ...body,
+            type: 'blob.generate-client-token',
+          },
+          request: req,
+          onBeforeGenerateToken: async (pathname) => {
+            debugLog('Generating token for:', pathname);
+            // Authenticate and authorize users here before generating the token
+            return {
+              allowedContentTypes: ['audio/*', 'video/*', 'image/*'],
+              maximumSizeInBytes: 100 * 1024 * 1024, // 100MB
+              tokenPayload: JSON.stringify({
+                // You can include user ID or other data here
+              }),
+            };
+          },
+        });
 
-      debugLog('Client-side upload handled successfully');
-      return res.status(200).json(response);
+        debugLog('Token generated successfully');
+        return res.status(200).json(response);
+      } else if (body.type === 'blob.upload-completed') {
+        // This is an upload completion webhook
+        await handleUpload({
+          body,
+          request: req,
+          onUploadCompleted: async ({ blob, tokenPayload }) => {
+            debugLog('Upload completed:', blob.url);
+            // Here you can update your database with the blob URL
+            // const { userId } = JSON.parse(tokenPayload);
+            // await db.update({ avatar: blob.url, userId });
+          },
+        });
+
+        debugLog('Upload completion handled successfully');
+        return res.status(200).json({ message: 'Upload completed' });
+      } else {
+        throw new Error('Invalid request body');
+      }
     } catch (error) {
       console.error('Error in upload-file handler:', error);
       if (error.name === 'BlobAccessError') {
@@ -63,9 +81,9 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: error.message || 'An unexpected error occurred' });
     }
   } else if (req.method === 'DELETE') {
+    // DELETE handling remains the same
     debugLog('Handling DELETE request');
     try {
-      // Parse the request body for DELETE requests
       const body = await new Promise((resolve) => {
         let data = '';
         req.on('data', (chunk) => { data += chunk; });

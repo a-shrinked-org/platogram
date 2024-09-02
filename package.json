@@ -4,7 +4,6 @@
     "cors": "^2.8.5",
     "stripe": "^8.191.0",
     "formidable": "^3.5.1",
-    "@vercel/blob": "^0.23.4",
-    "@vercel/blob/client": "^0.23.4"
+    "@vercel/blob": "^0.23.4"
   }
 }

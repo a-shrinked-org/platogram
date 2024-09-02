@@ -697,12 +697,12 @@ async function postToConvert(inputData, lang, sessionId, price) {
 
   const payload = {
     lang: lang,
-    payload: inputData // This will be the URL, whether user-entered or Blob URL
+    file: inputData // Change 'payload' to 'file'
   };
 
   if (sessionId) {
     payload.session_id = sessionId;
-  } else {
+  } else if (price !== null && price !== undefined) {
     payload.price = price;
   }
 

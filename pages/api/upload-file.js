@@ -16,9 +16,22 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
+      // Parse the request body
+      const body = await new Promise((resolve) => {
+        let data = '';
+        req.on('data', (chunk) => { data += chunk; });
+        req.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            resolve({});
+          }
+        });
+      });
+
       const response = await handleUpload({
+        body,
         request: req,
-        // Remove the 'body: req' line as it's not needed and not mentioned in the docs
         onBeforeGenerateToken: async (pathname, clientPayload) => {
           debugLog('Generating token for:', pathname);
           // Authenticate and authorize users here before generating the token
@@ -43,20 +56,25 @@ export default async function handler(req, res) {
       return res.status(200).json(response);
     } catch (error) {
       console.error('Error in upload-file handler:', error);
-      // Added specific handling for BlobAccessError as per documentation
       if (error instanceof BlobAccessError) {
         return res.status(403).json({ error: 'Access denied to Blob store' });
       }
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: error.message || 'An unexpected error occurred' });
     }
   } else if (req.method === 'DELETE') {
     debugLog('Handling DELETE request');
     try {
-      // Since bodyParser is false, we need to parse the body manually
+      // Parse the request body for DELETE requests
       const body = await new Promise((resolve) => {
         let data = '';
         req.on('data', (chunk) => { data += chunk; });
-        req.on('end', () => { resolve(JSON.parse(data)); });
+        req.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            resolve({});
+          }
+        });
       });
 
       const { fileUrl } = body;

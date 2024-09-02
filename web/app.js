@@ -622,8 +622,8 @@ async function uploadFile(file) {
   console.log('File details:', file.name, file.type, file.size);
 
   try {
-    // Step 1: Get the upload URL
-    const getUploadUrlResponse = await fetch('/api/upload-file', {
+    // Step 1: Get the client token
+    const getClientTokenResponse = await fetch('/api/upload-file', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -631,53 +631,27 @@ async function uploadFile(file) {
       body: JSON.stringify({ filename: file.name, contentType: file.type }),
     });
 
-    if (!getUploadUrlResponse.ok) {
-      throw new Error(`Failed to get upload URL: ${getUploadUrlResponse.status} ${getUploadUrlResponse.statusText}`);
+    if (!getClientTokenResponse.ok) {
+      throw new Error(`Failed to get client token: ${getClientTokenResponse.status} ${getClientTokenResponse.statusText}`);
     }
 
-    const responseData = await getUploadUrlResponse.json();
-    console.log('Upload URL response:', responseData);
+    const responseData = await getClientTokenResponse.json();
+    console.log('Client token response:', responseData);
 
-    if (!responseData.url || !responseData.headers) {
-      throw new Error('Invalid response from upload URL endpoint');
+    if (!responseData.clientToken) {
+      throw new Error('Invalid response from upload file endpoint: missing client token');
     }
 
-    const { url, headers } = responseData;
-
-    // Step 2: Upload the file with progress tracking
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('PUT', url, true);
-
-      if (headers && typeof headers === 'object') {
-        Object.keys(headers).forEach(key => xhr.setRequestHeader(key, headers[key]));
-      } else {
-        console.warn('Headers are missing or invalid, proceeding without custom headers');
-      }
-
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const percentComplete = (event.loaded / event.total) * 100;
-          updateUploadProgress(percentComplete);
-        }
-      };
-
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          const fileUrl = url.split('?')[0];  // Remove query parameters to get the file URL
-          console.log('File upload completed. Final URL:', fileUrl);
-          resolve(fileUrl);
-        } else {
-          reject(new Error(`Failed to upload file: ${xhr.status} ${xhr.statusText}`));
-        }
-      };
-
-      xhr.onerror = () => {
-        reject(new Error('Network error during file upload'));
-      };
-
-      xhr.send(file);
+    // Step 2: Use the Vercel Blob client to upload the file
+    const { put } = await import('@vercel/blob/client');
+    const { url } = await put(file.name, file, {
+      access: 'public',
+      token: responseData.clientToken,
     });
+
+    console.log('File uploaded successfully. URL:', url);
+    return url;
+
   } catch (error) {
     console.error('Error uploading file:', error);
     throw error;

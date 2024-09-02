@@ -29,13 +29,14 @@ export default async function handler(req, res) {
         });
       });
 
+      debugLog('Request body:', JSON.stringify(body));
+
       const response = await handleUpload({
         body,
         request: req,
         onBeforeGenerateToken: async (pathname, clientPayload) => {
           debugLog('Generating token for:', pathname);
           // Authenticate and authorize users here before generating the token
-          // You may want to add actual authentication logic here
           return {
             allowedContentTypes: ['audio/*', 'video/*', 'image/*'],
             maximumSizeInBytes: 100 * 1024 * 1024, // 100MB
@@ -56,7 +57,7 @@ export default async function handler(req, res) {
       return res.status(200).json(response);
     } catch (error) {
       console.error('Error in upload-file handler:', error);
-      if (error instanceof BlobAccessError) {
+      if (error.name === 'BlobAccessError') {
         return res.status(403).json({ error: 'Access denied to Blob store' });
       }
       return res.status(500).json({ error: error.message || 'An unexpected error occurred' });
@@ -77,7 +78,7 @@ export default async function handler(req, res) {
         });
       });
 
-      const { fileUrl } = body;
+      const { url: fileUrl } = body;
       if (!fileUrl) {
         return res.status(400).json({ error: 'File URL is required for deletion' });
       }
@@ -90,7 +91,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ message: 'File deleted successfully' });
     } catch (error) {
       console.error('Error deleting file:', error);
-      if (error instanceof BlobAccessError) {
+      if (error.name === 'BlobAccessError') {
         return res.status(403).json({ error: 'Access denied to Blob store' });
       }
       return res.status(500).json({ error: 'Failed to delete file' });

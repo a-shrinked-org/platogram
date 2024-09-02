@@ -479,21 +479,6 @@ async function handleSubmit(event) {
             submitButton.textContent = "Processing...";
         }
 
-        let fileUrl;
-        if (inputData instanceof File) {
-            console.log('Starting file upload');
-            try {
-                fileUrl = await uploadFile(inputData);
-                console.log('File uploaded successfully, URL:', fileUrl);
-            } catch (uploadError) {
-                console.error('File upload failed:', uploadError);
-                throw new Error(`File upload failed: ${uploadError.message}`);
-            }
-        } else {
-            fileUrl = inputData; // This should be the URL if not a file
-            console.log('Using provided URL:', fileUrl);
-        }
-
         // Close the modal
         const modal = document.getElementById("language-modal");
         if (modal) modal.classList.add("hidden");
@@ -502,10 +487,10 @@ async function handleSubmit(event) {
 
         if (price > 0) {
             console.log('Non-zero price detected, initiating Stripe checkout');
-            await handlePaidConversion(fileUrl, price);
+            await handlePaidConversion(inputData, price);
         } else {
             console.log('Free conversion, proceeding with postToConvert');
-            await postToConvert(fileUrl, selectedLanguage, null, price);
+            await postToConvert(inputData, selectedLanguage, null, price);
         }
     } catch (error) {
         console.error('Error in handleSubmit:', error);
@@ -688,45 +673,55 @@ async function deleteFile(fileUrl) {
   }
 
   async function postToConvert(inputData, lang, sessionId, price) {
-      let headers = {
-        Authorization: `Bearer ${await auth0Client.getTokenSilently({
-          audience: "https://platogram.vercel.app",
-        })}`,
-        'Content-Type': 'application/json'
-      };
+  let headers = {
+    Authorization: `Bearer ${await auth0Client.getTokenSilently({
+      audience: "https://platogram.vercel.app",
+    })}`,
+    'Content-Type': 'application/json'
+  };
 
-      const payload = {
-        lang: lang,
-      };
+  let payload = {
+    lang: lang
+  };
 
-      if (inputData.startsWith('http')) {
-        payload.payload = inputData;
-      } else {
-        payload.file = inputData;
-      }
+  if (typeof inputData === 'string') {
+    // If inputData is a string (URL), use it as the payload
+    payload.payload = inputData;
+  } else if (inputData instanceof File) {
+    // If inputData is a File object, we need to upload it first
+    try {
+      const fileUrl = await uploadFile(inputData);
+      payload.payload = fileUrl;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      throw error;
+    }
+  } else {
+    throw new Error('Invalid input data');
+  }
 
-      if (sessionId) {
-        payload.session_id = sessionId;
-      } else if (price !== null && price !== undefined) {
-        payload.price = price;
-      }
+  if (sessionId) {
+    payload.session_id = sessionId;
+  } else if (price !== null && price !== undefined) {
+    payload.price = price;
+  }
 
-      console.log("Sending data to Platogram for conversion:", payload);
+  console.log("Sending data to Platogram for conversion:", payload);
 
-      try {
-        const response = await fetch("https://temporary.name/convert", {
-          method: "POST",
-          headers: headers,
-          body: JSON.stringify(payload)
-        });
+  try {
+    const response = await fetch("https://temporary.name/convert", {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(payload)
+    });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`HTTP error! status: ${response.status}. ${errorText}`);
-        }
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}. ${errorText}`);
+    }
 
-        const result = await response.json();
-        console.log("Conversion API response:", result);
+    const result = await response.json();
+    console.log("Conversion API response:", result);
 
     if (result.message === "Conversion started" || result.status === "processing") {
       updateUIStatus("running");
@@ -739,10 +734,10 @@ async function deleteFile(fileUrl) {
         }
 
         // Only attempt to delete the file if it's a Blob URL
-        if (inputData.includes('.public.blob.vercel-storage.com/')) {
+        if (payload.payload.includes('.public.blob.vercel-storage.com/')) {
           try {
             console.log("Conversion complete. Attempting to delete temporary file");
-            await deleteFile(inputData);
+            await deleteFile(payload.payload);
             console.log("Temporary file successfully deleted");
           } catch (cleanupError) {
             console.error("Error during file cleanup:", cleanupError);
@@ -767,16 +762,23 @@ async function deleteFile(fileUrl) {
 
 function getInputData() {
     const urlInput = document.getElementById("url-input").value.trim();
+    const fileNameElement = document.getElementById("file-name");
+
     debugLog("getInputData called");
     debugLog("URL input: " + urlInput);
-    debugLog("uploadedFile exists: " + !!uploadedFile);
-    if (uploadedFile) {
-        debugLog("File name: " + uploadedFile.name);
-        debugLog("File size: " + uploadedFile.size + " bytes");
-        debugLog("File type: " + uploadedFile.type);
-        return uploadedFile;
+
+    if (fileNameElement && fileNameElement.file) {
+        debugLog("File input found: " + fileNameElement.file.name);
+        return fileNameElement.file;
     }
-    return urlInput || null;
+
+    if (urlInput) {
+        debugLog("URL input found: " + urlInput);
+        return urlInput;
+    }
+
+    debugLog("No input data found");
+    return null;
 }
 
 async function login() {

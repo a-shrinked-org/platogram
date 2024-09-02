@@ -1,6 +1,7 @@
 // pages/api/upload-file.js
 import { handleUpload } from '@vercel/blob/client';
-import formidable from 'formidable';
+import { put } from '@vercel/blob';
+import { IncomingForm } from 'formidable';
 
 export const config = {
   api: {
@@ -16,17 +17,20 @@ export default async function handler(req, res) {
   debugLog('Received request:', req.method);
 
   if (req.method === 'POST') {
-    try {
-      const form = new formidable.IncomingForm();
+    return new Promise((resolve, reject) => {
+      const form = new IncomingForm();
+
       form.parse(req, async (err, fields, files) => {
         if (err) {
           console.error('Error parsing form:', err);
-          return res.status(500).json({ error: 'Error parsing form' });
+          res.status(500).json({ error: 'Error parsing form' });
+          return resolve();
         }
 
-        const file = files.file;
+        const file = files.file?.[0]; // formidable v3 returns an array for each field
         if (!file) {
-          return res.status(400).json({ error: 'No file uploaded' });
+          res.status(400).json({ error: 'No file uploaded' });
+          return resolve();
         }
 
         debugLog('File received:', file.originalFilename);
@@ -37,16 +41,14 @@ export default async function handler(req, res) {
           });
 
           debugLog('File uploaded to Vercel Blob:', blob.url);
-          return res.status(200).json({ url: blob.url });
+          res.status(200).json({ url: blob.url });
         } catch (uploadError) {
           console.error('Error uploading to Vercel Blob:', uploadError);
-          return res.status(500).json({ error: 'Error uploading file to storage' });
+          res.status(500).json({ error: 'Error uploading file to storage' });
         }
+        resolve();
       });
-    } catch (error) {
-      console.error('Error in upload-file handler:', error);
-      return res.status(500).json({ error: error.message || 'An unexpected error occurred' });
-    }
+    });
   } else if (req.method === 'DELETE') {
     // DELETE handling remains the same
     debugLog('Handling DELETE request');

@@ -56,52 +56,8 @@ export default async function handler(req, res) {
       }
     }
   } else if (req.method === 'DELETE') {
-    // ... (keep existing DELETE logic)
   } else {
     res.setHeader('Allow', ['POST', 'DELETE']);
     res.status(405).end(`Method ${req.method} Not Allowed`);
-  }
-}
-
-// Client-side upload function (in app.js)
-import { upload } from '@vercel/blob/client';
-
-async function uploadFile(file) {
-  console.log('Starting file upload process');
-  console.log('File details:', file.name, file.type, file.size);
-
-  try {
-    if (file.size <= 4 * 1024 * 1024) {
-      // Small file, use server-side upload
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('filename', file.name);
-      formData.append('contentType', file.type);
-
-      const response = await fetch('/api/upload-file', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Server-side upload failed');
-      }
-
-      const result = await response.json();
-      console.log('File uploaded successfully, URL:', result.url);
-      return result.url;
-    } else {
-      // Large file, use client-side upload
-      const blob = await upload(file.name, file, {
-        access: 'public',
-        handleUploadUrl: '/api/upload-file',
-      });
-
-      console.log('File uploaded successfully, URL:', blob.url);
-      return blob.url;
-    }
-  } catch (error) {
-    console.error('Error uploading file:', error);
-    throw error;
   }
 }

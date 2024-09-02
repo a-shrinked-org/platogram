@@ -15,7 +15,10 @@
     },
     {
       "src": "pages/api/**/*.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["node_modules/**"]
+      }
     }
   ],
   "rewrites": [
@@ -32,5 +35,5 @@
       "destination": "/web/index.html"
     }
   ],
-  "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e . && npm install @vercel/blob"
+  "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e . && npm install"
 }

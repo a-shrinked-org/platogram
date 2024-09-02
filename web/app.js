@@ -490,7 +490,7 @@ async function handleSubmit(event) {
                 throw new Error(`File upload failed: ${uploadError.message}`);
             }
         } else {
-            fileUrl = inputData;
+            fileUrl = inputData; // This should be the URL if not a file
             console.log('Using provided URL:', fileUrl);
         }
 
@@ -697,7 +697,7 @@ async function postToConvert(inputData, lang, sessionId, price) {
 
   const payload = {
     lang: lang,
-    file: inputData // Change 'payload' to 'file'
+    payload: inputData // Change 'file' back to 'payload'
   };
 
   if (sessionId) {

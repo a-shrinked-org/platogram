@@ -687,69 +687,70 @@ async function deleteFile(fileUrl) {
     }
   }
 
-async function postToConvert(inputData, lang, sessionId, price) {
-  let headers = {
-    Authorization: `Bearer ${await auth0Client.getTokenSilently({
-      audience: "https://platogram.vercel.app",
-    })}`,
-  };
+  async function postToConvert(inputData, lang, sessionId, price) {
+      let headers = {
+        Authorization: `Bearer ${await auth0Client.getTokenSilently({
+          audience: "https://platogram.vercel.app",
+        })}`,
+      };
 
-  const formData = new FormData();
-  formData.append("lang", lang);
+      const formData = new FormData();
+      formData.append("lang", lang);
 
-  if (sessionId) {
-    formData.append('session_id', sessionId);
-  } else {
-    formData.append('price', price);
-  }
-
-  formData.append("payload", inputData);
-
-  console.log("Sending data to Platogram for conversion:", {
-    lang,
-    sessionId,
-    price,
-    inputData
-  });
-
-  try {
-    const response = await fetch("https://temporary.name/convert", {
-      method: "POST",
-      headers: headers,
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP error! status: ${response.status}. ${errorText}`);
-    }
-
-    const result = await response.json();
-    console.log("Conversion API response:", result);
-
-    if (result.message === "Conversion started" || result.status === "processing") {
-      updateUIStatus("running");
-      pollStatus(await auth0Client.getTokenSilently());
-      
-      if (inputData.includes('.public.blob.vercel-storage.com/')) {
-        try {
-          console.log("Attempting to delete temporary file");
-          await deleteFile(inputData);
-          console.log("Temporary file successfully deleted");
-        } catch (cleanupError) {
-          console.error("Error during file cleanup:", cleanupError);
-        }
+      if (sessionId) {
+        formData.append('session_id', sessionId);
       } else {
-        console.log("Input is not a Blob URL, no cleanup needed");
+        formData.append('price', price);
       }
-    } else {
-      updateUIStatus("error", "Unexpected response from server");
+
+      formData.append("payload", inputData);
+
+      console.log("Sending data to Platogram for conversion:", {
+        lang,
+        sessionId,
+        price,
+        inputData
+      });
+
+      try {
+        const response = await fetch("https://temporary.name/convert", {
+          method: "POST",
+          headers: headers,
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP error! status: ${response.status}. ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log("Conversion API response:", result);
+
+        if (result.message === "Conversion started" || result.status === "processing") {
+          updateUIStatus("running");
+          await pollStatus(await auth0Client.getTokenSilently());
+
+          // Only attempt to delete the file after polling is complete
+          if (inputData.includes('.public.blob.vercel-storage.com/')) {
+            try {
+              console.log("Conversion complete. Attempting to delete temporary file");
+              await deleteFile(inputData);
+              console.log("Temporary file successfully deleted");
+            } catch (cleanupError) {
+              console.error("Error during file cleanup:", cleanupError);
+            }
+          } else {
+            console.log("Input is not a Blob URL, no cleanup needed");
+          }
+        } else {
+          updateUIStatus("error", "Unexpected response from server");
+        }
+      } catch (error) {
+        console.error("Error in postToConvert:", error);
+        updateUIStatus("error", error.message);
+      }
     }
-  } catch (error) {
-    console.error("Error in postToConvert:", error);
-    updateUIStatus("error", error.message);
-  }
-}
 
 function getInputData() {
     const urlInput = document.getElementById("url-input").value.trim();
@@ -850,36 +851,40 @@ function selectLanguage(lang) {
 }
 
 function pollStatus(token) {
-  clearInterval(pollingInterval);
+  return new Promise((resolve, reject) => {
+    let pollingInterval;
 
-  async function checkStatus() {
-    try {
-      const response = await fetch("https://temporary.name/status", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+    async function checkStatus() {
+      try {
+        const response = await fetch("https://temporary.name/status", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-      const result = await response.json();
-      console.log("Polling status response:", result);
+        const result = await response.json();
+        console.log("Polling status response:", result);
 
-      updateUIStatus(result.status);
+        updateUIStatus(result.status);
 
-      if (result.status === "running") {
-        pollingInterval = setTimeout(checkStatus, 5000); // Poll every 5 seconds
-      } else {
+        if (result.status === "running") {
+          pollingInterval = setTimeout(checkStatus, 5000); // Poll every 5 seconds
+        } else {
+          clearTimeout(pollingInterval);
+          resolve(result); // Resolve the promise when status is not "running"
+        }
+      } catch (error) {
+        console.error("Error polling status:", error);
+        updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
         clearTimeout(pollingInterval);
+        reject(error); // Reject the promise if there's an error
       }
-    } catch (error) {
-      console.error("Error polling status:", error);
-      updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
-      clearTimeout(pollingInterval);
     }
-  }
 
-  checkStatus();
+    checkStatus(); // Start the polling process
+  });
 }
 
 function toggleSection(sectionToShow) {

@@ -28,6 +28,38 @@ function debugLog(message) {
   console.log(`[DEBUG] ${message}`);
 }
 
+window.updateAuthUI = function(isAuthenticated, user) {
+    const loginButton = document.getElementById('login-button');
+    const userCircle = document.getElementById('user-circle');
+    const logoutTooltip = document.getElementById('logout-tooltip');
+    if (isAuthenticated && user) {
+        if (loginButton) loginButton.classList.add('hidden');
+        if (userCircle) {
+            userCircle.classList.remove('hidden');
+            userCircle.textContent = getInitials(user.email);
+        }
+    } else {
+        if (loginButton) loginButton.classList.remove('hidden');
+        if (userCircle) userCircle.classList.add('hidden');
+        if (logoutTooltip) logoutTooltip.classList.add('hidden');
+    }
+    if (userCircle && logoutTooltip) {
+        userCircle.addEventListener('click', (event) => {
+            event.stopPropagation();
+            logoutTooltip.classList.toggle('hidden');
+        });
+        document.addEventListener('click', (event) => {
+            if (!userCircle.contains(event.target) && !logoutTooltip.contains(event.target)) {
+                logoutTooltip.classList.add('hidden');
+            }
+        });
+    }
+};
+
+function getInitials(email) {
+    return email.split('@')[0].substring(0, 2).toUpperCase();
+}
+
 // coffee counting machine
 
 function updateTotalPrice() {
@@ -1022,10 +1054,21 @@ document.addEventListener("DOMContentLoaded", () => {
     handleStripeRedirect();
     setupPriceUI();
 
-    const uploadIcon = document.querySelector(".upload-icon");
-    const fileNameElement = document.getElementById("file-name");
-    const urlInput = document.getElementById("url-input");
-    const convertButton = document.getElementById('convert-button');
+    const elements = {
+        uploadIcon: document.querySelector(".upload-icon"),
+        fileNameElement: document.getElementById("file-name"),
+        urlInput: document.getElementById("url-input"),
+        convertButton: document.getElementById('convert-button'),
+        uploadFileButton: document.getElementById('upload-file-button'),
+        fileUploadSection: document.getElementById('file-upload-section'),
+        inputSection: document.getElementById('input-section'),
+        backToUrlButton: document.getElementById('back-to-url'),
+        fileDropArea: document.getElementById('file-drop-area'),
+        fileInput: document.querySelector('input[type="file"]'),
+        convertFileButton: document.getElementById('convert-file-button'),
+        loginButton: document.getElementById('login-button'),
+        logoutButton: document.getElementById('logout-button'),
+    };
 
     // Set up language selection buttons
     const enButton = document.querySelector('button[onclick="selectLanguage(\'en\')"]');
@@ -1033,27 +1076,64 @@ document.addEventListener("DOMContentLoaded", () => {
     if (enButton) enButton.onclick = () => selectLanguage('en');
     if (esButton) esButton.onclick = () => selectLanguage('es');
 
-    if (uploadIcon) {
-      uploadIcon.addEventListener("click", handleFileUpload);
+    if (elements.uploadIcon) {
+        elements.uploadIcon.addEventListener("click", handleFileUpload);
     }
 
-    if (urlInput) {
-      urlInput.addEventListener("input", () => {
-        if (fileNameElement) fileNameElement.textContent = "";
-        uploadedFile = null;
-        if (convertButton) convertButton.disabled = urlInput.value.trim() === "";
-      });
+    if (elements.urlInput) {
+        elements.urlInput.addEventListener("input", () => {
+            if (elements.fileNameElement) elements.fileNameElement.textContent = "";
+            uploadedFile = null;
+            if (elements.convertButton) elements.convertButton.disabled = elements.urlInput.value.trim() === "";
+        });
     }
 
-    if (convertButton) {
-      // Remove any existing event listeners
-      convertButton.removeEventListener("click", onConvertClick);
-      // Add the event listener only once
-      convertButton.addEventListener("click", onConvertClick);
+    if (elements.convertButton) {
+        elements.convertButton.addEventListener("click", onConvertClick);
+    }
+
+    if (elements.uploadFileButton) {
+        elements.uploadFileButton.addEventListener('click', () => {
+            toggleSections(elements.inputSection, elements.fileUploadSection);
+        });
+    }
+
+    if (elements.backToUrlButton) {
+        elements.backToUrlButton.addEventListener('click', () => {
+            toggleSections(elements.fileUploadSection, elements.inputSection);
+        });
+    }
+
+    if (elements.fileDropArea) {
+        setupDragAndDrop(elements.fileDropArea, handleFiles);
+    }
+
+    if (elements.fileInput) {
+        elements.fileInput.addEventListener('change', (event) => {
+            handleFiles(event.target.files);
+        });
+    }
+
+    if (elements.convertFileButton) {
+        elements.convertFileButton.addEventListener('click', onConvertClick);
+    }
+
+    if (elements.loginButton) {
+        elements.loginButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            login();
+        });
+    }
+
+    if (elements.logoutButton) {
+        elements.logoutButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            logout();
+        });
     }
 
     initAuth0().catch((error) => console.error("Error initializing app:", error));
-  });
+});
 
 let fileInput;
 
@@ -1067,8 +1147,14 @@ function handleFileUpload() {
         fileInput.type = "file";
         fileInput.accept = ".srt,.wav,.ogg,.vtt,.mp3,.mp4,.m4a";
         fileInput.style.display = "none";
-        document.body.appendChild(fileInput);
-        debugLog("File input created");
+        // Check if document.body exists before appending
+        if (document.body) {
+            document.body.appendChild(fileInput);
+            debugLog("File input created and appended to body");
+        } else {
+            debugLog("Document body not available, file input not appended");
+            return; // Exit the function if we can't append the input
+        }
     }
 
     fileInput.onchange = (event) => {

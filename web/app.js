@@ -218,7 +218,7 @@ function handleFiles(files) {
         const urlInput = document.getElementById('url-input');
         if (urlInput) urlInput.value = "";
 
-        debugLog("File selected via drag & drop: " + file.name);
+        debugLog("File selected: " + file.name);
         debugLog("File size: " + file.size + " bytes");
         debugLog("File type: " + file.type);
     }
@@ -606,33 +606,32 @@ if (window.location.pathname === '/success') {
 }
 
 async function onConvertClick(event) {
-  if (event) event.preventDefault();
-  debugLog("Convert button clicked");
-  try {
-    if (!auth0Client) throw new Error("Auth0 client not initialized");
-    const inputData = getInputData();
-    debugLog("Input data type: " + (inputData ? (inputData instanceof File ? "File" : "URL") : "null"));
-    if (inputData instanceof File) {
-      debugLog("File details:", inputData.name, inputData.type, inputData.size);
-    } else if (typeof inputData === 'string') {
-      debugLog("URL input:", inputData);
+    if (event) event.preventDefault();
+    debugLog("Convert button clicked");
+    try {
+      if (!auth0Client) throw new Error("Auth0 client not initialized");
+      const inputData = getInputData();
+      if (!inputData) {
+        throw new Error("Please provide a valid URL or upload a file to be converted");
+      }
+      debugLog("Input data type: " + (inputData instanceof File ? "File" : "URL"));
+      if (inputData instanceof File) {
+        debugLog("File details:", inputData.name, inputData.type, inputData.size);
+      } else {
+        debugLog("URL input:", inputData);
+      }
+      const price = getPriceFromUI();
+      if (await auth0Client.isAuthenticated()) {
+        showLanguageSelectionModal(inputData, price);
+      } else {
+        sessionStorage.setItem('pendingConversion', JSON.stringify({ inputData: inputData instanceof File ? inputData.name : inputData, price }));
+        login();
+      }
+    } catch (error) {
+      console.error("Error in onConvertClick:", error);
+      updateUIStatus("error", error.message);
     }
-    if (!inputData) {
-      throw new Error("Please provide a valid URL or upload a file to be converted");
-    }
-    const price = getPriceFromUI();
-    if (await auth0Client.isAuthenticated()) {
-      showLanguageSelectionModal(inputData, price);
-    } else {
-      // Store the input data and price for use after login
-      sessionStorage.setItem('pendingConversion', JSON.stringify({ inputData, price }));
-      login();
-    }
-  } catch (error) {
-    console.error("Error in onConvertClick:", error);
-    updateUIStatus("error", error.message);
   }
-}
 
 async function uploadFile(file) {
   console.log('Starting file upload process');
@@ -770,8 +769,6 @@ async function deleteFile(fileUrl) {
 
 function getInputData() {
     const urlInput = document.getElementById("url-input").value.trim();
-    const fileNameElement = document.getElementById("file-name");
-
     debugLog("getInputData called");
     debugLog("URL input: " + urlInput);
 

@@ -31,8 +31,20 @@ export default async function handler(req, res) {
 
       debugLog('Request body:', JSON.stringify(body));
 
+      // Determine the event type based on the body content
+      let eventType;
+      if (body.filename && body.contentType) {
+        eventType = 'blob.generate-client-token';
+      } else if (body.url) {
+        eventType = 'blob.upload-completed';
+      } else {
+        throw new Error('Unable to determine event type from request body');
+      }
+
+      debugLog('Determined event type:', eventType);
+
       const jsonResponse = await handleUpload({
-        body,
+        body: { ...body, type: eventType },
         request: req,
         onBeforeGenerateToken: async (pathname) => {
           debugLog('Generating token for:', pathname);

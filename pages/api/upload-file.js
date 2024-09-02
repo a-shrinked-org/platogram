@@ -1,5 +1,6 @@
 // pages/api/upload-file.js
 import { handleUpload } from '@vercel/blob/client';
+import formidable from 'formidable';
 
 export const config = {
   api: {
@@ -16,59 +17,35 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     try {
-      // Parse the request body
-      const rawBody = await new Promise((resolve) => {
-        let data = '';
-        req.on('data', (chunk) => { data += chunk; });
-        req.on('end', () => {
-          try {
-            resolve(JSON.parse(data));
-          } catch (e) {
-            resolve({});
-          }
-        });
+      const form = new formidable.IncomingForm();
+      form.parse(req, async (err, fields, files) => {
+        if (err) {
+          console.error('Error parsing form:', err);
+          return res.status(500).json({ error: 'Error parsing form' });
+        }
+
+        const file = files.file;
+        if (!file) {
+          return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        debugLog('File received:', file.originalFilename);
+
+        try {
+          const blob = await put(file.originalFilename, file, {
+            access: 'public',
+          });
+
+          debugLog('File uploaded to Vercel Blob:', blob.url);
+          return res.status(200).json({ url: blob.url });
+        } catch (uploadError) {
+          console.error('Error uploading to Vercel Blob:', uploadError);
+          return res.status(500).json({ error: 'Error uploading file to storage' });
+        }
       });
-
-      debugLog('Raw request body:', JSON.stringify(rawBody));
-
-      // Restructure the body to match expected format
-      const body = {
-        type: 'blob.generate-client-token',
-        payload: {
-          pathname: rawBody.filename,
-          contentType: rawBody.contentType,
-        },
-      };
-
-      debugLog('Restructured body:', JSON.stringify(body));
-
-      const jsonResponse = await handleUpload({
-        body,
-        request: req,
-        onBeforeGenerateToken: async (pathname) => {
-          debugLog('Generating token for:', pathname);
-          // Authenticate and authorize users here before generating the token
-          return {
-            allowedContentTypes: ['audio/*', 'video/*', 'image/*'],
-            maximumSizeInBytes: 100 * 1024 * 1024, // 100MB
-            tokenPayload: JSON.stringify({
-              // You can include user ID or other data here
-            }),
-          };
-        },
-        onUploadCompleted: async ({ blob, tokenPayload }) => {
-          debugLog('Upload completed:', blob.url);
-          // Here you can update your database with the blob URL
-          // const { userId } = JSON.parse(tokenPayload);
-          // await db.update({ avatar: blob.url, userId });
-        },
-      });
-
-      debugLog('handleUpload completed successfully');
-      return res.status(200).json(jsonResponse);
     } catch (error) {
       console.error('Error in upload-file handler:', error);
-      return res.status(400).json({ error: error.message || 'An unexpected error occurred' });
+      return res.status(500).json({ error: error.message || 'An unexpected error occurred' });
     }
   } else if (req.method === 'DELETE') {
     // DELETE handling remains the same

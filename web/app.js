@@ -622,35 +622,29 @@ async function uploadFile(file) {
   console.log('File details:', file.name, file.type, file.size);
 
   try {
-    // Step 1: Get the client token
-    const getClientTokenResponse = await fetch('/api/upload-file', {
+    // Create a FormData object to send the file
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // Send the file to our API endpoint
+    const response = await fetch('/api/upload-file', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ filename: file.name, contentType: file.type }),
+      body: formData,
     });
 
-    if (!getClientTokenResponse.ok) {
-      throw new Error(`Failed to get client token: ${getClientTokenResponse.status} ${getClientTokenResponse.statusText}`);
+    if (!response.ok) {
+      throw new Error(`Failed to upload file: ${response.status} ${response.statusText}`);
     }
 
-    const responseData = await getClientTokenResponse.json();
-    console.log('Client token response:', responseData);
+    const result = await response.json();
+    console.log('File upload response:', result);
 
-    if (!responseData.clientToken) {
-      throw new Error('Invalid response from upload file endpoint: missing client token');
+    if (!result.url) {
+      throw new Error('Invalid response from upload file endpoint: missing URL');
     }
 
-    // Step 2: Use the Vercel Blob client to upload the file
-    const { put } = await import('@vercel/blob/client');
-    const { url } = await put(file.name, file, {
-      access: 'public',
-      token: responseData.clientToken,
-    });
-
-    console.log('File uploaded successfully. URL:', url);
-    return url;
+    console.log('File uploaded successfully. URL:', result.url);
+    return result.url;
 
   } catch (error) {
     console.error('Error uploading file:', error);

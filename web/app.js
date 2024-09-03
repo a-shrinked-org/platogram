@@ -117,7 +117,7 @@ function handleOptionClick(option) {
             coffee2Button.classList.remove('bg-blue-500', 'text-white');
         }
     } else {
-        // Remove active style from coffee selectors when basic is selected
+        coffeeCount = 0;
         if (coffee1Button) {
             coffee1Button.classList.remove('bg-blue-500', 'text-white');
         }
@@ -131,6 +131,7 @@ function handleOptionClick(option) {
 function handleCoffeeCountClick(count) {
     coffeeCount = count;
     customPrice = '';
+    selectedOption = 'coffee';
     const customPriceInput = document.getElementById('custom-price');
     if (customPriceInput) customPriceInput.value = '';
     const coffee1Button = document.getElementById('coffee-1');
@@ -143,8 +144,7 @@ function handleCoffeeCountClick(count) {
         coffee2Button.classList.toggle('bg-blue-500', count === 2);
         coffee2Button.classList.toggle('text-white', count === 2);
     }
-    selectedOption = 'coffee'; // Ensure coffee option is selected
-    updateTotalPrice(); // Call this to update the price
+    updateTotalPrice();
 }
 
 function handleCustomPriceChange(e) {
@@ -196,7 +196,6 @@ function setupPriceUI() {
         });
     }
 
-    // Initialize with coffee option and 1 coffee count
     handleOptionClick('coffee');
 }
 

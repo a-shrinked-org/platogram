@@ -7,6 +7,7 @@ let uploadedFile = null;
 let selectedOption = 'coffee';
 let coffeeCount = 1;
 let customPrice = '';
+let totalPrice = 5;
 let vercelBlobUpload;
 
 import('https://esm.sh/@vercel/blob@0.23.4').then(module => {

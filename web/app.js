@@ -667,13 +667,16 @@ async function onConvertClick(event) {
           }
         });
         if (!blobTokenResponse.ok) {
-            const errorText = await blobTokenResponse.text();
-            throw new Error(`Failed to get Blob token: ${blobTokenResponse.status} ${errorText}`);
+          const errorText = await blobTokenResponse.text();
+          throw new Error(`Failed to get Blob token: ${blobTokenResponse.status} ${errorText}`);
         }
         const { token: blobToken } = await blobTokenResponse.json();
 
         console.log('Initiating Vercel Blob upload');
-        const blob = await put(file.name, file, {
+        if (typeof window.vercelBlobPut !== 'function') {
+          throw new Error('Vercel Blob put function not available');
+        }
+        const blob = await window.vercelBlobPut(file.name, file, {
           access: 'public',
           token: blobToken,
           handleUploadUrl: '/api/upload-file',

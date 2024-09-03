@@ -984,24 +984,24 @@ function toggleSection(sectionToShow) {
  //               status === "error" ? "error-section" : "input-section");
 //}
 
-function toggleSection(sectionToShow) {
-  const sections = [
-    "input-section",
-    "file-upload-section",
-    "status-section",
-    "error-section",
-    "done-section"
-  ];
-
-  sections.forEach(sectionId => {
-    const section = document.getElementById(sectionId);
-    if (section) {
-      section.classList.toggle("hidden", sectionId !== sectionToShow);
-    } else {
-      console.warn(`Section not found: ${sectionId}`);
-    }
-  });
-}
+//function toggleSection(sectionToShow) {
+ // const sections = [
+//    "input-section",
+ //   "file-upload-section",
+//    "status-section",
+//    "error-section",
+//    "done-section"
+//  ];
+//
+//  sections.forEach(sectionId => {
+//    const section = document.getElementById(sectionId);
+//    if (section) {
+//      section.classList.toggle("hidden", sectionId !== sectionToShow);
+//    } else {
+//      console.warn(`Section not found: ${sectionId}`);
+ //   }
+//  });
+//}
 
 // Update these functions to use toggleSection
 function toggleSections(hiddenSection, visibleSection) {

@@ -676,7 +676,7 @@ async function onConvertClick(event) {
         if (typeof window.vercelBlobPut !== 'function') {
           throw new Error('Vercel Blob put function not available');
         }
-        const blob = await window.vercelBlobPut(file.name, file, {
+        const blob = await vercelBlobUpload(file.name, file, {
           access: 'public',
           token: blobToken,
           handleUploadUrl: '/api/upload-file',

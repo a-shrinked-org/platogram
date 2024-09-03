@@ -658,38 +658,35 @@ async function onConvertClick(event) {
         });
         console.log('Auth token obtained');
 
-        console.log('Initiating Vercel Blob upload');
-        const blob = await vercelBlobUpload(file.name, file, {
-          access: 'public',
-          handleUploadUrl: '/api/upload-file',
-          onUploadProgress: (progress) => {
-            console.log(`Upload progress: ${progress}%`);
+        const formData = new FormData();
+        formData.append('file', file);
+
+        console.log('Sending file to server');
+        const response = await fetch('/api/upload-file', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
           },
-          client: {
-            // Pass the token in the headers
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          }
+          body: formData
         });
 
-        console.log('Blob metadata:', blob);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to upload file: ${response.status} ${response.statusText}. ${errorText}`);
+        }
 
-        if (!blob.url) {
+        const result = await response.json();
+        console.log('Upload response:', result);
+
+        if (!result.url) {
           throw new Error('Invalid response from upload file endpoint: missing URL');
         }
 
-        console.log('File uploaded successfully. URL:', blob.url);
-        return blob.url;
+        console.log('File uploaded successfully. URL:', result.url);
+        return result.url;
       } catch (error) {
         console.error('Error uploading file:', error);
         console.error('Error stack:', error.stack);
-        if (error.cause && error.cause.response) {
-          console.log('Response status:', error.cause.response.status);
-          console.log('Response headers:', Object.fromEntries(error.cause.response.headers.entries()));
-          const errorText = await error.cause.response.text();
-          console.error('Error response body:', errorText);
-        }
         throw error;
       }
     }

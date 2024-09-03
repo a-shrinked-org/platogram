@@ -1,5 +1,6 @@
-import { handleUpload } from '@vercel/blob/client';
+import { put } from '@vercel/blob';
 import { auth } from 'express-oauth2-jwt-bearer';
+import formidable from 'formidable';
 
 // Configure Auth0 middleware
 const checkJwt = auth({
@@ -38,40 +39,23 @@ export default async function handler(req, res) {
         });
       });
 
-      debugLog('Initiating handleUpload');
-      const response = await handleUpload({
-        body: req,
-        request: req,
-        onBeforeGenerateToken: async (pathname) => {
-          debugLog('onBeforeGenerateToken called');
-          const user = req.auth.payload;
-          debugLog('User:', user);
-          const userCanUpload = true;
-          if (!userCanUpload) {
-            throw new Error('Not authorized to upload');
-          }
-          return {
-            allowedContentTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'video/mp4', 'text/vtt', 'text/plain'],
-            tokenPayload: JSON.stringify({
-              userId: user.sub,
-            }),
-          };
-        },
-        onUploadCompleted: async ({ blob, tokenPayload }) => {
-          debugLog('Upload completed:', blob, tokenPayload);
-          try {
-            const { userId } = JSON.parse(tokenPayload);
-            // You can add additional logic here if needed
-            // For example: await db.update({ fileUrl: blob.url, userId });
-          } catch (error) {
-            console.error('Error in onUploadCompleted:', error);
-            throw new Error('Could not process completed upload');
-          }
-        },
+      const form = new formidable.IncomingForm();
+      const { fields, files } = await new Promise((resolve, reject) => {
+        form.parse(req, (err, fields, files) => {
+          if (err) reject(err);
+          else resolve({ fields, files });
+        });
+      });
+
+      debugLog('File received:', files.file);
+
+      const file = files.file;
+      const blob = await put(file.originalFilename, file, {
+        access: 'public',
       });
 
       debugLog('Upload successful, sending response');
-      return res.status(200).json(response);
+      return res.status(200).json({ url: blob.url });
     } catch (error) {
       console.error('Error in upload handler:', error);
       debugLog('Error details:', error.stack);

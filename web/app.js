@@ -64,7 +64,7 @@ function getInitials(email) {
 
 function updateTotalPrice() {
     if (selectedOption === 'basic') {
-        totalPrice = 0;
+        totalPrice = 5;
     } else if (selectedOption === 'coffee') {
         if (customPrice) {
             totalPrice = parseFloat(customPrice);
@@ -747,7 +747,7 @@ async function deleteFile(fileUrl) {
             updateUIStatus("running");
             const finalStatus = await pollStatus(await auth0Client.getTokenSilently());
 
-            Check if the inputData is a Blob URL and trigger cleanup
+            // Check if the inputData is a Blob URL and trigger cleanup
             if (inputData.includes('.public.blob.vercel-storage.com/')) {
                 try {
                     console.log("Conversion complete. Attempting to delete temporary file");

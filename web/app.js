@@ -183,13 +183,23 @@ function setupPriceUI() {
     if (basicJobButton) basicJobButton.addEventListener('click', () => handleOptionClick('basic'));
 
     const coffeeButton = document.getElementById('coffee-button');
-    if (coffeeButton) coffeeButton.addEventListener('click', () => handleOptionClick('coffee'));
+    if (coffeeButton) coffeeButton.addEventListener('click', (event) => {
 
+        event.stopPropagation();
+        handleOptionClick('coffee');
+    });
     const coffee1Button = document.getElementById('coffee-1');
-    if (coffee1Button) coffee1Button.addEventListener('click', () => handleCoffeeCountClick(1));
+    if (coffee1Button) coffee1Button.addEventListener('click', (event) => {
 
+        event.stopPropagation();
+        handleCoffeeCountClick(1);
+    });
     const coffee2Button = document.getElementById('coffee-2');
-    if (coffee2Button) coffee2Button.addEventListener('click', () => handleCoffeeCountClick(2));
+    if (coffee2Button) coffee2Button.addEventListener('click', (event) => {
+
+        event.stopPropagation();
+        handleCoffeeCountClick(2);
+    });
 
     const customPriceInput = document.getElementById('custom-price');
     if (customPriceInput) customPriceInput.addEventListener('input', handleCustomPriceChange);
@@ -319,68 +329,58 @@ function updateUIStatus(status, message = "") {
 
   // Show the appropriate section based on status
   switch (status) {
-    case "idle":
-      if (inputSection) {
-        inputSection.classList.remove("hidden");
-      } else {
-        console.error("Input section not found");
-      }
-      break;
-    case "uploading":
-        if (uploadProcessSection) {
-          uploadProcessSection.classList.remove("hidden");
-          // Update upload progress here
-        } else {
-          console.error("Upload process section not found");
+      case "idle":
+        toggleSection("input-section");
+        break;
+      case "uploading":
+        toggleSection("upload-process-section");
+        // Update upload progress here if needed
+        break;
+      case "running":
+        toggleSection("status-section");
+        const statusSection = document.getElementById("status-section");
+        if (statusSection) {
+          statusSection.innerHTML = `
+            <p>File: ${fileName}</p>
+            <p>Email: ${userEmail}</p>
+            <p>Status: ${status}</p>
+            ${message ? `<p>${message}</p>` : ''}
+            <div id="processing-stage"></div>
+          `;
+          initializeProcessingStage();
         }
         break;
-    case "running":
-      if (statusSection) {
-        statusSection.classList.remove("hidden");
-        statusSection.innerHTML = `
-          <p>File: ${fileName}</p>
-          <p>Email: ${userEmail}</p>
-          <p>Status: ${status}</p>
-          ${message ? `<p>${message}</p>` : ''}
-          <div id="processing-stage"></div>
-        `;
-        initializeProcessingStage();
-      } else {
-        console.error("Status section not found");
-      }
-      break;
-    case "done":
-      if (doneSection) {
-        doneSection.classList.remove("hidden");
-        doneSection.innerHTML = `
-          <p>File: ${fileName}</p>
-          <p>Email: ${userEmail}</p>
-          <p>Status: Completed</p>
-          ${message ? `<p>${message}</p>` : ''}
-        `;
-      } else {
-        console.error("Done section not found");
-      }
-      clearProcessingStageInterval();
-      break;
-    case "error":
-      if (errorSection) {
-        errorSection.classList.remove("hidden");
-        errorSection.innerHTML = `
-          <p>File: ${fileName}</p>
-          <p>Email: ${userEmail}</p>
-          <p>Status: Error</p>
-          <p>${message || "An error occurred. Please try again."}</p>
-        `;
-      } else {
-        console.error("Error section not found");
-      }
-      clearProcessingStageInterval();
-      break;
-    default:
-      console.error(`Unknown status: ${status}`);
+      case "done":
+        toggleSection("done-section");
+        const doneSection = document.getElementById("done-section");
+        if (doneSection) {
+          doneSection.innerHTML = `
+            <p>File: ${fileName}</p>
+            <p>Email: ${userEmail}</p>
+            <p>Status: Completed</p>
+            ${message ? `<p>${message}</p>` : ''}
+          `;
+        }
+        clearProcessingStageInterval();
+        break;
+      case "error":
+        toggleSection("error-section");
+        const errorSection = document.getElementById("error-section");
+        if (errorSection) {
+          errorSection.innerHTML = `
+            <p>File: ${fileName}</p>
+            <p>Email: ${userEmail}</p>
+            <p>Status: Error</p>
+            <p>${message || "An error occurred. Please try again."}</p>
+          `;
+        }
+        clearProcessingStageInterval();
+        break;
+      default:
+        console.error(`Unknown status: ${status}`);
+    }
   }
-}
+  
 async function updateUI() {
     if (!auth0Client) {
       console.error("Auth0 client not initialized");
@@ -1010,27 +1010,28 @@ function pollStatus(token) {
 }
 
 function toggleSection(sectionToShow) {
-  const sections = [
-    "input-section",
-    "file-upload-section",
-    "status-section",
-    "error-section",
-    "done-section"
-  ];
+    const sections = [
+      "input-section",
+      "file-upload-section",
+      "upload-process-section",
+      "status-section",
+      "error-section",
+      "done-section"
+    ];
 
-  sections.forEach(sectionId => {
-    const section = document.getElementById(sectionId);
-    if (section) {
-      if (sectionId === sectionToShow) {
-        section.classList.remove("hidden");
+    sections.forEach(sectionId => {
+      const section = document.getElementById(sectionId);
+      if (section) {
+        if (sectionId === sectionToShow) {
+          section.classList.remove("hidden");
+        } else {
+          section.classList.add("hidden");
+        }
       } else {
-        section.classList.add("hidden");
+        console.warn(`Section not found: ${sectionId}`);
       }
-    } else {
-      console.warn(`Section not found: ${sectionId}`);
-    }
-  });
-}
+    });
+  }
 
 //function updateUIStatus(status, message = "") {
 //  debugLog(`Updating UI status: ${status}`);

@@ -1,11 +1,17 @@
 import { handleUpload } from '@vercel/blob/client';
-import { auth } from 'express-oauth2-jwt-bearer';
+import jwt from 'jsonwebtoken';
+import jwksClient from 'jwks-rsa';
 
-// Configure Auth0 middleware
-const checkJwt = auth({
-  audience: 'https://platogram.vercel.app/',
-  issuerBaseURL: `https://dev-w0dm4z23pib7oeui.us.auth0.com/`,
+const client = jwksClient({
+  jwksUri: `https://dev-w0dm4z23pib7oeui.us.auth0.com/.well-known/jwks.json`
 });
+
+function getKey(header, callback) {
+  client.getSigningKey(header.kid, function (err, key) {
+    var signingKey = key.publicKey || key.rsaPublicKey;
+    callback(null, signingKey);
+  });
+}
 
 export const config = {
   api: {
@@ -17,6 +23,22 @@ function debugLog(...args) {
   console.log('[DEBUG]', ...args);
 }
 
+async function verifyToken(token) {
+  return new Promise((resolve, reject) => {
+    jwt.verify(token, getKey, {
+      audience: 'https://platogram.vercel.app/',
+      issuer: `https://dev-w0dm4z23pib7oeui.us.auth0.com/`,
+      algorithms: ['RS256']
+    }, (err, decoded) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(decoded);
+      }
+    });
+  });
+}
+
 export default async function handler(req, res) {
   debugLog('Request method:', req.method);
   debugLog('Request headers:', req.headers);
@@ -25,18 +47,21 @@ export default async function handler(req, res) {
     try {
       debugLog('Starting POST request handling');
 
+      // Extract the token from the Authorization header
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        throw new Error('No token provided');
+      }
+      const token = authHeader.split(' ')[1];
+
       // Verify the Auth0 token
-      await new Promise((resolve, reject) => {
-        checkJwt(req, res, (err) => {
-          if (err) {
-            debugLog('Auth error:', err);
-            reject(new Error('Unauthorized'));
-          } else {
-            debugLog('Auth successful');
-            resolve();
-          }
-        });
-      });
+      try {
+        const decoded = await verifyToken(token);
+        debugLog('Auth successful', decoded);
+      } catch (error) {
+        debugLog('Auth error:', error);
+        throw new Error('Unauthorized');
+      }
 
       // Check if this is a token request or an upload request
       const isTokenRequest = req.headers['x-vercel-blob-token-request'] === 'true';
@@ -53,16 +78,10 @@ export default async function handler(req, res) {
           request: req,
           onBeforeGenerateToken: async (pathname) => {
             debugLog('onBeforeGenerateToken called');
-            const user = req.auth.payload;
-            debugLog('User:', user);
-            const userCanUpload = true;
-            if (!userCanUpload) {
-              throw new Error('Not authorized to upload');
-            }
             return {
               allowedContentTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'video/mp4', 'text/vtt', 'text/plain'],
               tokenPayload: JSON.stringify({
-                userId: user.sub,
+                userId: decoded.sub,
               }),
             };
           },

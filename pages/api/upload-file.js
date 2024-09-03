@@ -1,54 +1,53 @@
 import { handleUpload } from '@vercel/blob/client';
-import { NextResponse } from 'next/server';
-import { jwtVerify } from 'jose';
+import { auth } from 'express-oauth2-jwt-bearer';
+
+// Configure Auth0 middleware
+const checkJwt = auth({
+  audience: 'https://platogram.vercel.app/',
+  issuerBaseURL: `https://dev-w0dm4z23pib7oeui.us.auth0.com/`,
+});
 
 export const config = {
-  runtime: 'edge',
+  api: {
+    bodyParser: false,
+  },
 };
 
-async function verifyToken(token) {
-  try {
-    const JWKS = jose.createRemoteJWKSet(new URL('https://dev-w0dm4z23pib7oeui.us.auth0.com/.well-known/jwks.json'));
-    const { payload } = await jwtVerify(token, JWKS, {
-      audience: 'https://platogram.vercel.app/',
-      issuer: 'https://dev-w0dm4z23pib7oeui.us.auth0.com/',
-    });
-    return payload;
-  } catch (error) {
-    console.error('Token verification failed:', error);
-    throw new Error('Unauthorized');
-  }
+function debugLog(...args) {
+  console.log('[DEBUG]', ...args);
 }
 
-export default async function handler(request) {
-  if (request.method === 'POST') {
+export default async function handler(req, res) {
+  if (req.method === 'POST') {
     try {
-      // Extract the token from the Authorization header
-      const authHeader = request.headers.get('Authorization');
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        throw new Error('Unauthorized');
-      }
-      const token = authHeader.split(' ')[1];
-
       // Verify the Auth0 token
-      const user = await verifyToken(token);
+      await new Promise((resolve, reject) => {
+        checkJwt(req, res, (err) => {
+          if (err) {
+            reject(new Error('Unauthorized'));
+          } else {
+            resolve();
+          }
+        });
+      });
 
-      const body = await request.json();
-
+      const body = await req.json();
       const jsonResponse = await handleUpload({
         body,
-        request,
+        request: req,
         onBeforeGenerateToken: async (pathname) => {
+          // The user is already authenticated by this point
+          const user = req.auth.payload;
           // Here you can implement your own logic to check if the user can upload
+          // For now, we'll assume all authenticated users can upload
           const userCanUpload = true;
           if (!userCanUpload) {
             throw new Error('Not authorized to upload');
           }
-
           return {
             allowedContentTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'video/mp4', 'text/vtt', 'text/plain'],
             tokenPayload: JSON.stringify({
-              userId: user.sub,
+              userId: user.sub, // Auth0 uses 'sub' for user ID
             }),
           };
         },
@@ -56,6 +55,7 @@ export default async function handler(request) {
           console.log('Blob upload completed', blob, tokenPayload);
           try {
             // Here you can run any logic after the file upload is completed
+            // For example, you might want to save the blob URL to your database
             const { userId } = JSON.parse(tokenPayload);
             // await db.update({ fileUrl: blob.url, userId });
           } catch (error) {
@@ -65,30 +65,41 @@ export default async function handler(request) {
         },
       });
 
-      return NextResponse.json(jsonResponse);
+      return res.status(200).json(jsonResponse);
     } catch (error) {
       console.error('Error in upload handler:', error);
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.message === 'Unauthorized' ? 401 : 400 }
-      );
+      return res.status(error.message === 'Unauthorized' ? 401 : 400).json({ error: error.message });
     }
-  } else if (request.method === 'DELETE') {
+  } else if (req.method === 'DELETE') {
+    debugLog('Handling DELETE request');
     try {
-      const { url: fileUrl } = await request.json();
+      const body = await new Promise((resolve) => {
+        let data = '';
+        req.on('data', (chunk) => { data += chunk; });
+        req.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            resolve({});
+          }
+        });
+      });
+      const { url: fileUrl } = body;
       if (!fileUrl) {
-        return NextResponse.json({ error: 'File URL is required for deletion' }, { status: 400 });
+        return res.status(400).json({ error: 'File URL is required for deletion' });
       }
-
+      debugLog('Attempting to delete file:', fileUrl);
       const { del } = await import('@vercel/blob');
       await del(fileUrl);
-
-      return NextResponse.json({ message: 'File deleted successfully' });
+      debugLog('File deleted successfully');
+      return res.status(200).json({ message: 'File deleted successfully' });
     } catch (error) {
       console.error('Error deleting file:', error);
-      return NextResponse.json({ error: 'Failed to delete file' }, { status: 400 });
+      return res.status(400).json({ error: 'Failed to delete file' });
     }
   } else {
-    return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+    debugLog('Invalid method:', req.method);
+    res.setHeader('Allow', ['POST', 'DELETE']);
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }

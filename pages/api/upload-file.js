@@ -78,7 +78,6 @@ export default async function handler(req, res) {
       return res.status(error.message === 'Unauthorized' ? 401 : 500).json({ error: error.message });
     }
   } else if (req.method === 'DELETE') {
-    // DELETE handling remains the same
     debugLog('Handling DELETE request');
     try {
       const body = await new Promise((resolve) => {

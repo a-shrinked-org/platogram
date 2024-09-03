@@ -648,50 +648,51 @@ async function onConvertClick(event) {
   }
 
   async function uploadFile(file) {
-  console.log('Starting file upload process');
-  console.log('File details:', file.name, file.type, file.size);
+      console.log('Starting file upload process');
+      console.log('File details:', file.name, file.type, file.size);
 
-  try {
-    if (typeof vercelBlobUpload !== 'function') {
-      throw new Error('Vercel Blob upload function is not available. Make sure the module is loaded.');
+      try {
+        // Get the Auth0 token
+        const token = await auth0Client.getTokenSilently({
+          audience: "https://platogram.vercel.app",
+        });
+        console.log('Auth token obtained');
+
+        console.log('Initiating Vercel Blob upload');
+        const blob = await vercelBlobUpload(file.name, file, {
+          access: 'public',
+          handleUploadUrl: '/api/upload-file',
+          onUploadProgress: (progress) => {
+            console.log(`Upload progress: ${progress}%`);
+          },
+          client: {
+            // Pass the token in the headers
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        });
+
+        console.log('Blob metadata:', blob);
+
+        if (!blob.url) {
+          throw new Error('Invalid response from upload file endpoint: missing URL');
+        }
+
+        console.log('File uploaded successfully. URL:', blob.url);
+        return blob.url;
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        console.error('Error stack:', error.stack);
+        if (error.cause && error.cause.response) {
+          console.log('Response status:', error.cause.response.status);
+          console.log('Response headers:', Object.fromEntries(error.cause.response.headers.entries()));
+          const errorText = await error.cause.response.text();
+          console.error('Error response body:', errorText);
+        }
+        throw error;
+      }
     }
-
-    // Get the Auth0 token
-    const token = await auth0Client.getTokenSilently({
-      audience: "https://platogram.vercel.app",
-    });
-    console.log('Auth token obtained');
-
-    console.log('Initiating Vercel Blob upload');
-    const blob = await vercelBlobUpload(file.name, file, {
-      access: 'public',
-      handleUploadUrl: '/api/upload-file',
-      token: token,
-      onUploadProgress: (progress) => {
-        console.log(`Upload progress: ${progress}%`);
-      },
-    });
-
-    console.log('Blob metadata:', blob);
-
-    if (!blob.url) {
-      throw new Error('Invalid response from upload file endpoint: missing URL');
-    }
-
-    console.log('File uploaded successfully. URL:', blob.url);
-    return blob.url;
-  } catch (error) {
-    console.error('Error uploading file:', error);
-    console.error('Error stack:', error.stack);
-    if (error.cause && error.cause.response) {
-      console.log('Response status:', error.cause.response.status);
-      console.log('Response headers:', Object.fromEntries(error.cause.response.headers.entries()));
-      const errorText = await error.cause.response.text();
-      console.error('Error response body:', errorText);
-    }
-    throw error;
-  }
-}
     
 function updateUploadProgress(progress) {
   const uploadProgressBar = document.getElementById('upload-progress-bar');

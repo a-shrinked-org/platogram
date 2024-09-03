@@ -646,7 +646,7 @@ async function uploadFile(file) {
     console.log('Auth token obtained');
 
     console.log('Initiating Vercel Blob upload');
-    const blob = await upload(file.name, file, {
+    const blob = await vercelBlob.upload(file.name, file, {
       access: 'public',
       handleUploadUrl: '/api/upload-file',
       clientOptions: {
@@ -659,13 +659,27 @@ async function uploadFile(file) {
       },
     });
 
+    console.log('Response status: 200'); // Blob upload doesn't provide a status, assuming success
+    console.log('Blob metadata:', blob);
+
+    if (!blob.url) {
+      throw new Error('Invalid response from upload file endpoint: missing URL');
+    }
+
     console.log('File uploaded successfully. URL:', blob.url);
     return blob.url;
   } catch (error) {
     console.error('Error uploading file:', error);
+    if (error.cause && error.cause.response) {
+      console.log('Response status:', error.cause.response.status);
+      console.log('Response headers:', Object.fromEntries(error.cause.response.headers.entries()));
+      const errorText = await error.cause.response.text();
+      console.error('Error response body:', errorText);
+    }
     throw error;
   }
 }
+
 function updateUploadProgress(progress) {
   const uploadProgressBar = document.getElementById('upload-progress-bar');
   const uploadProgressText = document.getElementById('upload-progress-text');

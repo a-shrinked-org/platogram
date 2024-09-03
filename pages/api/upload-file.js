@@ -10,7 +10,6 @@ const checkJwt = auth({
 export const config = {
   api: {
     bodyParser: false,
-    responseLimit: false,
   },
 };
 
@@ -39,13 +38,9 @@ export default async function handler(req, res) {
         });
       });
 
-      debugLog('Parsing request body');
-      const body = await req.json();
-      debugLog('Request body:', body);
-
       debugLog('Initiating handleUpload');
       const jsonResponse = await handleUpload({
-        body,
+        body: req,
         request: req,
         onBeforeGenerateToken: async (pathname) => {
           debugLog('onBeforeGenerateToken called');
@@ -84,6 +79,7 @@ export default async function handler(req, res) {
       return res.status(error.message === 'Unauthorized' ? 401 : 500).json({ error: error.message });
     }
   } else if (req.method === 'DELETE') {
+    // DELETE handling remains the same
     debugLog('Handling DELETE request');
     try {
       const body = await new Promise((resolve) => {

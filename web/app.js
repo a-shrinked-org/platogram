@@ -634,6 +634,8 @@ async function onConvertClick(event) {
     }
   }
 
+import { upload } from '@vercel/blob/client';
+
 async function uploadFile(file) {
   console.log('Starting file upload process');
   console.log('File details:', file.name, file.type, file.size);
@@ -645,44 +647,27 @@ async function uploadFile(file) {
     });
     console.log('Auth token obtained');
 
-    // Create a FormData object to send the file
-    const formData = new FormData();
-    formData.append('file', file);
-
-    console.log('Sending request to /api/upload-file');
-    // Send the file to our API endpoint
-    const response = await fetch('/api/upload-file', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
+    console.log('Initiating Vercel Blob upload');
+    const blob = await upload(file.name, file, {
+      access: 'public',
+      handleUploadUrl: '/api/upload-file',
+      clientOptions: {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       },
-      body: formData,
+      onUploadProgress: (progress) => {
+        console.log(`Upload progress: ${progress}%`);
+      },
     });
 
-    console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error response body:', errorText);
-      throw new Error(`Failed to upload file: ${response.status} ${response.statusText}. ${errorText}`);
-    }
-
-    const result = await response.json();
-    console.log('File upload response:', result);
-
-    if (!result.url) {
-      throw new Error('Invalid response from upload file endpoint: missing URL');
-    }
-
-    console.log('File uploaded successfully. URL:', result.url);
-    return result.url;
+    console.log('File uploaded successfully. URL:', blob.url);
+    return blob.url;
   } catch (error) {
     console.error('Error uploading file:', error);
     throw error;
   }
 }
-
 function updateUploadProgress(progress) {
   const uploadProgressBar = document.getElementById('upload-progress-bar');
   const uploadProgressText = document.getElementById('upload-progress-text');

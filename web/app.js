@@ -639,28 +639,30 @@ async function uploadFile(file) {
   console.log('File details:', file.name, file.type, file.size);
 
   try {
-    // Get the Auth0 token
-    const token = await auth0Client.getTokenSilently({
-      audience: "https://platogram.vercel.app",
+    // Create a FormData object to send the file
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // Send the file to our API endpoint
+    const response = await fetch('/api/upload-file', {
+      method: 'POST',
+      body: formData,
     });
 
-    const blob = await upload(file.name, file, {
-      access: 'public',
-      handleUploadUrl: '/api/upload-file',
-      clientOptions: {
-        // Include the Auth0 token in the request headers
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      },
-      onUploadProgress: (progress) => {
-        console.log(`Upload progress: ${progress}%`);
-        updateUploadProgress(progress);
-      },
-    });
+    if (!response.ok) {
+      throw new Error(`Failed to upload file: ${response.status} ${response.statusText}`);
+    }
 
-    console.log('File uploaded successfully. URL:', blob.url);
-    return blob.url;
+    const result = await response.json();
+    console.log('File upload response:', result);
+
+    if (!result.url) {
+      throw new Error('Invalid response from upload file endpoint: missing URL');
+    }
+
+    console.log('File uploaded successfully. URL:', result.url);
+    return result.url;
+
   } catch (error) {
     console.error('Error uploading file:', error);
     throw error;
@@ -745,16 +747,16 @@ async function deleteFile(fileUrl) {
             updateUIStatus("running");
             const finalStatus = await pollStatus(await auth0Client.getTokenSilently());
 
-            // Check if the inputData is a Blob URL and trigger cleanup
-           // if (inputData.includes('.public.blob.vercel-storage.com/')) {
-             //   try {
-             //       console.log("Conversion complete. Attempting to delete temporary file");
-             //       await deleteFile(inputData);
-             //       console.log("Temporary file successfully deleted");
-             //   } catch (cleanupError) {
-             //       console.error("Error during file cleanup:", cleanupError);
-            //    }
-          //  }
+            Check if the inputData is a Blob URL and trigger cleanup
+            if (inputData.includes('.public.blob.vercel-storage.com/')) {
+                try {
+                    console.log("Conversion complete. Attempting to delete temporary file");
+                    await deleteFile(inputData);
+                    console.log("Temporary file successfully deleted");
+                     } catch (cleanupError) {
+                    console.error("Error during file cleanup:", cleanupError);
+                }
+            }
 
             if (finalStatus.status === 'done') {
                 updateUIStatus("done", "Conversion completed successfully");

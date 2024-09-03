@@ -9,6 +9,9 @@ let coffeeCount = 1;
 let customPrice = '';
 let totalPrice = 5;
 
+import * as vercelBlob from 'https://esm.sh/@vercel/blob@0.23.4';
+console.log('Vercel Blob import:', vercelBlob);
+
 const processingStages = [
   "Byte Whispering",
   "Qubit Juggling",
@@ -635,49 +638,56 @@ async function onConvertClick(event) {
   }
 
   async function uploadFile(file) {
-      console.log('Starting file upload process');
-      console.log('File details:', file.name, file.type, file.size);
+  console.log('Starting file upload process');
+  console.log('File details:', file.name, file.type, file.size);
 
-      try {
-        // Get the Auth0 token
-        const token = await auth0Client.getTokenSilently({
-          audience: "https://platogram.vercel.app",
-        });
-        console.log('Auth token obtained');
+  try {
+    console.log('Vercel Blob object:', vercelBlob);
 
-        console.log('Initiating Vercel Blob upload');
-        const blob = await upload(file.name, file, {
-          access: 'public',
-          handleUploadUrl: '/api/upload-file',
-          clientOptions: {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          },
-          onUploadProgress: (progress) => {
-            console.log(`Upload progress: ${progress}%`);
-          },
-        });
-
-        console.log('Blob metadata:', blob);
-
-        if (!blob.url) {
-          throw new Error('Invalid response from upload file endpoint: missing URL');
-        }
-
-        console.log('File uploaded successfully. URL:', blob.url);
-        return blob.url;
-      } catch (error) {
-        console.error('Error uploading file:', error);
-        if (error.cause && error.cause.response) {
-          console.log('Response status:', error.cause.response.status);
-          console.log('Response headers:', Object.fromEntries(error.cause.response.headers.entries()));
-          const errorText = await error.cause.response.text();
-          console.error('Error response body:', errorText);
-        }
-        throw error;
-      }
+    if (typeof vercelBlob.upload !== 'function') {
+      throw new Error('Vercel Blob upload function is not available');
     }
+
+    // Get the Auth0 token
+    const token = await auth0Client.getTokenSilently({
+      audience: "https://platogram.vercel.app",
+    });
+    console.log('Auth token obtained');
+
+    console.log('Initiating Vercel Blob upload');
+    const blob = await vercelBlob.upload(file.name, file, {
+      access: 'public',
+      handleUploadUrl: '/api/upload-file',
+      clientOptions: {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      },
+      onUploadProgress: (progress) => {
+        console.log(`Upload progress: ${progress}%`);
+      },
+    });
+
+    console.log('Blob metadata:', blob);
+
+    if (!blob.url) {
+      throw new Error('Invalid response from upload file endpoint: missing URL');
+    }
+
+    console.log('File uploaded successfully. URL:', blob.url);
+    return blob.url;
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    console.error('Error stack:', error.stack);
+    if (error.cause && error.cause.response) {
+      console.log('Response status:', error.cause.response.status);
+      console.log('Response headers:', Object.fromEntries(error.cause.response.headers.entries()));
+      const errorText = await error.cause.response.text();
+      console.error('Error response body:', errorText);
+    }
+    throw error;
+  }
+}
     
 function updateUploadProgress(progress) {
   const uploadProgressBar = document.getElementById('upload-progress-bar');

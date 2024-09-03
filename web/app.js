@@ -645,14 +645,8 @@ async function onConvertClick(event) {
         });
         console.log('Auth token obtained');
 
-        // Check if the Vercel Blob client is available
-        if (typeof window.VercelBlob === 'undefined' || typeof window.VercelBlob.upload !== 'function') {
-          console.error('Vercel Blob client is not properly loaded. window.VercelBlob:', window.VercelBlob);
-          throw new Error('Vercel Blob client is not properly loaded');
-        }
-
         console.log('Initiating Vercel Blob upload');
-        const blob = await window.VercelBlob.upload(file.name, file, {
+        const blob = await upload(file.name, file, {
           access: 'public',
           handleUploadUrl: '/api/upload-file',
           clientOptions: {
@@ -684,6 +678,7 @@ async function onConvertClick(event) {
         throw error;
       }
     }
+    
 function updateUploadProgress(progress) {
   const uploadProgressBar = document.getElementById('upload-progress-bar');
   const uploadProgressText = document.getElementById('upload-progress-text');

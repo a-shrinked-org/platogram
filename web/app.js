@@ -1208,16 +1208,16 @@ function handleFileUpload() {
    // }
 //}
 
-function initializeProcessingStage() {
-  debugLog("Initializing processing stage");
-  const processingStage = document.getElementById("processing-stage");
-  if (!processingStage) {
-    debugLog("Processing stage element not found. Skipping initialization.");
-    return;
-  }
-  updateProcessingStage();
-  processingStageInterval = setInterval(updateProcessingStage, 3000);
-}
+//function initializeProcessingStage() {
+ // debugLog("Initializing processing stage");
+ // const processingStage = document.getElementById("processing-stage");
+//  if (!processingStage) {
+//    debugLog("Processing stage element not found. Skipping initialization.");
+ //   return;
+//  }
+//  updateProcessingStage();
+//  processingStageInterval = setInterval(updateProcessingStage, 3000);
+// }
 
 // Ensure all functions are in global scope
 window.toggleConvertButtonState = toggleConvertButtonState;

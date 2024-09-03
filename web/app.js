@@ -348,15 +348,6 @@ function updateUIStatus(status, message = "") {
       console.error(`Unknown status: ${status}`);
   }
 }
-
-function clearProcessingStageInterval() {
-  if (processingStageInterval) {
-    debugLog("Clearing processing stage interval");
-    clearInterval(processingStageInterval);
-    processingStageInterval = null;
-  }
-}
-
 async function updateUI() {
   if (!auth0Client) {
     console.error("Auth0 client not initialized");

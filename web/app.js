@@ -81,7 +81,7 @@ function updateTotalPrice() {
         if (customPrice) {
             totalPrice = parseFloat(customPrice);
         } else {
-            totalPrice = coffeeCount * 5;
+            totalPrice = coffeeCount * 5; // This line is correct, but wasn't being reflected in the UI
         }
     }
     const totalPriceElement = document.getElementById('total-price');
@@ -126,7 +126,8 @@ function handleCoffeeCountClick(count) {
         coffee2Button.classList.toggle('bg-blue-500', count === 2);
         coffee2Button.classList.toggle('text-white', count === 2);
     }
-    updateTotalPrice();
+    selectedOption = 'coffee'; // Ensure coffee option is selected
+    updateTotalPrice(); // Call this to update the price
 }
 
 function handleCustomPriceChange(e) {

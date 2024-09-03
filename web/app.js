@@ -489,7 +489,7 @@ async function handleSubmit(event) {
     if (event) event.preventDefault();
     console.log('handleSubmit called');
     const price = getPriceFromUI();
-    const inputData = getInputData();
+    let inputData = getInputData();
     const submitButton = document.getElementById('submit-btn');
 
     if (!inputData) {
@@ -506,7 +506,8 @@ async function handleSubmit(event) {
 
         // If inputData is a File, upload it and get the URL
         if (inputData instanceof File) {
-            inputData = await uploadFile(inputData);
+            const uploadedUrl = await uploadFile(inputData);
+            inputData = uploadedUrl;  // Assign the URL to inputData
         }
 
         // Close the modal
@@ -517,7 +518,7 @@ async function handleSubmit(event) {
 
         if (price > 0) {
             console.log('Non-zero price detected, initiating Stripe checkout');
-            sessionStorage.setItem('pendingConversionData', inputData instanceof File ? inputData.name : inputData);
+            sessionStorage.setItem('pendingConversionData', inputData);
             await handlePaidConversion(inputData, price);
         } else {
             console.log('Free conversion, proceeding with postToConvert');

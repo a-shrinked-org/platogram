@@ -130,22 +130,28 @@ function handleOptionClick(option) {
 
 function handleCoffeeCountClick(count) {
     coffeeCount = count;
-    customPrice = '';
-    selectedOption = 'coffee';
-    const customPriceInput = document.getElementById('custom-price');
-    if (customPriceInput) customPriceInput.value = '';
-    const coffee1Button = document.getElementById('coffee-1');
-    const coffee2Button = document.getElementById('coffee-2');
+    customPrice = "";
+    selectedOption = "coffee";
+    const customPriceInput = document.getElementById("custom-price");
+    if (customPriceInput) customPriceInput.value = "";
+    const coffee1Button = document.getElementById("coffee-1");
+    const coffee2Button = document.getElementById("coffee-2");
     if (coffee1Button) {
-        coffee1Button.classList.toggle('bg-blue-500', count === 1);
-        coffee1Button.classList.toggle('text-white', count === 1);
+      if (count === 1) {
+        coffee1Button.classList.add("bg-blue-500", "text-white");
+      } else {
+        coffee1Button.classList.remove("bg-blue-500", "text-white");
+      }
     }
     if (coffee2Button) {
-        coffee2Button.classList.toggle('bg-blue-500', count === 2);
-        coffee2Button.classList.toggle('text-white', count === 2);
+      if (count === 2) {
+        coffee2Button.classList.add("bg-blue-500", "text-white");
+      } else {
+        coffee2Button.classList.remove("bg-blue-500", "text-white");
+      }
     }
     updateTotalPrice();
-}
+  }
 
 function handleCustomPriceChange(e) {
     const value = e.target.value;
@@ -804,6 +810,14 @@ async function deleteFile(fileUrl) {
             updateUIStatus("running");
             const finalStatus = await pollStatus(await auth0Client.getTokenSilently());
 
+            if (finalStatus.status === 'idle') {
+                updateUIStatus("idle", "Ready for new conversion");
+            } else if (finalStatus.status === 'done') {
+                updateUIStatus("done", "Conversion completed successfully");
+            } else {
+                updateUIStatus("error", finalStatus.error || "Conversion failed");
+            }
+
             // Check if the inputData is a Blob URL and trigger cleanup
             if (inputData.includes('.public.blob.vercel-storage.com/')) {
                 try {
@@ -952,17 +966,24 @@ function pollStatus(token) {
 
         updateUIStatus(result.status);
 
-        if (result.status === "running") {
-          pollingInterval = setTimeout(checkStatus, 5000); // Poll every 5 seconds
+        if (result.status === "done") {
+          // Instead of stopping, continue polling
+          setTimeout(checkStatus, 5000);
         } else if (result.status === "idle") {
-            // If status is idle, show the input section
-            updateUIStatus("idle");
-          }
+          // If status is idle, show the input section and resolve the promise
+          updateUIStatus("idle");
+          resolve(result);
+        } else if (result.status === "running") {
+          // Continue polling
+          setTimeout(checkStatus, 5000);
+        } else {
+          // For any other status, resolve the promise
+          resolve(result);
+        }
       } catch (error) {
         console.error("Error polling status:", error);
         updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
-        clearTimeout(pollingInterval);
-        reject(error); // Reject the promise if there's an error
+        reject(error);
       }
     }
 

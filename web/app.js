@@ -9,8 +9,11 @@ let coffeeCount = 1;
 let customPrice = '';
 let totalPrice = 5;
 
-import * as vercelBlob from 'https://esm.sh/@vercel/blob@0.23.4';
-console.log('Vercel Blob import:', vercelBlob);
+import('https://esm.sh/@vercel/blob@0.23.4').then(module => {
+console.log('Vercel Blob import (alternative):', module);
+window.vercelBlob = module;
+}).catch(error => {
+console.error('Error importing Vercel Blob:', error);
 
 const processingStages = [
   "Byte Whispering",

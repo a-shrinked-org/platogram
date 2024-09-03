@@ -660,6 +660,10 @@
 <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
 <script src="https://js.stripe.com/v3/"></script>
 <script type="module" src="https://esm.sh/@vercel/blob@0.23.4"></script>
-<script src="https://platogram.vercel.app/web/app.js"></script>
+<script type="module">
+    import { put } from 'https://esm.sh/@vercel/blob/client';
+    window.vercelBlobPut = put;
+  </script>
+<script type="module" src="https://platogram.vercel.app/web/app.js"></script>
 </body>
 </html>

@@ -748,15 +748,15 @@ async function deleteFile(fileUrl) {
             const finalStatus = await pollStatus(await auth0Client.getTokenSilently());
 
             // Check if the inputData is a Blob URL and trigger cleanup
-            if (inputData.includes('.public.blob.vercel-storage.com/')) {
-                try {
-                    console.log("Conversion complete. Attempting to delete temporary file");
-                    await deleteFile(inputData);
-                    console.log("Temporary file successfully deleted");
-                } catch (cleanupError) {
-                    console.error("Error during file cleanup:", cleanupError);
-                }
-            }
+           // if (inputData.includes('.public.blob.vercel-storage.com/')) {
+             //   try {
+             //       console.log("Conversion complete. Attempting to delete temporary file");
+             //       await deleteFile(inputData);
+             //       console.log("Temporary file successfully deleted");
+             //   } catch (cleanupError) {
+             //       console.error("Error during file cleanup:", cleanupError);
+            //    }
+          //  }
 
             if (finalStatus.status === 'done') {
                 updateUIStatus("done", "Conversion completed successfully");

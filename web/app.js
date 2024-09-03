@@ -639,18 +639,33 @@ async function uploadFile(file) {
   console.log('File details:', file.name, file.type, file.size);
 
   try {
+    // Get the Auth0 token
+    const token = await auth0Client.getTokenSilently({
+      audience: "https://platogram.vercel.app",
+    });
+    console.log('Auth token obtained');
+
     // Create a FormData object to send the file
     const formData = new FormData();
     formData.append('file', file);
 
+    console.log('Sending request to /api/upload-file');
     // Send the file to our API endpoint
     const response = await fetch('/api/upload-file', {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
       body: formData,
     });
 
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
-      throw new Error(`Failed to upload file: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Error response body:', errorText);
+      throw new Error(`Failed to upload file: ${response.status} ${response.statusText}. ${errorText}`);
     }
 
     const result = await response.json();
@@ -662,7 +677,6 @@ async function uploadFile(file) {
 
     console.log('File uploaded successfully. URL:', result.url);
     return result.url;
-
   } catch (error) {
     console.error('Error uploading file:', error);
     throw error;

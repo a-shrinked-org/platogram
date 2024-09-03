@@ -10,6 +10,7 @@ const checkJwt = auth({
 export const config = {
   api: {
     bodyParser: false,
+    responseLimit: false,
   },
 };
 
@@ -18,44 +19,54 @@ function debugLog(...args) {
 }
 
 export default async function handler(req, res) {
+  debugLog('Request method:', req.method);
+  debugLog('Request headers:', req.headers);
+
   if (req.method === 'POST') {
     try {
+      debugLog('Starting POST request handling');
+
       // Verify the Auth0 token
       await new Promise((resolve, reject) => {
         checkJwt(req, res, (err) => {
           if (err) {
+            debugLog('Auth error:', err);
             reject(new Error('Unauthorized'));
           } else {
+            debugLog('Auth successful');
             resolve();
           }
         });
       });
 
+      debugLog('Parsing request body');
       const body = await req.json();
+      debugLog('Request body:', body);
+
+      debugLog('Initiating handleUpload');
       const jsonResponse = await handleUpload({
         body,
         request: req,
         onBeforeGenerateToken: async (pathname) => {
-          // The user is already authenticated by this point
+          debugLog('onBeforeGenerateToken called');
           const user = req.auth.payload;
-          // Here you can implement your own logic to check if the user can upload
-          // For now, we'll assume all authenticated users can upload
+          debugLog('User:', user);
+
           const userCanUpload = true;
           if (!userCanUpload) {
             throw new Error('Not authorized to upload');
           }
+
           return {
             allowedContentTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'video/mp4', 'text/vtt', 'text/plain'],
             tokenPayload: JSON.stringify({
-              userId: user.sub, // Auth0 uses 'sub' for user ID
+              userId: user.sub,
             }),
           };
         },
         onUploadCompleted: async ({ blob, tokenPayload }) => {
-          console.log('Blob upload completed', blob, tokenPayload);
+          debugLog('Upload completed:', blob, tokenPayload);
           try {
-            // Here you can run any logic after the file upload is completed
-            // For example, you might want to save the blob URL to your database
             const { userId } = JSON.parse(tokenPayload);
             // await db.update({ fileUrl: blob.url, userId });
           } catch (error) {
@@ -65,10 +76,12 @@ export default async function handler(req, res) {
         },
       });
 
+      debugLog('Upload successful, sending response');
       return res.status(200).json(jsonResponse);
     } catch (error) {
       console.error('Error in upload handler:', error);
-      return res.status(error.message === 'Unauthorized' ? 401 : 400).json({ error: error.message });
+      debugLog('Error details:', error.stack);
+      return res.status(error.message === 'Unauthorized' ? 401 : 500).json({ error: error.message });
     }
   } else if (req.method === 'DELETE') {
     debugLog('Handling DELETE request');

@@ -950,6 +950,7 @@ function selectLanguage(lang) {
 function pollStatus(token) {
   return new Promise((resolve, reject) => {
     let pollingInterval;
+      let resetTimeout;
 
     async function checkStatus() {
       try {
@@ -967,8 +968,20 @@ function pollStatus(token) {
         updateUIStatus(result.status);
 
         if (result.status === "done") {
-          // Instead of stopping, continue polling
-          setTimeout(checkStatus, 5000);
+          // Clear any existing reset timeout
+          if (resetTimeout) {
+            clearTimeout(resetTimeout);
+          }
+
+          // Set a new reset timeout
+          resetTimeout = setTimeout(async () => {
+            try {
+              await reset();
+              console.log("Automatic reset performed after 'done' status");
+            } catch (error) {
+              console.error("Error during automatic reset:", error);
+            }
+          }, 10000); // 10 seconds
         } else if (result.status === "idle") {
           // If status is idle, show the input section and resolve the promise
           updateUIStatus("idle");

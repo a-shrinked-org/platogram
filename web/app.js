@@ -74,10 +74,9 @@ function getInitials(email) {
 }
 
 // coffee counting machine
-
 function updateTotalPrice() {
     if (selectedOption === 'basic') {
-        totalPrice = 5;
+        totalPrice = 0;
     } else if (selectedOption === 'coffee') {
         if (customPrice) {
             totalPrice = parseFloat(customPrice);
@@ -134,6 +133,7 @@ function handleCustomPriceChange(e) {
     const value = e.target.value;
     if (value === '' || (/^\d{1,3}(\.\d{0,2})?$/.test(value) && parseFloat(value) <= 999)) {
         customPrice = value;
+        coffeeCount = 0; // Reset coffee count when custom price is entered
         updateTotalPrice();
     }
 }

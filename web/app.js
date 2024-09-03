@@ -658,32 +658,34 @@ async function onConvertClick(event) {
         });
         console.log('Auth token obtained');
 
-        const formData = new FormData();
-        formData.append('file', file);
-
-        console.log('Sending file to server');
-        const response = await fetch('/api/upload-file', {
+        // Get the Blob token
+        const blobTokenResponse = await fetch('/api/upload-file', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`
-          },
-          body: formData
+            'Authorization': `Bearer ${token}`,
+            'X-Vercel-Blob-Token-Request': 'true'
+          }
+        });
+        if (!blobTokenResponse.ok) {
+          throw new Error('Failed to get Blob token');
+        }
+        const { token: blobToken } = await blobTokenResponse.json();
+
+        console.log('Initiating Vercel Blob upload');
+        const blob = await put(file.name, file, {
+          access: 'public',
+          token: blobToken,
+          handleUploadUrl: '/api/upload-file',
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to upload file: ${response.status} ${response.statusText}. ${errorText}`);
-        }
+        console.log('Blob metadata:', blob);
 
-        const result = await response.json();
-        console.log('Upload response:', result);
-
-        if (!result.url) {
+        if (!blob.url) {
           throw new Error('Invalid response from upload file endpoint: missing URL');
         }
 
-        console.log('File uploaded successfully. URL:', result.url);
-        return result.url;
+        console.log('File uploaded successfully. URL:', blob.url);
+        return blob.url;
       } catch (error) {
         console.error('Error uploading file:', error);
         console.error('Error stack:', error.stack);

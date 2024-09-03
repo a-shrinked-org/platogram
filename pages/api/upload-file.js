@@ -1,6 +1,5 @@
-import { put } from '@vercel/blob';
+import { handleUpload } from '@vercel/blob/client';
 import { auth } from 'express-oauth2-jwt-bearer';
-import formidable from 'formidable';
 
 // Configure Auth0 middleware
 const checkJwt = auth({
@@ -39,29 +38,56 @@ export default async function handler(req, res) {
         });
       });
 
-      const form = new formidable.IncomingForm();
-      const { fields, files } = await new Promise((resolve, reject) => {
-        form.parse(req, (err, fields, files) => {
-          if (err) reject(err);
-          else resolve({ fields, files });
+      // Check if this is a token request or an upload request
+      const isTokenRequest = req.headers['x-vercel-blob-token-request'] === 'true';
+
+      if (isTokenRequest) {
+        // Return the Blob token for client-side uploads
+        debugLog('Returning Blob token for client-side upload');
+        return res.status(200).json({ token: process.env.BLOB_READ_WRITE_TOKEN });
+      } else {
+        // Handle server-side upload (keeping existing functionality)
+        debugLog('Initiating handleUpload');
+        const response = await handleUpload({
+          body: req,
+          request: req,
+          onBeforeGenerateToken: async (pathname) => {
+            debugLog('onBeforeGenerateToken called');
+            const user = req.auth.payload;
+            debugLog('User:', user);
+            const userCanUpload = true;
+            if (!userCanUpload) {
+              throw new Error('Not authorized to upload');
+            }
+            return {
+              allowedContentTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'video/mp4', 'text/vtt', 'text/plain'],
+              tokenPayload: JSON.stringify({
+                userId: user.sub,
+              }),
+            };
+          },
+          onUploadCompleted: async ({ blob, tokenPayload }) => {
+            debugLog('Upload completed:', blob, tokenPayload);
+            try {
+              const { userId } = JSON.parse(tokenPayload);
+              // You can add additional logic here if needed
+              // For example: await db.update({ fileUrl: blob.url, userId });
+            } catch (error) {
+              console.error('Error in onUploadCompleted:', error);
+              throw new Error('Could not process completed upload');
+            }
+          },
         });
-      });
-
-      debugLog('File received:', files.file);
-
-      const file = files.file;
-      const blob = await put(file.originalFilename, file, {
-        access: 'public',
-      });
-
-      debugLog('Upload successful, sending response');
-      return res.status(200).json({ url: blob.url });
+        debugLog('Upload successful, sending response');
+        return res.status(200).json(response);
+      }
     } catch (error) {
       console.error('Error in upload handler:', error);
       debugLog('Error details:', error.stack);
       return res.status(error.message === 'Unauthorized' ? 401 : 500).json({ error: error.message });
     }
   } else if (req.method === 'DELETE') {
+    // DELETE handling remains the same
     debugLog('Handling DELETE request');
     try {
       const body = await new Promise((resolve) => {

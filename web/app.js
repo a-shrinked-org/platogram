@@ -334,7 +334,6 @@ function updateUIStatus(status, message = "") {
         break;
       case "uploading":
         toggleSection("upload-process-section");
-        // Update upload progress here if needed
         break;
       case "running":
         toggleSection("status-section");
@@ -549,25 +548,23 @@ async function handleSubmit(event) {
             submitButton.textContent = "Processing...";
         }
 
-        // If inputData is a File, upload it and get the URL
-        if (inputData instanceof File) {
-            const uploadedUrl = await uploadFile(inputData);
-            inputData = uploadedUrl;  // Assign the URL to inputData
-        }
-
         // Close the modal
-        const modal = document.getElementById("language-modal");
-        if (modal) modal.classList.add("hidden");
-
-        updateUIStatus("running", "Starting conversion...");
         closeLanguageModal();
 
         if (price > 0) {
             console.log('Non-zero price detected, initiating Stripe checkout');
-            sessionStorage.setItem('pendingConversionData', inputData);
+            sessionStorage.setItem('pendingConversionData', JSON.stringify({
+                inputData: inputData instanceof File ? inputData.name : inputData,
+                isFile: inputData instanceof File
+            }));
             await handlePaidConversion(inputData, price);
         } else {
-            console.log("InputData being passed to postToConvert:", inputData);
+            // For free conversions, proceed with upload/conversion
+            if (inputData instanceof File) {
+                const uploadedUrl = await uploadFile(inputData);
+                inputData = uploadedUrl;
+            }
+            updateUIStatus("running", "Starting conversion...");
             await postToConvert(inputData, selectedLanguage, null, price);
         }
     } catch (error) {
@@ -685,6 +682,7 @@ async function onConvertClick(event) {
       console.log('File details:', file.name, file.type, file.size);
 
       try {
+          closeLanguageModal();
           updateUIStatus("uploading");
         // Get the Auth0 token
         const token = await auth0Client.getTokenSilently({

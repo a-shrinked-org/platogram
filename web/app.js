@@ -667,7 +667,8 @@ async function onConvertClick(event) {
           }
         });
         if (!blobTokenResponse.ok) {
-          throw new Error('Failed to get Blob token');
+            const errorText = await blobTokenResponse.text();
+            throw new Error(`Failed to get Blob token: ${blobTokenResponse.status} ${errorText}`);
         }
         const { token: blobToken } = await blobTokenResponse.json();
 

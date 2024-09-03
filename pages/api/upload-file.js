@@ -55,8 +55,9 @@ export default async function handler(req, res) {
       const token = authHeader.split(' ')[1];
 
       // Verify the Auth0 token
+      let decoded;
       try {
-        const decoded = await verifyToken(token);
+        decoded = await verifyToken(token);
         debugLog('Auth successful', decoded);
       } catch (error) {
         debugLog('Auth error:', error);

@@ -7,7 +7,6 @@ let uploadedFile = null;
 let selectedOption = 'coffee';
 let coffeeCount = 1;
 let customPrice = '';
-let totalPrice = 5;
 let vercelBlobUpload;
 
 import('https://esm.sh/@vercel/blob@0.23.4').then(module => {
@@ -81,7 +80,7 @@ function updateTotalPrice() {
         if (customPrice) {
             totalPrice = parseFloat(customPrice);
         } else {
-            totalPrice = coffeeCount * 5; // This line is correct, but wasn't being reflected in the UI
+            totalPrice = coffeeCount * 5;
         }
     }
     const totalPriceElement = document.getElementById('total-price');

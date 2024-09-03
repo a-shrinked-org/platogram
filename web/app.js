@@ -634,52 +634,56 @@ async function onConvertClick(event) {
     }
   }
 
-async function uploadFile(file) {
-  console.log('Starting file upload process');
-  console.log('File details:', file.name, file.type, file.size);
+  async function uploadFile(file) {
+      console.log('Starting file upload process');
+      console.log('File details:', file.name, file.type, file.size);
 
-  try {
-    // Get the Auth0 token
-    const token = await auth0Client.getTokenSilently({
-      audience: "https://platogram.vercel.app",
-    });
-    console.log('Auth token obtained');
+      try {
+        // Get the Auth0 token
+        const token = await auth0Client.getTokenSilently({
+          audience: "https://platogram.vercel.app",
+        });
+        console.log('Auth token obtained');
 
-    console.log('Initiating Vercel Blob upload');
-    const blob = await vercelBlob.upload(file.name, file, {
-      access: 'public',
-      handleUploadUrl: '/api/upload-file',
-      clientOptions: {
-        headers: {
-          'Authorization': `Bearer ${token}`
+        // Check if the Vercel Blob client is available
+        if (typeof window.VercelBlob === 'undefined' || typeof window.VercelBlob.upload !== 'function') {
+          console.error('Vercel Blob client is not properly loaded. window.VercelBlob:', window.VercelBlob);
+          throw new Error('Vercel Blob client is not properly loaded');
         }
-      },
-      onUploadProgress: (progress) => {
-        console.log(`Upload progress: ${progress}%`);
-      },
-    });
 
-    console.log('Response status: 200'); // Blob upload doesn't provide a status, assuming success
-    console.log('Blob metadata:', blob);
+        console.log('Initiating Vercel Blob upload');
+        const blob = await window.VercelBlob.upload(file.name, file, {
+          access: 'public',
+          handleUploadUrl: '/api/upload-file',
+          clientOptions: {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          },
+          onUploadProgress: (progress) => {
+            console.log(`Upload progress: ${progress}%`);
+          },
+        });
 
-    if (!blob.url) {
-      throw new Error('Invalid response from upload file endpoint: missing URL');
+        console.log('Blob metadata:', blob);
+
+        if (!blob.url) {
+          throw new Error('Invalid response from upload file endpoint: missing URL');
+        }
+
+        console.log('File uploaded successfully. URL:', blob.url);
+        return blob.url;
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        if (error.cause && error.cause.response) {
+          console.log('Response status:', error.cause.response.status);
+          console.log('Response headers:', Object.fromEntries(error.cause.response.headers.entries()));
+          const errorText = await error.cause.response.text();
+          console.error('Error response body:', errorText);
+        }
+        throw error;
+      }
     }
-
-    console.log('File uploaded successfully. URL:', blob.url);
-    return blob.url;
-  } catch (error) {
-    console.error('Error uploading file:', error);
-    if (error.cause && error.cause.response) {
-      console.log('Response status:', error.cause.response.status);
-      console.log('Response headers:', Object.fromEntries(error.cause.response.headers.entries()));
-      const errorText = await error.cause.response.text();
-      console.error('Error response body:', errorText);
-    }
-    throw error;
-  }
-}
-
 function updateUploadProgress(progress) {
   const uploadProgressBar = document.getElementById('upload-progress-bar');
   const uploadProgressText = document.getElementById('upload-progress-text');

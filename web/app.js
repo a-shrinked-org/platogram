@@ -521,7 +521,7 @@ async function handleSubmit(event) {
             sessionStorage.setItem('pendingConversionData', inputData);
             await handlePaidConversion(inputData, price);
         } else {
-            console.log('Free conversion, proceeding with postToConvert');
+            console.log("InputData being passed to postToConvert:", inputData);
             await postToConvert(inputData, selectedLanguage, null, price);
         }
     } catch (error) {
@@ -705,36 +705,40 @@ async function deleteFile(fileUrl) {
   }
 
   async function postToConvert(inputData, lang, sessionId, price) {
-    let headers = {
+      let headers = {
         Authorization: `Bearer ${await auth0Client.getTokenSilently({
-            audience: "https://platogram.vercel.app",
+          audience: "https://platogram.vercel.app",
         })}`,
-        'Content-Type': 'application/json'
-    };
+      };
 
-    const payload = {
-        lang: lang,
-        payload: inputData
-    };
+      const formData = new FormData();
+      formData.append("lang", lang);
 
-    if (sessionId) {
-        payload.session_id = sessionId;
-    } else {
-        payload.price = price;
-    }
+      if (sessionId) {
+        formData.append('session_id', sessionId);
+      } else {
+        formData.append('price', price);
+      }
 
-    try {
-        console.log("Sending data to Platogram for conversion:", payload);
+      if (inputData instanceof File) {
+        formData.append("file", inputData);
+      } else {
+        formData.append("payload", inputData);
+      }
+
+      try {
+        console.log("Sending data to Platogram for conversion:", Object.fromEntries(formData));
         const response = await fetch("https://temporary.name/convert", {
-            method: "POST",
-            headers: headers,
-            body: JSON.stringify(payload)
+          method: "POST",
+          headers: headers,
+          body: formData,
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`HTTP error! status: ${response.status}. ${errorText}`);
-        }
+          if (!response.ok) {
+              const errorText = await response.text();
+              console.log("Full error response:", errorText);
+              throw new Error(`HTTP error! status: ${response.status}. ${errorText}`);
+          }
 
         const result = await response.json();
         console.log("Conversion API response:", result);

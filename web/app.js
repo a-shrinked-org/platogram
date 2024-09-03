@@ -298,6 +298,7 @@ async function initAuth0() {
 function updateUIStatus(status, message = "") {
   debugLog(`Updating UI status: ${status}`);
   const inputSection = document.getElementById("input-section");
+  const uploadProcessSection = document.getElementById("upload-process-section");
   const statusSection = document.getElementById("status-section");
   const doneSection = document.getElementById("done-section");
   const errorSection = document.getElementById("error-section");
@@ -306,7 +307,7 @@ function updateUIStatus(status, message = "") {
   const userEmail = document.getElementById("user-email")?.textContent || "Unknown email";
 
   // Hide all sections first
-  [inputSection, statusSection, doneSection, errorSection].forEach(section => {
+  [inputSection, statusSection, uploadProcessSection, doneSection, errorSection].forEach(section => {
     if (section) section.classList.add("hidden");
   });
 
@@ -319,6 +320,14 @@ function updateUIStatus(status, message = "") {
         console.error("Input section not found");
       }
       break;
+    case "uploading":
+        if (uploadProcessSection) {
+          uploadProcessSection.classList.remove("hidden");
+          // Update upload progress here
+        } else {
+          console.error("Upload process section not found");
+        }
+        break;
     case "running":
       if (statusSection) {
         statusSection.classList.remove("hidden");
@@ -367,33 +376,34 @@ function updateUIStatus(status, message = "") {
   }
 }
 async function updateUI() {
-  if (!auth0Client) {
-    console.error("Auth0 client not initialized");
-    return;
+    if (!auth0Client) {
+      console.error("Auth0 client not initialized");
+      return;
+    }
+
+    const isAuthenticated = await auth0Client.isAuthenticated();
+    const loginButton = document.getElementById("login-button");
+    const logoutButton = document.getElementById("logout-button");
+
+    if (loginButton) loginButton.classList.toggle("hidden", isAuthenticated);
+    if (logoutButton) logoutButton.classList.toggle("hidden", !isAuthenticated);
+
+    if (isAuthenticated) {
+      const user = await auth0Client.getUser();
+      const token = await auth0Client.getTokenSilently({
+        audience: "https://platogram.vercel.app",
+      });
+      await pollStatus(token);
+      debugLog("Logged in as: " + user.email);
+
+      // Add this line to update the UI with the new design
+      window.updateAuthUI(isAuthenticated, user);
+    } else {
+      // Add this line to update the UI when not authenticated
+      window.updateAuthUI(false, null);
+    }
   }
 
-  const isAuthenticated = await auth0Client.isAuthenticated();
-  const loginButton = document.getElementById("login-button");
-  const logoutButton = document.getElementById("logout-button");
-
-  if (loginButton) loginButton.classList.toggle("hidden", isAuthenticated);
-  if (logoutButton) logoutButton.classList.toggle("hidden", !isAuthenticated);
-
-  if (isAuthenticated) {
-    const user = await auth0Client.getUser();
-    const token = await auth0Client.getTokenSilently({
-      audience: "https://platogram.vercel.app",
-    });
-    pollStatus(token);
-    debugLog("Logged in as: " + user.email);
-
-    // Add this line to update the UI with the new design
-    window.updateAuthUI(isAuthenticated, user);
-} else {
-    // Add this line to update the UI when not authenticated
-    window.updateAuthUI(false, null);
-  }
-}
 
 async function reset() {
   try {
@@ -499,13 +509,16 @@ async function uploadLargeFile(file) {
   return fileId;
 }
 
-function updateUploadProgress(percentage) {
-  const progressBar = document.getElementById('upload-progress');
-  if (progressBar) {
-    progressBar.style.width = `${percentage}%`;
-    progressBar.textContent = `${Math.round(percentage)}%`;
+function updateUploadProgress(progress) {
+    const uploadProgressBar = document.getElementById('upload-progress-bar');
+    const uploadProgressText = document.getElementById('upload-progress-text');
+    if (uploadProgressBar && uploadProgressText) {
+      uploadProgressBar.style.width = `${progress}%`;
+      uploadProgressText.textContent = `Uploading: ${progress.toFixed(2)}%`;
+    } else {
+      console.error('Progress bar or text element not found');
+    }
   }
-}
 
 async function handleSubmit(event) {
     if (event) event.preventDefault();
@@ -661,6 +674,7 @@ async function onConvertClick(event) {
       console.log('File details:', file.name, file.type, file.size);
 
       try {
+          updateUIStatus("uploading");
         // Get the Auth0 token
         const token = await auth0Client.getTokenSilently({
           audience: "https://platogram.vercel.app",
@@ -689,6 +703,10 @@ async function onConvertClick(event) {
           access: 'public',
           token: blobToken,
           handleUploadUrl: '/api/upload-file',
+          onUploadProgress: (progress) => {
+              console.log(`Upload progress: ${progress}%`);
+              updateUploadProgress(progress);
+            },
         });
 
         console.log('Blob metadata:', blob);
@@ -698,10 +716,12 @@ async function onConvertClick(event) {
         }
 
         console.log('File uploaded successfully. URL:', blob.url);
+        updateUIStatus("running", "File uploaded, starting conversion...");
         return blob.url;
       } catch (error) {
         console.error('Error uploading file:', error);
         console.error('Error stack:', error.stack);
+        updateUIStatus("error", error.message);
         throw error;
       }
     }
@@ -934,10 +954,10 @@ function pollStatus(token) {
 
         if (result.status === "running") {
           pollingInterval = setTimeout(checkStatus, 5000); // Poll every 5 seconds
-        } else {
-          clearTimeout(pollingInterval);
-          resolve(result); // Resolve the promise when status is not "running"
-        }
+        } else if (result.status === "idle") {
+            // If status is idle, show the input section
+            updateUIStatus("idle");
+          }
       } catch (error) {
         console.error("Error polling status:", error);
         updateUIStatus("error", `An error occurred while checking status: ${error.message}`);

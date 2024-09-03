@@ -14,6 +14,7 @@ console.log('Vercel Blob import (alternative):', module);
 window.vercelBlob = module;
 }).catch(error => {
 console.error('Error importing Vercel Blob:', error);
+    });
 
 const processingStages = [
   "Byte Whispering",

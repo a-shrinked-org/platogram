@@ -634,8 +634,6 @@ async function onConvertClick(event) {
     }
   }
 
-import { upload } from '@vercel/blob/client';
-
 async function uploadFile(file) {
   console.log('Starting file upload process');
   console.log('File details:', file.name, file.type, file.size);

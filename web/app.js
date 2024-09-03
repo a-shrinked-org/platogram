@@ -697,16 +697,16 @@ async function onConvertClick(event) {
       }
     }
     
-function updateUploadProgress(progress) {
-  const uploadProgressBar = document.getElementById('upload-progress-bar');
-  const uploadProgressText = document.getElementById('upload-progress-text');
-  if (uploadProgressBar && uploadProgressText) {
-    uploadProgressBar.style.width = `${progress}%`;
-    uploadProgressText.textContent = `Uploading: ${progress.toFixed(2)}%`;
-  } else {
-    console.error('Progress bar or text element not found');
-  }
-}
+//function updateUploadProgress(progress) {
+//  const uploadProgressBar = document.getElementById('upload-progress-bar');
+//  const uploadProgressText = document.getElementById('upload-progress-text');
+//  if (uploadProgressBar && uploadProgressText) {
+//    uploadProgressBar.style.width = `${progress}%`;
+ //   uploadProgressText.textContent = `Uploading: ${progress.toFixed(2)}%`;
+//  } else {
+ //   console.error('Progress bar or text element not found');
+//  }
+//}
 
 async function deleteFile(fileUrl) {
     try {

@@ -8,13 +8,19 @@ let selectedOption = 'coffee';
 let coffeeCount = 1;
 let customPrice = '';
 let totalPrice = 5;
+let vercelBlobUpload;
 
 import('https://esm.sh/@vercel/blob@0.23.4').then(module => {
-console.log('Vercel Blob import (alternative):', module);
-window.vercelBlob = module;
-}).catch(error => {
-console.error('Error importing Vercel Blob:', error);
-    });
+        console.log('Vercel Blob import:', module);
+        if (module.put && typeof module.put === 'function') {
+          vercelBlobUpload = module.put;
+          console.log('Vercel Blob upload function found:', vercelBlobUpload);
+        } else {
+          console.error('Vercel Blob upload function not found in module');
+        }
+      }).catch(error => {
+        console.error('Error importing Vercel Blob:', error);
+      });
 
 const processingStages = [
   "Byte Whispering",
@@ -646,10 +652,8 @@ async function onConvertClick(event) {
   console.log('File details:', file.name, file.type, file.size);
 
   try {
-    console.log('Vercel Blob object:', vercelBlob);
-
-    if (typeof vercelBlob.upload !== 'function') {
-      throw new Error('Vercel Blob upload function is not available');
+    if (typeof vercelBlobUpload !== 'function') {
+      throw new Error('Vercel Blob upload function is not available. Make sure the module is loaded.');
     }
 
     // Get the Auth0 token
@@ -659,14 +663,10 @@ async function onConvertClick(event) {
     console.log('Auth token obtained');
 
     console.log('Initiating Vercel Blob upload');
-    const blob = await vercelBlob.upload(file.name, file, {
+    const blob = await vercelBlobUpload(file.name, file, {
       access: 'public',
       handleUploadUrl: '/api/upload-file',
-      clientOptions: {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      },
+      token: token,
       onUploadProgress: (progress) => {
         console.log(`Upload progress: ${progress}%`);
       },

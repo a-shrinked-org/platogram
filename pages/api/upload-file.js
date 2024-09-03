@@ -39,19 +39,17 @@ export default async function handler(req, res) {
       });
 
       debugLog('Initiating handleUpload');
-      const jsonResponse = await handleUpload({
+      const response = await handleUpload({
         body: req,
         request: req,
         onBeforeGenerateToken: async (pathname) => {
           debugLog('onBeforeGenerateToken called');
           const user = req.auth.payload;
           debugLog('User:', user);
-
           const userCanUpload = true;
           if (!userCanUpload) {
             throw new Error('Not authorized to upload');
           }
-
           return {
             allowedContentTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'video/mp4', 'text/vtt', 'text/plain'],
             tokenPayload: JSON.stringify({
@@ -63,7 +61,8 @@ export default async function handler(req, res) {
           debugLog('Upload completed:', blob, tokenPayload);
           try {
             const { userId } = JSON.parse(tokenPayload);
-            // await db.update({ fileUrl: blob.url, userId });
+            // You can add additional logic here if needed
+            // For example: await db.update({ fileUrl: blob.url, userId });
           } catch (error) {
             console.error('Error in onUploadCompleted:', error);
             throw new Error('Could not process completed upload');
@@ -72,7 +71,7 @@ export default async function handler(req, res) {
       });
 
       debugLog('Upload successful, sending response');
-      return res.status(200).json(jsonResponse);
+      return res.status(200).json(response);
     } catch (error) {
       console.error('Error in upload handler:', error);
       debugLog('Error details:', error.stack);

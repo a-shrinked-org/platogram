@@ -639,30 +639,28 @@ async function uploadFile(file) {
   console.log('File details:', file.name, file.type, file.size);
 
   try {
-    // Create a FormData object to send the file
-    const formData = new FormData();
-    formData.append('file', file);
-
-    // Send the file to our API endpoint
-    const response = await fetch('/api/upload-file', {
-      method: 'POST',
-      body: formData,
+    // Get the Auth0 token
+    const token = await auth0Client.getTokenSilently({
+      audience: "https://platogram.vercel.app",
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to upload file: ${response.status} ${response.statusText}`);
-    }
+    const blob = await upload(file.name, file, {
+      access: 'public',
+      handleUploadUrl: '/api/upload-file',
+      clientOptions: {
+        // Include the Auth0 token in the request headers
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      },
+      onUploadProgress: (progress) => {
+        console.log(`Upload progress: ${progress}%`);
+        updateUploadProgress(progress);
+      },
+    });
 
-    const result = await response.json();
-    console.log('File upload response:', result);
-
-    if (!result.url) {
-      throw new Error('Invalid response from upload file endpoint: missing URL');
-    }
-
-    console.log('File uploaded successfully. URL:', result.url);
-    return result.url;
-
+    console.log('File uploaded successfully. URL:', blob.url);
+    return blob.url;
   } catch (error) {
     console.error('Error uploading file:', error);
     throw error;

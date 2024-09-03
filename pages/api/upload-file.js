@@ -1,88 +1,94 @@
-// pages/api/upload-file.js
 import { handleUpload } from '@vercel/blob/client';
-import { put } from '@vercel/blob';
-import { IncomingForm } from 'formidable';
+import { NextResponse } from 'next/server';
+import { jwtVerify } from 'jose';
 
 export const config = {
-  api: {
-    bodyParser: false,
-  },
+  runtime: 'edge',
 };
 
-function debugLog(message, data = '') {
-  console.log(`[DEBUG] ${message}`, data);
+async function verifyToken(token) {
+  try {
+    const JWKS = jose.createRemoteJWKSet(new URL('https://dev-w0dm4z23pib7oeui.us.auth0.com/.well-known/jwks.json'));
+    const { payload } = await jwtVerify(token, JWKS, {
+      audience: 'https://platogram.vercel.app/',
+      issuer: 'https://dev-w0dm4z23pib7oeui.us.auth0.com/',
+    });
+    return payload;
+  } catch (error) {
+    console.error('Token verification failed:', error);
+    throw new Error('Unauthorized');
+  }
 }
 
-export default async function handler(req, res) {
-  debugLog('Received request:', req.method);
-
-  if (req.method === 'POST') {
-    return new Promise((resolve, reject) => {
-      const form = new IncomingForm();
-
-      form.parse(req, async (err, fields, files) => {
-        if (err) {
-          console.error('Error parsing form:', err);
-          res.status(500).json({ error: 'Error parsing form' });
-          return resolve();
-        }
-
-        const file = files.file?.[0]; // formidable v3 returns an array for each field
-        if (!file) {
-          res.status(400).json({ error: 'No file uploaded' });
-          return resolve();
-        }
-
-        debugLog('File received:', file.originalFilename);
-
-        try {
-          const blob = await put(file.originalFilename, file, {
-            access: 'public',
-          });
-
-          debugLog('File uploaded to Vercel Blob:', blob.url);
-          res.status(200).json({ url: blob.url });
-        } catch (uploadError) {
-          console.error('Error uploading to Vercel Blob:', uploadError);
-          res.status(500).json({ error: 'Error uploading file to storage' });
-        }
-        resolve();
-      });
-    });
-  } else if (req.method === 'DELETE') {
-    // DELETE handling remains the same
-    debugLog('Handling DELETE request');
+export default async function handler(request) {
+  if (request.method === 'POST') {
     try {
-      const body = await new Promise((resolve) => {
-        let data = '';
-        req.on('data', (chunk) => { data += chunk; });
-        req.on('end', () => {
-          try {
-            resolve(JSON.parse(data));
-          } catch (e) {
-            resolve({});
+      // Extract the token from the Authorization header
+      const authHeader = request.headers.get('Authorization');
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        throw new Error('Unauthorized');
+      }
+      const token = authHeader.split(' ')[1];
+
+      // Verify the Auth0 token
+      const user = await verifyToken(token);
+
+      const body = await request.json();
+
+      const jsonResponse = await handleUpload({
+        body,
+        request,
+        onBeforeGenerateToken: async (pathname) => {
+          // Here you can implement your own logic to check if the user can upload
+          const userCanUpload = true;
+          if (!userCanUpload) {
+            throw new Error('Not authorized to upload');
           }
-        });
+
+          return {
+            allowedContentTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'video/mp4', 'text/vtt', 'text/plain'],
+            tokenPayload: JSON.stringify({
+              userId: user.sub,
+            }),
+          };
+        },
+        onUploadCompleted: async ({ blob, tokenPayload }) => {
+          console.log('Blob upload completed', blob, tokenPayload);
+          try {
+            // Here you can run any logic after the file upload is completed
+            const { userId } = JSON.parse(tokenPayload);
+            // await db.update({ fileUrl: blob.url, userId });
+          } catch (error) {
+            console.error('Error in onUploadCompleted:', error);
+            throw new Error('Could not process completed upload');
+          }
+        },
       });
 
-      const { url: fileUrl } = body;
+      return NextResponse.json(jsonResponse);
+    } catch (error) {
+      console.error('Error in upload handler:', error);
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.message === 'Unauthorized' ? 401 : 400 }
+      );
+    }
+  } else if (request.method === 'DELETE') {
+    try {
+      const { url: fileUrl } = await request.json();
       if (!fileUrl) {
-        return res.status(400).json({ error: 'File URL is required for deletion' });
+        return NextResponse.json({ error: 'File URL is required for deletion' }, { status: 400 });
       }
 
-      debugLog('Attempting to delete file:', fileUrl);
       const { del } = await import('@vercel/blob');
       await del(fileUrl);
 
-      debugLog('File deleted successfully');
-      return res.status(200).json({ message: 'File deleted successfully' });
+      return NextResponse.json({ message: 'File deleted successfully' });
     } catch (error) {
       console.error('Error deleting file:', error);
-      return res.status(400).json({ error: 'Failed to delete file' });
+      return NextResponse.json({ error: 'Failed to delete file' }, { status: 400 });
     }
   } else {
-    debugLog('Invalid method:', req.method);
-    res.setHeader('Allow', ['POST', 'DELETE']);
-    return res.status(405).end(`Method ${req.method} Not Allowed`);
+    return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
   }
 }

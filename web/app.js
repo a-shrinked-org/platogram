@@ -964,25 +964,25 @@ function toggleSection(sectionToShow) {
   });
 }
 
-function updateUIStatus(status, message = "") {
-  debugLog(`Updating UI status: ${status}`);
-  const statusSection = document.getElementById("status-section");
-  const fileName = document.getElementById("file-name").textContent;
-  const userEmail = document.getElementById("user-email").textContent;
+//function updateUIStatus(status, message = "") {
+//  debugLog(`Updating UI status: ${status}`);
+ // const statusSection = document.getElementById("status-section");
+ // const fileName = document.getElementById("file-name").textContent;
+ // const userEmail = document.getElementById("user-email").textContent;
+//
+ // if (statusSection) {
+//    statusSection.innerHTML = `
+ //     <p>File: ${fileName}</p>
+ //     <p>Email: ${userEmail}</p>
+ //     <p>Status: ${status}</p>
+ //     ${message ? `<p>${message}</p>` : ''}
+ //   `;
+ // }
 
-  if (statusSection) {
-    statusSection.innerHTML = `
-      <p>File: ${fileName}</p>
-      <p>Email: ${userEmail}</p>
-      <p>Status: ${status}</p>
-      ${message ? `<p>${message}</p>` : ''}
-    `;
-  }
-
-  toggleSection(status === "running" ? "status-section" :
-                status === "done" ? "done-section" :
-                status === "error" ? "error-section" : "input-section");
-}
+ // toggleSection(status === "running" ? "status-section" :
+ //               status === "done" ? "done-section" :
+ //               status === "error" ? "error-section" : "input-section");
+//}
 
 function toggleSection(sectionToShow) {
   const sections = [

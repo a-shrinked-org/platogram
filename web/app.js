@@ -399,6 +399,10 @@ async function updateUI() {
       const token = await auth0Client.getTokenSilently({
         audience: "https://platogram.vercel.app",
       });
+        const userEmailElement = document.getElementById("user-email");
+        if (userEmailElement) {
+          userEmailElement.textContent = user.email;
+        }
       await pollStatus(token);
       debugLog("Logged in as: " + user.email);
 
@@ -519,12 +523,12 @@ function updateUploadProgress(progress) {
     const uploadProgressBar = document.getElementById('upload-progress-bar');
     const uploadProgressText = document.getElementById('upload-progress-text');
     if (uploadProgressBar && uploadProgressText) {
-      uploadProgressBar.style.width = `${progress}%`;
-      uploadProgressText.textContent = `Uploading: ${progress.toFixed(2)}%`;
+        uploadProgressBar.style.width = `${progress}%`;
+        uploadProgressText.textContent = `Uploading: ${progress.toFixed(2)}%`;
     } else {
-      console.error('Progress bar or text element not found');
+        console.error('Progress bar or text element not found');
     }
-  }
+}
 
 async function handleSubmit(event) {
     if (event) event.preventDefault();
@@ -556,6 +560,7 @@ async function handleSubmit(event) {
         if (modal) modal.classList.add("hidden");
 
         updateUIStatus("running", "Starting conversion...");
+        closeLanguageModal();
 
         if (price > 0) {
             console.log('Non-zero price detected, initiating Stripe checkout');

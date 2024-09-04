@@ -970,21 +970,42 @@ function pollStatus(token) {
 
         updateUIStatus(result.status);
 
-        if (result.status === "done") {
-          // Clear any existing reset timeout
-          if (resetTimeout) {
-            clearTimeout(resetTimeout);
+       function scheduleReset(delay) {
+            if (resetTimeout) {
+              clearTimeout(resetTimeout);
+            }
+            resetTimeout = setTimeout(async () => {
+              try {
+                await reset();
+                console.log(`Automatic reset performed after ${result.status} status`);
+                updateUIStatus("idle");
+              } catch (error) {
+                console.error("Error during automatic reset:", error);
+              }
+            }, delay);
           }
 
-          // Set a new reset timeout
-          resetTimeout = setTimeout(async () => {
-            try {
-              await reset();
-              console.log("Automatic reset performed after 'done' status");
-            } catch (error) {
-              console.error("Error during automatic reset:", error);
+          function scheduleReset(delay) {
+              if (resetTimeout) {
+                clearTimeout(resetTimeout);
+              }
+              resetTimeout = setTimeout(async () => {
+                try {
+                  await reset();
+                  console.log(`Automatic reset performed after ${result.status} status`);
+                  updateUIStatus("idle");
+                } catch (error) {
+                  console.error("Error during automatic reset:", error);
+                }
+              }, delay);
             }
-          }, 10000); // 10 seconds
+
+            if (result.status === "done") {
+              scheduleReset(10000); // 10 seconds for success
+              resolve(result);
+            } else if (result.status === "error" || result.status === "failed") {
+              scheduleReset(3000); // 3 seconds for error
+              resolve(result);
         } else if (result.status === "idle") {
           // If status is idle, show the input section and resolve the promise
           updateUIStatus("idle");

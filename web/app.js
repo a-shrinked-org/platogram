@@ -677,9 +677,41 @@ async function onConvertClick(event) {
     }
   }
 
+  function sanitizeFileName(fileName) {
+      // Remove any character that isn't a word character, number, or safe punctuation
+      let sanitized = fileName.replace(/[^\w\d.-]/g, '_');
+
+      // Replace multiple consecutive underscores with a single one
+      sanitized = sanitized.replace(/_+/g, '_');
+
+      // Remove leading and trailing underscores
+      sanitized = sanitized.replace(/^_|_$/g, '');
+
+      // Ensure the file name isn't too long (e.g., limit to 100 characters)
+      sanitized = sanitized.slice(0, 100);
+
+      // If the sanitized name is empty, provide a default name
+      if (sanitized === '') {
+        sanitized = 'unnamed_file';
+      }
+
+      // Preserve the original file extension
+      const originalExtension = fileName.split('.').pop();
+      const sanitizedExtension = sanitized.split('.').pop();
+
+      if (originalExtension !== sanitizedExtension) {
+        sanitized += '.' + originalExtension;
+      }
+
+      return sanitized;
+    }
+
   async function uploadFile(file) {
       console.log('Starting file upload process');
       console.log('File details:', file.name, file.type, file.size);
+
+      const sanitizedFileName = sanitizeFileName(file.name);
+      console.log('Sanitized file name:', sanitizedFileName);
 
       try {
           closeLanguageModal();

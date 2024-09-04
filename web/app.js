@@ -1161,6 +1161,8 @@ document.addEventListener("DOMContentLoaded", () => {
         convertFileButton: document.getElementById('convert-file-button'),
         loginButton: document.getElementById('login-button'),
         logoutButton: document.getElementById('logout-button'),
+        userCircle: document.getElementById('user-circle'),
+        logoutTooltip: document.getElementById('logout-tooltip'),
     };
 
     // Set up language selection buttons

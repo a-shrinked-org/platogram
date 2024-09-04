@@ -970,21 +970,6 @@ function pollStatus(token) {
 
         updateUIStatus(result.status);
 
-       function scheduleReset(delay) {
-            if (resetTimeout) {
-              clearTimeout(resetTimeout);
-            }
-            resetTimeout = setTimeout(async () => {
-              try {
-                await reset();
-                console.log(`Automatic reset performed after ${result.status} status`);
-                updateUIStatus("idle");
-              } catch (error) {
-                console.error("Error during automatic reset:", error);
-              }
-            }, delay);
-          }
-
           function scheduleReset(delay) {
               if (resetTimeout) {
                 clearTimeout(resetTimeout);

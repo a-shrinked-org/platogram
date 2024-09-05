@@ -40,7 +40,6 @@ let currentStageIndex = 0;
 let processingStageInterval;
 
 function debugLog(message) {
-    const logMessage = data ? `${message} ${JSON.stringify(data)}` : message;
   console.log(`[DEBUG] ${message}`);
 }
 

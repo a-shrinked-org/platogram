@@ -9,6 +9,8 @@ let coffeeCount = 1;
 let customPrice = '';
 let totalPrice = 5;
 let vercelBlobUpload;
+let db;
+let testMode = false;
 
 import('https://esm.sh/@vercel/blob@0.23.4').then(module => {
         console.log('Vercel Blob import:', module);
@@ -38,7 +40,13 @@ let currentStageIndex = 0;
 let processingStageInterval;
 
 function debugLog(message) {
+    const logMessage = data ? `${message} ${JSON.stringify(data)}` : message;
   console.log(`[DEBUG] ${message}`);
+}
+
+function enableTestMode() {
+    testMode = true;
+    console.log("Test mode enabled");
 }
 
 window.updateAuthUI = function(isAuthenticated, user) {
@@ -529,9 +537,65 @@ function updateUploadProgress(progress) {
     }
 }
 
+// Initialize IndexedDB
+function initDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open("FileStorage", 1);
+        request.onerror = (event) => reject("IndexedDB error: " + event.target.error);
+        request.onsuccess = (event) => {
+            db = event.target.result;
+            resolve();
+        };
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            db.createObjectStore("files", { keyPath: "id" });
+        };
+    });
+}
+
+// Store file in IndexedDB
+async function storeFileTemporarily(file) {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(["files"], "readwrite");
+        const store = transaction.objectStore("files");
+        const id = Date.now().toString();
+        const request = store.add({ id: id, file: file });
+        request.onerror = (event) => reject("Error storing file: " + event.target.error);
+        request.onsuccess = (event) => resolve(id);
+    });
+}
+
+// Retrieve file from IndexedDB
+async function retrieveFileFromTemporaryStorage(id) {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(["files"], "readonly");
+        const store = transaction.objectStore("files");
+        const request = store.get(id);
+        request.onerror = (event) => reject("Error retrieving file: " + event.target.error);
+        request.onsuccess = (event) => resolve(event.target.result.file);
+    });
+}
+
+// Test that IndexedDB works
+async function testIndexedDB() {
+    const testFile = new File(["test content"], "test.mp3", { type: "audio/mpeg" });
+    const fileId = await storeFileTemporarily(testFile);
+    debugLog("File stored with ID", fileId);
+
+    const retrievedFile = await retrieveFileFromTemporaryStorage(fileId);
+    debugLog("File retrieved", { name: retrievedFile.name, size: retrievedFile.size, type: retrievedFile.type });
+
+    if (testFile.name === retrievedFile.name && testFile.size === retrievedFile.size && testFile.type === retrievedFile.type) {
+        console.log("IndexedDB test passed");
+    } else {
+        console.error("IndexedDB test failed");
+    }
+}
+
 async function handleSubmit(event) {
     if (event) event.preventDefault();
     console.log('handleSubmit called');
+    debugLog("handleSubmit called", { price: getPriceFromUI(), inputData: getInputData() });
     const price = getPriceFromUI();
     let inputData = getInputData();
     const submitButton = document.getElementById('submit-btn');
@@ -553,11 +617,18 @@ async function handleSubmit(event) {
 
         if (price > 0) {
             console.log('Non-zero price detected, initiating Stripe checkout');
+            let fileId = null;
+            if (inputData instanceof File) {
+                fileId = await storeFileTemporarily(inputData);
+            }
+            // Store job parameters before redirecting to Stripe
             sessionStorage.setItem('pendingConversionData', JSON.stringify({
-                inputData: inputData instanceof File ? inputData.name : inputData,
-                isFile: inputData instanceof File
+                inputData: inputData instanceof File ? fileId : inputData,
+                isFile: inputData instanceof File,
+                lang: selectedLanguage,
+                price: price
             }));
-            await handlePaidConversion(inputData, price);
+            await handlePaidConversion(price);
         } else {
             // For free conversions, proceed with upload/conversion
             if (inputData instanceof File) {
@@ -565,7 +636,7 @@ async function handleSubmit(event) {
                 inputData = uploadedUrl;
             }
             updateUIStatus("running", "Starting conversion...");
-            await postToConvert(inputData, selectedLanguage, null, price);
+            await postToConvert(inputData, selectedLanguage, null, price, true);
         }
     } catch (error) {
         console.error('Error in handleSubmit:', error);
@@ -578,11 +649,18 @@ async function handleSubmit(event) {
     }
 }
 
-async function handlePaidConversion(inputData, price) {
+async function handlePaidConversion(price) {
     const user = await auth0Client.getUser();
     const email = user.email || user["https://platogram.com/user_email"];
     if (!email) {
         throw new Error('User email not available');
+    }
+    if (testMode) {
+        console.log("Test mode: Simulating Stripe checkout");
+        // Simulate successful payment
+        const sessionId = 'test_session_' + Date.now();
+        await handleStripeSuccess({ session_id: sessionId });
+        return;
     }
 
     const response = await fetch('/api/create-checkout-session', {
@@ -612,17 +690,39 @@ async function handlePaidConversion(inputData, price) {
     }
 }
 
-function handleStripeSuccess() {
+async function handleStripeSuccess() {
     const urlParams = new URLSearchParams(window.location.search);
-    const sessionId = urlParams.get('session_id');
-    const lang = urlParams.get('lang');
-    const inputData = sessionStorage.getItem('pendingConversionData');
+    // const sessionId = urlParams.get('session_id');
+    const sessionId = mockSession ? mockSession.session_id : urlParams.get('session_id');
+    const pendingConversionData = JSON.parse(sessionStorage.getItem('pendingConversionData'));
 
-    if (sessionId && lang && inputData) {
-        sessionStorage.removeItem('pendingConversionData');
-        postToConvert(inputData, lang, sessionId, null);
-    } else {
+    if (!sessionId || !pendingConversionData) {
         updateUIStatus('error', 'Invalid success parameters');
+        return;
+    }
+
+    sessionStorage.removeItem('pendingConversionData');
+
+    let inputData = pendingConversionData.inputData;
+    const lang = pendingConversionData.lang;
+    const price = pendingConversionData.price;
+
+    try {
+        if (pendingConversionData.isFile) {
+            // Retrieve the file from IndexedDB
+            const file = await retrieveFileFromTemporaryStorage(inputData);
+            // Now upload the file to your server or Blob storage
+            inputData = await uploadFile(file);
+        }
+
+        // Start the conversion process
+        await postToConvert(inputData, lang, sessionId, price, false);
+
+        // Redirect to the main page and show status
+        window.location.href = '/?showStatus=true';
+    } catch (error) {
+        console.error('Error in handleStripeSuccess:', error);
+        updateUIStatus("error", "Error starting conversion after payment: " + error.message);
     }
 }
 
@@ -803,6 +903,7 @@ async function deleteFile(fileUrl) {
   }
 
   async function postToConvert(inputData, lang, sessionId, price) {
+      debugLog("postToConvert called", { inputData, lang, sessionId, price });
       let headers = {
         Authorization: `Bearer ${await auth0Client.getTokenSilently({
           audience: "https://platogram.vercel.app",
@@ -1178,6 +1279,11 @@ function safeUpdateProcessingStage() {
     console.error("Error in safeUpdateProcessingStage:", error);
   }
 }
+
+document.addEventListener("DOMContentLoaded", async () => {
+    await initDB();
+    await testIndexedDB();
+});
 
 document.addEventListener("DOMContentLoaded", () => {
     debugLog("DOM Content Loaded");

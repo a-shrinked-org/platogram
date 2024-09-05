@@ -585,6 +585,12 @@
                 <a href="https://coda.io/@shrinked/privacy" target="_blank" class="text-blue-600 hover:underline mr-4">Privacy</a>
                 <a href="https://coda.io/@shrinked/terms-of-service" target="_blank" class="text-blue-600 hover:underline">Terms of Service</a>
             </div>
+            <div id="test-panel" style="display: none; border: 1px solid #ccc; padding: 10px; margin-top: 20px;">
+                <h3>Test Panel</h3>
+                <button onclick="testURLInput()">Test URL Input</button>
+                <button onclick="testFileInput()">Test File Input</button>
+                <button onclick="testPaidConversion()">Test Paid Conversion</button>
+            </div>
         </footer>
     </div>
 
@@ -672,5 +678,28 @@
     window.vercelBlobPut = put;
   </script>
 <script type="module" src="https://platogram.vercel.app/web/app.js"></script>
+<script>
+    function showTestPanel() {
+        document.getElementById('test-panel').style.display = 'block';
+    }
+
+    async function testURLInput() {
+        document.getElementById('url-input').value = 'https://example.com/test.mp3';
+        await onConvertClick();
+    }
+
+    async function testFileInput() {
+        const file = new File(["test content"], "test.mp3", { type: "audio/mpeg" });
+        await handleFiles([file]);
+        await onConvertClick();
+    }
+
+    async function testPaidConversion() {
+        enableTestMode();
+        const file = new File(["test content"], "test.mp3", { type: "audio/mpeg" });
+        await handleFiles([file]);
+        await handleSubmit();
+    }
+    </script>
 </body>
 </html>

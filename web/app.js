@@ -711,7 +711,7 @@ async function handlePaidConversion(price) {
     }
 }
 
-async function handleStripeSuccess() {
+async function handleStripeSuccess(mockSession = null) {
     const urlParams = new URLSearchParams(window.location.search);
     // const sessionId = urlParams.get('session_id');
     const sessionId = mockSession ? mockSession.session_id : urlParams.get('session_id');

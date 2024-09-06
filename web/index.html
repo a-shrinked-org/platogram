@@ -691,49 +691,55 @@ function showTestPanel() {
     document.getElementById('test-panel').style.display = 'block';
 }
 
-function updateTestStatus(message) {
-    document.getElementById('test-status').textContent = message;
-}
+ function updateTestStatus(message) {
+     const statusElement = document.getElementById('test-status');
+     if (statusElement) {
+         statusElement.textContent = message;
+     }
+     console.log('[Test Status]', message);
+ }
 
 async function testURLInput() {
     enableTestMode();
-    updateTestStatus("Testing URL input...");
-    document.getElementById('url-input').value = 'https://example.com/test.mp3';
-    await simulateConversionFlow(false);
+    const testUrl = 'https://example.com/test.mp3';
+    updateTestStatus("Testing URL input: " + testUrl);
+    document.getElementById('url-input').value = testUrl;
+    await simulateConversionFlow(false, testUrl);
 }
 
 async function testFileInput() {
     enableTestMode();
-    updateTestStatus("Testing file input...");
     const file = new File(["test content"], "test.mp3", { type: "audio/mpeg" });
+    updateTestStatus("Testing file input: " + file.name);
     await handleFiles([file]);
-    await simulateConversionFlow(true);
+    await simulateConversionFlow(true, file);
 }
 
- async function simulateConversionFlow(isFile) {
-     try {
-         // Simulate storing conversion data
-         const conversionData = {
-             inputData: isFile ? "test.mp3" : "https://example.com/test.mp3",
-             isFile: isFile,
-             lang: "en",
-             price: TEST_PRICE
-         };
-         sessionStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
-         updateTestStatus("Conversion data stored. Simulating Stripe redirect...");
+async function simulateConversionFlow(isFile, inputData) {
+    try {
+        // Simulate storing conversion data
+        const conversionData = {
+            inputData: isFile ? inputData.name : inputData,
+            isFile: isFile,
+            lang: "en",
+            price: TEST_PRICE
+        };
+        sessionStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
+        console.log('Stored conversion data:', conversionData);
+        updateTestStatus("Conversion data stored. Simulating Stripe redirect in 5 seconds...");
 
-         // Simulate delay before redirect
-         await new Promise(resolve => setTimeout(resolve, 5000));
+        // Simulate delay before redirect
+        await new Promise(resolve => setTimeout(resolve, 5000));
 
-         // Simulate redirect to success page
-         const testSessionId = 'test_session_' + Date.now();
-         updateTestStatus("Redirecting to success page...");
-         window.location.href = `/success?session_id=${testSessionId}`;
-     } catch (error) {
-         console.error("Error in test flow:", error);
-         updateTestStatus("Error: " + error.message);
-     }
- }
+        // Simulate redirect to success page
+        const testSessionId = 'test_session_' + Date.now();
+        updateTestStatus("Redirecting to success page...");
+        window.location.href = `/success?session_id=${testSessionId}`;
+    } catch (error) {
+        console.error("Error in test flow:", error);
+        updateTestStatus("Error: " + error.message);
+    }
+}
     </script>
 </body>
 </html>

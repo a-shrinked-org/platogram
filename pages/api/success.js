@@ -58,7 +58,13 @@ export default function Success() {
         async function handleSuccess() {
             await initDB();
             const { session_id } = router.query;
-            const pendingConversionData = JSON.parse(sessionStorage.getItem('pendingConversionData'));
+            console.log('Session ID:', session_id);
+
+            const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
+            console.log('Retrieved pendingConversionDataString:', pendingConversionDataString);
+
+            const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
+            console.log('Parsed pendingConversionData:', pendingConversionData);
 
             if (!session_id || !pendingConversionData) {
                 setStatus('Error: Invalid success parameters');
@@ -73,13 +79,15 @@ export default function Success() {
             try {
                 if (pendingConversionData.isFile) {
                     setStatus('Retrieving file...');
+                    console.log('Retrieving file:', inputData);
                     // In test mode, simulate file retrieval
                     const file = isTestMode
-                        ? new File(["test content"], pendingConversionData.inputData, { type: "audio/mpeg" })
-                        : await retrieveFileFromTemporaryStorage(pendingConversionData.inputData);
+                        ? new File(["test content"], inputData, { type: "audio/mpeg" })
+                        : await retrieveFileFromTemporaryStorage(inputData);
 
                     setStatus('Uploading file...');
                     inputData = await uploadFile(file, isTestMode);
+                    console.log('File uploaded:', inputData);
                 }
 
                 setStatus('Starting conversion...');
@@ -90,21 +98,21 @@ export default function Success() {
                     await new Promise(resolve => setTimeout(resolve, 3000)); // Wait before redirect
                     router.push('/?showStatus=true');
                 } else {
-                    response = await fetch('/convert', {
+                    // Existing code for real API call
+                    const response = await fetch('/convert', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({ session_id, lang, inputData }),
                     });
-                }
           
-                if (response.ok) {
-                    setStatus('Conversion started');
-                    // Redirect to main page with status
-                    router.push('/?showStatus=true');
-                } else {
-                    setStatus('Failed to start conversion');
+                    if (response.ok) {
+                        setStatus('Conversion started');
+                        router.push('/?showStatus=true');
+                    } else {
+                        setStatus('Failed to start conversion');
+                    }
                 }
             } catch (error) {
                 console.error('Error in handleSuccess:', error);

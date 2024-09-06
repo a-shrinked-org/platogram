@@ -593,7 +593,6 @@ async function testIndexedDB() {
 
 async function handleSubmit(event) {
     if (event) event.preventDefault();
-    console.log('handleSubmit called');
     debugLog("handleSubmit called", { price: getPriceFromUI(), inputData: getInputData() });
     const price = getPriceFromUI();
     let inputData = getInputData();
@@ -615,7 +614,7 @@ async function handleSubmit(event) {
         closeLanguageModal();
 
         if (price > 0) {
-            console.log('Non-zero price detected, initiating Stripe checkout');
+            console.log('Non-zero price detected, initiating Stripe checkout', { price, inputData: inputData instanceof File ? 'File' : inputData });
             let fileId = null;
             if (inputData instanceof File) {
                 fileId = await storeFileTemporarily(inputData);
@@ -639,6 +638,7 @@ async function handleSubmit(event) {
         }
     } catch (error) {
         console.error('Error in handleSubmit:', error);
+        console.error('Error details:', { price, inputData: inputData instanceof File ? 'File' : inputData });
         updateUIStatus("error", "Error: " + error.message);
     } finally {
         if (submitButton) {
@@ -649,6 +649,7 @@ async function handleSubmit(event) {
 }
 
 async function handlePaidConversion(price) {
+    console.log('handlePaidConversion called', { price });
     const user = await auth0Client.getUser();
     const email = user.email || user["https://platogram.com/user_email"];
     if (!email) {
@@ -660,6 +661,13 @@ async function handlePaidConversion(price) {
         const sessionId = 'test_session_' + Date.now();
         await handleStripeSuccess({ session_id: sessionId });
         return;
+    }
+
+    // Retrieve the stored pending conversion data
+    const pendingConversionData = JSON.parse(sessionStorage.getItem('pendingConversionData'));
+    console.log('Pending conversion data retrieved', pendingConversionData);
+    if (!pendingConversionData) {
+        throw new Error('No pending conversion data found');
     }
 
     const response = await fetch('/api/create-checkout-session', {

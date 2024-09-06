@@ -680,9 +680,7 @@ async function handlePaidConversion(price) {
 
     if (testMode) {
         console.log("Test mode: Simulating Stripe checkout");
-        // Simulate successful payment
-        const sessionId = 'test_session_' + Date.now();
-        await handleStripeSuccess({ session_id: sessionId });
+        await simulateConversionFlow(uploadedFile instanceof File);
         return;
     }
 

@@ -591,6 +591,14 @@ async function testIndexedDB() {
     }
 }
 
+function checkSessionStorage() {
+    console.log('Current sessionStorage content:');
+    for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        console.log(`${key}: ${sessionStorage.getItem(key)}`);
+    }
+}
+
 async function handleSubmit(event) {
     if (event) event.preventDefault();
     debugLog("handleSubmit called", { price: getPriceFromUI(), inputData: getInputData() });
@@ -613,19 +621,22 @@ async function handleSubmit(event) {
         // Close the modal
         closeLanguageModal();
 
-        if (price > 0) {
+         if (price > 0) {
             console.log('Non-zero price detected, initiating Stripe checkout', { price, inputData: inputData instanceof File ? 'File' : inputData });
             let fileId = null;
             if (inputData instanceof File) {
                 fileId = await storeFileTemporarily(inputData);
             }
             // Store job parameters before redirecting to Stripe
-            sessionStorage.setItem('pendingConversionData', JSON.stringify({
+            const pendingConversionData = JSON.stringify({
                 inputData: inputData instanceof File ? fileId : inputData,
                 isFile: inputData instanceof File,
                 lang: selectedLanguage,
                 price: price
-            }));
+            });
+            sessionStorage.setItem('pendingConversionData', pendingConversionData);
+            console.log('Stored pendingConversionData:', pendingConversionData);
+            checkSessionStorage();
             await handlePaidConversion(price);
         } else {
             // For free conversions, proceed with upload/conversion
@@ -655,19 +666,24 @@ async function handlePaidConversion(price) {
     if (!email) {
         throw new Error('User email not available');
     }
+    console.log('User email retrieved', { email });
+
+    const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
+    console.log('Retrieved pendingConversionDataString:', pendingConversionDataString);
+
+    const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
+    console.log('Parsed pendingConversionData:', pendingConversionData);
+
+    if (!pendingConversionData) {
+        throw new Error('No pending conversion data found');
+    }
+
     if (testMode) {
         console.log("Test mode: Simulating Stripe checkout");
         // Simulate successful payment
         const sessionId = 'test_session_' + Date.now();
         await handleStripeSuccess({ session_id: sessionId });
         return;
-    }
-
-    // Retrieve the stored pending conversion data
-    const pendingConversionData = JSON.parse(sessionStorage.getItem('pendingConversionData'));
-    console.log('Pending conversion data retrieved', pendingConversionData);
-    if (!pendingConversionData) {
-        throw new Error('No pending conversion data found');
     }
 
     const response = await fetch('/api/create-checkout-session', {
@@ -677,9 +693,9 @@ async function handlePaidConversion(price) {
         },
         body: JSON.stringify({
             price: price,
-            lang: selectedLanguage,
+            lang: pendingConversionData.lang,
             email: email,
-            inputData: inputData instanceof File ? null : inputData
+            inputData: pendingConversionData.inputData
         }),
     });
 

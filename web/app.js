@@ -721,23 +721,22 @@ async function handleStripeSuccessRedirect() {
             console.error('Error handling Stripe success:', error);
             updateUIStatus("error", "Error processing payment: " + error.message);
         }
+    } else {
+        console.error('No session_id found in URL parameters');
+        updateUIStatus("error", "Invalid payment session");
     }
 }
 
-async function handleStripeSuccess() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const sessionId = urlParams.get('session_id');
+async function handleStripeSuccess(sessionId) {
     const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
-
     console.log("Retrieved pendingConversionDataString:", pendingConversionDataString);
 
-    if (!sessionId || !pendingConversionDataString) {
+    if (!pendingConversionDataString) {
         updateUIStatus('error', 'Invalid success parameters');
         return;
     }
 
     const pendingConversionData = JSON.parse(pendingConversionDataString);
-
     let inputData = pendingConversionData.inputData;
     const lang = pendingConversionData.lang;
     const price = pendingConversionData.price;
@@ -750,7 +749,12 @@ async function handleStripeSuccess() {
 
         if (pendingConversionData.isFile) {
             // Handle file input
+            console.log("Retrieving file from temporary storage:", inputData);
             const file = await retrieveFileFromTemporaryStorage(inputData);
+            if (!file) {
+                throw new Error("Failed to retrieve file from temporary storage");
+            }
+            console.log("File retrieved, uploading to Blob storage");
             inputData = await uploadFile(file);
         } else {
             // Handle URL input - no need to upload, use directly
@@ -771,17 +775,19 @@ async function handleStripeSuccess() {
     }
 }
 
-
 function handleStripeRedirect() {
-  const query = new URLSearchParams(window.location.search);
-  if (query.get('success')) {
-    console.log('Payment successful! You will receive an email confirmation.');
-    updateUIStatus('done', 'Payment successful! You will receive an email confirmation.');
-  }
-  if (query.get('canceled')) {
-    console.log('Order canceled -- continue to shop around and checkout when you are ready.');
-    updateUIStatus('idle', 'Order canceled. You can try again when you are ready.');
-  }
+    const query = new URLSearchParams(window.location.search);
+    if (query.get('success')) {
+        console.log('Payment successful! Redirecting to success page...');
+        // Instead of updating UI status here, redirect to the success page
+        window.location.href = `/success?session_id=${query.get('session_id')}`;
+    } else if (query.get('canceled')) {
+        console.log('Order canceled -- continue to shop around and checkout when you are ready.');
+        updateUIStatus('idle', 'Order canceled. You can try again when you are ready.');
+    } else {
+        console.log('Unknown Stripe redirect status');
+        updateUIStatus('error', 'Unknown payment status. Please contact support if you believe this is an error.');
+    }
 }
 
 function handleStripeCancel() {
@@ -852,65 +858,79 @@ async function onConvertClick(event) {
       return sanitized;
     }
 
-  async function uploadFile(file) {
-      console.log('Starting file upload process');
-      console.log('File details:', file.name, file.type, file.size);
+    async function uploadFile(file) {
+        console.log('Starting file upload process');
+        console.log('File details:', file.name, file.type, file.size);
 
-      const sanitizedFileName = sanitizeFileName(file.name);
-      console.log('Sanitized file name:', sanitizedFileName);
+        const sanitizedFileName = sanitizeFileName(file.name);
+        console.log('Sanitized file name:', sanitizedFileName);
 
-      try {
-          closeLanguageModal();
-          updateUIStatus("uploading");
-        // Get the Auth0 token
-        const token = await auth0Client.getTokenSilently({
-          audience: "https://platogram.vercel.app",
-        });
-        console.log('Auth token obtained');
+        try {
+            closeLanguageModal();
+            updateUIStatus("uploading");
 
-        // Get the Blob token
-        const blobTokenResponse = await fetch('/api/upload-file', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-Vercel-Blob-Token-Request': 'true'
-          }
-        });
-        if (!blobTokenResponse.ok) {
-          const errorText = await blobTokenResponse.text();
-          throw new Error(`Failed to get Blob token: ${blobTokenResponse.status} ${errorText}`);
+            // Get the Auth0 token
+            let token;
+            try {
+                token = await auth0Client.getTokenSilently({
+                    audience: "https://platogram.vercel.app",
+                });
+                console.log('Auth token obtained');
+            } catch (authError) {
+                console.error('Error getting Auth0 token:', authError);
+                throw new Error('Authentication failed. Please try logging in again.');
+            }
+
+            // Get the Blob token
+            let blobToken;
+            try {
+                const blobTokenResponse = await fetch('/api/upload-file', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'X-Vercel-Blob-Token-Request': 'true'
+                    }
+                });
+                if (!blobTokenResponse.ok) {
+                    const errorText = await blobTokenResponse.text();
+                    throw new Error(`Failed to get Blob token: ${blobTokenResponse.status} ${errorText}`);
+                }
+                ({ token: blobToken } = await blobTokenResponse.json());
+            } catch (blobTokenError) {
+                console.error('Error getting Blob token:', blobTokenError);
+                throw new Error('Failed to initialize file upload. Please try again.');
+            }
+
+            console.log('Initiating Vercel Blob upload');
+            if (typeof vercelBlobUpload !== 'function') {
+                throw new Error('Vercel Blob upload function not available');
+            }
+
+            const blob = await vercelBlobUpload(sanitizedFileName, file, {
+                access: 'public',
+                token: blobToken,
+                handleUploadUrl: '/api/upload-file',
+                onUploadProgress: (progress) => {
+                    console.log(`Upload progress: ${progress}%`);
+                    updateUploadProgress(progress);
+                },
+            });
+
+            console.log('Blob metadata:', blob);
+
+            if (!blob.url) {
+                throw new Error('Invalid response from upload file endpoint: missing URL');
+            }
+
+            console.log('File uploaded successfully. URL:', blob.url);
+            updateUIStatus("running", "File uploaded, starting conversion...");
+            return blob.url;
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            console.error('Error stack:', error.stack);
+            updateUIStatus("error", error.message || 'An unknown error occurred during file upload');
+            throw error;
         }
-        const { token: blobToken } = await blobTokenResponse.json();
-
-        console.log('Initiating Vercel Blob upload');
-        if (typeof window.vercelBlobPut !== 'function') {
-          throw new Error('Vercel Blob put function not available');
-        }
-        const blob = await vercelBlobUpload(file.name, file, {
-          access: 'public',
-          token: blobToken,
-          handleUploadUrl: '/api/upload-file',
-          onUploadProgress: (progress) => {
-              console.log(`Upload progress: ${progress}%`);
-              updateUploadProgress(progress);
-            },
-        });
-
-        console.log('Blob metadata:', blob);
-
-        if (!blob.url) {
-          throw new Error('Invalid response from upload file endpoint: missing URL');
-        }
-
-        console.log('File uploaded successfully. URL:', blob.url);
-        updateUIStatus("running", "File uploaded, starting conversion...");
-        return blob.url;
-      } catch (error) {
-        console.error('Error uploading file:', error);
-        console.error('Error stack:', error.stack);
-        updateUIStatus("error", error.message);
-        throw error;
-      }
     }
     
 //function updateUploadProgress(progress) {
@@ -950,7 +970,9 @@ async function deleteFile(fileUrl) {
 
   async function postToConvert(inputData, lang, sessionId, price) {
     debugLog("postToConvert called", { inputData, lang, sessionId, price });
-    let headers = {};
+    let headers = {
+        'Content-Type': 'application/json'
+    };
 
     try {
         if (!auth0Client) {
@@ -966,29 +988,19 @@ async function deleteFile(fileUrl) {
         // Proceed without the token if there's an error
     }
 
-    const formData = new FormData();
-    formData.append("lang", lang);
-    if (sessionId) {
-        formData.append('session_id', sessionId);
-    } else {
-        formData.append('price', price);
-    }
-
-    if (inputData instanceof File) {
-        formData.append("file", inputData);
-    } else if (inputData instanceof Blob) {
-        // Handle Blob URLs from Vercel Blob storage
-        formData.append("file", inputData, "uploaded_file");
-    } else {
-        formData.append("payload", inputData);
-    }
+    const payload = {
+        lang,
+        session_id: sessionId,
+        price,
+        payload: inputData
+    };
 
     try {
-        console.log("Sending data to Platogram for conversion:", Object.fromEntries(formData));
+        console.log("Sending data to Platogram for conversion:", payload);
         const response = await fetch("https://temporary.name/convert", {
             method: "POST",
             headers: headers,
-            body: formData,
+            body: JSON.stringify(payload),
         });
 
         if (!response.ok) {

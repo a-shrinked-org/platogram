@@ -720,12 +720,26 @@ async function handlePaidConversion(price) {
         throw new Error(result.error.message);
     }
 }
+async function handleStripeSuccessRedirect() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+    if (sessionId) {
+        try {
+            await initAuth0(); // Make sure Auth0 is initialized
+            await handleStripeSuccess();
+        } catch (error) {
+            console.error('Error handling Stripe success:', error);
+            updateUIStatus("error", "Error processing payment: " + error.message);
+        }
+    }
+}
 
 async function handleStripeSuccess(mockSession = null) {
     const urlParams = new URLSearchParams(window.location.search);
-    // const sessionId = urlParams.get('session_id');
     const sessionId = mockSession ? mockSession.session_id : urlParams.get('session_id');
-    const pendingConversionData = JSON.parse(sessionStorage.getItem('pendingConversionData'));
+    const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
+    console.log('Retrieved pendingConversionDataString:', pendingConversionDataString);
+    const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
 
     if (!sessionId || !pendingConversionData) {
         updateUIStatus('error', 'Invalid success parameters');
@@ -741,22 +755,23 @@ async function handleStripeSuccess(mockSession = null) {
 
     try {
         if (pendingConversionData.isFile) {
-            // Retrieve the file from IndexedDB
             const file = await retrieveFileFromTemporaryStorage(inputData);
-            // Now upload the file to your server or Blob storage
-            inputData = await uploadFile(file);
+            inputData = await uploadFile(file, isTestMode);
         }
 
-        // Start the conversion process
-        await postToConvert(inputData, lang, sessionId, price, false);
+        await postToConvert(inputData, lang, sessionId, price, isTestMode);
 
-        // Redirect to the main page and show status
-        window.location.href = '/?showStatus=true';
+        // Instead of redirecting, update the UI to show conversion status
+        updateUIStatus("running", "Conversion started. Checking status...");
+        // Start polling for status
+        const token = await auth0Client.getTokenSilently();
+        await pollStatus(token);
     } catch (error) {
         console.error('Error in handleStripeSuccess:', error);
         updateUIStatus("error", "Error starting conversion after payment: " + error.message);
     }
 }
+
 
 function handleStripeRedirect() {
   const query = new URLSearchParams(window.location.search);
@@ -1312,9 +1327,22 @@ function safeUpdateProcessingStage() {
   }
 }
 
+userCircle.addEventListener('click', (event) => {
+    console.log('User circle clicked');
+    event.preventDefault();
+    event.stopPropagation();
+    logoutTooltip.classList.toggle('hidden');
+    console.log('Tooltip hidden class toggled');
+});
+
 document.addEventListener("DOMContentLoaded", async () => {
     await initDB();
     await testIndexedDB();
+
+    // Add this line to handle Stripe success redirect
+    if (window.location.pathname === '/success') {
+        await handleStripeSuccessRedirect();
+    }
 });
 
 document.addEventListener("DOMContentLoaded", () => {

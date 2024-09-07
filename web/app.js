@@ -714,8 +714,9 @@ async function handleStripeSuccessRedirect() {
     const sessionId = urlParams.get('session_id');
     if (sessionId) {
         try {
+            await ensureDbInitialized();
             await initAuth0(); // Make sure Auth0 is initialized
-            await handleStripeSuccess();
+            await handleStripeSuccess(sessionId);
         } catch (error) {
             console.error('Error handling Stripe success:', error);
             updateUIStatus("error", "Error processing payment: " + error.message);
@@ -762,8 +763,8 @@ async function handleStripeSuccess() {
         // Clear the pending conversion data
         sessionStorage.removeItem('pendingConversionData');
 
-        // Redirect to the main page and show status
-        window.location.href = '/?showStatus=true';
+        // Update UI to show conversion started
+        updateUIStatus("running", "Conversion started");
     } catch (error) {
         console.error('Error in handleStripeSuccess:', error);
         updateUIStatus("error", "Error starting conversion after payment: " + error.message);
@@ -948,55 +949,53 @@ async function deleteFile(fileUrl) {
   }
 
   async function postToConvert(inputData, lang, sessionId, price) {
-      debugLog("postToConvert called", { inputData, lang, sessionId, price });
-      let headers = {
-        Authorization: `Bearer ${await auth0Client.getTokenSilently({
-          audience: "https://platogram.vercel.app",
-        })}`,
-      };
+    debugLog("postToConvert called", { inputData, lang, sessionId, price });
+    let headers = {};
 
-      try {
-          if (!auth0Client) {
-              console.log("Auth0 client not initialized, attempting to initialize...");
-              await initAuth0();
-          }
+    try {
+        if (!auth0Client) {
+            console.log("Auth0 client not initialized, attempting to initialize...");
+            await initAuth0();
+        }
+        const token = await auth0Client.getTokenSilently({
+            audience: "https://platogram.vercel.app",
+        });
+        headers.Authorization = `Bearer ${token}`;
+    } catch (error) {
+        console.error("Error getting auth token:", error);
+        // Proceed without the token if there's an error
+    }
 
-          headers.Authorization = `Bearer ${await auth0Client.getTokenSilently({
-              audience: "https://platogram.vercel.app",
-          })}`;
-      } catch (error) {
-          console.error("Error getting auth token:", error);
-          // Proceed without the token if there's an error
-      }
-
-      const formData = new FormData();
-      formData.append("lang", lang);
-
-      if (sessionId) {
+    const formData = new FormData();
+    formData.append("lang", lang);
+    if (sessionId) {
         formData.append('session_id', sessionId);
-      } else {
+    } else {
         formData.append('price', price);
-      }
+    }
 
-      if (inputData instanceof File) {
+    if (inputData instanceof File) {
         formData.append("file", inputData);
-      } else {
+    } else if (inputData instanceof Blob) {
+        // Handle Blob URLs from Vercel Blob storage
+        formData.append("file", inputData, "uploaded_file");
+    } else {
         formData.append("payload", inputData);
-      }
+    }
 
-      try {
+    try {
         console.log("Sending data to Platogram for conversion:", Object.fromEntries(formData));
         const response = await fetch("https://temporary.name/convert", {
-          method: "POST",
-          headers: headers,
-          body: formData,
+            method: "POST",
+            headers: headers,
+            body: formData,
         });
 
-          if (!response.ok) {
-              const errorText = await response.text();
-              console.log("Full error response:", errorText);
-              throw new Error(`HTTP error! status: ${response.status}. ${errorText}`);
-          }
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.log("Full error response:", errorText);
+            throw new Error(`HTTP error! status: ${response.status}. ${errorText}`);
+        }
 
         const result = await response.json();
         console.log("Conversion API response:", result);
@@ -1004,7 +1003,6 @@ async function deleteFile(fileUrl) {
         if (result.message === "Conversion started" || result.status === "processing") {
             updateUIStatus("running");
             const finalStatus = await pollStatus(await auth0Client.getTokenSilently());
-
             if (finalStatus.status === 'idle') {
                 updateUIStatus("idle", "Ready for new conversion");
             } else if (finalStatus.status === 'done') {
@@ -1014,20 +1012,14 @@ async function deleteFile(fileUrl) {
             }
 
             // Check if the inputData is a Blob URL and trigger cleanup
-            if (inputData.includes('.public.blob.vercel-storage.com/')) {
+            if (typeof inputData === 'string' && inputData.includes('.public.blob.vercel-storage.com/')) {
                 try {
                     console.log("Conversion complete. Attempting to delete temporary file");
                     await deleteFile(inputData);
                     console.log("Temporary file successfully deleted");
-                     } catch (cleanupError) {
+                } catch (cleanupError) {
                     console.error("Error during file cleanup:", cleanupError);
                 }
-            }
-
-            if (finalStatus.status === 'done') {
-                updateUIStatus("done", "Conversion completed successfully");
-            } else {
-                updateUIStatus("error", finalStatus.error || "Conversion failed");
             }
         } else {
             updateUIStatus("error", "Unexpected response from server");

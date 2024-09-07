@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import { put } from '@vercel/blob/client';
+import { useAuth0 } from '@auth0/auth0-react';
 
 let db;
 
 // Initialize IndexedDB
 function initDB() {
-  return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         const request = indexedDB.open("FileStorage", 1);
         request.onerror = (event) => reject("IndexedDB error: " + event.target.error);
         request.onsuccess = (event) => {
@@ -30,29 +32,50 @@ async function retrieveFileFromTemporaryStorage(id) {
     });
 }
 
-// Upload file to server
-async function uploadFile(file, isTestMode = false) {
+async function uploadFile(file, isTestMode = false, getTokenSilently) {
     if (isTestMode) {
         console.log('Test mode: Simulating file upload');
         return `https://example.com/test-upload/${file.name}`;
     }
 
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await fetch('/api/upload-file', {
-        method: 'POST',
-        body: formData,
-    });
-    if (!response.ok) {
+    try {
+        // Get the Auth0 token
+        const token = await getTokenSilently();
+
+        // Get the Blob token
+        const tokenResponse = await fetch('/api/upload-file', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'X-Vercel-Blob-Token-Request': 'true'
+            }
+        });
+
+        if (!tokenResponse.ok) {
+            throw new Error('Failed to get Blob token');
+        }
+
+        const { token: blobToken } = await tokenResponse.json();
+
+        // Use Vercel Blob to upload the file
+        const blob = await put(file.name, file, {
+            access: 'public',
+            token: blobToken,
+            handleUploadUrl: '/api/upload-file',
+        });
+
+        console.log('File uploaded successfully. URL:', blob.url);
+        return blob.url;
+    } catch (error) {
+        console.error('Error uploading file:', error);
         throw new Error('Failed to upload file');
     }
-    const result = await response.json();
-    return result.url;
 }
 
 export default function Success() {
     const router = useRouter();
     const [status, setStatus] = useState('Processing payment');
+    const { getTokenSilently } = useAuth0();
 
     useEffect(() => {
         async function handleSuccess() {
@@ -80,13 +103,10 @@ export default function Success() {
                 if (pendingConversionData.isFile) {
                     setStatus('Retrieving file...');
                     console.log('Retrieving file:', inputData);
-                    // In test mode, simulate file retrieval
-                    const file = isTestMode
-                        ? new File(["test content"], inputData, { type: "audio/mpeg" })
-                        : await retrieveFileFromTemporaryStorage(inputData);
+                    const file = await retrieveFileFromTemporaryStorage(inputData);
 
                     setStatus('Uploading file...');
-                    inputData = await uploadFile(file, isTestMode);
+                    inputData = await uploadFile(file, isTestMode, getTokenSilently);
                     console.log('File uploaded:', inputData);
                 }
 
@@ -98,11 +118,13 @@ export default function Success() {
                     await new Promise(resolve => setTimeout(resolve, 3000)); // Wait before redirect
                     router.push('/?showStatus=true');
                 } else {
-                    // Existing code for real API call
+                    // Real API call
+                    const token = await getTokenSilently();
                     const response = await fetch('/convert', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
                         },
                         body: JSON.stringify({ session_id, lang, inputData }),
                     });
@@ -123,7 +145,7 @@ export default function Success() {
         if (router.query.session_id) {
             handleSuccess();
         }
-    }, [router.query]);
+    }, [router.query, getTokenSilently]);
 
     return (
         <div>

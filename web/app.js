@@ -337,26 +337,18 @@ function updateUIStatus(status, message = "") {
     // Show the appropriate section based on status
     switch (status) {
         case "idle":
-            // Only update to idle if we're not already in a processing state
-            if (!["running", "uploading"].includes(currentStatus)) {
-                toggleSection("input-section");
-                currentStatus = "idle";
-            }
+            toggleSection("input-section");
             break;
-        case "uploading":
-            toggleSection("upload-process-section");
-            currentStatus = "uploading";
-            break;
+        case "processing":
         case "running":
-            toggleSection("status-section");
-            currentStatus = "running";
-            const statusSectionElement = document.getElementById("status-section");
-            if (statusSectionElement) {
-                statusSectionElement.innerHTML = `
-                    <p>File: ${fileName}</p>
+            toggleSection("upload-process-section");
+            const progressSection = document.getElementById("upload-process-section");
+            if (progressSection) {
+                progressSection.innerHTML = `
+                    <p>File/URL: ${fileName}</p>
                     <p>Email: ${userEmail}</p>
                     <p>Status: ${status}</p>
-                    ${message ? `<p>${message}</p>` : ''}
+                    <p>${message}</p>
                     <div id="processing-stage"></div>
                 `;
                 initializeProcessingStage();
@@ -364,11 +356,10 @@ function updateUIStatus(status, message = "") {
             break;
         case "done":
             toggleSection("done-section");
-            currentStatus = "done";
             const doneSectionElement = document.getElementById("done-section");
             if (doneSectionElement) {
                 doneSectionElement.innerHTML = `
-                    <p>File: ${fileName}</p>
+                    <p>File/URL: ${fileName}</p>
                     <p>Email: ${userEmail}</p>
                     <p>Status: Completed</p>
                     ${message ? `<p>${message}</p>` : ''}
@@ -377,12 +368,12 @@ function updateUIStatus(status, message = "") {
             clearProcessingStageInterval();
             break;
         case "error":
+        case "failed":
             toggleSection("error-section");
-            currentStatus = "error";
             const errorSectionElement = document.getElementById("error-section");
             if (errorSectionElement) {
                 errorSectionElement.innerHTML = `
-                    <p>File: ${fileName}</p>
+                    <p>File/URL: ${fileName}</p>
                     <p>Email: ${userEmail}</p>
                     <p>Status: Error</p>
                     <p>${message || "An error occurred. Please try again."}</p>
@@ -392,10 +383,9 @@ function updateUIStatus(status, message = "") {
             break;
         default:
             console.warn(`Unknown status: ${status}`);
+            toggleSection("input-section");
     }
 }
-
-let currentStatus = "idle";
   
 async function updateUI() {
     if (!auth0Client) {
@@ -433,7 +423,6 @@ async function updateUI() {
       console.error("Error updating UI:", error);
     }
   }
-
 
 async function reset() {
   try {
@@ -645,11 +634,7 @@ async function handleSubmit(event) {
         // Close the modal
         closeLanguageModal();
 
-        // For URL inputs, skip Stripe-related checks and directly proceed to conversion
-        if (typeof inputData === 'string' && inputData.startsWith('http')) {
-            updateUIStatus("running", "Starting conversion...");
-            await postToConvert(inputData, selectedLanguage, null, price, true);
-        } else if (price > 0) {
+        if (price > 0) {
             // Existing logic for paid conversions
             console.log('Non-zero price detected, initiating Stripe checkout', { price, inputData: inputData instanceof File ? 'File' : inputData });
             let fileId = null;
@@ -1007,7 +992,7 @@ async function deleteFile(fileUrl) {
         headers.Authorization = `Bearer ${token}`;
     } catch (error) {
         console.error("Error getting auth token:", error);
-        // Proceed without the token if there's an error
+        throw new Error("Authentication failed. Please try logging in again.");
     }
 
     const formData = new FormData();
@@ -1017,14 +1002,11 @@ async function deleteFile(fileUrl) {
     } else {
         formData.append('price', price);
     }
-    if (inputData instanceof File) {
-        formData.append("file", inputData);
-    } else {
-        formData.append("payload", inputData);
-    }
+    formData.append("payload", inputData);
 
     try {
         console.log("Sending data to Platogram for conversion:", Object.fromEntries(formData));
+        updateUIStatus("processing", "Sending conversion request...");
         const response = await fetch("https://temporary.name/convert", {
             method: "POST",
             headers: headers,
@@ -1041,9 +1023,8 @@ async function deleteFile(fileUrl) {
         console.log("Conversion API response:", result);
 
         if (result.message === "Conversion started" || result.status === "processing") {
-            updateUIStatus("running");
-            const finalStatus = await pollStatus(await auth0Client.getTokenSilently());
-            handleConversionStatus(finalStatus, inputData);
+            updateUIStatus("processing", "Conversion in progress...");
+            await pollStatus(await auth0Client.getTokenSilently());
         } else {
             updateUIStatus("error", "Unexpected response from server");
         }
@@ -1051,7 +1032,7 @@ async function deleteFile(fileUrl) {
         console.error("Error in postToConvert:", error);
         updateUIStatus("error", error.message);
     }
-  }
+}
 
 function handleConversionStatus(status, inputData) {
     switch (status.status) {
@@ -1188,66 +1169,60 @@ function selectLanguage(lang) {
 }
 
 function pollStatus(token) {
-  return new Promise((resolve, reject) => {
-    let pollingInterval;
-      let resetTimeout;
+    return new Promise((resolve, reject) => {
+        let pollingInterval;
+        let resetTimeout;
+        let attemptCount = 0;
+        const maxAttempts = 60; // 5 minutes of polling at 5-second intervals
 
-    async function checkStatus() {
-      try {
-        const response = await fetch("https://temporary.name/status", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-        console.log("Polling status response:", result);
-
-        updateUIStatus(result.status);
-
-          function scheduleReset(delay) {
-              if (resetTimeout) {
-                clearTimeout(resetTimeout);
-              }
-              resetTimeout = setTimeout(async () => {
-                try {
-                  await reset();
-                  console.log(`Automatic reset performed after ${result.status} status`);
-                  updateUIStatus("idle");
-                } catch (error) {
-                  console.error("Error during automatic reset:", error);
-                }
-              }, delay);
+        async function checkStatus() {
+            if (attemptCount >= maxAttempts) {
+                clearInterval(pollingInterval);
+                updateUIStatus("error", "Conversion timed out. Please try again.");
+                reject(new Error("Polling timed out"));
+                return;
             }
 
-            if (result.status === "done") {
-              scheduleReset(10000); // 10 seconds for success
-              resolve(result);
-            } else if (result.status === "error" || result.status === "failed") {
-              scheduleReset(3000); // 3 seconds for error
-              resolve(result);
-        } else if (result.status === "idle") {
-          // If status is idle, show the input section and resolve the promise
-          updateUIStatus("idle");
-          resolve(result);
-        } else if (result.status === "running") {
-          // Continue polling
-          setTimeout(checkStatus, 5000);
-        } else {
-          // For any other status, resolve the promise
-          resolve(result);
-        }
-      } catch (error) {
-        console.error("Error polling status:", error);
-        updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
-        reject(error);
-      }
-    }
+            attemptCount++;
 
-    checkStatus(); // Start the polling process
-  });
+            try {
+                const response = await fetch("https://temporary.name/status", {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log("Polling status response:", result);
+
+                updateUIStatus(result.status, `Conversion ${result.status}...`);
+
+                if (result.status === "done") {
+                    clearInterval(pollingInterval);
+                    resolve(result);
+                } else if (result.status === "error" || result.status === "failed") {
+                    clearInterval(pollingInterval);
+                    updateUIStatus("error", result.error || "Conversion failed");
+                    reject(new Error(result.error || "Conversion failed"));
+                } else if (result.status === "idle") {
+                    // If status is idle, but we're still polling, continue
+                    console.log("Received idle status, continuing to poll...");
+                } else if (result.status !== "running" && result.status !== "processing") {
+                    console.warn(`Unknown status: ${result.status}`);
+                }
+            } catch (error) {
+                console.error("Error polling status:", error);
+                updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
+                clearInterval(pollingInterval);
+                reject(error);
+            }
+        }
+
+        pollingInterval = setInterval(checkStatus, 5000); // Poll every 5 seconds
+        checkStatus(); // Start the polling process immediately
+    });
 }
 
 function toggleSection(sectionToShow) {

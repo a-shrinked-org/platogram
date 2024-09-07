@@ -290,6 +290,7 @@ function initStripe() {
 }
 
 async function initAuth0() {
+  if (auth0Initialized) return;
   try {
     auth0Client = await auth0.createAuth0Client({
       domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
@@ -302,6 +303,7 @@ async function initAuth0() {
       cacheLocation: "localstorage",
     });
     debugLog("Auth0 client initialized successfully");
+    auth0Initialized = true;
 
     const query = window.location.search;
     if (query.includes("code=") && query.includes("state=")) {
@@ -316,61 +318,69 @@ async function initAuth0() {
 }
 
 function updateUIStatus(status, message = "") {
-  debugLog(`Updating UI status: ${status}`);
-  const inputSection = document.getElementById("input-section");
-  const uploadProcessSection = document.getElementById("upload-process-section");
-  const statusSection = document.getElementById("status-section");
-  const doneSection = document.getElementById("done-section");
-  const errorSection = document.getElementById("error-section");
+    debugLog(`Updating UI status: ${status}`);
+    const inputSection = document.getElementById("input-section");
+    const uploadProcessSection = document.getElementById("upload-process-section");
+    const statusSection = document.getElementById("status-section");
+    const doneSection = document.getElementById("done-section");
+    const errorSection = document.getElementById("error-section");
 
-  const fileName = document.getElementById("file-name")?.textContent || "Unknown file";
-  const userEmail = document.getElementById("user-email")?.textContent || "Unknown email";
+    const fileName = document.getElementById("file-name")?.textContent || "Unknown file";
+    const userEmail = document.getElementById("user-email")?.textContent || "Unknown email";
 
-  // Hide all sections first
-  [inputSection, statusSection, uploadProcessSection, doneSection, errorSection].forEach(section => {
-    if (section) section.classList.add("hidden");
-  });
+    // Hide all sections first
+    [inputSection, statusSection, uploadProcessSection, doneSection, errorSection].forEach(section => {
+        if (section) section.classList.add("hidden");
+    });
 
-  // Show the appropriate section based on status
-  switch (status) {
-      case "idle":
-        toggleSection("input-section");
-        break;
-      case "uploading":
-        toggleSection("upload-process-section");
-        break;
-      case "running":
-        toggleSection("status-section");
-        const statusSection = document.getElementById("status-section");
-        if (statusSection) {
-          statusSection.innerHTML = `
-            <p>File: ${fileName}</p>
-            <p>Email: ${userEmail}</p>
-            <p>Status: ${status}</p>
-            ${message ? `<p>${message}</p>` : ''}
-            <div id="processing-stage"></div>
-          `;
-          initializeProcessingStage();
-        }
-        break;
-      case "done":
-        toggleSection("done-section");
-        const doneSection = document.getElementById("done-section");
-        if (doneSection) {
-          doneSection.innerHTML = `
-            <p>File: ${fileName}</p>
-            <p>Email: ${userEmail}</p>
-            <p>Status: Completed</p>
-            ${message ? `<p>${message}</p>` : ''}
-          `;
-        }
-        clearProcessingStageInterval();
-        break;
-      case "error":
+    // Show the appropriate section based on status
+    switch (status) {
+        case "idle":
+            // Only update to idle if we're not already in a processing state
+            if (!["running", "uploading"].includes(currentStatus)) {
+                toggleSection("input-section");
+                currentStatus = "idle";
+            }
+            break;
+        case "uploading":
+            toggleSection("upload-process-section");
+            currentStatus = "uploading";
+            break;
+        case "running":
+            toggleSection("status-section");
+            currentStatus = "running";
+            const statusSectionElement = document.getElementById("status-section");
+            if (statusSectionElement) {
+                statusSectionElement.innerHTML = `
+                    <p>File: ${fileName}</p>
+                    <p>Email: ${userEmail}</p>
+                    <p>Status: ${status}</p>
+                    ${message ? `<p>${message}</p>` : ''}
+                    <div id="processing-stage"></div>
+                `;
+                initializeProcessingStage();
+            }
+            break;
+        case "done":
+            toggleSection("done-section");
+            currentStatus = "done";
+            const doneSectionElement = document.getElementById("done-section");
+            if (doneSectionElement) {
+                doneSectionElement.innerHTML = `
+                    <p>File: ${fileName}</p>
+                    <p>Email: ${userEmail}</p>
+                    <p>Status: Completed</p>
+                    ${message ? `<p>${message}</p>` : ''}
+                `;
+            }
+            clearProcessingStageInterval();
+            break;
+        case "error":
             toggleSection("error-section");
-            const errorSection = document.getElementById("error-section");
-            if (errorSection) {
-                errorSection.innerHTML = `
+            currentStatus = "error";
+            const errorSectionElement = document.getElementById("error-section");
+            if (errorSectionElement) {
+                errorSectionElement.innerHTML = `
                     <p>File: ${fileName}</p>
                     <p>Email: ${userEmail}</p>
                     <p>Status: Error</p>
@@ -383,6 +393,8 @@ function updateUIStatus(status, message = "") {
             console.warn(`Unknown status: ${status}`);
     }
 }
+
+let currentStatus = "idle";
   
 async function updateUI() {
     if (!auth0Client) {
@@ -612,6 +624,13 @@ async function handleSubmit(event) {
         return;
     }
 
+    if (isConversionInProgress) {
+        console.log("Conversion already in progress. Skipping.");
+        return;
+    }
+
+    isConversionInProgress = true;
+
     try {
         if (submitButton) {
             submitButton.disabled = true;
@@ -621,7 +640,12 @@ async function handleSubmit(event) {
         // Close the modal
         closeLanguageModal();
 
-         if (price > 0) {
+        // For URL inputs, skip Stripe-related checks and directly proceed to conversion
+        if (typeof inputData === 'string' && inputData.startsWith('http')) {
+            updateUIStatus("running", "Starting conversion...");
+            await postToConvert(inputData, selectedLanguage, null, price, true);
+        } else if (price > 0) {
+            // Existing logic for paid conversions
             console.log('Non-zero price detected, initiating Stripe checkout', { price, inputData: inputData instanceof File ? 'File' : inputData });
             let fileId = null;
             if (inputData instanceof File) {
@@ -639,7 +663,7 @@ async function handleSubmit(event) {
             checkSessionStorage();
             await handlePaidConversion(price);
         } else {
-            // For free conversions, proceed with upload/conversion
+            // For free file conversions, proceed with upload/conversion
             if (inputData instanceof File) {
                 const uploadedUrl = await uploadFile(inputData);
                 inputData = uploadedUrl;
@@ -656,6 +680,7 @@ async function handleSubmit(event) {
             submitButton.disabled = false;
             submitButton.textContent = "Submit";
         }
+        isConversionInProgress = false;
     }
 }
 
@@ -963,12 +988,6 @@ async function deleteFile(fileUrl) {
   }
 
   async function postToConvert(inputData, lang, sessionId, price) {
-    if (isConversionInProgress) {
-        console.log("Conversion already in progress. Skipping.");
-        return;
-    }
-
-    isConversionInProgress = true;
     debugLog("postToConvert called", { inputData, lang, sessionId, price });
     let headers = {};
 
@@ -1026,10 +1045,8 @@ async function deleteFile(fileUrl) {
     } catch (error) {
         console.error("Error in postToConvert:", error);
         updateUIStatus("error", error.message);
-    } finally {
-        isConversionInProgress = false;
     }
-}
+  }
 
 function handleConversionStatus(status, inputData) {
     switch (status.status) {

@@ -723,38 +723,47 @@ async function handleStripeSuccessRedirect() {
     }
 }
 
-async function handleStripeSuccess(mockSession = null) {
+async function handleStripeSuccess() {
     const urlParams = new URLSearchParams(window.location.search);
-    const sessionId = mockSession ? mockSession.session_id : urlParams.get('session_id');
+    const sessionId = urlParams.get('session_id');
     const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
-    console.log('Retrieved pendingConversionDataString:', pendingConversionDataString);
-    const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
 
-    if (!sessionId || !pendingConversionData) {
+    console.log("Retrieved pendingConversionDataString:", pendingConversionDataString);
+
+    if (!sessionId || !pendingConversionDataString) {
         updateUIStatus('error', 'Invalid success parameters');
         return;
     }
 
-    sessionStorage.removeItem('pendingConversionData');
+    const pendingConversionData = JSON.parse(pendingConversionDataString);
 
     let inputData = pendingConversionData.inputData;
     const lang = pendingConversionData.lang;
     const price = pendingConversionData.price;
-    const isTestMode = sessionId.startsWith('test_session_');
 
     try {
-        if (pendingConversionData.isFile) {
-            const file = await retrieveFileFromTemporaryStorage(inputData);
-            inputData = await uploadFile(file, isTestMode);
+        if (!auth0Client) {
+            console.log("Auth0 client not initialized, attempting to initialize...");
+            await initAuth0();
         }
 
-        await postToConvert(inputData, lang, sessionId, price, isTestMode);
+        if (pendingConversionData.isFile) {
+            // Handle file input
+            const file = await retrieveFileFromTemporaryStorage(inputData);
+            inputData = await uploadFile(file);
+        } else {
+            // Handle URL input - no need to upload, use directly
+            console.log("URL input detected, using directly:", inputData);
+        }
 
-        // Instead of redirecting, update the UI to show conversion status
-        updateUIStatus("running", "Conversion started. Checking status...");
-        // Start polling for status
-        const token = await auth0Client.getTokenSilently();
-        await pollStatus(token);
+        // Start the conversion process
+        await postToConvert(inputData, lang, sessionId, price);
+
+        // Clear the pending conversion data
+        sessionStorage.removeItem('pendingConversionData');
+
+        // Redirect to the main page and show status
+        window.location.href = '/?showStatus=true';
     } catch (error) {
         console.error('Error in handleStripeSuccess:', error);
         updateUIStatus("error", "Error starting conversion after payment: " + error.message);
@@ -945,6 +954,20 @@ async function deleteFile(fileUrl) {
           audience: "https://platogram.vercel.app",
         })}`,
       };
+
+      try {
+          if (!auth0Client) {
+              console.log("Auth0 client not initialized, attempting to initialize...");
+              await initAuth0();
+          }
+
+          headers.Authorization = `Bearer ${await auth0Client.getTokenSilently({
+              audience: "https://platogram.vercel.app",
+          })}`;
+      } catch (error) {
+          console.error("Error getting auth token:", error);
+          // Proceed without the token if there's an error
+      }
 
       const formData = new FormData();
       formData.append("lang", lang);
@@ -1350,6 +1373,11 @@ document.addEventListener("DOMContentLoaded", () => {
         logoutTooltip: document.getElementById('logout-tooltip'),
     };
 
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('session_id')) {
+        handleStripeSuccess();
+    }
+
     // Add event listener for userCircle
     if (elements.userCircle && elements.logoutTooltip) {
         elements.userCircle.addEventListener('click', (event) => {
@@ -1358,6 +1386,8 @@ document.addEventListener("DOMContentLoaded", () => {
             event.stopPropagation();
             elements.logoutTooltip.classList.toggle('hidden');
             console.log('Tooltip hidden class toggled');
+            console.log('Tooltip is now ' + (elements.logoutTooltip.classList.contains('hidden') ? 'hidden' : 'visible'));
+            console.log('Tooltip classes:', elements.logoutTooltip.className);
         });
 
         // Add click event listener to document to close tooltip when clicking outside

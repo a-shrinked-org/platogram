@@ -677,6 +677,7 @@
 <script>
  let testMode = true;
 const TEST_PRICE = 5;
+ const TEST_LANG = 'en';
 
 function enableTestMode() {
     testMode = true;
@@ -687,55 +688,82 @@ function showTestPanel() {
     document.getElementById('test-panel').style.display = 'block';
 }
 
- function updateTestStatus(message) {
-     const statusElement = document.getElementById('test-status');
-     if (statusElement) {
-         statusElement.textContent = message;
+ function TestPanel() {
+    const [url, setUrl] = useState('');
+    const [file, setFile] = useState(null);
+    const [testStatus, setTestStatus] = useState('');
+
+    async function simulateConversionFlow(isFile, inputData) {
+        try {
+            // Store conversion data
+            const conversionData = {
+                inputData: isFile ? await storeFileTemporarily(inputData) : inputData,
+                isFile: isFile,
+                lang: TEST_LANG,
+                price: TEST_PRICE
+            };
+            sessionStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
+            console.log('Stored conversion data:', conversionData);
+            setTestStatus("Conversion data stored. Simulating Stripe redirect in 5 seconds...");
+
+             // Simulate delay before redirect
+             await new Promise(resolve => setTimeout(resolve, 5000));
+
+             // Simulate redirect to success page
+             const testSessionId = 'test_session_' + Date.now();
+             setTestStatus("Redirecting to success page...");
+             window.location.href = `/success?session_id=${testSessionId}`;
+         } catch (error) {
+             console.error("Error in test flow:", error);
+             setTestStatus("Error: " + error.message);
+         }
      }
-     console.log('[Test Status]', message);
+
+     async function handleUrlTest() {
+         if (!url) {
+             setTestStatus("Please enter a URL");
+             return;
+         }
+         setTestStatus("Testing URL input: " + url);
+         await simulateConversionFlow(false, url);
+     }
+
+     async function handleFileTest() {
+         if (!file) {
+             setTestStatus("Please select a file");
+             return;
+         }
+         setTestStatus("Testing file input: " + file.name);
+         await simulateConversionFlow(true, file);
+     }
+
+     return (
+         <div style={{ border: '1px solid #ccc', padding: '20px', margin: '20px 0' }}>
+             <h2>Test Panel</h2>
+             <div>
+                 <input
+                     type="text"
+                     value={url}
+                     onChange={(e) => setUrl(e.target.value)}
+                     placeholder="Enter URL"
+                 />
+                 <button onClick={handleUrlTest}>Test URL Input ($5)</button>
+             </div>
+             <div style={{ marginTop: '10px' }}>
+                 <input
+                     type="file"
+                     onChange={(e) => setFile(e.target.files[0])}
+                 />
+                 <button onClick={handleFileTest}>Test File Input ($5)</button>
+             </div>
+             <div style={{ marginTop: '10px' }}>
+                 <strong>Test Status:</strong> {testStatus}
+             </div>
+         </div>
+     );
  }
 
-async function testURLInput() {
-    enableTestMode();
-    const testUrl = 'https://example.com/test.mp3';
-    updateTestStatus("Testing URL input: " + testUrl);
-    document.getElementById('url-input').value = testUrl;
-    await simulateConversionFlow(false, testUrl);
-}
-
-async function testFileInput() {
-    enableTestMode();
-    const file = new File(["test content"], "test.mp3", { type: "audio/mpeg" });
-    updateTestStatus("Testing file input: " + file.name);
-    await handleFiles([file]);
-    await simulateConversionFlow(true, file);
-}
-
-async function simulateConversionFlow(isFile, inputData) {
-    try {
-        // Simulate storing conversion data
-        const conversionData = {
-            inputData: isFile ? inputData.name : inputData,
-            isFile: isFile,
-            lang: "en",
-            price: TEST_PRICE
-        };
-        sessionStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
-        console.log('Stored conversion data:', conversionData);
-        updateTestStatus("Conversion data stored. Simulating Stripe redirect in 5 seconds...");
-
-        // Simulate delay before redirect
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        // Simulate redirect to success page
-        const testSessionId = 'test_session_' + Date.now();
-        updateTestStatus("Redirecting to success page...");
-        window.location.href = `/success?session_id=${testSessionId}`;
-    } catch (error) {
-        console.error("Error in test flow:", error);
-        updateTestStatus("Error: " + error.message);
-    }
-}
+ export default TestPanel;
     </script>
 </body>
 </html>

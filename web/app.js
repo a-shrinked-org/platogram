@@ -1,4 +1,5 @@
 let auth0Client = null;
+let auth0Initialized = false;
 let stripe = null;
 let selectedLanguage = 'en'; // Default language
 let pollingInterval;
@@ -402,30 +403,34 @@ async function updateUI() {
       return;
     }
 
-    const isAuthenticated = await auth0Client.isAuthenticated();
-    const loginButton = document.getElementById("login-button");
-    const logoutButton = document.getElementById("logout-button");
+    try {
+      const isAuthenticated = await auth0Client.isAuthenticated();
+      const loginButton = document.getElementById("login-button");
+      const logoutButton = document.getElementById("logout-button");
 
-    if (loginButton) loginButton.classList.toggle("hidden", isAuthenticated);
-    if (logoutButton) logoutButton.classList.toggle("hidden", !isAuthenticated);
+      if (loginButton) loginButton.classList.toggle("hidden", isAuthenticated);
+      if (logoutButton) logoutButton.classList.toggle("hidden", !isAuthenticated);
 
-    if (isAuthenticated) {
-      const user = await auth0Client.getUser();
-      const token = await auth0Client.getTokenSilently({
-        audience: "https://platogram.vercel.app",
-      });
+      if (isAuthenticated) {
+        const user = await auth0Client.getUser();
+        const token = await auth0Client.getTokenSilently({
+          audience: "https://platogram.vercel.app",
+        });
         const userEmailElement = document.getElementById("user-email");
         if (userEmailElement) {
           userEmailElement.textContent = user.email;
         }
-      await pollStatus(token);
-      debugLog("Logged in as: " + user.email);
+        await pollStatus(token);
+        debugLog("Logged in as: " + user.email);
 
-      // Add this line to update the UI with the new design
-      window.updateAuthUI(isAuthenticated, user);
-    } else {
-      // Add this line to update the UI when not authenticated
-      window.updateAuthUI(false, null);
+        // Add this line to update the UI with the new design
+        window.updateAuthUI(isAuthenticated, user);
+      } else {
+        // Add this line to update the UI when not authenticated
+        window.updateAuthUI(false, null);
+      }
+    } catch (error) {
+      console.error("Error updating UI:", error);
     }
   }
 

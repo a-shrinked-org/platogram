@@ -708,24 +708,23 @@ async function handlePaidConversion(price) {
     if (result.error) {
         throw new Error(result.error.message);
     }
-}
-async function handleStripeSuccessRedirect() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const sessionId = urlParams.get('session_id');
-    if (sessionId) {
-        try {
-            await ensureDbInitialized();
-            await initAuth0(); // Make sure Auth0 is initialized
-            await handleStripeSuccess(sessionId);
-        } catch (error) {
-            console.error('Error handling Stripe success:', error);
-            updateUIStatus("error", "Error processing payment: " + error.message);
+    async function handleStripeSuccessRedirect() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session_id');
+        if (sessionId) {
+            try {
+                await ensureDbInitialized();
+                await initAuth0(); // Make sure Auth0 is initialized
+                await handleStripeSuccess(sessionId);
+            } catch (error) {
+                console.error('Error handling Stripe success:', error);
+                updateUIStatus("error", "Error processing payment: " + error.message);
+            }
+        } else {
+            console.error('No session_id found in URL parameters');
+            updateUIStatus("error", "Invalid payment session");
         }
-    } else {
-        console.error('No session_id found in URL parameters');
-        updateUIStatus("error", "Invalid payment session");
     }
-}
 
 async function handleStripeSuccess(sessionId) {
     const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
@@ -742,13 +741,7 @@ async function handleStripeSuccess(sessionId) {
     const price = pendingConversionData.price;
 
     try {
-        if (!auth0Client) {
-            console.log("Auth0 client not initialized, attempting to initialize...");
-            await initAuth0();
-        }
-
         if (pendingConversionData.isFile) {
-            // Handle file input
             console.log("Retrieving file from temporary storage:", inputData);
             const file = await retrieveFileFromTemporaryStorage(inputData);
             if (!file) {
@@ -756,8 +749,8 @@ async function handleStripeSuccess(sessionId) {
             }
             console.log("File retrieved, uploading to Blob storage");
             inputData = await uploadFile(file);
+            console.log("File uploaded successfully, URL:", inputData);
         } else {
-            // Handle URL input - no need to upload, use directly
             console.log("URL input detected, using directly:", inputData);
         }
 
@@ -767,8 +760,6 @@ async function handleStripeSuccess(sessionId) {
         // Clear the pending conversion data
         sessionStorage.removeItem('pendingConversionData');
 
-        // Update UI to show conversion started
-        updateUIStatus("running", "Conversion started");
     } catch (error) {
         console.error('Error in handleStripeSuccess:', error);
         updateUIStatus("error", "Error starting conversion after payment: " + error.message);
@@ -970,9 +961,7 @@ async function deleteFile(fileUrl) {
 
   async function postToConvert(inputData, lang, sessionId, price) {
     debugLog("postToConvert called", { inputData, lang, sessionId, price });
-    let headers = {
-        'Content-Type': 'application/json'
-    };
+    let headers = {};
 
     try {
         if (!auth0Client) {
@@ -988,19 +977,26 @@ async function deleteFile(fileUrl) {
         // Proceed without the token if there's an error
     }
 
-    const payload = {
-        lang,
-        session_id: sessionId,
-        price,
-        payload: inputData
-    };
+    const formData = new FormData();
+    formData.append("lang", lang);
+    if (sessionId) {
+        formData.append('session_id', sessionId);
+    } else {
+        formData.append('price', price);
+    }
+
+    if (inputData instanceof File) {
+        formData.append("file", inputData);
+    } else {
+        formData.append("payload", inputData);
+    }
 
     try {
-        console.log("Sending data to Platogram for conversion:", payload);
+        console.log("Sending data to Platogram for conversion:", Object.fromEntries(formData));
         const response = await fetch("https://temporary.name/convert", {
             method: "POST",
             headers: headers,
-            body: JSON.stringify(payload),
+            body: formData,
         });
 
         if (!response.ok) {

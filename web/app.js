@@ -11,6 +11,7 @@ let totalPrice = 5;
 let vercelBlobUpload;
 let db;
 let testMode = false;
+let isConversionInProgress = false;
 
 import('https://esm.sh/@vercel/blob@0.23.4').then(module => {
         console.log('Vercel Blob import:', module);
@@ -366,22 +367,22 @@ function updateUIStatus(status, message = "") {
         clearProcessingStageInterval();
         break;
       case "error":
-        toggleSection("error-section");
-        const errorSection = document.getElementById("error-section");
-        if (errorSection) {
-          errorSection.innerHTML = `
-            <p>File: ${fileName}</p>
-            <p>Email: ${userEmail}</p>
-            <p>Status: Error</p>
-            <p>${message || "An error occurred. Please try again."}</p>
-          `;
-        }
-        clearProcessingStageInterval();
-        break;
-      default:
-        console.error(`Unknown status: ${status}`);
+            toggleSection("error-section");
+            const errorSection = document.getElementById("error-section");
+            if (errorSection) {
+                errorSection.innerHTML = `
+                    <p>File: ${fileName}</p>
+                    <p>Email: ${userEmail}</p>
+                    <p>Status: Error</p>
+                    <p>${message || "An error occurred. Please try again."}</p>
+                `;
+            }
+            clearProcessingStageInterval();
+            break;
+        default:
+            console.warn(`Unknown status: ${status}`);
     }
-  }
+}
   
 async function updateUI() {
     if (!auth0Client) {
@@ -962,6 +963,12 @@ async function deleteFile(fileUrl) {
   }
 
   async function postToConvert(inputData, lang, sessionId, price) {
+    if (isConversionInProgress) {
+        console.log("Conversion already in progress. Skipping.");
+        return;
+    }
+
+    isConversionInProgress = true;
     debugLog("postToConvert called", { inputData, lang, sessionId, price });
     let headers = {};
 
@@ -986,7 +993,6 @@ async function deleteFile(fileUrl) {
     } else {
         formData.append('price', price);
     }
-
     if (inputData instanceof File) {
         formData.append("file", inputData);
     } else {
@@ -1013,30 +1019,45 @@ async function deleteFile(fileUrl) {
         if (result.message === "Conversion started" || result.status === "processing") {
             updateUIStatus("running");
             const finalStatus = await pollStatus(await auth0Client.getTokenSilently());
-            if (finalStatus.status === 'idle') {
-                updateUIStatus("idle", "Ready for new conversion");
-            } else if (finalStatus.status === 'done') {
-                updateUIStatus("done", "Conversion completed successfully");
-            } else {
-                updateUIStatus("error", finalStatus.error || "Conversion failed");
-            }
-
-            // Check if the inputData is a Blob URL and trigger cleanup
-            if (typeof inputData === 'string' && inputData.includes('.public.blob.vercel-storage.com/')) {
-                try {
-                    console.log("Conversion complete. Attempting to delete temporary file");
-                    await deleteFile(inputData);
-                    console.log("Temporary file successfully deleted");
-                } catch (cleanupError) {
-                    console.error("Error during file cleanup:", cleanupError);
-                }
-            }
+            handleConversionStatus(finalStatus, inputData);
         } else {
             updateUIStatus("error", "Unexpected response from server");
         }
     } catch (error) {
         console.error("Error in postToConvert:", error);
         updateUIStatus("error", error.message);
+    } finally {
+        isConversionInProgress = false;
+    }
+}
+
+function handleConversionStatus(status, inputData) {
+    switch (status.status) {
+        case 'idle':
+            updateUIStatus("idle", "Ready for new conversion");
+            break;
+        case 'done':
+            updateUIStatus("done", "Conversion completed successfully");
+            break;
+        case 'failed':
+            updateUIStatus("error", status.error || "Conversion failed");
+            break;
+        default:
+            updateUIStatus("error", "Unknown status: " + status.status);
+    }
+
+    // Check if the inputData is a Blob URL and trigger cleanup
+    if (typeof inputData === 'string' && inputData.includes('.public.blob.vercel-storage.com/')) {
+        try {
+            console.log("Conversion complete. Attempting to delete temporary file");
+            deleteFile(inputData).then(() => {
+                console.log("Temporary file successfully deleted");
+            }).catch((cleanupError) => {
+                console.error("Error during file cleanup:", cleanupError);
+            });
+        } catch (cleanupError) {
+            console.error("Error during file cleanup:", cleanupError);
+        }
     }
 }
 

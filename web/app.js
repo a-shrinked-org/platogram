@@ -70,17 +70,6 @@ window.updateAuthUI = function(isAuthenticated, user) {
         if (userCircle) userCircle.classList.add('hidden');
         if (logoutTooltip) logoutTooltip.classList.add('hidden');
     }
-    if (userCircle && logoutTooltip) {
-        userCircle.addEventListener('click', (event) => {
-            event.stopPropagation();
-            logoutTooltip.classList.toggle('hidden');
-        });
-        document.addEventListener('click', (event) => {
-            if (!userCircle.contains(event.target) && !logoutTooltip.contains(event.target)) {
-                logoutTooltip.classList.add('hidden');
-            }
-        });
-    }
 };
 
 function getInitials(email) {
@@ -1327,14 +1316,6 @@ function safeUpdateProcessingStage() {
   }
 }
 
-userCircle.addEventListener('click', (event) => {
-    console.log('User circle clicked');
-    event.preventDefault();
-    event.stopPropagation();
-    logoutTooltip.classList.toggle('hidden');
-    console.log('Tooltip hidden class toggled');
-});
-
 document.addEventListener("DOMContentLoaded", async () => {
     await initDB();
     await testIndexedDB();
@@ -1368,6 +1349,24 @@ document.addEventListener("DOMContentLoaded", () => {
         userCircle: document.getElementById('user-circle'),
         logoutTooltip: document.getElementById('logout-tooltip'),
     };
+
+    // Add event listener for userCircle
+    if (elements.userCircle && elements.logoutTooltip) {
+        elements.userCircle.addEventListener('click', (event) => {
+            console.log('User circle clicked');
+            event.preventDefault();
+            event.stopPropagation();
+            elements.logoutTooltip.classList.toggle('hidden');
+            console.log('Tooltip hidden class toggled');
+        });
+
+        // Add click event listener to document to close tooltip when clicking outside
+        document.addEventListener('click', (event) => {
+            if (!elements.userCircle.contains(event.target) && !elements.logoutTooltip.contains(event.target)) {
+                elements.logoutTooltip.classList.add('hidden');
+            }
+        });
+    }
 
     // Set up language selection buttons
     const enButton = document.querySelector('button[onclick="selectLanguage(\'en\')"]');

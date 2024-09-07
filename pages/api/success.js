@@ -32,8 +32,14 @@ async function retrieveFileFromTemporaryStorage(id) {
     });
 }
 
-async function uploadFile(file, getTokenSilently) {
+async function uploadFile(file, isTestMode = false, getTokenSilently) {
+    if (isTestMode) {
+        console.log('Test mode: Simulating file upload');
+        return `https://example.com/test-upload/${file.name}`;
+    }
+
     try {
+        // Get the Auth0 token
         const token = await getTokenSilently();
 
         // Get the Blob token
@@ -69,15 +75,10 @@ async function uploadFile(file, getTokenSilently) {
 export default function Success() {
     const router = useRouter();
     const [status, setStatus] = useState('Processing payment');
-    const { getTokenSilently, isAuthenticated, isLoading } = useAuth0();
+    const { getTokenSilently } = useAuth0();
 
     useEffect(() => {
         async function handleSuccess() {
-            if (!isAuthenticated) {
-                setStatus('Error: User not authenticated');
-                return;
-            }
-
             await initDB();
             const { session_id } = router.query;
             console.log('Session ID:', session_id);
@@ -96,6 +97,7 @@ export default function Success() {
             sessionStorage.removeItem('pendingConversionData');
             let inputData = pendingConversionData.inputData;
             const lang = pendingConversionData.lang;
+            const isTestMode = session_id.startsWith('test_session_');
 
             try {
                 if (pendingConversionData.isFile) {
@@ -104,27 +106,35 @@ export default function Success() {
                     const file = await retrieveFileFromTemporaryStorage(inputData);
 
                     setStatus('Uploading file...');
-                    inputData = await uploadFile(file, getTokenSilently);
+                    inputData = await uploadFile(file, isTestMode, getTokenSilently);
                     console.log('File uploaded:', inputData);
                 }
 
                 setStatus('Starting conversion...');
-                const token = await getTokenSilently();
-                const response = await fetch('/convert', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ session_id, lang, inputData }),
-                });
-
-                if (response.ok) {
-                    setStatus('Conversion started');
+                if (isTestMode) {
+                    console.log('Test mode: Simulating conversion request');
+                    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API delay
+                    setStatus('Conversion started (Test Mode)');
+                    await new Promise(resolve => setTimeout(resolve, 3000)); // Wait before redirect
                     router.push('/?showStatus=true');
                 } else {
-                    const errorData = await response.json();
-                    setStatus(`Failed to start conversion: ${errorData.error || 'Unknown error'}`);
+                    // Real API call
+                    const token = await getTokenSilently();
+                    const response = await fetch('/convert', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ session_id, lang, inputData }),
+                    });
+
+                    if (response.ok) {
+                        setStatus('Conversion started');
+                        router.push('/?showStatus=true');
+                    } else {
+                        setStatus('Failed to start conversion');
+                    }
                 }
             } catch (error) {
                 console.error('Error in handleSuccess:', error);
@@ -132,14 +142,10 @@ export default function Success() {
             }
         }
 
-        if (router.query.session_id && !isLoading) {
+        if (router.query.session_id) {
             handleSuccess();
         }
-    }, [router.query, getTokenSilently, isAuthenticated, isLoading]);
-
-    if (isLoading) {
-        return <div>Loading...</div>;
-    }
+    }, [router.query, getTokenSilently]);
 
     return (
         <div>

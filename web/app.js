@@ -48,6 +48,13 @@ function enableTestMode() {
     console.log("Test mode enabled");
 }
 
+// Ensure IndexedDB is initialized
+async function ensureDbInitialized() {
+    if (!db) {
+        await initDB();
+    }
+}
+
 window.updateAuthUI = function(isAuthenticated, user) {
     const loginButton = document.getElementById('login-button');
     const userCircle = document.getElementById('user-circle');
@@ -554,6 +561,9 @@ function initDB() {
 
 // Store file in IndexedDB
 async function storeFileTemporarily(file) {
+    if (!db) {
+        await initDB();
+    }
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(["files"], "readwrite");
         const store = transaction.objectStore("files");
@@ -727,6 +737,7 @@ async function handleStripeSuccess(mockSession = null) {
     let inputData = pendingConversionData.inputData;
     const lang = pendingConversionData.lang;
     const price = pendingConversionData.price;
+    const isTestMode = sessionId.startsWith('test_session_');
 
     try {
         if (pendingConversionData.isFile) {

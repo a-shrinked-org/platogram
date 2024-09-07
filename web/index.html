@@ -228,10 +228,10 @@
           </div>
         <main role="main">
             <h1
-                class="font-perfectly-nineties text-black text-4xl sm:text-4xl mb-6 text-center max-w-2xl mx-auto">
+                class="font-perfectly-nineties text-black font-normal text-5.5xl sm:text-4xl mb-6 text-center max-w-2xl mx-auto">
                 Transform spoken words into structured knowledge.
-                <span>Unlock insights from audio and video — beyond transcripts, summaries, and scattered notes.</span>
-                <span>10x your content understanding.</span>
+                <span class="block">Unlock insights from audio and video — beyond transcripts, summaries, and scattered notes.</span>
+                <span class="block">10x your content understanding.</span>
             </h1>
 
             <div id="input-section" class="max-w-2xl mx-auto input-section">
@@ -677,7 +677,6 @@
 <script>
  let testMode = true;
 const TEST_PRICE = 5;
- const TEST_LANG = 'en';
 
 function enableTestMode() {
     testMode = true;
@@ -688,7 +687,31 @@ function showTestPanel() {
     document.getElementById('test-panel').style.display = 'block';
 }
 
- function TestPanel() {
+ function updateTestStatus(message) {
+     const statusElement = document.getElementById('test-status');
+     if (statusElement) {
+         statusElement.textContent = message;
+     }
+     console.log('[Test Status]', message);
+ }
+
+async function testURLInput() {
+    enableTestMode();
+    const testUrl = 'https://example.com/test.mp3';
+    updateTestStatus("Testing URL input: " + testUrl);
+    document.getElementById('url-input').value = testUrl;
+    await simulateConversionFlow(false, testUrl);
+}
+
+async function testFileInput() {
+    enableTestMode();
+    const file = new File(["test content"], "test.mp3", { type: "audio/mpeg" });
+    updateTestStatus("Testing file input: " + file.name);
+    await handleFiles([file]);
+    await simulateConversionFlow(true, file);
+}
+
+function TestPanel() {
     const [url, setUrl] = useState('');
     const [file, setFile] = useState(null);
     const [testStatus, setTestStatus] = useState('');
@@ -702,9 +725,9 @@ function showTestPanel() {
                 lang: TEST_LANG,
                 price: TEST_PRICE
             };
-            sessionStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
-            console.log('Stored conversion data:', conversionData);
-            setTestStatus("Conversion data stored. Simulating Stripe redirect in 5 seconds...");
+             sessionStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
+             console.log('Stored conversion data:', conversionData);
+             setTestStatus("Conversion data stored. Simulating Stripe redirect in 5 seconds...");
 
              // Simulate delay before redirect
              await new Promise(resolve => setTimeout(resolve, 5000));

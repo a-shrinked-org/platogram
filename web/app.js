@@ -708,6 +708,8 @@ async function handlePaidConversion(price) {
     if (result.error) {
         throw new Error(result.error.message);
     }
+}
+
     async function handleStripeSuccessRedirect() {
         const urlParams = new URLSearchParams(window.location.search);
         const sessionId = urlParams.get('session_id');

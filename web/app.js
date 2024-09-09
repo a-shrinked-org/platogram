@@ -549,7 +549,7 @@ function initDB() {
         request.onerror = (event) => reject("IndexedDB error: " + event.target.error);
         request.onsuccess = (event) => {
             db = event.target.result;
-            resolve();
+            resolve(db);
         };
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
@@ -575,6 +575,7 @@ async function storeFileTemporarily(file) {
 
 // Retrieve file from IndexedDB
 async function retrieveFileFromTemporaryStorage(id) {
+    await ensureDbInitialized();
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(["files"], "readonly");
         const store = transaction.objectStore("files");
@@ -710,46 +711,52 @@ async function handlePaidConversion(price) {
     }
 }
 
-async function handleStripeSuccessRedirect() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const sessionId = urlParams.get('session_id');
-    if (sessionId) {
-      try {
+async function handleStripeSuccess(sessionId) {
+    try {
         await ensureDbInitialized();
-        await initAuth0();
-        const token = await auth0Client.getTokenSilently();
-        const pendingConversionData = JSON.parse(sessionStorage.getItem('pendingConversionData'));
+        const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
+        console.log("Retrieved pendingConversionDataString:", pendingConversionDataString);
 
-        if (!pendingConversionData) {
-          throw new Error('No pending conversion data found');
+        if (!pendingConversionDataString) {
+            updateUIStatus('error', 'Invalid success parameters');
+            return;
         }
 
-        // Start the conversion process
-        await postToConvert(
-          pendingConversionData.inputData,
-          pendingConversionData.lang,
-          sessionId,
-          pendingConversionData.price,
-          pendingConversionData.isTestMode
-        );
+        const pendingConversionData = JSON.parse(pendingConversionDataString);
+        let inputData = pendingConversionData.inputData;
+        const lang = pendingConversionData.lang;
+        const price = pendingConversionData.price;
+        const isTestMode = pendingConversionData.isTestMode || false;
 
-        // Poll for status
-        await pollStatus(token, pendingConversionData.isTestMode);
+        try {
+            if (pendingConversionData.isFile) {
+                console.log("Retrieving file from temporary storage:", inputData);
+                const file = await retrieveFileFromTemporaryStorage(inputData);
+                if (!file) {
+                    throw new Error("Failed to retrieve file from temporary storage");
+                }
+                console.log("File retrieved, uploading to Blob storage");
+                inputData = await uploadFile(file, isTestMode);
+                console.log("File uploaded successfully, URL:", inputData);
+            } else {
+                console.log("URL input detected, using directly:", inputData);
+            }
 
-        // Clear the pending conversion data
-        sessionStorage.removeItem('pendingConversionData');
+            // Start the conversion process
+            await postToConvert(inputData, lang, sessionId, price, isTestMode);
 
-        // Redirect to the main page with a success status
-        window.location.href = '/?showStatus=true';
-      } catch (error) {
-        console.error('Error handling Stripe success:', error);
-        window.location.href = `/?showError=true&message=${encodeURIComponent(error.message)}`;
-      }
-    } else {
-      console.error('No session_id found in URL parameters');
-      window.location.href = '/?showError=true&message=Invalid payment session';
+            // Clear the pending conversion data
+            sessionStorage.removeItem('pendingConversionData');
+
+        } catch (error) {
+            console.error('Error in handleStripeSuccess:', error);
+            updateUIStatus("error", "Error starting conversion after payment: " + error.message);
+        }
+    } catch (error) {
+        console.error('Error in handleStripeSuccess:', error);
+        updateUIStatus("error", "Error: " + error.message);
     }
-  }
+}
 
 
 async function handleStripeSuccess(sessionId) {
@@ -986,10 +993,14 @@ async function deleteFile(fileUrl) {
   }
 
   async function postToConvert(inputData, lang, sessionId, price, isTestMode = false) {
-    if (isTestMode) {
-        console.log("Test mode: Simulating conversion request");
-        return { status: "done" };
-    }
+      if (isTestMode) {
+          console.log("Test mode: Simulating conversion request");
+          updateUIStatus("processing", "Test mode: Simulating conversion...");
+          // Simulate a delay
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          updateUIStatus("done", "Test conversion completed");
+          return;
+      }
 
     debugLog("postToConvert called", { inputData, lang, sessionId, price });
     let headers = {};

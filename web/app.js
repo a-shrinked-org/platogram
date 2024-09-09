@@ -337,13 +337,23 @@ function updateUIStatus(status, message = "") {
         case "idle":
             toggleSection("input-section");
             break;
-        case "starting":
+        case "uploading":
+            toggleSection("upload-process-section");
+            if (uploadProcessSection) {
+                uploadProcessSection.innerHTML = `
+                    <p>File: ${fileName}</p>
+                    <p>Email: ${userEmail}</p>
+                    <p>Status: Uploading</p>
+                    <div id="upload-progress-bar" style="width: 0%; height: 20px; background-color: #4CAF50;"></div>
+                    <p id="upload-progress-text">Uploading: 0%</p>
+                `;
+            }
+            break;
         case "processing":
         case "running":
-            toggleSection("upload-process-section");
-            const progressSection = document.getElementById("upload-process-section");
-            if (progressSection) {
-                progressSection.innerHTML = `
+            toggleSection("status-section");
+            if (statusSection) {
+                statusSection.innerHTML = `
                     <p>File/URL: ${fileName}</p>
                     <p>Email: ${userEmail}</p>
                     <p>Status: ${status}</p>
@@ -355,9 +365,8 @@ function updateUIStatus(status, message = "") {
             break;
         case "done":
             toggleSection("done-section");
-            const doneSectionElement = document.getElementById("done-section");
-            if (doneSectionElement) {
-                doneSectionElement.innerHTML = `
+            if (doneSection) {
+                doneSection.innerHTML = `
                     <p>File/URL: ${fileName}</p>
                     <p>Email: ${userEmail}</p>
                     <p>Status: Completed</p>
@@ -368,11 +377,9 @@ function updateUIStatus(status, message = "") {
             clearProcessingStageInterval();
             break;
         case "error":
-        case "failed":
             toggleSection("error-section");
-            const errorSectionElement = document.getElementById("error-section");
-            if (errorSectionElement) {
-                errorSectionElement.innerHTML = `
+            if (errorSection) {
+                errorSection.innerHTML = `
                     <p>File/URL: ${fileName}</p>
                     <p>Email: ${userEmail}</p>
                     <p>Status: Error</p>
@@ -631,22 +638,16 @@ async function handleSubmit(event) {
         closeLanguageModal();
 
         if (price > 0) {
-            console.log('Non-zero price detected, initiating Stripe checkout');
-            sessionStorage.setItem('pendingConversionData', JSON.stringify({
-                inputData: inputData instanceof File ? inputData.name : inputData,
-                isFile: inputData instanceof File,
-                lang: selectedLanguage,
-                price: price,
-                isTestMode: false // Add this line for test mode
-            }));
+            console.log('Non-zero price detected, initiating paid conversion');
             await handlePaidConversion(inputData, price);
         } else {
+            // For free conversions, proceed with upload/conversion
             if (inputData instanceof File) {
                 const uploadedUrl = await uploadFile(inputData);
                 inputData = uploadedUrl;
             }
-            updateUIStatus("running", "Starting conversion...");
-            await postToConvert(inputData, selectedLanguage, null, price, false); // Add false for isTestMode
+            updateUIStatus("processing", "Starting conversion...");
+            await postToConvert(inputData, selectedLanguage, null, price, false);
         }
     } catch (error) {
         console.error('Error in handleSubmit:', error);
@@ -659,7 +660,7 @@ async function handleSubmit(event) {
     }
 }
 
-async function handlePaidConversion(price) {
+async function handlePaidConversion(inputData, price) {
     console.log('handlePaidConversion called', { price });
     const user = await auth0Client.getUser();
     const email = user.email || user["https://platogram.com/user_email"];
@@ -668,19 +669,25 @@ async function handlePaidConversion(price) {
     }
     console.log('User email retrieved', { email });
 
-    const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
-    console.log('Retrieved pendingConversionDataString:', pendingConversionDataString);
-
-    const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
-    console.log('Parsed pendingConversionData:', pendingConversionData);
-
-    if (!pendingConversionData) {
-        throw new Error('No pending conversion data found');
+    let fileId = null;
+    if (inputData instanceof File) {
+        fileId = await storeFileTemporarily(inputData);
+        console.log('File stored temporarily with ID:', fileId);
     }
+
+    const conversionData = {
+        inputData: fileId || inputData,
+        isFile: !!fileId,
+        lang: selectedLanguage,
+        price: price
+    };
+
+    sessionStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
+    console.log('Stored pendingConversionData:', conversionData);
 
     if (testMode) {
         console.log("Test mode: Simulating Stripe checkout");
-        await simulateConversionFlow(uploadedFile instanceof File);
+        await simulateStripeCheckout(conversionData);
         return;
     }
 
@@ -691,9 +698,9 @@ async function handlePaidConversion(price) {
         },
         body: JSON.stringify({
             price: price,
-            lang: pendingConversionData.lang,
+            lang: selectedLanguage,
             email: email,
-            inputData: pendingConversionData.inputData
+            inputData: fileId || inputData
         }),
     });
 
@@ -711,7 +718,14 @@ async function handlePaidConversion(price) {
     }
 }
 
-async function handleStripeSuccess(sessionId) {
+async function simulateStripeCheckout(conversionData) {
+    console.log("Simulating Stripe checkout in test mode");
+    updateUIStatus("processing", "Simulating payment...");
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate payment processing
+    await handleStripeSuccess(null, true);
+}
+
+async function handleStripeSuccess(sessionId, isTestMode = false) {
     try {
         await ensureDbInitialized();
         const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
@@ -726,7 +740,6 @@ async function handleStripeSuccess(sessionId) {
         let inputData = pendingConversionData.inputData;
         const lang = pendingConversionData.lang;
         const price = pendingConversionData.price;
-        const isTestMode = pendingConversionData.isTestMode || false;
 
         try {
             if (pendingConversionData.isFile) {
@@ -736,7 +749,7 @@ async function handleStripeSuccess(sessionId) {
                     throw new Error("Failed to retrieve file from temporary storage");
                 }
                 console.log("File retrieved, uploading to Blob storage");
-                inputData = await uploadFile(file, isTestMode);
+                inputData = await uploadFile(file);
                 console.log("File uploaded successfully, URL:", inputData);
             } else {
                 console.log("URL input detected, using directly:", inputData);
@@ -850,7 +863,7 @@ async function onConvertClick(event) {
 
         try {
             closeLanguageModal();
-            updateUIStatus("uploading");
+            updateUIStatus("uploading", "Uploading file...");
 
             // Get the Auth0 token
             let token;
@@ -1001,7 +1014,7 @@ async function deleteFile(fileUrl) {
 
         if (result.message === "Conversion started" || result.status === "processing") {
             updateUIStatus("processing", "Conversion in progress...");
-            return await pollStatus(token, isTestMode);
+            return await pollStatus(await auth0Client.getTokenSilently(), isTestMode);
         } else {
             updateUIStatus("error", "Unexpected response from server");
             throw new Error("Unexpected response from server");
@@ -1340,6 +1353,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (window.location.pathname === '/success') {
         await handleStripeSuccessRedirect();
     }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('session_id')) {
+        await handleStripeSuccess(urlParams.get('session_id'));
+    }
 });
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -1365,11 +1383,6 @@ document.addEventListener("DOMContentLoaded", () => {
         userCircle: document.getElementById('user-circle'),
         logoutTooltip: document.getElementById('logout-tooltip'),
     };
-
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('session_id')) {
-        handleStripeSuccess();
-    }
 
     // Add event listener for userCircle
     if (elements.userCircle && elements.logoutTooltip) {

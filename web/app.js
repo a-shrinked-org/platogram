@@ -952,16 +952,7 @@ async function deleteFile(fileUrl) {
   }
 
   async function postToConvert(inputData, lang, sessionId, price, isTestMode = false) {
-      if (isTestMode) {
-          console.log("Test mode: Simulating conversion request");
-          updateUIStatus("processing", "Test mode: Simulating conversion...");
-          // Simulate a delay
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          updateUIStatus("done", "Test conversion completed");
-          return;
-      }
-
-    debugLog("postToConvert called", { inputData, lang, sessionId, price });
+    debugLog("postToConvert called", { inputData, lang, sessionId, price, isTestMode });
     let headers = {};
 
     try {
@@ -986,6 +977,9 @@ async function deleteFile(fileUrl) {
         formData.append('price', price);
     }
     formData.append("payload", inputData);
+    if (isTestMode) {
+        formData.append('test_mode', 'true');
+    }
 
     try {
         console.log("Sending data to Platogram for conversion:", Object.fromEntries(formData));
@@ -1007,7 +1001,7 @@ async function deleteFile(fileUrl) {
 
         if (result.message === "Conversion started" || result.status === "processing") {
             updateUIStatus("processing", "Conversion in progress...");
-            return await pollStatus(token);
+            return await pollStatus(token, isTestMode);
         } else {
             updateUIStatus("error", "Unexpected response from server");
             throw new Error("Unexpected response from server");
@@ -1170,7 +1164,10 @@ function pollStatus(token, isTestMode = false) {
 
             try {
                 const response = await fetch("https://temporary.name/status", {
-                    headers: { Authorization: `Bearer ${token}` },
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        ...(isTestMode ? { 'X-Test-Mode': 'true' } : {})
+                    },
                 });
 
                 if (!response.ok) {
@@ -1196,15 +1193,8 @@ function pollStatus(token, isTestMode = false) {
             }
         }
 
-        if (isTestMode) {
-            console.log('Test mode: Simulating status polling');
-            setTimeout(() => {
-                resolve({ status: "done" });
-            }, 3000);
-        } else {
-            pollingInterval = setInterval(checkStatus, 5000);
-            checkStatus(); // Start the polling process immediately
-        }
+        pollingInterval = setInterval(checkStatus, 5000);
+        checkStatus(); // Start the polling process immediately
     });
 }
 

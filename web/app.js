@@ -315,6 +315,7 @@ async function initAuth0() {
     await updateUI();
   } catch (error) {
     console.error("Error initializing Auth0:", error);
+    updateUIStatus("error", "Failed to initialize authentication. Please refresh the page.");
   }
 }
 
@@ -727,23 +728,47 @@ async function handlePaidConversion(price) {
     }
 }
 
-    async function handleStripeSuccessRedirect() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const sessionId = urlParams.get('session_id');
-        if (sessionId) {
-            try {
-                await ensureDbInitialized();
-                await initAuth0(); // Make sure Auth0 is initialized
-                await handleStripeSuccess(sessionId);
-            } catch (error) {
-                console.error('Error handling Stripe success:', error);
-                updateUIStatus("error", "Error processing payment: " + error.message);
-            }
-        } else {
-            console.error('No session_id found in URL parameters');
-            updateUIStatus("error", "Invalid payment session");
+async function handleStripeSuccessRedirect() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionId = urlParams.get('session_id');
+    if (sessionId) {
+      try {
+        await ensureDbInitialized();
+        await initAuth0();
+        const token = await auth0Client.getTokenSilently();
+        const pendingConversionData = JSON.parse(sessionStorage.getItem('pendingConversionData'));
+
+        if (!pendingConversionData) {
+          throw new Error('No pending conversion data found');
         }
+
+        // Start the conversion process
+        await postToConvert(
+          pendingConversionData.inputData,
+          pendingConversionData.lang,
+          sessionId,
+          pendingConversionData.price,
+          pendingConversionData.isTestMode
+        );
+
+        // Poll for status
+        await pollStatus(token, pendingConversionData.isTestMode);
+
+        // Clear the pending conversion data
+        sessionStorage.removeItem('pendingConversionData');
+
+        // Redirect to the main page with a success status
+        window.location.href = '/?showStatus=true';
+      } catch (error) {
+        console.error('Error handling Stripe success:', error);
+        window.location.href = `/?showError=true&message=${encodeURIComponent(error.message)}`;
+      }
+    } else {
+      console.error('No session_id found in URL parameters');
+      window.location.href = '/?showError=true&message=Invalid payment session';
     }
+  }
+
 
 async function handleStripeSuccess(sessionId) {
     const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
@@ -1207,6 +1232,14 @@ function pollStatus(token) {
                     case "done":
                         clearInterval(pollingInterval);
                         updateUIStatus("done", "Conversion completed successfully");
+                        if (typeof inputData === 'string' && inputData.includes('.public.blob.vercel-storage.com/')) {
+                            try {
+                                await deleteFile(inputData);
+                                console.log("Temporary file deleted successfully");
+                              } catch (cleanupError) {
+                                console.error("Error during file cleanup:", cleanupError);
+                              }
+                            }
                         resolve(result);
                         break;
                     case "error":

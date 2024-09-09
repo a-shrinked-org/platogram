@@ -5,6 +5,8 @@ import { useAuth0 } from '@auth0/auth0-react';
 
 let db;
 
+const [conversionStarted, setConversionStarted] = useState(false);
+
 // Initialize IndexedDB
 function initDB() {
     return new Promise((resolve, reject) => {
@@ -78,11 +80,21 @@ export default function Success() {
     const { getTokenSilently, isAuthenticated, isLoading } = useAuth0();
 
     useEffect(() => {
+        if (router.query.session_id && !isLoading && !conversionStarted) {
+            handleSuccess();
+          }
+        }, [router.query, isAuthenticated, isLoading, conversionStarted]);
         async function handleSuccess() {
+
+            if (conversionStarted) return;
+            setConversionStarted(true);
+
             if (!isAuthenticated) {
+                console.error('User not authenticated');
                 setStatus('Error: User not authenticated');
+                setTimeout(() => router.push('/?showError=true'), 5000);
                 return;
-            }
+              }
 
             await initDB();
             const { session_id } = router.query;
@@ -95,7 +107,9 @@ export default function Success() {
             console.log('Parsed pendingConversionData:', pendingConversionData);
 
             if (!session_id || !pendingConversionData) {
+                console.error('Missing session_id or pendingConversionData');
                 setStatus('Error: Invalid success parameters');
+                setTimeout(() => router.push('/?showError=true'), 5000);
                 return;
             }
 
@@ -127,10 +141,9 @@ export default function Success() {
 
                 if (response.ok) {
                     const result = await response.json();
-                    setStatus('Conversion started');
-                    // Store the job ID or any other necessary information
+                    updateUIStatus("processing", "Conversion started");
                     sessionStorage.setItem('conversionJobId', result.jobId);
-                    // Redirect to main page with status
+                    await pollStatus(token);
                     router.push('/?showStatus=true');
                 } else {
                     const errorData = await response.json();

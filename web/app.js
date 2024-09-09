@@ -339,6 +339,7 @@ function updateUIStatus(status, message = "") {
         case "idle":
             toggleSection("input-section");
             break;
+        case "starting":
         case "processing":
         case "running":
             toggleSection("upload-process-section");
@@ -1171,7 +1172,6 @@ function selectLanguage(lang) {
 function pollStatus(token) {
     return new Promise((resolve, reject) => {
         let pollingInterval;
-        let resetTimeout;
         let attemptCount = 0;
         const maxAttempts = 60; // 5 minutes of polling at 5-second intervals
 
@@ -1182,7 +1182,6 @@ function pollStatus(token) {
                 reject(new Error("Polling timed out"));
                 return;
             }
-
             attemptCount++;
 
             try {
@@ -1197,20 +1196,31 @@ function pollStatus(token) {
                 const result = await response.json();
                 console.log("Polling status response:", result);
 
-                updateUIStatus(result.status, `Conversion ${result.status}...`);
-
-                if (result.status === "done") {
-                    clearInterval(pollingInterval);
-                    resolve(result);
-                } else if (result.status === "error" || result.status === "failed") {
-                    clearInterval(pollingInterval);
-                    updateUIStatus("error", result.error || "Conversion failed");
-                    reject(new Error(result.error || "Conversion failed"));
-                } else if (result.status === "idle") {
-                    // If status is idle, but we're still polling, continue
-                    console.log("Received idle status, continuing to poll...");
-                } else if (result.status !== "running" && result.status !== "processing") {
-                    console.warn(`Unknown status: ${result.status}`);
+                switch (result.status) {
+                    case "starting":
+                        updateUIStatus("starting", "Conversion starting...");
+                        break;
+                    case "processing":
+                    case "running":
+                        updateUIStatus(result.status, `Conversion ${result.status}...`);
+                        break;
+                    case "done":
+                        clearInterval(pollingInterval);
+                        updateUIStatus("done", "Conversion completed successfully");
+                        resolve(result);
+                        break;
+                    case "error":
+                    case "failed":
+                        clearInterval(pollingInterval);
+                        updateUIStatus("error", result.error || "Conversion failed");
+                        reject(new Error(result.error || "Conversion failed"));
+                        break;
+                    case "idle":
+                        console.log("Received idle status, continuing to poll...");
+                        break;
+                    default:
+                        console.warn(`Unknown status: ${result.status}`);
+                        updateUIStatus("processing", `Conversion in progress (${result.status})...`);
                 }
             } catch (error) {
                 console.error("Error polling status:", error);

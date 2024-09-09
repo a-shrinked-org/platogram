@@ -758,47 +758,6 @@ async function handleStripeSuccess(sessionId) {
     }
 }
 
-
-async function handleStripeSuccess(sessionId) {
-    const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
-    console.log("Retrieved pendingConversionDataString:", pendingConversionDataString);
-
-    if (!pendingConversionDataString) {
-        updateUIStatus('error', 'Invalid success parameters');
-        return;
-    }
-
-    const pendingConversionData = JSON.parse(pendingConversionDataString);
-    let inputData = pendingConversionData.inputData;
-    const lang = pendingConversionData.lang;
-    const price = pendingConversionData.price;
-
-    try {
-        if (pendingConversionData.isFile) {
-            console.log("Retrieving file from temporary storage:", inputData);
-            const file = await retrieveFileFromTemporaryStorage(inputData);
-            if (!file) {
-                throw new Error("Failed to retrieve file from temporary storage");
-            }
-            console.log("File retrieved, uploading to Blob storage");
-            inputData = await uploadFile(file);
-            console.log("File uploaded successfully, URL:", inputData);
-        } else {
-            console.log("URL input detected, using directly:", inputData);
-        }
-
-        // Start the conversion process
-        await postToConvert(inputData, lang, sessionId, price);
-
-        // Clear the pending conversion data
-        sessionStorage.removeItem('pendingConversionData');
-
-    } catch (error) {
-        console.error('Error in handleStripeSuccess:', error);
-        updateUIStatus("error", "Error starting conversion after payment: " + error.message);
-    }
-}
-
 function handleStripeRedirect() {
     const query = new URLSearchParams(window.location.search);
     if (query.get('success')) {

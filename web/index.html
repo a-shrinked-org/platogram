@@ -724,15 +724,14 @@ async function simulateConversionFlow(isFile, inputData) {
             inputData: isFile ? fileId : inputData,
             isFile: isFile,
             lang: TEST_LANG,
-            price: TEST_PRICE
+            price: TEST_PRICE,
+            isTestMode: true  // Add this line
         };
         sessionStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
         console.log('Stored conversion data:', conversionData);
         updateTestStatus("Conversion data stored. Simulating Stripe redirect in 5 seconds...");
-
         // Simulate delay before redirect
         await new Promise(resolve => setTimeout(resolve, 5000));
-
         // Simulate redirect to success page
         const testSessionId = 'test_session_' + Date.now();
         updateTestStatus("Redirecting to success page...");

@@ -1,102 +1,31 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { put } from '@vercel/blob/client';
 import { useAuth0 } from '@auth0/auth0-react';
 
-let db;
-
-const [conversionStarted, setConversionStarted] = useState(false);
-
-// Initialize IndexedDB
-function initDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open("FileStorage", 1);
-        request.onerror = (event) => reject("IndexedDB error: " + event.target.error);
-        request.onsuccess = (event) => {
-            db = event.target.result;
-            resolve();
-        };
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            db.createObjectStore("files", { keyPath: "id" });
-        };
-    });
-}
-
-// Retrieve file from IndexedDB
-async function retrieveFileFromTemporaryStorage(id) {
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(["files"], "readonly");
-        const store = transaction.objectStore("files");
-        const request = store.get(id);
-        request.onerror = (event) => reject("Error retrieving file: " + event.target.error);
-        request.onsuccess = (event) => resolve(event.target.result.file);
-    });
-}
-
-async function uploadFile(file, isTestMode = false, getTokenSilently) {
-    if (isTestMode) {
-        console.log('Test mode: Simulating file upload');
-        return `https://example.com/test-upload/${file.name}`;
-    }
-
-    try {
-        // Get the Auth0 token
-        const token = await getTokenSilently();
-
-        // Get the Blob token
-        const tokenResponse = await fetch('/api/upload-file', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'X-Vercel-Blob-Token-Request': 'true'
-            }
-        });
-
-        if (!tokenResponse.ok) {
-            throw new Error('Failed to get Blob token');
-        }
-
-        const { token: blobToken } = await tokenResponse.json();
-
-        // Use Vercel Blob to upload the file
-        const blob = await put(file.name, file, {
-            access: 'public',
-            token: blobToken,
-            handleUploadUrl: '/api/upload-file',
-        });
-
-        console.log('File uploaded successfully. URL:', blob.url);
-        return blob.url;
-    } catch (error) {
-        console.error('Error uploading file:', error);
-        throw new Error('Failed to upload file');
-    }
-}
-
-export default function Success() {
+function Success() {
     const router = useRouter();
     const [status, setStatus] = useState('Processing payment');
     const { getTokenSilently, isAuthenticated, isLoading } = useAuth0();
+    const [conversionStarted, setConversionStarted] = useState(false);
 
     useEffect(() => {
         if (router.query.session_id && !isLoading && !conversionStarted) {
             handleSuccess();
-          }
-        }, [router.query, isAuthenticated, isLoading, conversionStarted]);
-        async function handleSuccess() {
+        }
+    }, [router.query, isAuthenticated, isLoading, conversionStarted]);
 
-            if (conversionStarted) return;
-            setConversionStarted(true);
+    async function handleSuccess() {
+        if (conversionStarted) return;
+        setConversionStarted(true);
 
-            if (!isAuthenticated) {
-                console.error('User not authenticated');
-                setStatus('Error: User not authenticated');
-                setTimeout(() => router.push('/?showError=true'), 5000);
-                return;
-              }
+        if (!isAuthenticated) {
+            console.error('User not authenticated');
+            setStatus('Error: User not authenticated');
+            setTimeout(() => router.push('/?showError=true'), 5000);
+            return;
+        }
 
-            await initDB();
+        try {
             const { session_id } = router.query;
             console.log('Session ID:', session_id);
 
@@ -116,51 +45,33 @@ export default function Success() {
             sessionStorage.removeItem('pendingConversionData');
             let inputData = pendingConversionData.inputData;
             const lang = pendingConversionData.lang;
+            const isTestMode = pendingConversionData.isTestMode || false; // Add this line for test mode
 
-            try {
-                if (pendingConversionData.isFile) {
-                    setStatus('Retrieving file...');
-                    console.log('Retrieving file:', inputData);
-                    const file = await retrieveFileFromTemporaryStorage(inputData);
+            const token = await getTokenSilently();
 
-                    setStatus('Uploading file...');
-                    inputData = await uploadFile(file, getTokenSilently);
-                    console.log('File uploaded:', inputData);
-                }
+            if (pendingConversionData.isFile) {
+                setStatus('Retrieving file...');
+                console.log('Retrieving file:', inputData);
+                const file = await window.retrieveFileFromTemporaryStorage(inputData);
 
-                setStatus('Starting conversion...');
-                const token = await getTokenSilently();
-                const response = await fetch('/convert', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ session_id, lang, inputData }),
-                });
-
-                if (response.ok) {
-                    const result = await response.json();
-                    updateUIStatus("processing", "Conversion started");
-                    sessionStorage.setItem('conversionJobId', result.jobId);
-                    await pollStatus(token);
-                    router.push('/?showStatus=true');
-                } else {
-                    const errorData = await response.json();
-                    throw new Error(`Failed to start conversion: ${errorData.error || 'Unknown error'}`);
-                }
-            } catch (error) {
-                console.error('Error in handleSuccess:', error);
-                setStatus(`Error: ${error.message}`);
-                // Wait for a few seconds before redirecting in case of error
-                setTimeout(() => router.push('/?showError=true'), 5000);
+                setStatus('Uploading file...');
+                inputData = await window.uploadFile(file, token, isTestMode); // Pass isTestMode to uploadFile
+                console.log('File uploaded:', inputData);
             }
-        }
 
-        if (router.query.session_id && !isLoading) {
-            handleSuccess();
+            setStatus('Starting conversion...');
+            await window.postToConvert(inputData, lang, session_id, pendingConversionData.price, isTestMode); // Pass isTestMode to postToConvert
+
+            // The pollStatus function in app.js will handle status updates and UI changes
+            await window.pollStatus(token, isTestMode); // Pass isTestMode to pollStatus
+
+            router.push('/?showStatus=true');
+        } catch (error) {
+            console.error('Error in handleSuccess:', error);
+            setStatus(`Error: ${error.message}`);
+            setTimeout(() => router.push('/?showError=true'), 5000);
         }
-    }, [router.query, getTokenSilently, isAuthenticated, isLoading]);
+    }
 
     if (isLoading) {
         return <div>Loading...</div>;
@@ -173,3 +84,5 @@ export default function Success() {
         </div>
     );
 }
+
+export default Success;

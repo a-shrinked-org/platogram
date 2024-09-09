@@ -291,33 +291,30 @@ function initStripe() {
 }
 
 async function initAuth0() {
-  if (auth0Initialized) return;
-  try {
-    auth0Client = await auth0.createAuth0Client({
-      domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
-      clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
-      authorizationParams: {
-        redirect_uri: window.location.origin,
-        audience: "https://platogram.vercel.app/",
-        scope: "openid profile email",
-      },
-      cacheLocation: "localstorage",
-    });
-    debugLog("Auth0 client initialized successfully");
-    auth0Initialized = true;
+    try {
+      auth0Client = await auth0.createAuth0Client({
+        domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
+        clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
+        authorizationParams: {
+          redirect_uri: window.location.origin,
+          audience: "https://platogram.vercel.app/",
+          scope: "openid profile email",
+        },
+        cacheLocation: "localstorage",
+      });
+      debugLog("Auth0 client initialized successfully");
 
-    const query = window.location.search;
-    if (query.includes("code=") && query.includes("state=")) {
-      await auth0Client.handleRedirectCallback();
-      window.history.replaceState({}, document.title, "/");
+      const query = window.location.search;
+      if (query.includes("code=") && query.includes("state=")) {
+        await auth0Client.handleRedirectCallback();
+        window.history.replaceState({}, document.title, "/");
+      }
+
+      await updateUI();
+    } catch (error) {
+      console.error("Error initializing Auth0:", error);
     }
-
-    await updateUI();
-  } catch (error) {
-    console.error("Error initializing Auth0:", error);
-    updateUIStatus("error", "Failed to initialize authentication. Please refresh the page.");
   }
-}
 
 function updateUIStatus(status, message = "") {
     debugLog(`Updating UI status: ${status}`);
@@ -612,7 +609,7 @@ function checkSessionStorage() {
 
 async function handleSubmit(event) {
     if (event) event.preventDefault();
-    debugLog("handleSubmit called", { price: getPriceFromUI(), inputData: getInputData() });
+    console.log('handleSubmit called');
     const price = getPriceFromUI();
     let inputData = getInputData();
     const submitButton = document.getElementById('submit-btn');
@@ -623,59 +620,40 @@ async function handleSubmit(event) {
         return;
     }
 
-    if (isConversionInProgress) {
-        console.log("Conversion already in progress. Skipping.");
-        return;
-    }
-
-    isConversionInProgress = true;
-
     try {
         if (submitButton) {
             submitButton.disabled = true;
             submitButton.textContent = "Processing...";
         }
 
-        // Close the modal
         closeLanguageModal();
 
         if (price > 0) {
-            // Existing logic for paid conversions
-            console.log('Non-zero price detected, initiating Stripe checkout', { price, inputData: inputData instanceof File ? 'File' : inputData });
-            let fileId = null;
-            if (inputData instanceof File) {
-                fileId = await storeFileTemporarily(inputData);
-            }
-            // Store job parameters before redirecting to Stripe
-            const pendingConversionData = JSON.stringify({
-                inputData: inputData instanceof File ? fileId : inputData,
+            console.log('Non-zero price detected, initiating Stripe checkout');
+            sessionStorage.setItem('pendingConversionData', JSON.stringify({
+                inputData: inputData instanceof File ? inputData.name : inputData,
                 isFile: inputData instanceof File,
                 lang: selectedLanguage,
-                price: price
-            });
-            sessionStorage.setItem('pendingConversionData', pendingConversionData);
-            console.log('Stored pendingConversionData:', pendingConversionData);
-            checkSessionStorage();
-            await handlePaidConversion(price);
+                price: price,
+                isTestMode: false // Add this line for test mode
+            }));
+            await handlePaidConversion(inputData, price);
         } else {
-            // For free file conversions, proceed with upload/conversion
             if (inputData instanceof File) {
                 const uploadedUrl = await uploadFile(inputData);
                 inputData = uploadedUrl;
             }
             updateUIStatus("running", "Starting conversion...");
-            await postToConvert(inputData, selectedLanguage, null, price, true);
+            await postToConvert(inputData, selectedLanguage, null, price, false); // Add false for isTestMode
         }
     } catch (error) {
         console.error('Error in handleSubmit:', error);
-        console.error('Error details:', { price, inputData: inputData instanceof File ? 'File' : inputData });
         updateUIStatus("error", "Error: " + error.message);
     } finally {
         if (submitButton) {
             submitButton.disabled = false;
             submitButton.textContent = "Submit";
         }
-        isConversionInProgress = false;
     }
 }
 
@@ -1197,79 +1175,48 @@ function selectLanguage(lang) {
     document.getElementById("language-options").classList.add("hidden");
 }
 
-function pollStatus(token) {
+function pollStatus(token, isTestMode = false) {
     return new Promise((resolve, reject) => {
-        let pollingInterval;
-        let attemptCount = 0;
-        const maxAttempts = 60; // 5 minutes of polling at 5-second intervals
+      let pollingInterval;
 
-        async function checkStatus() {
-            if (attemptCount >= maxAttempts) {
-                clearInterval(pollingInterval);
-                updateUIStatus("error", "Conversion timed out. Please try again.");
-                reject(new Error("Polling timed out"));
-                return;
-            }
-            attemptCount++;
+      async function checkStatus() {
+        try {
+          const response = await fetch("https://temporary.name/status", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
 
-            try {
-                const response = await fetch("https://temporary.name/status", {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+          const result = await response.json();
+          console.log("Polling status response:", result);
 
-                const result = await response.json();
-                console.log("Polling status response:", result);
+          updateUIStatus(result.status);
 
-                switch (result.status) {
-                    case "starting":
-                        updateUIStatus("starting", "Conversion starting...");
-                        break;
-                    case "processing":
-                    case "running":
-                        updateUIStatus(result.status, `Conversion ${result.status}...`);
-                        break;
-                    case "done":
-                        clearInterval(pollingInterval);
-                        updateUIStatus("done", "Conversion completed successfully");
-                        if (typeof inputData === 'string' && inputData.includes('.public.blob.vercel-storage.com/')) {
-                            try {
-                                await deleteFile(inputData);
-                                console.log("Temporary file deleted successfully");
-                              } catch (cleanupError) {
-                                console.error("Error during file cleanup:", cleanupError);
-                              }
-                            }
-                        resolve(result);
-                        break;
-                    case "error":
-                    case "failed":
-                        clearInterval(pollingInterval);
-                        updateUIStatus("error", result.error || "Conversion failed");
-                        reject(new Error(result.error || "Conversion failed"));
-                        break;
-                    case "idle":
-                        console.log("Received idle status, continuing to poll...");
-                        break;
-                    default:
-                        console.warn(`Unknown status: ${result.status}`);
-                        updateUIStatus("processing", `Conversion in progress (${result.status})...`);
-                }
-            } catch (error) {
-                console.error("Error polling status:", error);
-                updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
-                clearInterval(pollingInterval);
-                reject(error);
-            }
+          if (result.status === "done" || result.status === "idle" || result.status === "error") {
+            clearInterval(pollingInterval);
+            resolve(result);
+          }
+        } catch (error) {
+          console.error("Error polling status:", error);
+          updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
+          clearInterval(pollingInterval);
+          reject(error);
         }
+      }
 
-        pollingInterval = setInterval(checkStatus, 5000); // Poll every 5 seconds
+      if (isTestMode) {
+        console.log('Test mode: Simulating status polling');
+        setTimeout(() => {
+          resolve({ status: "done" });
+        }, 3000);
+      } else {
+        pollingInterval = setInterval(checkStatus, 5000);
         checkStatus(); // Start the polling process immediately
+      }
     });
-}
+  }
 
 function toggleSection(sectionToShow) {
     const sections = [

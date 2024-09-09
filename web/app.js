@@ -361,9 +361,8 @@ function updateUIStatus(status, message = "") {
                     <p>File/URL: ${fileName}</p>
                     <p>Email: ${userEmail}</p>
                     <p>Status: Completed</p>
-                    ${message ? `<p>${message}</p>
-<button class="mx-auto block px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600" onclick="reset()">Reset</button>
-` : ''}
+                    ${message ? `<p>${message}</p>` : ''}
+                    <button class="mx-auto block px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" onclick="reset()">Reset</button>
                 `;
             }
             clearProcessingStageInterval();
@@ -392,6 +391,7 @@ function updateUIStatus(status, message = "") {
 async function updateUI() {
     if (!auth0Client) {
       console.error("Auth0 client not initialized");
+      updateUIStatus("idle"); // Set default state to idle
       return;
     }
 
@@ -415,14 +415,14 @@ async function updateUI() {
         await pollStatus(token);
         debugLog("Logged in as: " + user.email);
 
-        // Add this line to update the UI with the new design
         window.updateAuthUI(isAuthenticated, user);
       } else {
-        // Add this line to update the UI when not authenticated
         window.updateAuthUI(false, null);
+        updateUIStatus("idle"); // Set to idle state for non-authenticated users
       }
     } catch (error) {
       console.error("Error updating UI:", error);
+      updateUIStatus("idle"); // Set to idle state on error
     }
   }
 
@@ -447,6 +447,7 @@ async function reset() {
     if (urlInput) urlInput.value = "";
     if (fileNameElement) fileNameElement.textContent = "";
 
+    updateUIStatus("idle");  // Set status to idle after reset
     pollStatus(token);
   } catch (error) {
     console.error("Error resetting:", error);
@@ -1473,7 +1474,12 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    initAuth0().catch((error) => console.error("Error initializing app:", error));
+    initAuth0()
+        .then(() => updateUI())
+        .catch((error) => {
+            console.error("Error initializing app:", error);
+            updateUIStatus("idle"); // Set to idle state if initialization fails
+        });
 });
 
 let fileInput;

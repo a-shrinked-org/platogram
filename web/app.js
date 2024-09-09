@@ -985,7 +985,12 @@ async function deleteFile(fileUrl) {
     }
   }
 
-  async function postToConvert(inputData, lang, sessionId, price) {
+  async function postToConvert(inputData, lang, sessionId, price, isTestMode = false) {
+    if (isTestMode) {
+        console.log("Test mode: Simulating conversion request");
+        return { status: "done" };
+    }
+
     debugLog("postToConvert called", { inputData, lang, sessionId, price });
     let headers = {};
 
@@ -1032,13 +1037,15 @@ async function deleteFile(fileUrl) {
 
         if (result.message === "Conversion started" || result.status === "processing") {
             updateUIStatus("processing", "Conversion in progress...");
-            await pollStatus(await auth0Client.getTokenSilently());
+            return await pollStatus(token);
         } else {
             updateUIStatus("error", "Unexpected response from server");
+            throw new Error("Unexpected response from server");
         }
     } catch (error) {
         console.error("Error in postToConvert:", error);
         updateUIStatus("error", error.message);
+        throw error;
     }
 }
 
@@ -1178,46 +1185,58 @@ function selectLanguage(lang) {
 
 function pollStatus(token, isTestMode = false) {
     return new Promise((resolve, reject) => {
-      let pollingInterval;
+        let pollingInterval;
+        let attemptCount = 0;
+        const maxAttempts = 60; // 5 minutes of polling at 5-second intervals
 
-      async function checkStatus() {
-        try {
-          const response = await fetch("https://temporary.name/status", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+        async function checkStatus() {
+            if (attemptCount >= maxAttempts) {
+                clearInterval(pollingInterval);
+                updateUIStatus("error", "Conversion timed out. Please try again.");
+                reject(new Error("Polling timed out"));
+                return;
+            }
+            attemptCount++;
 
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
+            try {
+                const response = await fetch("https://temporary.name/status", {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
 
-          const result = await response.json();
-          console.log("Polling status response:", result);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
 
-          updateUIStatus(result.status);
+                const result = await response.json();
+                console.log("Polling status response:", result);
 
-          if (result.status === "done" || result.status === "idle" || result.status === "error") {
-            clearInterval(pollingInterval);
-            resolve(result);
-          }
-        } catch (error) {
-          console.error("Error polling status:", error);
-          updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
-          clearInterval(pollingInterval);
-          reject(error);
+                updateUIStatus(result.status, `Conversion ${result.status}...`);
+
+                if (result.status === "done" || result.status === "failed" || result.status === "error") {
+                    clearInterval(pollingInterval);
+                    resolve(result);
+                } else if (result.status === "idle") {
+                    console.log("Received idle status, continuing to poll...");
+                }
+            } catch (error) {
+                console.error("Error polling status:", error);
+                updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
+                clearInterval(pollingInterval);
+                reject(error);
+            }
         }
-      }
 
-      if (isTestMode) {
-        console.log('Test mode: Simulating status polling');
-        setTimeout(() => {
-          resolve({ status: "done" });
-        }, 3000);
-      } else {
-        pollingInterval = setInterval(checkStatus, 5000);
-        checkStatus(); // Start the polling process immediately
-      }
+        if (isTestMode) {
+            console.log('Test mode: Simulating status polling');
+            setTimeout(() => {
+                resolve({ status: "done" });
+            }, 3000);
+        } else {
+            pollingInterval = setInterval(checkStatus, 5000);
+            checkStatus(); // Start the polling process immediately
+        }
     });
-  }
+}
 
 function toggleSection(sectionToShow) {
     const sections = [

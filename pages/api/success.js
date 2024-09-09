@@ -9,69 +9,74 @@ function Success() {
     const [conversionStarted, setConversionStarted] = useState(false);
 
     useEffect(() => {
-        if (router.query.session_id && !isLoading && !conversionStarted) {
-            handleSuccess();
-        }
-    }, [router.query, isAuthenticated, isLoading, conversionStarted]);
+        let isMounted = true;
 
-    async function handleSuccess() {
-        if (conversionStarted) return;
-        setConversionStarted(true);
+        async function handleSuccess() {
+            if (conversionStarted) return;
+            setConversionStarted(true);
 
-        if (!isAuthenticated) {
-            console.error('User not authenticated');
-            setStatus('Error: User not authenticated');
-            setTimeout(() => router.push('/?showError=true'), 5000);
-            return;
-        }
-
-        try {
-            const { session_id } = router.query;
-            console.log('Session ID:', session_id);
-
-            const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
-            console.log('Retrieved pendingConversionDataString:', pendingConversionDataString);
-
-            const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
-            console.log('Parsed pendingConversionData:', pendingConversionData);
-
-            if (!session_id || !pendingConversionData) {
-                console.error('Missing session_id or pendingConversionData');
-                setStatus('Error: Invalid success parameters');
+            if (!isAuthenticated) {
+                console.error('User not authenticated');
+                setStatus('Error: User not authenticated');
                 setTimeout(() => router.push('/?showError=true'), 5000);
                 return;
             }
 
-            sessionStorage.removeItem('pendingConversionData');
-            let inputData = pendingConversionData.inputData;
-            const lang = pendingConversionData.lang;
-            const isTestMode = pendingConversionData.isTestMode || false; // Add this line for test mode
+            try {
+                const { session_id } = router.query;
+                console.log('Session ID:', session_id);
 
-            const token = await getTokenSilently();
+                const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
+                console.log('Retrieved pendingConversionDataString:', pendingConversionDataString);
 
-            if (pendingConversionData.isFile) {
-                setStatus('Retrieving file...');
-                console.log('Retrieving file:', inputData);
-                const file = await window.retrieveFileFromTemporaryStorage(inputData);
+                const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
+                console.log('Parsed pendingConversionData:', pendingConversionData);
 
-                setStatus('Uploading file...');
-                inputData = await window.uploadFile(file, token, isTestMode); // Pass isTestMode to uploadFile
-                console.log('File uploaded:', inputData);
+                if (!session_id || !pendingConversionData) {
+                    throw new Error('Missing session_id or pendingConversionData');
+                }
+
+                sessionStorage.removeItem('pendingConversionData');
+                let inputData = pendingConversionData.inputData;
+                const lang = pendingConversionData.lang;
+                const isTestMode = pendingConversionData.isTestMode || false;
+
+                const token = await getTokenSilently();
+
+                if (pendingConversionData.isFile) {
+                    setStatus('Retrieving file...');
+                    console.log('Retrieving file:', inputData);
+                    const file = await window.retrieveFileFromTemporaryStorage(inputData);
+                    setStatus('Uploading file...');
+                    inputData = await window.uploadFile(file, token, isTestMode);
+                    console.log('File uploaded:', inputData);
+                }
+
+                setStatus('Starting conversion...');
+                await window.postToConvert(inputData, lang, session_id, pendingConversionData.price, isTestMode);
+
+                // Only update status if component is still mounted
+                if (isMounted) {
+                    setStatus('Conversion started');
+                    router.push('/?showStatus=true');
+                }
+            } catch (error) {
+                console.error('Error in handleSuccess:', error);
+                if (isMounted) {
+                    setStatus(`Error: ${error.message}`);
+                    setTimeout(() => router.push('/?showError=true'), 5000);
+                }
             }
-
-            setStatus('Starting conversion...');
-            await window.postToConvert(inputData, lang, session_id, pendingConversionData.price, isTestMode); // Pass isTestMode to postToConvert
-
-            // The pollStatus function in app.js will handle status updates and UI changes
-            await window.pollStatus(token, isTestMode); // Pass isTestMode to pollStatus
-
-            router.push('/?showStatus=true');
-        } catch (error) {
-            console.error('Error in handleSuccess:', error);
-            setStatus(`Error: ${error.message}`);
-            setTimeout(() => router.push('/?showError=true'), 5000);
         }
-    }
+
+        if (router.query.session_id && !isLoading && !conversionStarted) {
+            handleSuccess();
+        }
+
+        return () => {
+            isMounted = false;
+        };
+    }, [router.query, isAuthenticated, isLoading, conversionStarted]);
 
     if (isLoading) {
         return <div>Loading...</div>;

@@ -339,17 +339,28 @@ function updateUIStatus(status, message = "") {
             break;
         case "uploading":
             toggleSection("upload-process-section");
-            if (uploadProcessSection) {
-                uploadProcessSection.innerHTML = `
-                    <p>File: ${fileName}</p>
-                    <p>Email: ${userEmail}</p>
-                    <p>Status: Uploading</p>
-                    <div id="upload-progress-bar" style="width: 0%; height: 20px; background-color: #4CAF50;"></div>
-                    <p id="upload-progress-text">Uploading: 0%</p>
-                `;
+            break;
+        case "preparing":
+            toggleSection("processing-section");
+            const processingStatusText = document.getElementById("processing-status-text");
+            if (processingStatusText) {
+                if (message.includes("payment confirmed")) {
+                    processingStatusText.innerHTML = `
+                        <p>File/URL: ${fileName}</p>
+                        <p>Email: ${userEmail}</p>
+                        <p>Status: Payment confirmed, preparing to start conversion</p>
+                        <p>${message}</p>
+                    `;
+                } else {
+                    processingStatusText.innerHTML = `
+                        <p>File/URL: ${fileName}</p>
+                        <p>Email: ${userEmail}</p>
+                        <p>Status: Preparing to start conversion</p>
+                        <p>${message}</p>
+                    `;
+                }
             }
             break;
-        case "processing":
         case "running":
             toggleSection("status-section");
             if (statusSection) {
@@ -643,10 +654,11 @@ async function handleSubmit(event) {
         } else {
             // For free conversions, proceed with upload/conversion
             if (inputData instanceof File) {
+                updateUIStatus("uploading", "Uploading file...");
                 const uploadedUrl = await uploadFile(inputData);
                 inputData = uploadedUrl;
             }
-            updateUIStatus("processing", "Starting conversion...");
+            updateUIStatus("preparing", "File uploaded, preparing to start conversion...");
             await postToConvert(inputData, selectedLanguage, null, price, false);
         }
     } catch (error) {
@@ -744,6 +756,7 @@ async function handleStripeSuccess(sessionId, isTestMode = false) {
         try {
             if (pendingConversionData.isFile) {
                 console.log("Retrieving file from temporary storage:", inputData);
+                updateUIStatus("uploading", "Retrieving and uploading file...");
                 const file = await retrieveFileFromTemporaryStorage(inputData);
                 if (!file) {
                     throw new Error("Failed to retrieve file from temporary storage");
@@ -756,6 +769,7 @@ async function handleStripeSuccess(sessionId, isTestMode = false) {
             }
 
             // Start the conversion process
+            updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
             await postToConvert(inputData, lang, sessionId, price, isTestMode);
 
             // Clear the pending conversion data

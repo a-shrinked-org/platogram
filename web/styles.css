@@ -283,6 +283,7 @@ footer a:hover {
   padding: 10px;
   padding-right: 40px;
   box-sizing: border-box;
+  font-family: 'IBM Plex Mono', sans-serif;
 }
 
 .upload-button {

@@ -280,7 +280,7 @@ function handleFiles(files) {
 
 function initStripe() {
   if (!stripe) {
-    const stripePublishableKey = 'sk_test_ILhImizeTSi8hN0jOkmqBUci'; // Replace with your actual publishable key
+    const stripePublishableKey = 'pk_live_51M7o8vFSngJcZDqfHcvpYSTIJ2TKO4SOlRKYrhkCe2HL8oXnoiCcKDuNluTjBwJsjIqBHHIONNAjFn1mC1qQ1HON00kuu0frmg'; // Replace with your actual publishable key
     if (!stripePublishableKey) {
       console.error('Stripe publishable key is not set');
       return null;

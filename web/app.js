@@ -280,7 +280,7 @@ function handleFiles(files) {
 
 function initStripe() {
   if (!stripe) {
-    const stripePublishableKey = 'pk_live_51M7o8vFSngJcZDqfHcvpYSTIJ2TKO4SOlRKYrhkCe2HL8oXnoiCcKDuNluTjBwJsjIqBHHIONNAjFn1mC1qQ1HON00kuu0frmg'; // Replace with your actual publishable key
+    const stripePublishableKey = 'process.env.STRIPE_API_KEY_TEST'; // Replace with your actual publishable key
     if (!stripePublishableKey) {
       console.error('Stripe publishable key is not set');
       return null;
@@ -405,7 +405,7 @@ function updateUIStatus(status, message = "") {
             toggleSection("input-section");
     }
 }
-  
+
 async function updateUI() {
     if (!auth0Client) {
       console.error("Auth0 client not initialized");
@@ -942,7 +942,7 @@ async function onConvertClick(event) {
             throw error;
         }
     }
-    
+
 //function updateUploadProgress(progress) {
 //  const uploadProgressBar = document.getElementById('upload-progress-bar');
 //  const uploadProgressText = document.getElementById('upload-progress-text');

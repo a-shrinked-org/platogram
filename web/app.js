@@ -404,6 +404,7 @@ function updateUIStatus(status, message = "") {
                 }
             }
             break;
+        case "processing":
         case "running":
             toggleSection("status-section");
             if (statusSection) {
@@ -1257,8 +1258,14 @@ function pollStatus(token, isTestMode = false) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const result = await response.json();
-        console.log("Polling status response:", result);
+        let result;
+        try {
+          result = await response.json();
+        } catch (parseError) {
+          console.error("Error parsing JSON:", parseError);
+          console.log("Raw response:", await response.text());
+          throw new Error("Invalid response format from server");
+        }
 
         updateUIStatus(result.status, `Conversion ${result.status}...`);
 

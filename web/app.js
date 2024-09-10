@@ -61,18 +61,24 @@ window.updateAuthUI = function(isAuthenticated, user) {
     const loginButton = document.getElementById('login-button');
     const userCircle = document.getElementById('user-circle');
     const logoutTooltip = document.getElementById('logout-tooltip');
+    const userEmailElement = document.getElementById('user-email');
+
     if (isAuthenticated && user) {
         if (loginButton) loginButton.classList.add('hidden');
         if (userCircle) {
-            userCircle.classList.remove('hidden');
-            userCircle.textContent = getInitials(user.email);
+          userCircle.classList.remove('hidden');
+          userCircle.textContent = getInitials(user.email);
         }
-    } else {
+        if (userEmailElement) {
+          userEmailElement.textContent = user.email;
+        }
+      } else {
         if (loginButton) loginButton.classList.remove('hidden');
         if (userCircle) userCircle.classList.add('hidden');
         if (logoutTooltip) logoutTooltip.classList.add('hidden');
-    }
-};
+        if (userEmailElement) userEmailElement.textContent = '';
+      }
+    };
 
 function getInitials(email) {
     return email.split('@')[0].substring(0, 2).toUpperCase();
@@ -423,17 +429,22 @@ async function updateUI() {
 
       if (isAuthenticated) {
         const user = await auth0Client.getUser();
-        const token = await auth0Client.getTokenSilently({
-          audience: "https://platogram.vercel.app",
-        });
         const userEmailElement = document.getElementById("user-email");
         if (userEmailElement) {
           userEmailElement.textContent = user.email;
         }
-        await pollStatus(token);
-        debugLog("Logged in as: " + user.email);
-
         window.updateAuthUI(isAuthenticated, user);
+
+        // Only poll status if authenticated and not in idle state
+        const currentStatus = getCurrentUIStatus();
+        if (currentStatus !== "idle") {
+          const token = await auth0Client.getTokenSilently({
+            audience: "https://platogram.vercel.app",
+          });
+          await pollStatus(token);
+        } else {
+          updateUIStatus("idle"); // Ensure idle state is set
+        }
       } else {
         window.updateAuthUI(false, null);
         updateUIStatus("idle"); // Set to idle state for non-authenticated users
@@ -442,6 +453,15 @@ async function updateUI() {
       console.error("Error updating UI:", error);
       updateUIStatus("idle"); // Set to idle state on error
     }
+  }
+
+  // Helper function to get current UI status
+  function getCurrentUIStatus() {
+    const statusSection = document.getElementById("status-section");
+    if (statusSection && !statusSection.classList.contains("hidden")) {
+      return statusSection.getAttribute("data-status") || "idle";
+    }
+    return "idle";
   }
 
 async function reset() {
@@ -1175,54 +1195,61 @@ function selectLanguage(lang) {
 }
 
 function pollStatus(token, isTestMode = false) {
-    return new Promise((resolve, reject) => {
-        let pollingInterval;
-        let attemptCount = 0;
-        const maxAttempts = 60; // 5 minutes of polling at 5-second intervals
+  return new Promise((resolve, reject) => {
+    let attemptCount = 0;
+    const maxAttempts = 60; // 5 minutes of polling at 5-second intervals
 
-        async function checkStatus() {
-            if (attemptCount >= maxAttempts) {
-                clearInterval(pollingInterval);
-                updateUIStatus("error", "Conversion timed out. Please try again.");
-                reject(new Error("Polling timed out"));
-                return;
-            }
-            attemptCount++;
+    async function checkStatus() {
+      if (attemptCount >= maxAttempts) {
+        clearInterval(pollingInterval);
+        updateUIStatus("error", "Conversion timed out. Please try again.");
+        reject(new Error("Polling timed out"));
+        return;
+      }
+      attemptCount++;
 
-            try {
-                const response = await fetch("https://temporary.name/status", {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        ...(isTestMode ? { 'X-Test-Mode': 'true' } : {})
-                    },
-                });
+      try {
+        const response = await fetch("/status", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...(isTestMode ? { 'X-Test-Mode': 'true' } : {})
+          },
+        });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const result = await response.json();
-                console.log("Polling status response:", result);
-
-                updateUIStatus(result.status, `Conversion ${result.status}...`);
-
-                if (result.status === "done" || result.status === "failed" || result.status === "error") {
-                    clearInterval(pollingInterval);
-                    resolve(result);
-                } else if (result.status === "idle") {
-                    console.log("Received idle status, continuing to poll...");
-                }
-            } catch (error) {
-                console.error("Error polling status:", error);
-                updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
-                clearInterval(pollingInterval);
-                reject(error);
-            }
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        pollingInterval = setInterval(checkStatus, 5000);
-        checkStatus(); // Start the polling process immediately
-    });
+        const result = await response.json();
+        console.log("Polling status response:", result);
+
+        updateUIStatus(result.status, `Conversion ${result.status}...`);
+
+        if (result.status === "done") {
+          clearInterval(pollingInterval);
+          resolve(result);
+        } else if (result.status === "failed" || result.status === "error") {
+          clearInterval(pollingInterval);
+          updateUIStatus("failed", result.error || "An error occurred");
+          reject(new Error(result.error || "Conversion failed"));
+        } else if (result.status === "idle") {
+          console.log("Received idle status, continuing to poll...");
+        } else if (result.status === "running") {
+          // Continue polling
+        } else {
+          console.warn("Unknown status received:", result.status);
+        }
+      } catch (error) {
+        console.error("Error polling status:", error);
+        updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
+        clearInterval(pollingInterval);
+        reject(error);
+      }
+    }
+
+    const pollingInterval = setInterval(checkStatus, 5000);
+    checkStatus(); // Start the polling process immediately
+  });
 }
 
 function toggleSection(sectionToShow) {

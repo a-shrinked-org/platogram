@@ -280,7 +280,7 @@ function handleFiles(files) {
 
 function initStripe() {
   if (!stripe) {
-    const stripePublishableKey = 'process.env.STRIPE_API_KEY_TEST'; // Replace with your actual publishable key
+    const stripePublishableKey = 'pk_test_qwV1XnR0ky7YqIJQC828bMwC'; // Replace with your actual publishable key
     if (!stripePublishableKey) {
       console.error('Stripe publishable key is not set');
       return null;

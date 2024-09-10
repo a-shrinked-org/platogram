@@ -280,7 +280,7 @@ function handleFiles(files) {
 
 function initStripe() {
   if (!stripe) {
-    const stripePublishableKey = 'pk_test_qwV1XnR0ky7YqIJQC828bMwC'; // Replace with your actual publishable key
+    const stripePublishableKey = 'sk_test_ILhImizeTSi8hN0jOkmqBUci'; // Replace with your actual publishable key
     if (!stripePublishableKey) {
       console.error('Stripe publishable key is not set');
       return null;
@@ -487,7 +487,7 @@ async function createCheckoutSession(price, lang) {
   }
 
   try {
-    const response = await fetch('https://platogram.vercel.app/api/create-checkout-session', {
+    const response = await fetch('https://shrinked.ai/api/create-checkout-session', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

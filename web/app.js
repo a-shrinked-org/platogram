@@ -1247,7 +1247,7 @@ function pollStatus(token, isTestMode = false) {
       attemptCount++;
 
       try {
-        const response = await fetch("/status", {
+        const response = await fetch("https://temporary.name/status", {
           headers: {
             Authorization: `Bearer ${token}`,
             ...(isTestMode ? { 'X-Test-Mode': 'true' } : {})

@@ -694,15 +694,15 @@ function createTestPanel() {
 
     panel.innerHTML = `
         <h2 style="display:none;">Test Panel</h2>
-        <div>
+        <div style="display:none;">
             <input type="text" id="test-url-input" placeholder="Enter URL">
             <button onclick="testURLInput()">Test URL Input ($5)</button>
         </div>
-        <div style="margin-top: 10px;">
+        <div style="margin-top: 10px; display:none;">
             <input type="file" id="test-file-input">
             <button onclick="testFileInput()">Test File Input ($5)</button>
         </div>
-        <div style="margin-top: 10px;">
+        <div style="margin-top: 10px; display:none;">
             <strong>Test Status:</strong> <span id="test-status"></span>
         </div>
     `;

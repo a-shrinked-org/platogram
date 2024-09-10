@@ -108,7 +108,6 @@
             text-decoration: none;
         }
 
-
         .input-section {
             border: 1px solid rgba(203, 213, 225, 0.2);
             border-radius: 14px;
@@ -139,10 +138,45 @@
             padding: 4px 16px;
             border-radius: 6px;
         }
+        #convert-file-button {
+            color: white;
+            text-transform: uppercase;
+            font-size: 14px;
+            background-color: #0F172A;
+            transition: background-color 0.3s ease, transform 0.3s ease;
+            font-family: 'IBM Plex Mono', sans-serif;
+            border-radius: 6px;
+        }
+        #convert-file-button:disabled
+        {
+            background-color: #D8D8D8;
+            color:white;
+        }
+        #url-input, #upload-file-button {
+            font-family: 'IBM Plex Mono', sans-serif;
+            letter-spacing: -0.6px;
+            font-size: 15px;
+          }
+
+        .upload-file-buttons span, .inform {
+            font-family: 'IBM Plex Mono', sans-serif;
+            letter-spacing: -0.2px;
+            font-weight:500;
+            font-size: 13px;
+          }
+
+        .upload-file-buttons span, .inform {
+            font-family: 'IBM Plex Mono', sans-serif;
+            letter-spacing: -0.2px;
+            font-weight:400;
+            font-size: 13px;
+          }
+
+
 
         .input-section #convert-button:disabled {
             background-color: #D8D8D8;
-            color:rgba(75,85,99)
+            color:white;
         }
 
         .input-section #convert-button button:hover {
@@ -152,7 +186,6 @@
         }
 
         .upload-file-buttons button {
-            border: 1px solid rgba(203, 213, 225, 0.4);
             background-color: #faf0e8;
         }
         .user-circle {
@@ -197,11 +230,9 @@
         #processing-stage {
             display: none !important;
         }
-
     </style>
 </head>
-
-<body class="bg-white">
+<body style="background-color: #F8EDEA !important;">
     <div class="max-w-6.5xl mx-auto pt-3 px-4 sm:px-6 lg:px-8 bg-white">
         <header class="flex justify-between items-center py-4">
             <a href="/" class="flex items-center space-x-2">
@@ -237,7 +268,7 @@
           </div>
         <main role="main">
             <h1
-                class="font-perfectly-nineties text-black font-normal lg:text-5xl lg:leading-11 sm:leading-7 sm:text-3xl mb-6 text-center max-w-2xl mx-auto">
+                class="font-perfectly-nineties text-black font-normal lg:text-5xl lg:leading-12 sm:leading-7 sm:text-3xl mb-6 text-center max-w-2xl mx-auto">
                 Transform spoken words into structured knowledge.
                 <span class="block pt-3">Unlock insights from audio and video — beyond transcripts, summaries, and scattered notes.</span>
                 <span class="block pt-3">10x your content understanding.</span>
@@ -331,7 +362,7 @@
               <button class="mx-auto block px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600" onclick="reset()">Reset</button>
             </div>
 
-            <div class="p-10 max-w-xl mx-auto text-center text-gray-400 text-sm">
+            <div class="p-10 max-w-xl mx-auto text-center text-gray-400 text-sm inform">
                 Transcription times can vary depending on the file size, length of
                 the content, and how busy our servers are.
             </div>
@@ -442,7 +473,7 @@
                     class="mx-auto mb-6" style="max-width: 350px;">
                 <h2 class="font-perfectly-nineties text-3xl mb-4 bg-white text-black">
                     Shrinked was created by two tech enthusiasts,<br>
-                    <span class="underline">Ivan</span> & <span class="underline">Artyom</span>, who wanted to
+                    <span class="underline"><a href="https://x.com/damnventures" target="_blank"></a>Ivan</a></span> & <span class="underline"><a href="https://x.com/ArtyomAstafurov" target="_blank">Artyom</a></span>, who wanted to
                     rediscover the<br>
                     magic in spoken stories.
                 </h2>

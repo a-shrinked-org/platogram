@@ -1,4 +1,4 @@
-const stripe = require('stripe')(process.env.STRIPE_API_KEY_TEST);
+const stripe = require('stripe')('sk_test_ILhImizeTSi8hN0jOkmqBUci');
 
 module.exports = async (req, res) => {
   if (req.method === 'POST') {

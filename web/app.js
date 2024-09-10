@@ -263,15 +263,25 @@ function toggleHighlight(dropArea, isActive) {
 function handleFiles(files) {
     if (files.length > 0) {
         const file = files[0];
-        uploadedFile = file; // Update the global uploadedFile variable
+        uploadedFile = file;
         const fileNameDisplay = document.getElementById('file-name-display');
         const convertFileButton = document.getElementById('convert-file-button');
+        const fileUploadPrompt = document.getElementById('file-upload-prompt');
+        const fileResetOption = document.getElementById('file-reset-option');
+
         if (fileNameDisplay) {
             fileNameDisplay.textContent = file.name;
         }
         if (convertFileButton) {
             toggleConvertButtonState(true, convertFileButton);
         }
+        if (fileUploadPrompt) {
+            fileUploadPrompt.classList.add('hidden');
+        }
+        if (fileResetOption) {
+            fileResetOption.classList.remove('hidden');
+        }
+
         // Clear URL input if it exists
         const urlInput = document.getElementById('url-input');
         if (urlInput) urlInput.value = "";
@@ -280,6 +290,33 @@ function handleFiles(files) {
         debugLog("File size: " + file.size + " bytes");
         debugLog("File type: " + file.type);
     }
+}
+
+function resetFileSelection() {
+    uploadedFile = null;
+    const fileNameDisplay = document.getElementById('file-name-display');
+    const convertFileButton = document.getElementById('convert-file-button');
+    const fileUploadPrompt = document.getElementById('file-upload-prompt');
+    const fileResetOption = document.getElementById('file-reset-option');
+    const fileInput = document.querySelector('input[type="file"]');
+
+    if (fileNameDisplay) {
+        fileNameDisplay.textContent = '';
+    }
+    if (convertFileButton) {
+        toggleConvertButtonState(false, convertFileButton);
+    }
+    if (fileUploadPrompt) {
+        fileUploadPrompt.classList.remove('hidden');
+    }
+    if (fileResetOption) {
+        fileResetOption.classList.add('hidden');
+    }
+    if (fileInput) {
+        fileInput.value = ''; // Reset the file input
+    }
+
+    debugLog("File selection reset");
 }
 
 // Stripe + Auth Init
@@ -1418,6 +1455,7 @@ document.addEventListener("DOMContentLoaded", () => {
         backToUrlButton: document.getElementById('back-to-url'),
         fileDropArea: document.getElementById('file-drop-area'),
         fileInput: document.querySelector('input[type="file"]'),
+        resetFileLink: document.getElementById('reset-file-link'),
         convertFileButton: document.getElementById('convert-file-button'),
         loginButton: document.getElementById('login-button'),
         logoutButton: document.getElementById('logout-button'),
@@ -1455,6 +1493,13 @@ document.addEventListener("DOMContentLoaded", () => {
         elements.uploadIcon.addEventListener("click", handleFileUpload);
     }
 
+    if (elements.resetFileLink) {
+        elements.resetFileLink.addEventListener('click', (event) => {
+            event.preventDefault();
+            resetFileSelection();
+        });
+    }
+
     if (elements.urlInput) {
         elements.urlInput.addEventListener("input", () => {
             if (elements.fileNameElement) elements.fileNameElement.textContent = "";
@@ -1475,6 +1520,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (elements.backToUrlButton) {
         elements.backToUrlButton.addEventListener('click', () => {
+            resetFileSelection();
             toggleSections(elements.fileUploadSection, elements.inputSection);
         });
     }

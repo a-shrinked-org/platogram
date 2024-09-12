@@ -9,26 +9,34 @@ function TestIntermediate() {
         const { inputData } = router.query;
 
         if (inputData) {
-            const conversionData = JSON.parse(decodeURIComponent(inputData));
-            console.log('Received conversion data:', conversionData);
+            try {
+                const conversionData = JSON.parse(decodeURIComponent(inputData));
+                console.log('Received conversion data:', conversionData);
 
-            // Simulate a delay for payment processing
-            setTimeout(() => {
-                setStatus('Payment successful! Redirecting to success page...');
+                // Store the conversion data in localStorage
+                localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
 
-                // Simulate redirect to success page
-                const testSessionId = 'test_session_' + Date.now();
+                // Simulate a delay for payment processing
                 setTimeout(() => {
-                    router.push(`/success?session_id=${testSessionId}`);
-                }, 2000);
-            }, 3000);
+                    setStatus('Payment successful! Redirecting to success page...');
+
+                    // Simulate redirect to success page
+                    const testSessionId = 'test_session_' + Date.now();
+                    setTimeout(() => {
+                        router.push(`/success?session_id=${testSessionId}`);
+                    }, 2000);
+                }, 3000);
+            } catch (error) {
+                console.error('Error parsing input data:', error);
+                setStatus('Error: Invalid input data');
+            }
         } else {
             setStatus('Error: No input data received');
         }
     }, [router.query]);
 
     return (
-      <div>
+        <div>
             <h1>Simulated Stripe Checkout</h1>
             <p>{status}</p>
         </div>

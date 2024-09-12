@@ -79,10 +79,9 @@ body,
 html {
   height: 100%;
   margin: 0;
-  font-family: "Open Sans", sans-serif;
+  font-family: 'IBM Plex Mono', sans-serif;
   line-height: 1.6;
   color: var(--text-color);
-  background-color: var(--light-gray);
 }
 
 .container {
@@ -172,10 +171,8 @@ p {
 }
 
 section {
-  margin-bottom: 40px;
-  padding: 20px;
+  padding: 45px;
   background-color: var(--lighter-gray);
-  border-radius: 10px;
   text-align: center;
 }
 

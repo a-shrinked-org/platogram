@@ -13,6 +13,7 @@ let vercelBlobUpload;
 let db;
 let testMode = false;
 let isConversionInProgress = false;
+let currentView = 'cells';
 
 import('https://esm.sh/@vercel/blob@0.23.4').then(module => {
         console.log('Vercel Blob import:', module);
@@ -188,6 +189,26 @@ function closeLanguageModal() {
         modal.classList.add("hidden");
     }
 }
+
+window.changeImage = function(type) {
+    const image = document.getElementById('dashboard-image');
+    // In a real scenario, you would change the src to different images
+    // For this example, we'll just update the alt text
+    image.alt = `Dashboard view: ${type}`;
+
+    // Update button styles
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(button => {
+        if (button.textContent.trim().toLowerCase() === type) {
+            button.classList.remove('bg-gray-100', 'text-gray-600');
+            button.classList.add('bg-blue-100', 'text-blue-600');
+        } else {
+            button.classList.remove('bg-blue-100', 'text-blue-600');
+            button.classList.add('bg-gray-100', 'text-gray-600');
+        }
+    });
+};
+
 
 function setupPriceUI() {
     const basicJobButton = document.getElementById('basic-job-button');
@@ -752,7 +773,7 @@ async function handlePaidConversion(inputData, price) {
         price: price
     };
 
-    sessionStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
+    localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
     console.log('Stored pendingConversionData:', conversionData);
 
     if (testMode) {
@@ -844,18 +865,27 @@ async function handleStripeSuccess(sessionId, isTestMode = false) {
 }
 
 function handleStripeRedirect() {
-    const query = new URLSearchParams(window.location.search);
-    if (query.get('success')) {
-        console.log('Payment successful! Redirecting to success page...');
-        // Instead of updating UI status here, redirect to the success page
-        window.location.href = `/success?session_id=${query.get('session_id')}`;
-    } else if (query.get('canceled')) {
-        console.log('Order canceled -- continue to shop around and checkout when you are ready.');
-        updateUIStatus('idle', 'Order canceled. You can try again when you are ready.');
-    } else {
-        console.log('Unknown Stripe redirect status');
-        updateUIStatus('error', 'Unknown payment status. Please contact support if you believe this is an error.');
+    const currentPath = window.location.pathname;
+    const urlParams = new URLSearchParams(window.location.search);
+
+    if (currentPath === '/success') {
+        const sessionId = urlParams.get('session_id');
+        if (sessionId) {
+            console.log('Payment successful. Processing...');
+            handleStripeSuccess(sessionId);
+        } else {
+            console.error('Success route accessed without session ID');
+            updateUIStatus("error", "Invalid success parameters");
+        }
+    } else if (currentPath === '/cancel') {
+        console.log('Payment cancelled by user');
+        updateUIStatus("idle", "Payment was cancelled. You can try again when you're ready.");
+        // Redirect to the main page after a short delay
+        setTimeout(() => {
+            window.location.href = '/';
+        }, 3000);
     }
+    // If we're not on /success or /cancel, do nothing
 }
 
 function handleStripeCancel() {
@@ -1447,9 +1477,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 document.addEventListener("DOMContentLoaded", () => {
     debugLog("DOM Content Loaded");
+    updateUIStatus("idle"); // Set initial state to idle
     initStripe();
     handleStripeRedirect();
     setupPriceUI();
+
+    // Initialize Lucide icons
+    lucide.createIcons();
+    console.log('Lucide in');
 
     const elements = {
         uploadIcon: document.querySelector(".upload-icon"),
@@ -1468,6 +1503,21 @@ document.addEventListener("DOMContentLoaded", () => {
         logoutButton: document.getElementById('logout-button'),
         userCircle: document.getElementById('user-circle'),
         logoutTooltip: document.getElementById('logout-tooltip'),
+        cellsButton: document.getElementById('cells-button'),
+        chartsButton: document.getElementById('charts-button'),
+        aiSummaryButton: document.getElementById('ai-summary-button'),
+        tablesButton: document.getElementById('tables-button'),
+        filtersButton: document.getElementById('filters-button'),
+        dashboardImage: document.getElementById('dashboard-image')
+    };
+
+    // Definining image sources for each view
+    const viewImages = {
+        cells: './web/static/Assets/Abstract-image.png',
+        charts: './web/static/Assets/Contributors-image.png',
+        aisummary: './web/static/Assets/Chapters-image.png',
+        tables: './web/static/Assets/Introduction-image.png',
+        filters: './web/static/Assets/Conclusion-image.png'
     };
 
     // Add event listener for userCircle
@@ -1489,6 +1539,12 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
+
+    if (elements.cellsButton) elements.cellsButton.addEventListener('click', () => changeImage('cells'));
+    if (elements.chartsButton) elements.chartsButton.addEventListener('click', () => changeImage('charts'));
+    if (elements.aiSummaryButton) elements.aiSummaryButton.addEventListener('click', () => changeImage('aisummary'));
+    if (elements.tablesButton) elements.tablesButton.addEventListener('click', () => changeImage('tables'));
+    if (elements.filtersButton) elements.filtersButton.addEventListener('click', () => changeImage('filters'));
 
     // Set up language selection buttons
     const enButton = document.querySelector('button[onclick="selectLanguage(\'en\')"]');
@@ -1559,6 +1615,32 @@ document.addEventListener("DOMContentLoaded", () => {
             logout();
         });
     }
+
+    function changeImage(type) {
+        if (elements.dashboardImage) {
+            elements.dashboardImage.src = viewImages[type];
+            elements.dashboardImage.alt = `Dashboard view: ${type}`;
+        }
+
+        // Update button styles
+        ['cells', 'charts', 'ai-summary', 'tables', 'filters'].forEach(viewType => {
+            const button = document.getElementById(`${viewType}-button`);
+            if (button) {
+                if (viewType === type) {
+                    button.classList.remove('bg-gray-100', 'text-gray-600');
+                    button.classList.add('bg-blue-100', 'text-blue-600');
+                } else {
+                    button.classList.remove('bg-blue-100', 'text-blue-600');
+                    button.classList.add('bg-gray-100', 'text-gray-600');
+                }
+            }
+        });
+
+        currentView = type;
+    }
+
+    // Initialize the default view
+    changeImage(currentView);
 
     initAuth0()
         .then(() => updateUI())

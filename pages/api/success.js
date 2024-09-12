@@ -26,17 +26,22 @@ function Success() {
                 const { session_id } = router.query;
                 console.log('Session ID:', session_id);
 
-                const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
+                const pendingConversionDataString = localStorage.getItem('pendingConversionData');
                 console.log('Retrieved pendingConversionDataString:', pendingConversionDataString);
 
-                const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
+                if (!pendingConversionDataString) {
+                    throw new Error('No pending conversion data found');
+                }
+
+                const pendingConversionData = JSON.parse(pendingConversionDataString);
                 console.log('Parsed pendingConversionData:', pendingConversionData);
 
                 if (!session_id || !pendingConversionData) {
                     throw new Error('Missing session_id or pendingConversionData');
                 }
 
-                sessionStorage.removeItem('pendingConversionData');
+                localStorage.removeItem('pendingConversionData');
+
                 let inputData = pendingConversionData.inputData;
                 const lang = pendingConversionData.lang;
                 const isTestMode = pendingConversionData.isTestMode || false;
@@ -55,7 +60,6 @@ function Success() {
                 setStatus('Starting conversion...');
                 await window.postToConvert(inputData, lang, session_id, pendingConversionData.price, isTestMode);
 
-                // Only update status if component is still mounted
                 if (isMounted) {
                     setStatus('Conversion started');
                     router.push('/?showStatus=true');
@@ -69,7 +73,7 @@ function Success() {
             }
         }
 
-        if (router.query.session_id && !isLoading && !conversionStarted) {
+        if (router.query.session_id && !isLoading && isAuthenticated && !conversionStarted) {
             handleSuccess();
         }
 

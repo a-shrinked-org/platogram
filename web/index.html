@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="bg-white">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,11 +8,12 @@
     <title>Shrinked | Transform Spoken Content into Structured Knowledge</title>
     <link rel="icon" type="image/x-icon" href="./web/static/Assets/favicon.ico">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://platogram.vercel.app/web/styles.css">
+    <link rel="stylesheet" href="./web/styles.css">
     <script src="https://unpkg.com/country-flag-emoji@latest/dist/country-flag-emoji.umd.min.js"></script>
     <style>
         @font-face {
@@ -165,14 +166,12 @@
             font-size: 13px;
           }
 
-        .upload-file-buttons span, .inform {
+        .upload-file-buttons span, .inform, #status-section {
             font-family: 'IBM Plex Mono', sans-serif;
             letter-spacing: -0.2px;
             font-weight:400;
             font-size: 13px;
           }
-
-
 
         .input-section #convert-button:disabled {
             background-color: #D8D8D8;
@@ -233,7 +232,7 @@
     </style>
 </head>
 <body style="background-color: #F8EDEA !important;">
-    <div class="max-w-6.5xl mx-auto pt-3 px-4 sm:px-6 lg:px-8 bg-white">
+    <div id="wraphere">
         <header class="flex justify-between items-center py-4">
             <a href="/" class="flex items-center space-x-2">
                 <div class="w-40 h-10">
@@ -371,130 +370,184 @@
                 Transcription times can vary depending on the file size, length of
                 the content, and how busy our servers are.
             </div>
+        <div id="midwrap" class="bg-gray-100 m-0" style="padding-bottom:15px; margin-bottom:0 !important;">
+            <section class="text-center mb-8 bg-gray-100">
+                <h2 class="font-perfectly-nineties text-3xl mt-12 text-black">FROM FILES TO DATA, IN A CLICK.</h2>
+         </section>
 
-            <section class="mb-16 max-w-5xl mx-auto bg-transparent">
-                <div class="bg-white">
-                    <img src="https://platogram.vercel.app/web/static/Assets/pdf_example.jpg"
-                        alt="AI-Powered Speech-to-Text and Knowledge Extraction" class="w-full h-auto">
-                </div>
-            </section>
-
-            <section class="grid md:grid-cols-3 gap-8 mb-16 max-w-5xl mx-auto bg-white">
+            <section class="grid md:grid-cols-3 gap-8 mb-16 max-w-5xl mx-auto  bg-gray-100">
                 <div>
-                    <h3 class="font-perfectly-nineties text-3xl mb-4 bg-white  text-black">Drop a link, get a document
+                    <h3 class="font-perfectly-nineties text-3xl mb-4 text-black text-left">Drop a link, get a document
                     </h3>
-                    <p class="text-gray-600">
+                    <p class="text-gray-600 text-left text-sm">
                         Paste any audio/video URL - we'll email you a well-organized, readable document without storing
                         your content.
                     </p>
                 </div>
                 <div>
-                    <h3 class="font-perfectly-nineties text-3xl mb-4 bg-white  text-black">References included</h3>
-                    <p class="text-gray-600">
+                    <h3 class="font-perfectly-nineties text-3xl mb-4 text-black text-left">References included</h3>
+                    <p class="text-gray-600 text-left text-sm">
                         Each response is backed by precise references to the original content, ensuring credibility and
                         context.
                     </p>
                 </div>
                 <div>
-                    <h3 class="font-perfectly-nineties text-3xl mb-4 bg-white  text-black">
+                    <h3 class="font-perfectly-nineties text-3xl mb-4 text-black text-left">
                         Build your dataset
                         <span class="bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full ml-2">Soon</span>
                     </h3>
-                    <p class="text-gray-600">
+                    <p class="text-gray-600 text-left text-sm">
                         Select and combine audio/video links - create your own sharable, AI-ready context storage for
                         powerful Q&A insights.
                     </p>
                 </div>
             </section>
 
-            <section class="section mb-16 max-w-4xl mx-auto bg-grey-500 p-8 rounded-lgg">
-                <h2 class="font-perfectly-nineties text-4xl mb-6 text-center text-black">Would could be <i class="font-PerfectlyNineties-RegularItalic">Shrinked</i></i></h2>
-                <div class="divide-y divide-gray-200">
-                    <div class="flex py-4 text-left">
-                        <div class="w-1/2 pr-4">
-                            <a href="https://drive.google.com/file/d/1_w9mv4_mBVSwK4NSnybGXtRysaT7ROFT/view?usp=drive_link"
-                                target="_blank" class="text-black-600 hover:no-underline text-md underline">John
-                                Carmack: From Gaming Pioneer to AI Visionary - A Journey of Innovation and Insight</a>
-                        </div>
-                        <div class="w-1/2 pl-4">
-                            <p class="text-[#3D3D3D] text-base">5-hour podcast condensed into a structured, hierarchical document with timestamped references</p>
-                        </div>
-                    </div>
-                    <div class="flex py-4 text-left">
-                        <div class="w-1/2 pr-4">
-                            <a href="https://drive.google.com/file/d/1Kswr1tMuS6c0a0tNn9OCuZCuPuP0FLr-/view?usp=drive_link"
-                                target="_blank" class="text-black-600 hover:no-underline text-md underline">Hair Cells:
-                                The Remarkable Sensory Receptors of Hearing</a>
-                        </div>
-                        <div class="w-1/2 pl-4">
-                            <p class="text-[#3D3D3D] text-base">TED talk converted to a concise, readable format with key concepts extracted and highlighted</p>
-                        </div>
-                    </div>
-                    <div class="flex py-4 text-left">
-                        <div class="w-1/2 pr-4">
-                            <a href="https://drive.google.com/file/d/1c_70MVz0fb7Zh0teirYt6Pc6S1hMomKV/view?usp=drive_link"
-                                target="_blank" class="text-black-600 hover:no-underline text-md underline">Court
-                                Hearing: Data Disclosure and Trial Scheduling</a>
-                        </div>
-                        <div class="w-1/2 pl-4">
-                            <p class="text-[#3D3D3D] text-base">Courtroom transcript transformed into a structured document with automated topic segmentation</p>
-                        </div>
-                    </div>
-                    <div class="flex py-4 text-left">
-                        <div class="w-1/2 pr-4">
-                            <a href="https://drive.google.com/file/d/1w98NFdfeSObpgr-Tmm40zB2UOYctWTaS/view?usp=drive_link"
-                                target="_blank" class="text-black-600 hover:no-underline text-md underline">Building and
-                                Training GPT-2 from Scratch</a>
-                        </div>
-                        <div class="w-1/2 pl-4">
-                            <p class="text-[#3D3D3D] text-base">Academic lecture processed into a structured, citable document with precise timestamp references</p>
-                        </div>
-                    </div>
-                    <div class="flex py-4 text-left">
-                        <div class="w-1/2 pr-4">
-                            <a href="https://drive.google.com/file/d/14HFC36r6xLGBCDrSUdRTi50Z8SXCHD7q/view?usp=drive_link"
-                                target="_blank" class="text-black-600 hover:no-underline text-md underline">Intel Q2
-                                2024 Earnings Call: Restructuring and Cost Cutting</a>
-                        </div>
-                        <div class="w-1/2 pl-4">
-                            <p class="text-[#3D3D3D] text-base">Business discussion analyzed and organized into a hierarchical structure with key data points extracted</p>
-                        </div>
-                    </div>
-                    <div class="flex py-4 text-left">
-                        <div class="w-1/2 pr-4">
-                            <a href="https://drive.google.com/file/d/1DbtND485AFmUv4XVb4mgZgXo27JxdkzE/view?usp=drive_link"
-                                target="_blank" class="text-black-600 hover:no-underline text-md underline">Conversation
-                                with Mark Zuckerberg</a>
-                        </div>
-                        <div class="w-1/2 pl-4">
-                            <p class="text-[#3D3D3D] text-base">Long-form interview condensed into a structured, reference-rich format with topic-based segmentation</p>
-                        </div>
-                    </div>
+            <section class="mb-16 max-w-5xl mx-auto bg-gray-100 p-4 justify-between items-center">
+                <h1 class="font-perfectly-nineties text-7xl mb-6 text-center text-black max-w-2xl mx-auto ">All the good stuff. None of the clutter.</i></i></h1>
+                <p class="text-gray-600 text-center text-sm max-w-xl mx-auto m-12">
+                    We're architecting a new way to store and extract knowledge at scale — from entities extraction to paragraph shrinking.
+                </p>
+                <div class="flex justify-center mt-4 space-x-4" style="margin-bottom:35px;">
+                    <button id="cells-button" class="flex items-center justify-center px-4 py-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <i data-lucide="grid" class="w-5 h-5 mr-2"></i>
+                        Abstract
+                    </button>
+                    <button id="charts-button" class="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        <i data-lucide="bar-chart" class="w-5 h-5 mr-2"></i>
+                        Content Map
+                    </button>
+                    <button id="ai-summary-button" class="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        <i data-lucide="cpu" class="w-5 h-5 mr-2"></i>
+                        Entities
+                    </button>
+                    <button id="tables-button" class="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        <i data-lucide="table" class="w-5 h-5 mr-2"></i>
+                        Narrative
+                    </button>
+                    <button id="filters-button" class="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        <i data-lucide="filter" class="w-5 h-5 mr-2"></i>
+                        Conclusion
+                    </button>
                 </div>
+        <div class="p-20 rounded-lg overflow-hidden" style="background-color: #C9D7D5 !important">
+            <img id="dashboard-image" src="https://platogram.vercel.app/web/static/Assets/pdf_example.jpg"
+                alt="AI-Powered Speech-to-Text and Knowledge Extraction" class="w-full h-auto">
+        </div>
             </section>
+            </div>
+            <section class="bg-white m-0" style="padding-top:75px;">
+                <div class="max-w-6xl mx-auto">
+                    <h2 class="font-perfectly-nineties text-3xl text-black uppercase mb-8">Would could be Shrinked? YOU TELL US!</h2>
+                    <table class="w-full border-collapse border-separate border-spacing-2">
+                        <thead>
+                            <tr class="border-b-2 border-gray-200">
+                                <th class="text-left text-gray-400 text-sm inform">Document</th>
+                                <th class="text-left text-gray-400 text-sm inform">Description</th>
+                                <th class="text-left text-gray-400 text-sm inform">Refs</th>
+                                <th class="text-left text-gray-400 text-sm inform">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-gray-200">
+                                <td class="py-4 pr-8">
+                                    <h3 class="font-perfectly-nineties font-semibold text-2xl text-left text-black">John Carmack: From Gaming Pioneer to AI Visionary</h3>
+                                </td>
+                                <td class="py-4 pr-8 mono-desc text-left text-base inform text-gray-600">5-hour podcast condensed into a structured, hierarchical document with timestamped references</td>
+                                <td class="py-4 pr-8 text-center text-gray-600">247</td>
+                                <td class="py-4 px-4 text-center">
+                                    <a href="https://drive.google.com/file/d/1_w9mv4_mBVSwK4NSnybGXtRysaT7ROFT/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base  px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
+                                        <i data-lucide="download" class="w-4 h-4 mr-2"></i>
+                                        Download
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr class="border-b border-gray-200">
+                                <td class="py-4 pr-8">
+                                    <h3 class="font-perfectly-nineties font-semibold text-2xl text-left text-black">Hair Cells: The Remarkable Sensory Receptors of Hearing</h3>
+                                </td>
+                                <td class="py-4 pr-8 mono-desc text-left text-base inform text-gray-600">TED talk converted to a concise, readable format with key concepts extracted and highlighted</td>
+                                <td class="py-4 pr-8 text-center text-gray-600">42</td>
+                                <td class="py-4 px-4 text-center">
+                                    <a href="https://drive.google.com/file/d/1Kswr1tMuS6c0a0tNn9OCuZCuPuP0FLr-/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base  px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
+                                        <i data-lucide="download" class="w-4 h-4 mr-2"></i>
+                                        Download
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr class="border-b border-gray-200">
+                                <td class="py-4 pr-8">
+                                    <h3 class="font-perfectly-nineties font-semibold text-2xl text-left text-black">Court Hearing: Data Disclosure and Trial Scheduling</h3>
+                                </td>
+                                <td class="py-4 pr-8 mono-desc text-left text-base inform text-gray-600">Courtroom transcript transformed into a structured document with automated topic segmentation</td>
+                                <td class="py-4 pr-8 text-center text-gray-600">89</td>
+                                <td class="py-4 px-4 text-center">
+                                    <a href="https://drive.google.com/file/d/1c_70MVz0fb7Zh0teirYt6Pc6S1hMomKV/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
+                                        <i data-lucide="download" class="w-4 h-4 mr-2"></i>
+                                        Download
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr class="border-b border-gray-200">
+                                <td class="py-4 pr-8">
+                                    <h3 class="font-perfectly-nineties font-semibold text-2xl text-left text-black">Building and Training GPT-2 from Scratch</h3>
+                                </td>
+                                <td class="py-4 pr-8 mono-desc text-left text-base inform text-gray-600">Academic lecture processed into a structured, citable document with precise timestamp references</td>
+                                <td class="py-4 pr-8 text-center text-gray-600">156</td>
+                                <td class="py-4 px-4 text-center">
+                                    <a href="https://drive.google.com/file/d/1w98NFdfeSObpgr-Tmm40zB2UOYctWTaS/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
+                                        <i data-lucide="download" class="w-4 h-4 mr-2"></i>
+                                        Download
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr class="border-b border-gray-200">
+                                <td class="py-4 pr-8">
+                                    <h3 class="font-perfectly-nineties font-semibold text-2xl text-left text-black">Intel Q2 2024 Earnings Call: Restructuring and Cost Cutting</h3>
+                                </td>
+                                <td class="py-4 pr-8 mono-desc text-left text-base inform text-gray-600">Business discussion analyzed and organized into a hierarchical structure with key data points extracted</td>
+                                <td class="py-4 pr-8 text-center text-gray-600">73</td>
+                                <td class="py-4 px-4 text-center">
+                                    <a href="https://drive.google.com/file/d/14HFC36r6xLGBCDrSUdRTi50Z8SXCHD7q/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
+                                        <i data-lucide="download" class="w-4 h-4 mr-2 "></i>
+                                        Download
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr class="border-b border-gray-200">
+                                <td class="py-4 pr-8">
+                                    <h3 class="font-perfectly-nineties font-semibold text-2xl text-left text-black">Conversation with Mark Zuckerberg</h3>
+                                </td>
+                                <td class="py-4 pr-8 mono-desc text-left text-base inform text-gray-600">Long-form interview condensed into a structured, reference-rich format with topic-based segmentation</td>
+                                <td class="py-4 pr-8 text-center text-gray-600">201</td>
+                                <td class="py-4 px-4 text-center">
+                                    <a href="https://drive.google.com/file/d/1DbtND485AFmUv4XVb4mgZgXo27JxdkzE/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base text-white px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
+                                        <i data-lucide="download" class="w-4 h-4 mr-2"></i>
+                                        Download
+                                    </a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    </div>
+                </section>
 
-            <section class="mb-16 text-center bg-white">
+            <section class="text-center bg-white pb-20">
                 <img src="https://platogram.vercel.app/web/static/Assets/268vocabulary-1@2x.png" alt="Person reading"
                     class="mx-auto mb-6" style="max-width: 350px;">
-                <h2 class="font-perfectly-nineties text-3xl mb-4 bg-white text-black">
-                    Shrinked was created by two tech enthusiasts,<br>
+                <h2 class="font-perfectly-nineties text-3xl mb-4 bg-white text-black max-w-xl mx-auto pb-8">
+                    Shrinked was created by two tech enthusiasts,
                     <span class="underline"><a href="https://x.com/damnventures" target="_blank"></a>Ivan</a></span> & <span class="underline"><a href="https://x.com/ArtyomAstafurov" target="_blank">Artyom</a></span>, who wanted to
-                    rediscover the<br>
-                    magic in spoken stories.
+                    rediscover the magic in spoken stories. <br><br>This project transforms spoken words into structured data. It's a new way to know who said
+                    what — unlike vague AI summaries, with privacy and attribution at its core.
                 </h2>
-                <p class="text-xl mb-6 text-black">
-                    This project transforms spoken words into<br>
-                    structured data. It's a new way to know who said<br>
-                    what — unlike vague AI summaries, with privacy<br>
-                    and attribution at its core.
-                </p>
                 <p class="text-xl font-bold underline text-black">
                     <a href="#top">Try it with your favorite podcast or video</a>
                 </p>
             </section>
-
-            <section class="grid md:grid-cols-2 gap-8 mb-16 max-w-6xl mx-auto bg-white">
-                <div class="bg-gray-100 p-8 rounded-xl shadow-sm">
+<div id="footer-wrap" class="pt-12 bg-transparent" style="">
+            <section class="grid md:grid-cols-2 gap-8 mb-16 max-w-6xl mx-auto bg-transparent">
+                <div class="bg-gray-100 p-8 rounded-xl shadow-sm text-left">
                     <div class="flex items-center mb-4">
                         <div class="bg-blue-100 p-2 rounded-lg mr-3">
                             <svg class="w-6 h-6 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
@@ -503,9 +556,9 @@
                                 </path>
                             </svg>
                         </div>
-                        <h3 class="font-perfectly-nineties text-2xl text-gray-800">Generic AI Summaries</h3>
+                        <h3 class="font-perfectly-nineties text-2xl text-gray-800 text-left">Generic AI Summaries</h3>
                     </div>
-                    <p class="text-gray-500 mb-6">You're left with a condensed but often context-lacking summary that
+                    <p class="text-gray-500 mb-6 text-left">You're left with a condensed but often context-lacking summary that
                         misses crucial details and nuances</p>
                     <ul class="space-y-3">
                         <li class="flex items-start">
@@ -514,7 +567,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
-                            <span class="text-gray-700">Shallow summaries lacking depth</span>
+                            <span class="text-gray-700 text-left">Shallow summaries lacking depth</span>
                         </li>
                         <li class="flex items-start">
                             <svg class="w-5 h-5 text-red-500 mr-2 mt-1 flex-shrink-0" fill="none" stroke="currentColor"
@@ -522,7 +575,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
-                            <span class="text-gray-700">No sources references and timestamps</span>
+                            <span class="text-gray-700 text-left">No sources references and timestamps</span>
                         </li>
                         <li class="flex items-start">
                             <svg class="w-5 h-5 text-red-500 mr-2 mt-1 flex-shrink-0" fill="none" stroke="currentColor"
@@ -530,7 +583,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
-                            <span class="text-gray-700">Not good for RAG - low information density</span>
+                            <span class="text-gray-700 text-left">Not good for RAG - low information density</span>
                         </li>
                         <li class="flex items-start">
                             <svg class="w-5 h-5 text-red-500 mr-2 mt-1 flex-shrink-0" fill="none" stroke="currentColor"
@@ -538,7 +591,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
-                            <span class="text-gray-700">Limited to text, struggle with audio/video</span>
+                            <span class="text-gray-700 text-left">Limited to text, struggle with audio/video</span>
                         </li>
                         <li class="flex items-start">
                             <svg class="w-5 h-5 text-red-500 mr-2 mt-1 flex-shrink-0" fill="none" stroke="currentColor"
@@ -546,7 +599,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
-                            <span class="text-gray-700">Privacy concerns with data storage and usage</span>
+                            <span class="text-gray-700 text-left">Privacy concerns with data storage and usage</span>
                         </li>
                     </ul>
                 </div>
@@ -559,10 +612,10 @@
                                     clip-rule="evenodd"></path>
                             </svg>
                         </div>
-                        <h3 class="font-perfectly-nineties text-2xl text-gray-800">Advantages of structured documents
+                        <h3 class="font-perfectly-nineties text-2xl text-gray-800 text-left">Advantages of structured documents
                         </h3>
                     </div>
-                    <p class="text-gray-500 mb-6">Shrinked transforms spoken word into comprehensive, structured
+                    <p class="text-gray-500 mb-6 text-left">Shrinked transforms spoken word into comprehensive, structured
                         documents, offering a context-preserving, easily navigable output</p>
                     <ul class="space-y-3">
                         <li class="flex items-start">
@@ -571,7 +624,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M5 13l4 4L19 7"></path>
                             </svg>
-                            <span class="text-gray-700">Original paraphrased format</span>
+                            <span class="text-gray-700 text-left">Original paraphrased format</span>
                         </li>
                         <li class="flex items-start">
                             <svg class="w-5 h-5 text-green-500 mr-2 mt-1 flex-shrink-0" fill="none"
@@ -579,7 +632,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M5 13l4 4L19 7"></path>
                             </svg>
-                            <span class="text-gray-700">Hierarchical auto-generated chapters and sections</span>
+                            <span class="text-gray-700 text-left">Hierarchical auto-generated chapters and sections</span>
                         </li>
                         <li class="flex items-start">
                             <svg class="w-5 h-5 text-green-500 mr-2 mt-1 flex-shrink-0" fill="none"
@@ -587,7 +640,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M5 13l4 4L19 7"></path>
                             </svg>
-                            <span class="text-gray-700">RAG-optimized markup with timestamped references</span>
+                            <span class="text-gray-700 text-left">RAG-optimized markup with timestamped references</span>
                         </li>
                         <li class="flex items-start">
                             <svg class="w-5 h-5 text-green-500 mr-2 mt-1 flex-shrink-0" fill="none"
@@ -595,7 +648,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M5 13l4 4L19 7"></path>
                             </svg>
-                            <span class="text-gray-700">Privacy-first approach - no content storage</span>
+                            <span class="text-gray-700 text-left">Privacy-first approach - no content storage</span>
                         </li>
                         <li class="flex items-start">
                             <svg class="w-5 h-5 text-green-500 mr-2 mt-1 flex-shrink-0" fill="none"
@@ -603,14 +656,14 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M5 13l4 4L19 7"></path>
                             </svg>
-                            <span class="text-gray-700">Unlimited length audio/video input <span class="italic">(in pro
+                            <span class="text-gray-700 text-left">Unlimited length audio/video input <span class="italic">(in pro
                                     version)</span></span>
                         </li>
                     </ul>
                 </div>
             </section>
 
-            <section class="text-center mb-16 bg-white">
+            <section class="text-center mb-16 bg-transparent">
                 <h2 class="font-perfectly-nineties text-3xl mb-6 text-black">Book a demo</h2>
                 <p class="text-xl mb-6">
                     If you're an organization or business who's interested in<br>
@@ -619,25 +672,66 @@
                 </p>
                 <button class="bg-black text-white px-6 py-3 rounded-full text-lg">Contact Us</button>
             </section>
+        <footer class="mt-16 mx-auto bg-black text-white" style="border-radius: 0px !important;">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-8 p-2 pb-40">
+            <!-- Column 1: Contact -->
+            <div class="text-left">
+                <p>Email: info@shrinked.ai</p>
+                <p>Twitter: @shrinked_ai</p>
+            </div>
 
+            <!-- Column 2: Address and Legal -->
+            <div class="text-left">
+                <p>New York & Boston</p>
+                <a href="https://coda.io/@shrinked/privacy" target="_blank" class="text-white block hover:underline hover:text-white">Privacy Policy</a>
+                <a href="https://coda.io/@shrinked/terms-of-service" target="_blank" class="text-white block hover:underline hover:text-white">Terms of Service</a>
+                <a href="https://pdf.shrinked.ai" target="_blank" class="text-white block hover:underline mt-2 hover:text-white">Latest Process Docs</a>
+            </div>
+
+            <!-- Column 3: Attributions -->
+            <div class="text-left">
+                <p>Waffly, Inc.</p>
+                <p>Platogram/CodeAnyway</p>
+            </div>
+
+            <!-- Column 4: Copyright -->
+            <div class="text-left">
+                <p>© 2023-2024 Waffly, Inc.</p>
+                <p>All rights reserved.</p>
+                <p>Built with 💜 in New York and Boston</p>
+            </div>
+        </div>
+
+        <!-- Large Logo -->
+        <div class="flex justify-center items-center h-full w-full mb-8">
+           <svg width="100%" height="100%" viewBox="0 0 1146 237" preserveAspectRatio="xMidYMid meet" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+            <title>shrinked</title>
+            <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+                <g id="Artboard-Copy-37" transform="translate(-567.000000, -310.000000)" fill="#FFFFFF" fill-rule="nonzero">
+                    <g id="shrinked" transform="translate(567.600000, 310.000000)">
+                        <path d="M49.28,92.16 C66.56,92.16 80.64,103.36 89.6,123.52 L94.4,134.08 L105.28,134.08 L104.64,77.44 L83.84,85.44 C86.72,87.68 90.56,91.2 93.44,94.4 L93.44,103.68 C81.6,88 67.52,79.04 48.32,79.04 C22.4,79.04 2.56,96.32 2.56,123.52 C2.56,141.76 13.76,155.52 34.24,163.2 L66.24,175.36 C79.68,180.48 88.32,187.2 88.32,198.08 C88.32,212.16 77.12,220.8 59.84,220.8 C40.96,220.8 26.24,209.6 16.64,189.76 L10.88,177.92 L0,177.92 L0.96,236.48 L22.08,226.24 C19.52,224 16.64,221.12 13.44,217.6 L13.44,208.64 C26.56,224.96 41.28,234.56 62.08,234.56 C88.64,234.56 112.96,216.32 112.96,188.16 C112.96,170.56 102.08,157.76 82.56,150.08 L45.44,135.36 C33.6,130.56 26.88,123.52 26.88,112.64 C26.88,100.16 36.16,92.16 49.28,92.16 Z" id="Path"></path>
+                        <path d="M160.48,120.64 L160.48,110.72 L170.4,97.28 L170.4,0 L114.72,13.44 L126.24,18.24 C137.76,22.72 140.96,26.56 140.96,35.84 L140.96,201.6 C140.96,214.72 134.88,221.76 122.4,223.04 L115.68,223.68 L115.68,232 L193.12,232 L193.12,223.68 L187.36,223.04 C175.84,221.76 170.4,214.72 170.4,201.6 L170.4,118.72 C180,105.92 193.44,98.24 206.56,98.24 C224.8,98.24 235.36,109.12 235.36,128 L235.36,201.6 C235.36,214.72 229.92,221.76 218.4,223.04 L212.64,223.68 L212.64,232 L290.08,232 L290.08,223.68 L283.36,223.04 C270.88,221.76 264.8,214.72 264.8,201.6 L264.8,125.76 C264.8,95.68 248.48,78.08 220.64,78.08 C201.44,78.08 182.24,90.24 166.88,112 L160.48,120.64 Z" id="Path"></path>
+                        <path d="M316.16,115.52 L316.16,201.6 C316.16,214.4 310.4,221.76 297.6,223.04 L290.88,223.68 L290.88,232 L370.88,232 L370.88,223.68 L363.2,223.04 C351.36,222.08 345.6,214.4 345.6,201.6 L345.6,131.2 C351.68,112.32 369.92,89.6 389.76,90.56 L389.76,96 L385.28,96 C384,96.64 382.4,100.16 382.4,102.72 C382.4,113.28 391.68,120.32 400.64,120 C409.92,119.36 418.56,112 417.92,99.2 C417.28,88.32 408.64,77.44 392.32,77.44 C370.88,77.44 349.12,99.84 337.6,131.84 L337.6,118.4 C338.88,115.2 344,104.96 345.6,102.08 L345.6,78.4 L289.92,92.8 L301.44,98.24 C313.92,104.32 316.16,106.88 316.16,115.52 Z" id="Path"></path>
+                        <path d="M441.44,48 L472.8,48 L472.8,16.32 L441.44,16.32 L441.44,48 Z M416.48,92.8 L428,98.24 C440.48,104.32 442.72,106.88 442.72,115.52 L442.72,201.6 C442.72,214.72 436.64,221.76 424.16,223.04 L417.44,223.68 L417.44,232 L497.44,232 L497.44,223.68 L490.72,223.04 C478.24,221.76 472.16,214.72 472.16,201.6 L472.16,78.4 L416.48,92.8 Z" id="Shape"></path>
+                        <path d="M524.8,115.52 L524.8,201.6 C524.8,214.72 518.72,221.76 506.24,223.04 L499.52,223.68 L499.52,232 L576.96,232 L576.96,223.68 L571.2,223.04 C559.68,221.76 554.24,214.72 554.24,201.6 L554.24,118.72 C563.84,105.92 577.28,98.24 590.4,98.24 C608.64,98.24 619.2,109.12 619.2,128 L619.2,201.6 C619.2,214.72 613.76,221.76 602.24,223.04 L596.48,223.68 L596.48,232 L673.92,232 L673.92,223.68 L667.2,223.04 C654.72,221.76 648.64,214.72 648.64,201.6 L648.64,125.76 C648.64,95.68 632.32,78.08 604.48,78.08 C585.28,78.08 566.08,90.24 550.72,112 L544.32,120.64 L544.32,110.72 L554.24,97.28 L554.24,78.4 L498.56,92.8 L510.08,98.24 C522.56,104.32 524.8,106.88 524.8,115.52 Z" id="Path"></path>
+                        <path d="M798.24,232 L844.64,232 L844.64,224.32 C831.84,221.44 823.84,216 814.56,202.56 L767.84,135.36 L790.56,113.28 C801.44,102.4 819.36,93.12 835.04,89.28 L835.04,81.6 L768.8,81.6 L768.8,89.92 L775.2,90.56 C787.68,91.52 788.64,101.44 777.12,112.32 L719.52,168.32 L719.52,160.64 L728.16,151.68 L728.16,0 L672.48,13.44 L684,18.24 C695.52,23.04 698.72,26.88 698.72,35.52 L698.72,201.6 C698.72,214.72 692.64,221.76 680.16,223.04 L673.44,223.68 L673.44,232 L753.44,232 L753.44,223.68 L746.72,223.04 C734.24,221.76 728.16,214.72 728.16,201.6 L728.16,174.08 L747.04,155.52 L798.24,232 Z" id="Path"></path>
+                        <path d="M968,146.88 C969.28,106.56 944.32,78.4 907.2,78.4 C869.12,78.4 837.44,114.88 837.44,158.72 C837.44,204.48 866.88,235.2 911.04,235.2 C937.92,235.2 959.68,216.96 965.12,189.12 L964.48,188.8 C954.56,206.72 938.88,215.36 916.8,215.36 C889.28,215.36 869.44,189.76 868.48,152.96 L858.24,152.96 L858.24,146.88 L968,146.88 Z M904.96,91.2 C923.52,91.2 936.64,109.76 936.64,135.68 L869.12,135.68 C872,107.2 885.12,91.2 904.96,91.2 Z" id="Shape"></path>
+                        <path d="M1039.84,235.2 C1060,235.2 1077.28,223.36 1092.96,198.72 L1098.4,190.4 L1098.4,200 L1088.48,215.36 L1088.48,233.92 L1144.48,226.24 L1132.32,220.8 C1122.08,216.32 1117.92,211.84 1117.92,200.64 L1117.92,0 L1062.24,13.44 L1073.76,18.24 C1085.28,23.04 1088.48,26.88 1088.48,35.52 L1088.48,85.12 C1079.52,80.64 1068.64,78.4 1055.52,78.4 C1010.72,78.4 977.76,114.24 977.76,162.88 C977.76,204.8 1003.68,235.2 1039.84,235.2 Z M1009.76,155.52 C1009.76,117.12 1028.32,91.2 1056.16,91.2 C1067.36,91.2 1080.16,96.96 1088.48,104.64 L1088.48,192.96 C1080.8,205.12 1066.08,215.04 1053.6,215.04 C1027.68,215.04 1009.76,190.4 1009.76,155.52 Z" id="Shape"></path>
+                    </g>
+                </g>
+            </g>
+        </svg>
+        </div>
+
+        <!-- Test Panel (hidden by default) -->
+        <div id="test-panel" class="border border-gray-300 p-4 mt-8 hidden">
+            <h3 class="font-bold mb-4">Test Panel</h3>
+            <button onclick="testURLInput()" class="bg-blue-500 text-white px-4 py-2 rounded mr-4">Test URL Input ($5)</button>
+            <button onclick="testFileInput()" class="bg-blue-500 text-white px-4 py-2 rounded">Test File Input ($5)</button>
+            <div id="test-status" class="mt-4"></div>
+        </div>
+    </footer>
         </main>
-
-        <footer class="mt-16 text-center bg-white">
-            <p>© 2023-2024 Waffly, Inc. </p>
-            <p>Shrinked is crafted with care by Waffly and powered by the open-source magic of Platogram/CodeAnyway.</p>
-            <p>All rights reserved. Built with 💜 in New York and Boston</p>
-            </p>
-            <div class="mt-4">
-                <a href="https://coda.io/@shrinked/privacy" target="_blank" class="text-blue-600 hover:underline mr-4">Privacy</a>
-                <a href="https://coda.io/@shrinked/terms-of-service" target="_blank" class="text-blue-600 hover:underline">Terms of Service</a>
-            </div>
-            <div id="test-panel" style="border: 1px solid #ccc; padding: 10px; margin-top: 20px; display:none;">
-                <h3>Test Panel</h3>
-                <button onclick="testURLInput()">Test URL Input ($5)</button>
-                <button onclick="testFileInput()">Test File Input ($5)</button>
-                <div id="test-status" style="margin-top: 10px;"></div>
-            </div>
-        </footer>
     </div>
 
     <div id="language-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -723,101 +817,100 @@
     import { put } from 'https://esm.sh/@vercel/blob/client';
     window.vercelBlobPut = put;
   </script>
-<script type="module" src="https://platogram.vercel.app/web/app.js"></script>
+<script type="module" src="./web/app.js"></script>
 <script>
- let testMode = true;
-const TEST_PRICE = 5;
-const TEST_LANG = 'en';
+    let testMode = true;
+    const TEST_PRICE = 5;
+    const TEST_LANG = 'en';
 
-function createTestPanel() {
-    const panel = document.createElement('div');
-    panel.style.border = '0px solid #ccc';
-    panel.style.padding = '20px';
-    panel.style.margin = '20px 0';
-
-    panel.innerHTML = `
-        <h2 style="">Test Panel</h2>
-        <div style="">
-            <input type="text" id="test-url-input" placeholder="Enter URL">
-            <button onclick="testURLInput()">Test URL Input ($5)</button>
-        </div>
-        <div style="margin-top: 10px; display:none;">
-            <input type="file" id="test-file-input">
-            <button onclick="testFileInput()">Test File Input ($5)</button>
-        </div>
-        <div style="margin-top: 10px; display:none;">
-            <strong>Test Status:</strong> <span id="test-status"></span>
-        </div>
-    `;
-
-    document.body.appendChild(panel);
-}
-
-function updateTestStatus(message) {
-    const statusElement = document.getElementById('test-status');
-    if (statusElement) {
-        statusElement.textContent = message;
+    function createTestPanel() {
+        const panel = document.createElement('div');
+        panel.style.border = '0px solid #ccc';
+        panel.style.padding = '20px';
+        panel.style.margin = '20px 0';
+        panel.innerHTML = `
+            <h2 style="">Test Panel</h2>
+            <div style="">
+                <input type="text" id="test-url-input" placeholder="Enter URL">
+                <button onclick="testURLInput()">Test URL Input ($5)</button>
+            </div>
+            <div style="margin-top: 10px;">
+                <input type="file" id="test-file-input">
+                <button onclick="testFileInput()">Test File Input ($5)</button>
+            </div>
+            <div style="margin-top: 10px;">
+                <strong>Test Status:</strong> <span id="test-status"></span>
+            </div>
+        `;
+        document.body.appendChild(panel);
     }
-    console.log('[Test Status]', message);
-}
 
-async function simulateConversionFlow(isFile, inputData) {
-    try {
-        let fileId;
-        if (isFile) {
-            fileId = await storeFileTemporarily(inputData);
+    function updateTestStatus(message) {
+        const statusElement = document.getElementById('test-status');
+        if (statusElement) {
+            statusElement.textContent = message;
         }
-        // Store conversion data
-        const conversionData = {
-            inputData: isFile ? fileId : inputData,
-            isFile: isFile,
-            lang: TEST_LANG,
-            price: TEST_PRICE,
-            isTestMode: true  // Add this line
-        };
-        sessionStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
-        console.log('Stored conversion data:', conversionData);
-        updateTestStatus("Conversion data stored. Simulating Stripe redirect in 5 seconds...");
-        // Simulate delay before redirect
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        // Simulate redirect to success page
-        const testSessionId = 'test_session_' + Date.now();
-        updateTestStatus("Redirecting to success page...");
-        window.location.href = `/success?session_id=${testSessionId}`;
-    } catch (error) {
-        console.error("Error in test flow:", error);
-        updateTestStatus("Error: " + error.message);
+        console.log('[Test Status]', message);
     }
-}
 
-async function testURLInput() {
-    const urlInput = document.getElementById('test-url-input');
-    const url = urlInput.value.trim();
-    if (!url) {
-        updateTestStatus("Please enter a URL");
-        return;
+    async function simulateConversionFlow(isFile, inputData) {
+        try {
+            let fileId;
+            if (isFile) {
+                fileId = await storeFileTemporarily(inputData);
+            }
+            // Store conversion data
+            const conversionData = {
+                inputData: isFile ? fileId : inputData,
+                isFile: isFile,
+                lang: TEST_LANG,
+                price: TEST_PRICE,
+                isTestMode: true
+            };
+            localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
+            console.log('Stored conversion data:', conversionData);
+            updateTestStatus("Conversion data stored. Simulating Stripe redirect in 3 seconds...");
+
+            // Simulate delay before redirect to intermediate page
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // Simulate redirect to intermediate page
+            updateTestStatus("Redirecting to intermediate page...");
+            window.location.href = `/test-intermediate?inputData=${encodeURIComponent(JSON.stringify(conversionData))}`;
+        } catch (error) {
+            console.error("Error in test flow:", error);
+            updateTestStatus("Error: " + error.message);
+        }
     }
-    updateTestStatus("Testing URL input: " + url);
-    await simulateConversionFlow(false, url);
-}
 
-async function testFileInput() {
-    const fileInput = document.getElementById('test-file-input');
-    const file = fileInput.files[0];
-    if (!file) {
-        updateTestStatus("Please select a file");
-        return;
+    async function testURLInput() {
+        const urlInput = document.getElementById('test-url-input');
+        const url = urlInput.value.trim();
+        if (!url) {
+            updateTestStatus("Please enter a URL");
+            return;
+        }
+        updateTestStatus("Testing URL input: " + url);
+        await simulateConversionFlow(false, url);
     }
-    updateTestStatus("Testing file input: " + file.name);
-    await simulateConversionFlow(true, file);
-}
 
-// Make sure these functions are globally accessible
-window.testURLInput = testURLInput;
-window.testFileInput = testFileInput;
+    async function testFileInput() {
+        const fileInput = document.getElementById('test-file-input');
+        const file = fileInput.files[0];
+        if (!file) {
+            updateTestStatus("Please select a file");
+            return;
+        }
+        updateTestStatus("Testing file input: " + file.name);
+        await simulateConversionFlow(true, file);
+    }
 
-// Call this function when the DOM is loaded
-document.addEventListener('DOMContentLoaded', createTestPanel);
+    // Make sure these functions are globally accessible
+    window.testURLInput = testURLInput;
+    window.testFileInput = testFileInput;
+
+    // Call this function when the DOM is loaded
+    document.addEventListener('DOMContentLoaded', createTestPanel);
     </script>
 </body>
 </html>

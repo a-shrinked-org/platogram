@@ -3,27 +3,31 @@ import { useRouter } from 'next/router';
 import { useAuth0 } from '@auth0/auth0-react';
 
 export default function Success() {
-    const [status, setStatus] = useState('Initializing...');
     const [isClient, setIsClient] = useState(false);
+    const { isLoading, isAuthenticated } = useAuth0();
+    const router = useRouter();
+    const [status, setStatus] = useState('Initializing...');
 
     useEffect(() => {
         setIsClient(true);
     }, []);
 
-    if (!isLoading) {
-        handleSuccess();
-    }
-
     if (!isClient) {
         return <div>Loading...</div>;
     }
 
-    return <ClientSideSuccess setStatus={setStatus} status={status} />;
+    return (
+        <ClientSideSuccess
+            setStatus={setStatus}
+            status={status}
+            isLoading={isLoading}
+            isAuthenticated={isAuthenticated}
+            router={router}
+        />
+    );
 }
 
-function ClientSideSuccess({ setStatus, status }) {
-    const router = useRouter();
-    const { getTokenSilently, isAuthenticated, isLoading } = useAuth0();
+function ClientSideSuccess({ setStatus, status, isLoading, isAuthenticated, router }) {
     const [conversionStarted, setConversionStarted] = useState(false);
 
     useEffect(() => {
@@ -43,7 +47,11 @@ function ClientSideSuccess({ setStatus, status }) {
                 const { session_id } = router.query;
                 console.log('Session ID:', session_id);
 
-                const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+                if (typeof window === 'undefined') {
+                    throw new Error('Window object is not available');
+                }
+
+                const pendingConversionDataString = window.localStorage.getItem('pendingConversionData');
                 console.log('Retrieved pendingConversionDataString:', pendingConversionDataString);
 
                 if (!pendingConversionDataString) {
@@ -82,7 +90,7 @@ function ClientSideSuccess({ setStatus, status }) {
             }
         }
 
-        if (!isLoading) {
+        if (!isLoading && isClient) {
             handleSuccess();
         }
 

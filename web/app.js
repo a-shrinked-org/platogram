@@ -1745,3 +1745,6 @@ window.handleStripeCancel = handleStripeCancel;
 window.selectLanguage = selectLanguage;
 window.setupPriceUI = setupPriceUI;
 window.storeFileTemporarily = storeFileTemporarily;
+window.retrieveFileFromTemporaryStorage = retrieveFileFromTemporaryStorage;
+window.uploadFile = uploadFile;
+window.postToConvert = postToConvert;

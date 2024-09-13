@@ -1,4 +1,11 @@
 {
+  "name": "shrinked",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
   "dependencies": {
     "pg": "^8.7.1",
     "cors": "^2.8.5",

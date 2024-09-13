@@ -1,6 +1,24 @@
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
+import { useAuth0 } from '@auth0/auth0-react';
+
 export default function Success() {
-    const router = useRouter();
     const [status, setStatus] = useState('Initializing...');
+    const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
+
+    if (!isClient) {
+        return <div>Loading...</div>;
+    }
+
+    return <ClientSideSuccess setStatus={setStatus} status={status} />;
+}
+
+function ClientSideSuccess({ setStatus, status }) {
+    const router = useRouter();
     const { getTokenSilently, isAuthenticated, isLoading } = useAuth0();
     const [conversionStarted, setConversionStarted] = useState(false);
 

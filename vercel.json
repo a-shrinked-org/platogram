@@ -14,7 +14,7 @@
       "use": "@vercel/static"
     },
     {
-      "src": "pages/api/**/*.js",
+      "src": "pages/api/*.js",
       "use": "@vercel/node",
       "config": {
         "includeFiles": ["node_modules/**"]
@@ -29,10 +29,6 @@
     {
       "source": "/uploads/(.*)",
       "destination": "/public/uploads/$1"
-    },
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/web/index.html"
     }
   ],
   "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e . && npm install"

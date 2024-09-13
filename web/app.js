@@ -823,8 +823,7 @@ async function handleStripeSuccess(sessionId, isTestMode = false) {
         console.log("Retrieved pendingConversionDataString:", pendingConversionDataString);
 
         if (!pendingConversionDataString) {
-            updateUIStatus('error', 'Invalid success parameters');
-            return;
+            throw new Error('No pending conversion data found');
         }
 
         const pendingConversionData = JSON.parse(pendingConversionDataString);
@@ -832,32 +831,30 @@ async function handleStripeSuccess(sessionId, isTestMode = false) {
         const lang = pendingConversionData.lang;
         const price = pendingConversionData.price;
 
-        try {
-            if (pendingConversionData.isFile) {
-                console.log("Retrieving file from temporary storage:", inputData);
-                updateUIStatus("uploading", "Retrieving and uploading file...");
-                const file = await retrieveFileFromTemporaryStorage(inputData);
-                if (!file) {
-                    throw new Error("Failed to retrieve file from temporary storage");
-                }
-                console.log("File retrieved, uploading to Blob storage");
-                inputData = await uploadFile(file);
-                console.log("File uploaded successfully, URL:", inputData);
-            } else {
-                console.log("URL input detected, using directly:", inputData);
+        // Clear the pending conversion data early to prevent double-processing
+        sessionStorage.removeItem('pendingConversionData');
+
+        if (pendingConversionData.isFile) {
+            console.log("Retrieving file from temporary storage:", inputData);
+            updateUIStatus("uploading", "Retrieving and uploading file...");
+            const file = await retrieveFileFromTemporaryStorage(inputData);
+            if (!file) {
+                throw new Error("Failed to retrieve file from temporary storage");
             }
-
-            // Start the conversion process
-            updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
-            await postToConvert(inputData, lang, sessionId, price, isTestMode);
-
-            // Clear the pending conversion data
-            sessionStorage.removeItem('pendingConversionData');
-
-        } catch (error) {
-            console.error('Error in handleStripeSuccess:', error);
-            updateUIStatus("error", "Error starting conversion after payment: " + error.message);
+            console.log("File retrieved, uploading to Blob storage");
+            inputData = await uploadFile(file);
+            console.log("File uploaded successfully, URL:", inputData);
+        } else {
+            console.log("URL input detected, using directly:", inputData);
         }
+
+        // Start the conversion process
+        updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
+        await postToConvert(inputData, lang, sessionId, price, isTestMode);
+
+        // Update UI to show conversion has started
+        updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
+
     } catch (error) {
         console.error('Error in handleStripeSuccess:', error);
         updateUIStatus("error", "Error: " + error.message);

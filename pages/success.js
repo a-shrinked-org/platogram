@@ -45,6 +45,7 @@ export default function Success() {
                 let inputData = pendingConversionData.inputData;
                 const lang = pendingConversionData.lang;
                 const isTestMode = pendingConversionData.isTestMode || false;
+                const price = pendingConversionData.price;
 
                 const token = await getTokenSilently();
 
@@ -58,7 +59,7 @@ export default function Success() {
                 }
 
                 setStatus('Starting conversion...');
-                await window.postToConvert(inputData, lang, session_id, pendingConversionData.price, isTestMode);
+                await window.postToConvert(inputData, lang, session_id, price, isTestMode);
 
                 if (isMounted) {
                     setStatus('Conversion started');

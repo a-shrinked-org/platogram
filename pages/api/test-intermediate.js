@@ -38,7 +38,7 @@ function TestIntermediate() {
     );
 }
 
-export default TestIntermediate;
-
 res.status(200).json({ message: 'TestIntermediate API route' });
 }
+
+export default TestIntermediate;

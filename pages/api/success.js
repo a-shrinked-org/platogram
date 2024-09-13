@@ -96,7 +96,7 @@ function Success() {
     );
 }
 
-export default Success;
-
 res.status(200).json({ message: 'Success API route' });
 }
+
+export default Success;

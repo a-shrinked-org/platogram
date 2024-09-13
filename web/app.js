@@ -1447,6 +1447,40 @@ function updateProcessingStage() {
   }
 }
 
+async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
+    try {
+        updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
+
+        let token = isTestMode ? 'test_token' : await auth0Client.getTokenSilently();
+
+        if (typeof inputData === 'string' && inputData.startsWith('file:')) {
+            // This is a file ID, retrieve the file
+            const fileId = inputData.split(':')[1];
+            const file = await retrieveFileFromTemporaryStorage(fileId);
+            if (!file) {
+                throw new Error("Failed to retrieve file from temporary storage");
+            }
+
+            updateUIStatus("uploading", "Uploading file...");
+            inputData = await uploadFile(file, token, isTestMode);
+        }
+
+        await postToConvert(inputData, lang, sessionId, price, isTestMode, token);
+        updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
+    } catch (error) {
+        console.error('Error in handleConversion:', error);
+        updateUIStatus("error", "Error: " + error.message);
+    }
+}
+
+function handleStripeSuccessRedirect(conversionData) {
+    console.log('Handling Stripe success redirect with data:', conversionData);
+    const { inputData, lang, price, session_id, isTestMode } = conversionData;
+
+    // Start the conversion process
+    handleConversion(inputData, lang, session_id, price, isTestMode);
+}
+
 function initializeProcessingStage() {
   debugLog("Initializing processing stage");
   const processingStage = document.getElementById("processing-stage");

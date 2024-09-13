@@ -9,10 +9,10 @@ export default function Success() {
     const router = useRouter();
 
     useEffect(() => {
-        if (!isLoading) {
+        if (!isLoading && router.isReady) {
             handleSuccess();
         }
-    }, [isLoading, router.query]);
+    }, [isLoading, router.isReady]);
 
     async function handleSuccess() {
         const { session_id } = router.query;
@@ -43,8 +43,26 @@ export default function Success() {
             const result = await response.json();
 
             if (result.status === 'success') {
-                // Payment successful, redirect to index with success flag
-                router.push('/?paymentSuccess=true');
+                // Retrieve pendingConversionData from localStorage
+                const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+                if (!pendingConversionDataString) {
+                    throw new Error('No pending conversion data found');
+                }
+
+                const pendingConversionData = JSON.parse(pendingConversionDataString);
+
+                // Clear pendingConversionData from localStorage
+                localStorage.removeItem('pendingConversionData');
+
+                // Encode the data to pass it safely in the URL
+                const encodedData = encodeURIComponent(JSON.stringify({
+                    ...pendingConversionData,
+                    session_id,
+                    isTestMode
+                }));
+
+                // Redirect to index with success flag and encoded data
+                router.push(`/?paymentSuccess=true&conversionData=${encodedData}`);
             } else {
                 throw new Error(result.message || 'Payment verification failed');
             }
@@ -56,7 +74,7 @@ export default function Success() {
         }
     }
 
-    if (isLoading) {
+    if (isLoading || !router.isReady) {
         return <div>Loading...</div>;
     }
 

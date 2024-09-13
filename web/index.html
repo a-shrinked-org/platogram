@@ -823,6 +823,31 @@
     const TEST_PRICE = 5;
     const TEST_LANG = 'en';
 
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const paymentSuccess = urlParams.get('paymentSuccess');
+        const conversionData = urlParams.get('conversionData');
+
+        if (paymentSuccess === 'true' && conversionData) {
+            try {
+                const decodedData = JSON.parse(decodeURIComponent(conversionData));
+                console.log('Conversion data:', decodedData);
+
+                // Call the function from app.js to handle the conversion
+                if (typeof window.handleStripeSuccessRedirect === 'function') {
+                    window.handleStripeSuccessRedirect(decodedData);
+                } else {
+                    console.error('handleStripeSuccessRedirect function not found');
+                }
+
+                // Clear the URL parameters
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } catch (error) {
+                console.error('Error processing conversion data:', error);
+            }
+        }
+    });
+
     function createTestPanel() {
         const panel = document.createElement('div');
         panel.style.border = '0px solid #ccc';

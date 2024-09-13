@@ -10,23 +10,30 @@
       }
     },
     {
-      "src": "package.json",
-      "use": "@vercel/next"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/python/.*",
-      "dest": "web/main.py"
+      "src": "web/**",
+      "use": "@vercel/static"
     },
     {
-      "src": "/uploads/(.*)",
-      "dest": "/public/uploads/$1"
-    },
-    {
-      "src": "/((?!api/).*)",
-      "dest": "/$1"
+      "src": "pages/api/**/*.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["node_modules/**"]
+      }
     }
   ],
-  "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e . && npm install && npm run build"
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/pages/api/:path*.js"
+    },
+    {
+      "source": "/uploads/(.*)",
+      "destination": "/public/uploads/$1"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/web/index.html"
+    }
+  ],
+  "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e . && npm install"
 }

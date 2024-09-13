@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth0 } from '@auth0/auth0-react';
-import { retrieveFileFromTemporaryStorage, uploadFile, postToConvert } from 'https://www.shrinked.ai/web/app.js';
+import { retrieveFileFromTemporaryStorage, uploadFile, postToConvert } from '../web/app.js';
 
 export default function Success() {
     const [status, setStatus] = useState('Initializing...');

@@ -24,6 +24,14 @@
       "dest": "/api/$1"
     },
     {
+      "src": "^/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/_next/(.*)",
+      "dest": "/_next/$1"
+    },
+    {
       "src": "/$",
       "dest": "/web/index.html"
     },
@@ -32,5 +40,5 @@
       "dest": "/$1"
     }
   ],
-  "buildCommand": "apt-get update && apt-get install -y texlive-xetex && pip install -r requirements.txt && pip install -e . && npm install && npm run build"
+  "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e . && npm install && npm run build"
 }

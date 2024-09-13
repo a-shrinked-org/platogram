@@ -15,9 +15,19 @@ export default function Success() {
 
     useEffect(() => {
         console.log('isClient:', isClient, 'isLoading:', isLoading);
-        if (isClient && !isLoading) {
-            console.log('Calling handleSuccess');
-            handleSuccess();
+        if (isClient) {
+            const timer = setTimeout(() => {
+                console.log('Timeout triggered. Calling handleSuccess');
+                handleSuccess();
+            }, 5000); // Wait for 5 seconds before forcing handleSuccess
+
+            if (!isLoading) {
+                console.log('Calling handleSuccess immediately');
+                handleSuccess();
+                clearTimeout(timer);
+            }
+
+            return () => clearTimeout(timer);
         }
     }, [isClient, isLoading]);
 
@@ -44,10 +54,13 @@ export default function Success() {
             }
 
             if (!isTestMode && !isAuthenticated) {
-                throw new Error('User not authenticated for non-test session');
+                console.warn('User not authenticated for non-test session, but proceeding anyway');
             }
 
-            const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+            let pendingConversionDataString;
+            if (typeof window !== 'undefined') {
+                pendingConversionDataString = localStorage.getItem('pendingConversionData');
+            }
             console.log('Retrieved pendingConversionDataString:', pendingConversionDataString);
 
             if (!pendingConversionDataString) {
@@ -59,7 +72,9 @@ export default function Success() {
 
             let { inputData, lang, price } = pendingConversionData;
 
-            localStorage.removeItem('pendingConversionData');
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('pendingConversionData');
+            }
 
             if (pendingConversionData.isFile) {
                 setStatus('Retrieving file...');
@@ -97,7 +112,7 @@ export default function Success() {
 
     console.log('Rendering. isClient:', isClient, 'isLoading:', isLoading);
 
-    if (!isClient || isLoading) {
+    if (!isClient) {
         return <div>Loading...</div>;
     }
 

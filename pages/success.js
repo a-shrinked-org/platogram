@@ -31,7 +31,7 @@ export default function Success() {
         }
     }, [isClient, isLoading]);
 
-     async function handleSuccess() {
+async function handleSuccess() {
         console.log('handleSuccess called');
         const { session_id } = router.query;
         console.log('Session ID:', session_id);
@@ -105,8 +105,8 @@ export default function Success() {
 
         } catch (error) {
             console.error('Error in handleSuccess:', error);
-            setStatus(`Error: ${error.message}`);
-            setTimeout(() => router.push('/?showError=true'), 5000);
+            setError(error.message);
+            setStatus('Error occurred');
         }
     }
 
@@ -120,6 +120,13 @@ export default function Success() {
         <div>
             <h1>Payment Successful</h1>
             <p>{status}</p>
+            {error && (
+                <div style={{ color: 'red', marginTop: '20px' }}>
+                    <h2>Error:</h2>
+                    <p>{error}</p>
+                    <p>Please try again or contact support if the problem persists.</p>
+                </div>
+            )}
         </div>
     );
 }

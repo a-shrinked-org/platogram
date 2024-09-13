@@ -16,11 +16,15 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/web/main.py"
+      "src": "/api/python/.*",
+      "dest": "web/main.py"
     },
     {
-      "src": "/(.*)",
+      "src": "/uploads/(.*)",
+      "dest": "/public/uploads/$1"
+    },
+    {
+      "src": "/((?!api/).*)",
       "dest": "/$1"
     }
   ],

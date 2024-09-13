@@ -9,11 +9,14 @@ export default function Success() {
     const router = useRouter();
 
     useEffect(() => {
+        console.log('Success component mounted');
         setIsClient(true);
     }, []);
 
     useEffect(() => {
+        console.log('isClient:', isClient, 'isLoading:', isLoading);
         if (isClient && !isLoading) {
+            console.log('Calling handleSuccess');
             handleSuccess();
         }
     }, [isClient, isLoading]);
@@ -29,7 +32,16 @@ export default function Success() {
             }
 
             const isTestMode = session_id.startsWith('test_');
-            let token = isTestMode ? 'test_token' : await getAccessTokenSilently();
+            console.log('Is test mode:', isTestMode);
+
+            let token;
+            try {
+                token = isTestMode ? 'test_token' : await getAccessTokenSilently();
+                console.log('Token obtained:', token ? 'Yes' : 'No');
+            } catch (error) {
+                console.error('Error getting token:', error);
+                throw error;
+            }
 
             if (!isTestMode && !isAuthenticated) {
                 throw new Error('User not authenticated for non-test session');
@@ -47,24 +59,30 @@ export default function Success() {
 
             let { inputData, lang, price } = pendingConversionData;
 
-            // Clear pending conversion data
             localStorage.removeItem('pendingConversionData');
 
-            // If inputData is a file ID, retrieve and upload the file
             if (pendingConversionData.isFile) {
                 setStatus('Retrieving file...');
+                if (typeof window.retrieveFileFromTemporaryStorage !== 'function') {
+                    throw new Error('retrieveFileFromTemporaryStorage function not found');
+                }
                 const file = await window.retrieveFileFromTemporaryStorage(inputData);
                 if (!file) {
                     throw new Error("Failed to retrieve file from temporary storage");
                 }
 
                 setStatus('Uploading file...');
+                if (typeof window.uploadFile !== 'function') {
+                    throw new Error('uploadFile function not found');
+                }
                 inputData = await window.uploadFile(file, token, isTestMode);
                 console.log("File uploaded successfully, URL:", inputData);
             }
 
-            // Start the conversion process
             setStatus('Starting conversion...');
+            if (typeof window.postToConvert !== 'function') {
+                throw new Error('postToConvert function not found');
+            }
             await window.postToConvert(inputData, lang, session_id, price, isTestMode, token);
 
             setStatus('Conversion started');
@@ -76,6 +94,8 @@ export default function Success() {
             setTimeout(() => router.push('/?showError=true'), 5000);
         }
     }
+
+    console.log('Rendering. isClient:', isClient, 'isLoading:', isLoading);
 
     if (!isClient || isLoading) {
         return <div>Loading...</div>;

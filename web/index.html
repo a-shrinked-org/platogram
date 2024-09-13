@@ -853,36 +853,35 @@
         console.log('[Test Status]', message);
     }
 
-   async function simulateConversionFlow(isFile, inputData) {
-    try {
-        let fileId;
-        if (isFile) {
-            fileId = await storeFileTemporarily(inputData);
+    async function simulateConversionFlow(isFile, inputData) {
+        try {
+            let fileId;
+            if (isFile) {
+                fileId = await storeFileTemporarily(inputData);
+            }
+            // Store conversion data
+            const conversionData = {
+                inputData: isFile ? fileId : inputData,
+                isFile: isFile,
+                lang: TEST_LANG,
+                price: TEST_PRICE,
+                isTestMode: true
+            };
+            localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
+            console.log('Stored conversion data:', conversionData);
+            updateTestStatus("Conversion data stored. Simulating Stripe redirect in 3 seconds...");
+
+            // Simulate delay before redirect to intermediate page
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // Simulate redirect to intermediate page
+            updateTestStatus("Redirecting to intermediate page...");
+            window.location.href = `/test-intermediate?inputData=${encodeURIComponent(JSON.stringify(conversionData))}`;
+        } catch (error) {
+            console.error("Error in test flow:", error);
+            updateTestStatus("Error: " + error.message);
         }
-        // Store conversion data
-        const conversionData = {
-            inputData: isFile ? fileId : inputData,
-            isFile: isFile,
-            lang: TEST_LANG,
-            price: TEST_PRICE,
-            isTestMode: true
-        };
-        localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
-        console.log('Stored conversion data:', conversionData);
-        updateTestStatus("Conversion data stored. Simulating Stripe redirect in 3 seconds...");
-
-        // Simulate delay before redirect to intermediate page
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        // Simulate redirect to success page with a test session ID
-        updateTestStatus("Redirecting to success page...");
-        const testSessionId = 'test_session_' + Date.now();
-        window.location.href = `/success?session_id=${testSessionId}`;
-    } catch (error) {
-        console.error("Error in test flow:", error);
-        updateTestStatus("Error: " + error.message);
     }
-}
 
     async function testURLInput() {
         const urlInput = document.getElementById('test-url-input');

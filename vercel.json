@@ -12,13 +12,6 @@
     {
       "src": "web/**",
       "use": "@vercel/static"
-    },
-    {
-      "src": "pages/api/**/*.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": ["node_modules/**"]
-      }
     }
   ],
   "routes": [

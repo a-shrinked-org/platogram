@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth0 } from '@auth0/auth0-react';
 
+export default async function handler(req, res) {
+
 function Success() {
     const router = useRouter();
     const [status, setStatus] = useState('Processing payment');
@@ -95,3 +97,6 @@ function Success() {
 }
 
 export default Success;
+
+res.status(200).json({ message: 'Success API route' });
+}

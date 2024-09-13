@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 
+export default async function handler(req, res) {
 function TestIntermediate() {
     const router = useRouter();
     const [status, setStatus] = useState('Initializing...');
@@ -38,3 +39,6 @@ function TestIntermediate() {
 }
 
 export default TestIntermediate;
+
+res.status(200).json({ message: 'TestIntermediate API route' });
+}

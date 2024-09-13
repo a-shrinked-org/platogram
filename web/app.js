@@ -819,7 +819,7 @@ async function simulateStripeCheckout(conversionData) {
 async function handleStripeSuccess(sessionId, isTestMode = false) {
     try {
         await ensureDbInitialized();
-        const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
+        const pendingConversionDataString = localStorage.getItem('pendingConversionData');
         console.log("Retrieved pendingConversionDataString:", pendingConversionDataString);
 
         if (!pendingConversionDataString) {
@@ -830,9 +830,22 @@ async function handleStripeSuccess(sessionId, isTestMode = false) {
         let inputData = pendingConversionData.inputData;
         const lang = pendingConversionData.lang;
         const price = pendingConversionData.price;
+        isTestMode = isTestMode || pendingConversionData.isTestMode || false;
 
         // Clear the pending conversion data early to prevent double-processing
-        sessionStorage.removeItem('pendingConversionData');
+        localStorage.removeItem('pendingConversionData');
+
+        let token = 'test_token';
+        if (!isTestMode) {
+            if (!auth0Client) {
+                throw new Error('Auth0 client not initialized');
+            }
+            const isAuthenticated = await auth0Client.isAuthenticated();
+            if (!isAuthenticated) {
+                throw new Error('User not authenticated');
+            }
+            token = await auth0Client.getTokenSilently();
+        }
 
         if (pendingConversionData.isFile) {
             console.log("Retrieving file from temporary storage:", inputData);
@@ -842,7 +855,7 @@ async function handleStripeSuccess(sessionId, isTestMode = false) {
                 throw new Error("Failed to retrieve file from temporary storage");
             }
             console.log("File retrieved, uploading to Blob storage");
-            inputData = await uploadFile(file);
+            inputData = await uploadFile(file, token, isTestMode);
             console.log("File uploaded successfully, URL:", inputData);
         } else {
             console.log("URL input detected, using directly:", inputData);

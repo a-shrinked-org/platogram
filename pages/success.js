@@ -1,7 +1,3 @@
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
-import { useAuth0 } from '@auth0/auth0-react';
-
 export default function Success() {
     const router = useRouter();
     const [status, setStatus] = useState('Initializing...');
@@ -39,38 +35,13 @@ export default function Success() {
                     throw new Error('Missing session_id or pendingConversionData');
                 }
 
-                localStorage.removeItem('pendingConversionData');
+                const isTestMode = pendingConversionData.isTestMode || session_id.startsWith('test_');
 
-                let inputData = pendingConversionData.inputData;
-                const lang = pendingConversionData.lang;
-                const isTestMode = pendingConversionData.isTestMode || false;
-                const price = pendingConversionData.price;
-
-                console.log('Is test mode:', isTestMode);
-
-                let token = 'test_token';
-                if (!isTestMode) {
-                    if (!isAuthenticated) {
-                        console.error('User not authenticated');
-                        setStatus('Error: User not authenticated');
-                        setTimeout(() => router.push('/?showError=true'), 5000);
-                        return;
-                    }
-                    token = await getTokenSilently();
+                if (!isTestMode && !isAuthenticated) {
+                    throw new Error('User not authenticated for non-test session');
                 }
 
-                if (pendingConversionData.isFile) {
-                    setStatus('Retrieving file...');
-                    console.log('Retrieving file:', inputData);
-                    const file = await window.retrieveFileFromTemporaryStorage(inputData);
-                    setStatus('Uploading file...');
-                    inputData = await window.uploadFile(file, token, isTestMode);
-                    console.log('File uploaded:', inputData);
-                }
-
-                setStatus('Starting conversion...');
-                console.log('Calling postToConvert with:', { inputData, lang, session_id, price, isTestMode });
-                await window.postToConvert(inputData, lang, session_id, price, isTestMode);
+                await window.handleStripeSuccess(session_id, isTestMode);
 
                 if (isMounted) {
                     setStatus('Conversion started');
@@ -86,12 +57,7 @@ export default function Success() {
         }
 
         if (router.query.session_id && !isLoading) {
-            const isTestSession = router.query.session_id.startsWith('test_');
-            if (isTestSession || isAuthenticated) {
-                handleSuccess();
-            } else {
-                console.log('Waiting for authentication...');
-            }
+            handleSuccess();
         }
 
         return () => {

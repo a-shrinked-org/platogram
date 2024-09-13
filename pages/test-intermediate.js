@@ -21,6 +21,11 @@ export default function TestIntermediate() {
                 return;
             }
 
+            // Update pendingConversionData to include isTestMode flag
+            const updatedData = JSON.parse(pendingConversionData);
+            updatedData.isTestMode = true;
+            localStorage.setItem('pendingConversionData', JSON.stringify(updatedData));
+
             console.log('Redirecting to:', `/success?session_id=${testSessionId}`);
             router.push(`/success?session_id=${testSessionId}`);
         }, 5000);

@@ -4,23 +4,22 @@ import { useAuth0 } from '@auth0/auth0-react';
 
 export default function Success() {
     const router = useRouter();
-    const [status, setStatus] = useState('Processing payment');
+    const [status, setStatus] = useState('Initializing...');
     const { getTokenSilently, isAuthenticated, isLoading } = useAuth0();
     const [conversionStarted, setConversionStarted] = useState(false);
 
     useEffect(() => {
+        console.log('Success page loaded');
+        console.log('Router query:', router.query);
+        console.log('isAuthenticated:', isAuthenticated);
+        console.log('isLoading:', isLoading);
+
         let isMounted = true;
 
         async function handleSuccess() {
+            console.log('handleSuccess called');
             if (conversionStarted) return;
             setConversionStarted(true);
-
-            if (!isAuthenticated) {
-                console.error('User not authenticated');
-                setStatus('Error: User not authenticated');
-                setTimeout(() => router.push('/?showError=true'), 5000);
-                return;
-            }
 
             try {
                 const { session_id } = router.query;
@@ -47,7 +46,14 @@ export default function Success() {
                 const isTestMode = pendingConversionData.isTestMode || false;
                 const price = pendingConversionData.price;
 
-                const token = await getTokenSilently();
+                if (!isTestMode && !isAuthenticated) {
+                    console.error('User not authenticated');
+                    setStatus('Error: User not authenticated');
+                    setTimeout(() => router.push('/?showError=true'), 5000);
+                    return;
+                }
+
+                const token = isTestMode ? 'test_token' : await getTokenSilently();
 
                 if (pendingConversionData.isFile) {
                     setStatus('Retrieving file...');
@@ -74,7 +80,7 @@ export default function Success() {
             }
         }
 
-        if (router.query.session_id && !isLoading && isAuthenticated && !conversionStarted) {
+        if (router.query.session_id && !isLoading && (isAuthenticated || router.query.session_id.startsWith('test_'))) {
             handleSuccess();
         }
 
@@ -82,10 +88,6 @@ export default function Success() {
             isMounted = false;
         };
     }, [router.query, isAuthenticated, isLoading, conversionStarted]);
-
-    if (isLoading) {
-        return <div>Loading...</div>;
-    }
 
     return (
         <div>

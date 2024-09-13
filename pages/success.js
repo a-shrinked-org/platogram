@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth0 } from '@auth0/auth0-react';
+import { retrieveFileFromTemporaryStorage, uploadFile, postToConvert } from './web/app.js';
 
 export default function Success() {
     const [status, setStatus] = useState('Initializing...');
+    const [error, setError] = useState(null);  // Add this line
     const [isClient, setIsClient] = useState(false);
     const { isLoading, isAuthenticated, getAccessTokenSilently } = useAuth0();
     const router = useRouter();
@@ -31,7 +33,7 @@ export default function Success() {
         }
     }, [isClient, isLoading]);
 
-async function handleSuccess() {
+    async function handleSuccess() {
         console.log('handleSuccess called');
         const { session_id } = router.query;
         console.log('Session ID:', session_id);

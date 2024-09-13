@@ -21,15 +21,10 @@
       }
     }
   ],
-  "rewrites": [
+  "routes": [
     {
-      "source": "/uploads/(.*)",
-      "destination": "/public/uploads/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/web/index.html",
-      "status": 404
+      "src": "/$",
+      "dest": "/web/index.html"
     }
   ],
   "buildCommand": "apt-get update && apt-get install -y pandoc texlive-xetex && pip install -r requirements.txt && pip install -e . && npm install"

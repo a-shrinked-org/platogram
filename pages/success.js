@@ -46,14 +46,18 @@ export default function Success() {
                 const isTestMode = pendingConversionData.isTestMode || false;
                 const price = pendingConversionData.price;
 
-                if (!isTestMode && !isAuthenticated) {
-                    console.error('User not authenticated');
-                    setStatus('Error: User not authenticated');
-                    setTimeout(() => router.push('/?showError=true'), 5000);
-                    return;
-                }
+                console.log('Is test mode:', isTestMode);
 
-                const token = isTestMode ? 'test_token' : await getTokenSilently();
+                let token = 'test_token';
+                if (!isTestMode) {
+                    if (!isAuthenticated) {
+                        console.error('User not authenticated');
+                        setStatus('Error: User not authenticated');
+                        setTimeout(() => router.push('/?showError=true'), 5000);
+                        return;
+                    }
+                    token = await getTokenSilently();
+                }
 
                 if (pendingConversionData.isFile) {
                     setStatus('Retrieving file...');
@@ -65,6 +69,7 @@ export default function Success() {
                 }
 
                 setStatus('Starting conversion...');
+                console.log('Calling postToConvert with:', { inputData, lang, session_id, price, isTestMode });
                 await window.postToConvert(inputData, lang, session_id, price, isTestMode);
 
                 if (isMounted) {
@@ -80,14 +85,23 @@ export default function Success() {
             }
         }
 
-        if (router.query.session_id && !isLoading && (isAuthenticated || router.query.session_id.startsWith('test_'))) {
-            handleSuccess();
+        if (router.query.session_id && !isLoading) {
+            const isTestSession = router.query.session_id.startsWith('test_');
+            if (isTestSession || isAuthenticated) {
+                handleSuccess();
+            } else {
+                console.log('Waiting for authentication...');
+            }
         }
 
         return () => {
             isMounted = false;
         };
     }, [router.query, isAuthenticated, isLoading, conversionStarted]);
+
+    if (isLoading) {
+        return <div>Loading authentication state...</div>;
+    }
 
     return (
         <div>

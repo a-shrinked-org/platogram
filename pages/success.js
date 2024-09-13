@@ -10,6 +10,10 @@ export default function Success() {
         setIsClient(true);
     }, []);
 
+    if (!isLoading) {
+        handleSuccess();
+    }
+
     if (!isClient) {
         return <div>Loading...</div>;
     }
@@ -59,6 +63,10 @@ function ClientSideSuccess({ setStatus, status }) {
                     throw new Error('User not authenticated for non-test session');
                 }
 
+                if (typeof window.handleStripeSuccess !== 'function') {
+                    throw new Error('handleStripeSuccess function not found');
+                }
+
                 await window.handleStripeSuccess(session_id, isTestMode);
 
                 if (isMounted) {
@@ -74,7 +82,7 @@ function ClientSideSuccess({ setStatus, status }) {
             }
         }
 
-        if (router.query.session_id && !isLoading) {
+        if (!isLoading) {
             handleSuccess();
         }
 

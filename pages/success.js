@@ -31,7 +31,7 @@ export default function Success() {
         }
     }, [isClient, isLoading]);
 
-    async function handleSuccess() {
+     async function handleSuccess() {
         console.log('handleSuccess called');
         const { session_id } = router.query;
         console.log('Session ID:', session_id);

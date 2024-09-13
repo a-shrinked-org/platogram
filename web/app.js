@@ -1728,23 +1728,25 @@ function handleFileUpload() {
 // }
 
 // Ensure all functions are in global scope
-window.toggleConvertButtonState = toggleConvertButtonState;
-window.toggleSections = toggleSections;
-window.setupDragAndDrop = setupDragAndDrop;
-window.handleFiles = handleFiles;
-window.onConvertClick = onConvertClick;
-window.login = login;
-window.logout = logout;
-window.reset = reset;
-window.handleSubmit = handleSubmit;
-window.initializeProcessingStage = initializeProcessingStage;
-window.updateProcessingStage = updateProcessingStage;
-window.handleStripeRedirect = handleStripeRedirect;
-window.handleStripeSuccess = handleStripeSuccess;
-window.handleStripeCancel = handleStripeCancel;
-window.selectLanguage = selectLanguage;
-window.setupPriceUI = setupPriceUI;
-window.storeFileTemporarily = storeFileTemporarily;
-window.retrieveFileFromTemporaryStorage = retrieveFileFromTemporaryStorage;
-window.uploadFile = uploadFile;
-window.postToConvert = postToConvert;
+if (typeof window !== 'undefined') {
+    window.toggleConvertButtonState = toggleConvertButtonState;
+    window.toggleSections = toggleSections;
+    window.setupDragAndDrop = setupDragAndDrop;
+    window.handleFiles = handleFiles;
+    window.onConvertClick = onConvertClick;
+    window.login = login;
+    window.logout = logout;
+    window.reset = reset;
+    window.handleSubmit = handleSubmit;
+    window.initializeProcessingStage = initializeProcessingStage;
+    window.updateProcessingStage = updateProcessingStage;
+    window.handleStripeRedirect = handleStripeRedirect;
+    window.handleStripeSuccess = handleStripeSuccess;
+    window.handleStripeCancel = handleStripeCancel;
+    window.selectLanguage = selectLanguage;
+    window.setupPriceUI = setupPriceUI;
+    window.storeFileTemporarily = storeFileTemporarily;
+    window.retrieveFileFromTemporaryStorage = retrieveFileFromTemporaryStorage;
+    window.uploadFile = uploadFile;
+    window.postToConvert = postToConvert;
+}

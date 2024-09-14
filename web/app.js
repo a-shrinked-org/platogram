@@ -889,9 +889,18 @@ async function handleSuccessfulPayment() {
             const pendingConversionData = JSON.parse(pendingConversionDataString);
             localStorage.removeItem('pendingConversionData');
             const isTestMode = pendingConversionData.isTestMode || session_id.startsWith('test_');
-            if (!isTestMode && !await auth0Client.isAuthenticated()) {
+
+            // Initialize Auth0 if not already initialized
+            if (!auth0Client) {
+                await initAuth0();
+            }
+
+            // Check authentication status
+            const isAuthenticated = await auth0Client.isAuthenticated();
+            if (!isTestMode && !isAuthenticated) {
                 throw new Error('User not authenticated for non-test session');
             }
+
             let token = isTestMode ? 'test_token' : await auth0Client.getTokenSilently();
             await processConversion(pendingConversionData, session_id, isTestMode, token);
         } catch (error) {
@@ -926,7 +935,7 @@ function handleStripeRedirect() {
             updateUIStatus("success", "Payment successful! Redirecting...");
             setTimeout(() => {
                 window.location.href = '/';
-            }, 3000);
+            }, 6000);
         } else {
             console.error('Success route accessed without session ID');
             updateUIStatus("error", "Invalid success parameters");
@@ -936,7 +945,7 @@ function handleStripeRedirect() {
         updateUIStatus("cancelled", "Payment was cancelled. You can try again when you're ready.");
         setTimeout(() => {
             window.location.href = '/';
-        }, 3000);
+        }, 6000);
     }
 }
 

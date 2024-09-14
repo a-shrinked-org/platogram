@@ -874,6 +874,46 @@ async function handleStripeSuccess(sessionId, isTestMode = false) {
     }
 }
 
+async function handleSuccessfulPayment() {
+    const successfulPayment = sessionStorage.getItem('successfulPayment');
+    if (successfulPayment) {
+        const { session_id } = JSON.parse(successfulPayment);
+        sessionStorage.removeItem('successfulPayment');  // Clear the stored data
+        try {
+            updateUIStatus("processing", "Processing successful payment...");
+
+            const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+            if (!pendingConversionDataString) {
+                throw new Error('No pending conversion data found');
+            }
+            const pendingConversionData = JSON.parse(pendingConversionDataString);
+            localStorage.removeItem('pendingConversionData');
+            const isTestMode = pendingConversionData.isTestMode || session_id.startsWith('test_');
+            if (!isTestMode && !await auth0Client.isAuthenticated()) {
+                throw new Error('User not authenticated for non-test session');
+            }
+            let token = isTestMode ? 'test_token' : await auth0Client.getTokenSilently();
+            await processConversion(pendingConversionData, session_id, isTestMode, token);
+        } catch (error) {
+            console.error('Error processing payment:', error);
+            updateUIStatus("error", `Error: ${error.message}`);
+        }
+    }
+}
+
+async function processConversion(conversionData, sessionId, isTestMode, token) {
+    const { inputData, lang, price } = conversionData;
+    let processedInputData = inputData;
+    if (conversionData.isFile) {
+        updateUIStatus("uploading", "Retrieving and uploading file...");
+        const file = await retrieveFileFromTemporaryStorage(inputData);
+        processedInputData = await uploadFile(file, token, isTestMode);
+    }
+    updateUIStatus("preparing", "Starting conversion...");
+    await postToConvert(processedInputData, lang, sessionId, price, isTestMode);
+    updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
+}
+
 function handleStripeRedirect() {
     const currentPath = window.location.pathname;
     const urlParams = new URLSearchParams(window.location.search);
@@ -882,20 +922,22 @@ function handleStripeRedirect() {
         const sessionId = urlParams.get('session_id');
         if (sessionId) {
             console.log('Payment successful. Processing...');
-            handleStripeSuccess(sessionId);
+            sessionStorage.setItem('successfulPayment', JSON.stringify({ session_id: sessionId }));
+            updateUIStatus("success", "Payment successful! Redirecting...");
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 3000);
         } else {
             console.error('Success route accessed without session ID');
             updateUIStatus("error", "Invalid success parameters");
         }
     } else if (currentPath === '/cancel') {
         console.log('Payment cancelled by user');
-        updateUIStatus("idle", "Payment was cancelled. You can try again when you're ready.");
-        // Redirect to the main page after a short delay
+        updateUIStatus("cancelled", "Payment was cancelled. You can try again when you're ready.");
         setTimeout(() => {
             window.location.href = '/';
         }, 3000);
     }
-    // If we're not on /success or /cancel, do nothing
 }
 
 function handleStripeCancel() {
@@ -1508,6 +1550,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     await initDB();
     await testIndexedDB();
 
+    handleStripeRedirect();
+
+    // Handle successful payment if redirected from success page
+    await handleSuccessfulPayment();
+
     // Add this line to handle Stripe success redirect
     if (window.location.pathname === '/success') {
         await handleStripeSuccessRedirect();
@@ -1523,7 +1570,6 @@ document.addEventListener("DOMContentLoaded", () => {
     debugLog("DOM Content Loaded");
     updateUIStatus("idle"); // Set initial state to idle
     initStripe();
-    handleStripeRedirect();
     setupPriceUI();
 
     // Initialize Lucide icons

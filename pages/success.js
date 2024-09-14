@@ -1,94 +1,31 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { useAuth0 } from '@auth0/auth0-react';
 
 export default function Success() {
-    const [status, setStatus] = useState('Verifying payment...');
-    const [error, setError] = useState(null);
-    const { isLoading, getAccessTokenSilently } = useAuth0();
+    const [status, setStatus] = useState('Processing payment...');
     const router = useRouter();
 
     useEffect(() => {
-        if (!isLoading && router.isReady) {
-            handleSuccess();
-        }
-    }, [isLoading, router.isReady]);
-
-    async function handleSuccess() {
         const { session_id } = router.query;
-        console.log('Session ID:', session_id);
-
-        try {
-            if (!session_id) {
-                throw new Error('Missing session_id');
-            }
-
-            const isTestMode = session_id.startsWith('test_');
-            let token = isTestMode ? 'test_token' : await getAccessTokenSilently();
-
-            // Verify the Stripe session
-            const response = await fetch('/api/verify-session', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ session_id, isTestMode })
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to verify payment session');
-            }
-
-            const result = await response.json();
-
-            if (result.status === 'success') {
-                // Retrieve pendingConversionData from localStorage
-                const pendingConversionDataString = localStorage.getItem('pendingConversionData');
-                if (!pendingConversionDataString) {
-                    throw new Error('No pending conversion data found');
-                }
-
-                const pendingConversionData = JSON.parse(pendingConversionDataString);
-
-                // Clear pendingConversionData from localStorage
-                localStorage.removeItem('pendingConversionData');
-
-                // Encode the data to pass it safely in the URL
-                const encodedData = encodeURIComponent(JSON.stringify({
-                    ...pendingConversionData,
-                    session_id,
-                    isTestMode
-                }));
-
-                // Redirect to index with success flag and encoded data
-                router.push(`/?paymentSuccess=true&conversionData=${encodedData}`);
-            } else {
-                throw new Error(result.message || 'Payment verification failed');
-            }
-
-        } catch (error) {
-            console.error('Error in handleSuccess:', error);
-            setError(error.message);
-            setStatus('Error occurred');
+        if (session_id) {
+            setStatus('Payment successful! Redirecting...');
+            // Store the session_id in sessionStorage for app.js to access
+            sessionStorage.setItem('successfulPayment', JSON.stringify({ session_id }));
+            setTimeout(() => {
+                window.location.href = '/';  // Redirect to the main page
+            }, 3000); // Redirect after 3 seconds
+        } else {
+            setStatus('Error: Invalid session');
+            setTimeout(() => {
+                window.location.href = '/?error=invalid_session';
+            }, 3000);
         }
-    }
-
-    if (isLoading || !router.isReady) {
-        return <div>Loading...</div>;
-    }
+    }, [router.query]);
 
     return (
         <div>
-            <h1>Payment Verification</h1>
+            <h1>Payment Status</h1>
             <p>{status}</p>
-            {error && (
-                <div style={{ color: 'red', marginTop: '20px' }}>
-                    <h2>Error:</h2>
-                    <p>{error}</p>
-                    <p>Please try again or contact support if the problem persists.</p>
-                </div>
-            )}
         </div>
     );
 }

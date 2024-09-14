@@ -1550,6 +1550,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     await initDB();
     await testIndexedDB();
 
+    // Initialize Auth0
+    await initAuth0();
+
     handleStripeRedirect();
 
     // Handle successful payment if redirected from success page
@@ -1732,12 +1735,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // Initialize the default view
     changeImage(currentView);
 
-    initAuth0()
-        .then(() => updateUI())
-        .catch((error) => {
-            console.error("Error initializing app:", error);
-            updateUIStatus("idle"); // Set to idle state if initialization fails
-        });
+    updateUI().catch((error) => {
+        console.error("Error updating UI:", error);
+        updateUIStatus("idle"); // Set to idle state if update fails
+    });
 });
 
 let fileInput;

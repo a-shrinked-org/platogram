@@ -391,6 +391,7 @@ async function initAuth0() {
             window.history.replaceState({}, document.title, window.location.pathname);
         }
 
+        auth0Initialized = true;
         await updateUI();
         return auth0Client;
     } catch (error) {
@@ -398,6 +399,7 @@ async function initAuth0() {
         throw error;
     }
 }
+
 async function ensureAuth0Initialized() {
     if (!auth0Initialized) {
         await initAuth0();
@@ -924,12 +926,13 @@ function storeConversionData(inputData, lang, price) {
 }
 
 async function handleSuccessfulPayment() {
-    const successfulPayment = sessionStorage.getItem('successfulPayment');
-    if (successfulPayment) {
-        const { session_id } = JSON.parse(successfulPayment);
-        sessionStorage.removeItem('successfulPayment');  // Clear the stored data
-        try {
-            updateUIStatus("processing", "Processing successful payment...");
+    try {
+        await ensureAuth0Initialized();
+
+        const successfulPayment = sessionStorage.getItem('successfulPayment');
+        if (successfulPayment) {
+            const { session_id } = JSON.parse(successfulPayment);
+            sessionStorage.removeItem('successfulPayment');  // Clear the stored data
 
             const pendingConversionDataString = localStorage.getItem('pendingConversionData');
             if (!pendingConversionDataString) {
@@ -937,27 +940,17 @@ async function handleSuccessfulPayment() {
             }
             const pendingConversionData = JSON.parse(pendingConversionDataString);
             localStorage.removeItem('pendingConversionData');
+
+            updateUIStatus("processing", "Processing successful payment...");
+
             const isTestMode = pendingConversionData.isTestMode || session_id.startsWith('test_');
+            const token = isTestMode ? 'test_token' : await getAuthToken();
 
-            await ensureAuth0Initialized();
-
-            let token;
-            if (!isTestMode) {
-                const isAuthenticated = await auth0Client.isAuthenticated();
-                if (!isAuthenticated) {
-                    debugLog("User not authenticated, initiating login");
-                    await login();
-                    throw new Error("User authentication required. Please log in and try again.");
-                }
-                token = await getAuthToken();
-            } else {
-                token = 'test_token';
-            }
             await processConversion(pendingConversionData, session_id, isTestMode, token);
-        } catch (error) {
-            console.error('Error processing payment:', error);
-            updateUIStatus("error", `Error: ${error.message}`);
         }
+    } catch (error) {
+        console.error('Error processing payment:', error);
+        updateUIStatus("error", `Error: ${error.message}`);
     }
 }
 

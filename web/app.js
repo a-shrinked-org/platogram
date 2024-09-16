@@ -356,9 +356,23 @@ function initStripe() {
 
 async function initAuth0() {
     if (auth0Client) {
-        return;
+        return auth0Client;
     }
+
+    const waitForAuth0 = () => {
+        return new Promise((resolve) => {
+            if (typeof auth0 !== 'undefined') {
+                resolve();
+            } else {
+                console.warn("Auth0 not loaded yet, retrying in 1 second...");
+                setTimeout(() => waitForAuth0().then(resolve), 1000);
+            }
+        });
+    };
+
     try {
+        await waitForAuth0();
+
         auth0Client = await auth0.createAuth0Client({
             domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
             clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
@@ -378,8 +392,10 @@ async function initAuth0() {
         }
 
         await updateUI();
+        return auth0Client;
     } catch (error) {
         console.error("Error initializing Auth0:", error);
+        throw error;
     }
 }
 async function ensureAuth0Initialized() {
@@ -392,10 +408,8 @@ async function ensureAuth0Initialized() {
 }
 
 async function getAuthToken() {
-    if (!auth0Client) {
-        await initAuth0();
-    }
     try {
+        await initAuth0();
         const token = await auth0Client.getTokenSilently({
             audience: "https://platogram.vercel.app",
         });
@@ -405,6 +419,7 @@ async function getAuthToken() {
         throw new Error("Authentication failed. Please try logging in again.");
     }
 }
+
 
 function updateUIStatus(status, message = "") {
     debugLog(`Updating UI status: ${status}`);
@@ -500,10 +515,8 @@ function updateUIStatus(status, message = "") {
 }
 
 async function updateUI() {
-    if (!auth0Client) {
-        return;
-    }
     try {
+      await initAuth0();
       const isAuthenticated = await auth0Client.isAuthenticated();
       const loginButton = document.getElementById("login-button");
       const logoutButton = document.getElementById("logout-button");
@@ -1272,6 +1285,7 @@ function getInputData() {
 
 async function login() {
     try {
+        await initAuth0();
         await auth0Client.loginWithRedirect();
     } catch (error) {
         console.error("Error logging in:", error);
@@ -1280,17 +1294,16 @@ async function login() {
 }
 
 async function logout() {
-  try {
-    if (!auth0Client) throw new Error("Auth0 client not initialized");
-    await auth0Client.logout({
-      logoutParams: { returnTo: window.location.origin },
-    });
-  } catch (error) {
-    console.error("Error logging out:", error);
-    updateUIStatus("error", "Failed to log out. Please try again.");
-  }
+    try {
+        await initAuth0();
+        await auth0Client.logout({
+            logoutParams: { returnTo: window.location.origin },
+        });
+    } catch (error) {
+        console.error("Error logging out:", error);
+        updateUIStatus("error", "Failed to log out. Please try again.");
+    }
 }
-
 function showLanguageSelectionModal(inputData, price) {
     const modal = document.getElementById("language-modal");
     if (!modal) {

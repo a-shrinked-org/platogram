@@ -14,6 +14,7 @@ let db;
 let testMode = false;
 let isConversionInProgress = false;
 let currentView = 'cells';
+let isConversionComplete = false;
 
 import('https://esm.sh/@vercel/blob@0.23.4').then(module => {
         console.log('Vercel Blob import:', module);
@@ -497,6 +498,7 @@ function updateUIStatus(status, message = "") {
                 `;
             }
             clearProcessingStageInterval();
+            isConversionComplete = true;
             break;
         case "error":
             toggleSection("error-section");
@@ -1421,6 +1423,11 @@ function pollStatus(token, isTestMode = false) {
       }
     }
 
+    const pollingInterval = setInterval(checkStatus, 5000);
+    checkStatus(); // Start the polling process immediately
+  });
+}
+
 function toggleSection(sectionToShow) {
     const sections = [
       "input-section",
@@ -1566,6 +1573,8 @@ async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
     } catch (error) {
         console.error('Error in handleConversion:', error);
         updateUIStatus("error", "Error: " + error.message);
+    } finally {
+        isConversionComplete = true; // Ensure flag is set even if an error occurs
     }
 }
 async function handleStripeSuccessRedirect() {
@@ -1602,16 +1611,19 @@ async function handleStripeSuccessRedirect() {
 }
 
 function initializeProcessingStage() {
-  if (isConversionComplete) return; // Don't initialize if conversion is complete
-  debugLog("Initializing processing stage");
-  const processingStage = document.getElementById("processing-stage");
-  if (!processingStage) {
-    debugLog("Processing stage element not found. Skipping initialization.");
-    return;
+    if (isConversionComplete) return; // Don't initialize if conversion is complete
+
+    debugLog("Initializing processing stage");
+    const processingStage = document.getElementById("processing-stage");
+    if (!processingStage) {
+      debugLog("Processing stage element not found. Skipping initialization.");
+      return;
+    }
+    updateProcessingStage();
+    if (!processingStageInterval) {
+      processingStageInterval = setInterval(updateProcessingStage, 3000);
+    }
   }
-  updateProcessingStage();
-  processingStageInterval = setInterval(updateProcessingStage, 3000);
-}
 
 function safeUpdateProcessingStage() {
   try {

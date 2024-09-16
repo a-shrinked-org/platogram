@@ -425,7 +425,7 @@ async function getAuthToken() {
 
 
 function updateUIStatus(status, message = "") {
-    if (isConversionComplete) return; // Don't update UI if conversion is already complete
+    if (isConversionComplete && status !== "done" && status !== "error") return; // Allow updates for final states
     debugLog(`Updating UI status: ${status}`);
     const inputSection = document.getElementById("input-section");
     const uploadProcessSection = document.getElementById("upload-process-section");
@@ -435,7 +435,7 @@ function updateUIStatus(status, message = "") {
 
     const pendingConversionDataString = localStorage.getItem('pendingConversionData');
     const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
-    const fileName = document.getElementById("file-name")?.textContent || "Unknown file";
+    const fileName = storedFileName || document.getElementById("file-name")?.textContent || "Unknown file";
     const userEmail = document.getElementById("user-email")?.textContent || "Unknown email";
 
     // Hide all sections first
@@ -499,6 +499,7 @@ function updateUIStatus(status, message = "") {
             }
             clearProcessingStageInterval();
             isConversionComplete = true;
+            console.log("Conversion complete, UI updated to 'done' state");
             break;
         case "error":
             toggleSection("error-section");
@@ -920,10 +921,12 @@ async function handleStripeSuccess(sessionId, isTestMode = false) {
 }
 
 function storeConversionData(inputData, lang, price) {
+    const fileName = inputData instanceof File ? inputData.name : inputData;
     const conversionData = {
         inputData: inputData instanceof File ? inputData.name : inputData,
         lang: lang,
-        price: price
+        price: price,
+        fileName: fileName
     };
     localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
 }
@@ -1397,23 +1400,25 @@ function pollStatus(token, isTestMode = false) {
         console.log("Status update received:", result.status);
 
         if (result.status === "done") {
-          isConversionComplete = true;
-          clearInterval(pollingInterval);
-          clearProcessingStageInterval();
-          updateUIStatus("done", "Conversion completed successfully. Check your email for results.");
-          resolve(result);
-        } else if (result.status === "failed" || result.status === "error") {
-          isConversionComplete = true;
-          clearInterval(pollingInterval);
-          clearProcessingStageInterval();
-          updateUIStatus("error", result.error || "An error occurred during conversion");
-          reject(new Error(result.error || "Conversion failed"));
-        } else if (["idle", "running", "processing"].includes(result.status)) {
-          updateUIStatus(result.status, `Conversion ${result.status}...`);
-          console.log(`Conversion still in progress (${result.status}), continuing to poll...`);
-        } else {
-          console.warn("Unknown status received:", result.status);
-        }
+            isConversionComplete = true;
+            clearInterval(pollingInterval);
+            clearProcessingStageInterval();
+            updateUIStatus("done", "Conversion completed successfully. Check your email for results.", fileName);
+            console.log("Conversion complete, UI updated to 'done' state");
+            resolve(result);
+          } else if (result.status === "failed" || result.status === "error") {
+            isConversionComplete = true;
+            clearInterval(pollingInterval);
+            clearProcessingStageInterval();
+            updateUIStatus("error", result.error || "An error occurred during conversion", fileName);
+            console.log("Conversion failed, UI updated to 'error' state");
+            reject(new Error(result.error || "Conversion failed"));
+          } else if (["idle", "running", "processing"].includes(result.status)) {
+            updateUIStatus(result.status, `Conversion ${result.status}...`, fileName);
+            console.log(`Conversion still in progress (${result.status}), continuing to poll...`);
+          } else {
+            console.warn("Unknown status received:", result.status);
+          }
       } catch (error) {
         console.error("Error polling status:", error);
         updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
@@ -1539,10 +1544,10 @@ function updateProcessingStage() {
   }
 }
 
-async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
+async function handleConversion(inputData, lang, sessionId, price, isTestMode, fileName) {
     try {
         isConversionComplete = false; // Reset the flag at the start of conversion
-        updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
+        updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...", fileName);
 
         let token = isTestMode ? 'test_token' : await auth0Client.getTokenSilently();
 
@@ -1554,29 +1559,30 @@ async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
                 throw new Error("Failed to retrieve file from temporary storage");
             }
 
-            updateUIStatus("uploading", "Uploading file...");
+            updateUIStatus("uploading", "Uploading file...", fileName);
             inputData = await uploadFile(file, token, isTestMode);
         }
 
         await postToConvert(inputData, lang, sessionId, price, isTestMode, token);
-        updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
+        updateUIStatus("processing", "Conversion started. You will be notified when it's complete.", fileName);
 
         // Start polling for status
         try {
-            await pollStatus(token, isTestMode);
+            await pollStatus(token, isTestMode, fileName);
             // If pollStatus resolves successfully, the conversion is done
-            updateUIStatus("done", "Conversion completed successfully. Check your email for results.");
+            updateUIStatus("done", "Conversion completed successfully. Check your email for results.", fileName);
         } catch (pollError) {
             console.error("Error during status polling:", pollError);
-            updateUIStatus("error", "An error occurred during conversion. Please try again.");
+            updateUIStatus("error", "An error occurred during conversion. Please try again.", fileName);
         }
     } catch (error) {
         console.error('Error in handleConversion:', error);
-        updateUIStatus("error", "Error: " + error.message);
+        updateUIStatus("error", "Error: " + error.message, fileName);
     } finally {
         isConversionComplete = true; // Ensure flag is set even if an error occurs
     }
 }
+
 async function handleStripeSuccessRedirect() {
     try {
         await ensureAuth0Initialized();
@@ -1595,11 +1601,17 @@ async function handleStripeSuccessRedirect() {
 
             console.log('Handling Stripe success redirect with data:', pendingConversionData);
 
-            const { inputData, lang, price } = pendingConversionData;
+            const { inputData, lang, price, fileName } = pendingConversionData;
             const isTestMode = pendingConversionData.isTestMode || session_id.startsWith('test_');
 
+            // Update the file name in the UI
+            const fileNameElement = document.getElementById("file-name");
+            if (fileNameElement) {
+                fileNameElement.textContent = fileName || "Unknown file";
+            }
+
             // Start the conversion process
-            await handleConversion(inputData, lang, session_id, price, isTestMode);
+            await handleConversion(inputData, lang, session_id, price, isTestMode, fileName);
         } else {
             console.error('No successful payment data found');
             updateUIStatus("error", "Payment data not found");

@@ -354,54 +354,34 @@ function initStripe() {
   return stripe;
 }
 
-function initAuth0() {
-    return new Promise((resolve, reject) => {
-        if (auth0Initialized) {
-            debugLog("Auth0 already initialized");
-            resolve();
-            return;
+async function initAuth0() {
+    if (auth0Client) {
+        return;
+    }
+    try {
+        auth0Client = await auth0.createAuth0Client({
+            domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
+            clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
+            authorizationParams: {
+                redirect_uri: window.location.origin,
+                audience: "https://platogram.vercel.app/",
+                scope: "openid profile email",
+            },
+            cacheLocation: "localstorage",
+        });
+        debugLog("Auth0 client initialized successfully");
+
+        // Handle the redirect flow
+        if (window.location.search.includes("code=") && window.location.search.includes("state=")) {
+            await auth0Client.handleRedirectCallback();
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
 
-        const initAttempt = async () => {
-            if (typeof auth0 === 'undefined') {
-                console.warn("Auth0 not loaded yet, retrying in 1 second...");
-                setTimeout(initAttempt, 1000);
-                return;
-            }
-
-            try {
-                auth0Client = await auth0.createAuth0Client({
-                    domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
-                    clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
-                    authorizationParams: {
-                        redirect_uri: window.location.origin,
-                        audience: "https://platogram.vercel.app/",
-                        scope: "openid profile email",
-                    },
-                    cacheLocation: "localstorage",
-                });
-                debugLog("Auth0 client initialized successfully");
-
-                const query = window.location.search;
-                if (query.includes("code=") && query.includes("state=")) {
-                    await auth0Client.handleRedirectCallback();
-                    window.history.replaceState({}, document.title, "/");
-                }
-
-                auth0Initialized = true;
-                await updateUI();
-                resolve();
-            } catch (error) {
-                console.error("Error initializing Auth0:", error);
-                auth0Initialized = false;
-                reject(error);
-            }
-        };
-
-        initAttempt();
-    });
+        await updateUI();
+    } catch (error) {
+        console.error("Error initializing Auth0:", error);
+    }
 }
-
 async function ensureAuth0Initialized() {
     if (!auth0Initialized) {
         await initAuth0();
@@ -412,14 +392,10 @@ async function ensureAuth0Initialized() {
 }
 
 async function getAuthToken() {
-    await ensureAuth0Initialized();
+    if (!auth0Client) {
+        await initAuth0();
+    }
     try {
-        const isAuthenticated = await auth0Client.isAuthenticated();
-        if (!isAuthenticated) {
-            debugLog("User not authenticated, initiating login");
-            await login();
-            throw new Error("User authentication required. Please log in and try again.");
-        }
         const token = await auth0Client.getTokenSilently({
             audience: "https://platogram.vercel.app",
         });
@@ -429,7 +405,6 @@ async function getAuthToken() {
         throw new Error("Authentication failed. Please try logging in again.");
     }
 }
-
 
 function updateUIStatus(status, message = "") {
     debugLog(`Updating UI status: ${status}`);
@@ -525,8 +500,10 @@ function updateUIStatus(status, message = "") {
 }
 
 async function updateUI() {
+    if (!auth0Client) {
+        return;
+    }
     try {
-      await ensureAuth0Initialized();
       const isAuthenticated = await auth0Client.isAuthenticated();
       const loginButton = document.getElementById("login-button");
       const logoutButton = document.getElementById("logout-button");
@@ -1294,16 +1271,12 @@ function getInputData() {
 }
 
 async function login() {
-    await ensureAuth0Initialized();
-  try {
-    if (!auth0Client) throw new Error("Auth0 client not initialized");
-    await auth0Client.loginWithRedirect({
-      authorizationParams: { redirect_uri: window.location.origin },
-    });
-  } catch (error) {
-    console.error("Error logging in:", error);
-    updateUIStatus("error", "Failed to log in. Please try again.");
-  }
+    try {
+        await auth0Client.loginWithRedirect();
+    } catch (error) {
+        console.error("Error logging in:", error);
+        updateUIStatus("error", "Failed to log in. Please try again.");
+    }
 }
 
 async function logout() {
@@ -1619,6 +1592,7 @@ function safeUpdateProcessingStage() {
 document.addEventListener("DOMContentLoaded", async () => {
     await initDB();
     await testIndexedDB();
+    await initAuth0();
 
     handleStripeRedirect();
 
@@ -1638,8 +1612,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 document.addEventListener("DOMContentLoaded", () => {
     debugLog("DOM Content Loaded");
-    // Initialize Auth0
-    initAuth0();
     updateUIStatus("idle"); // Set initial state to idle
     initStripe();
     setupPriceUI();

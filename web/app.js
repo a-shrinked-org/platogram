@@ -355,50 +355,30 @@ function initStripe() {
 }
 
 async function initAuth0() {
-    if (auth0Client) {
-        return auth0Client;
+    try {
+      auth0Client = await auth0.createAuth0Client({
+        domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
+        clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
+        authorizationParams: {
+          redirect_uri: window.location.origin,
+          audience: "https://platogram.vercel.app/",
+          scope: "openid profile email",
+        },
+        cacheLocation: "localstorage",
+      });
+      debugLog("Auth0 client initialized successfully");
+
+      const query = window.location.search;
+      if (query.includes("code=") && query.includes("state=")) {
+        await auth0Client.handleRedirectCallback();
+        window.history.replaceState({}, document.title, "/");
+      }
+
+      await updateUI();
+    } catch (error) {
+      console.error("Error initializing Auth0:", error);
     }
-
-    const maxRetries = 5;
-    const retryDelay = 1000; // 1 second
-
-    for (let i = 0; i < maxRetries; i++) {
-        try {
-            if (typeof auth0 === 'undefined') {
-                console.warn(`Auth0 not loaded yet, retrying in ${retryDelay/1000} seconds... (Attempt ${i + 1}/${maxRetries})`);
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                continue;
-            }
-
-            auth0Client = await auth0.createAuth0Client({
-                domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
-                clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
-                authorizationParams: {
-                    redirect_uri: window.location.origin,
-                    audience: "https://platogram.vercel.app/",
-                    scope: "openid profile email",
-                },
-                cacheLocation: "localstorage",
-            });
-
-            debugLog("Auth0 client initialized successfully");
-
-            // Handle the redirect flow
-            if (window.location.search.includes("code=") && window.location.search.includes("state=")) {
-                await auth0Client.handleRedirectCallback();
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }
-
-            await updateUI();
-            return auth0Client;
-        } catch (error) {
-            console.error(`Error initializing Auth0 (Attempt ${i + 1}/${maxRetries}):`, error);
-            if (i === maxRetries - 1) {
-                throw error; // Throw error on last attempt
-            }
-        }
-    }
-}
+  }
 
 async function getAuthToken() {
     try {
@@ -1282,31 +1262,27 @@ function getInputData() {
 }
 
 async function login() {
-    try {
-        await initAuth0();
-        if (!auth0Client) {
-            throw new Error("Auth0 client not initialized");
-        }
-        await auth0Client.loginWithRedirect();
-    } catch (error) {
-        console.error("Error logging in:", error);
-        updateUIStatus("error", "Failed to log in. Please try again.");
-    }
+  try {
+    if (!auth0Client) throw new Error("Auth0 client not initialized");
+    await auth0Client.loginWithRedirect({
+      authorizationParams: { redirect_uri: window.location.origin },
+    });
+  } catch (error) {
+    console.error("Error logging in:", error);
+    updateUIStatus("error", "Failed to log in. Please try again.");
+  }
 }
 
 async function logout() {
-    try {
-        await initAuth0();
-        if (!auth0Client) {
-            throw new Error("Auth0 client not initialized");
-        }
-        await auth0Client.logout({
-            logoutParams: { returnTo: window.location.origin },
-        });
-    } catch (error) {
-        console.error("Error logging out:", error);
-        updateUIStatus("error", "Failed to log out. Please try again.");
-    }
+  try {
+    if (!auth0Client) throw new Error("Auth0 client not initialized");
+    await auth0Client.logout({
+      logoutParams: { returnTo: window.location.origin },
+    });
+  } catch (error) {
+    console.error("Error logging out:", error);
+    updateUIStatus("error", "Failed to log out. Please try again.");
+  }
 }
 
 function showLanguageSelectionModal(inputData, price) {

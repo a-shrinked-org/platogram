@@ -374,10 +374,34 @@ async function initAuth0() {
         window.history.replaceState({}, document.title, "/");
       }
 
+      auth0Initialized = true;
       await updateUI();
     } catch (error) {
       console.error("Error initializing Auth0:", error);
+      auth0Initialized = false;
     }
+  }
+
+  async function ensureAuth0Initialized() {
+      if (!auth0Initialized) {
+          await initAuth0();
+      }
+      if (!auth0Initialized) {
+          throw new Error("Failed to initialize Auth0");
+      }
+  }
+
+  async function getAuthToken() {
+      await ensureAuth0Initialized();
+      try {
+          const token = await auth0Client.getTokenSilently({
+              audience: "https://platogram.vercel.app",
+          });
+          return token;
+      } catch (error) {
+          console.error("Error getting auth token:", error);
+          throw new Error("Authentication failed. Please try logging in again.");
+      }
   }
 
 function updateUIStatus(status, message = "") {
@@ -890,18 +914,14 @@ async function handleSuccessfulPayment() {
             localStorage.removeItem('pendingConversionData');
             const isTestMode = pendingConversionData.isTestMode || session_id.startsWith('test_');
 
-            // Initialize Auth0 if not already initialized
-            if (!auth0Client) {
-                await initAuth0();
-            }
+            await ensureAuth0Initialized();
 
-            // Check authentication status
             const isAuthenticated = await auth0Client.isAuthenticated();
             if (!isTestMode && !isAuthenticated) {
                 throw new Error('User not authenticated for non-test session');
             }
 
-            let token = isTestMode ? 'test_token' : await auth0Client.getTokenSilently();
+            let token = isTestMode ? 'test_token' : await getAuthToken();
             await processConversion(pendingConversionData, session_id, isTestMode, token);
         } catch (error) {
             console.error('Error processing payment:', error);
@@ -1132,13 +1152,7 @@ async function deleteFile(fileUrl) {
     let headers = {};
 
     try {
-        if (!auth0Client) {
-            console.log("Auth0 client not initialized, attempting to initialize...");
-            await initAuth0();
-        }
-        const token = await auth0Client.getTokenSilently({
-            audience: "https://platogram.vercel.app",
-        });
+        const token = await getAuthToken();
         headers.Authorization = `Bearer ${token}`;
     } catch (error) {
         console.error("Error getting auth token:", error);

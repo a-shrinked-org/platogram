@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Head from 'next/head';
 
 export default function Success() {
     const [status, setStatus] = useState('Processing payment...');
@@ -23,11 +24,19 @@ export default function Success() {
     }, [router.query]);
 
     return (
-        <div className="flex items-center justify-center min-h-screen bg-black">
-            <div className="text-center">
-                <h1 className="text-3xl font-bold mb-4 text-white">Payment Status</h1>
-                <p className="text-xl text-green-400">{status}</p>
+        <>
+            <Head>
+                <link
+                    href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+                    rel="stylesheet"
+                />
+            </Head>
+            <div className="flex items-center justify-center min-h-screen bg-black">
+                <div className="text-center">
+                    <h1 className="text-3xl font-bold mb-4 text-white">Payment Status</h1>
+                    <p className="text-xl text-green-400">{status}</p>
+                </div>
             </div>
-        </div>
+        </>
     );
 }

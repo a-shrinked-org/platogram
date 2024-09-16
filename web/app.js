@@ -355,64 +355,80 @@ function initStripe() {
 }
 
 function initAuth0() {
-    if (auth0Initialized) {
-        debugLog("Auth0 already initialized");
-        return;
+    return new Promise((resolve, reject) => {
+        if (auth0Initialized) {
+            debugLog("Auth0 already initialized");
+            resolve();
+            return;
+        }
+
+        const initAttempt = async () => {
+            if (typeof auth0 === 'undefined') {
+                console.warn("Auth0 not loaded yet, retrying in 1 second...");
+                setTimeout(initAttempt, 1000);
+                return;
+            }
+
+            try {
+                auth0Client = await auth0.createAuth0Client({
+                    domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
+                    clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
+                    authorizationParams: {
+                        redirect_uri: window.location.origin,
+                        audience: "https://platogram.vercel.app/",
+                        scope: "openid profile email",
+                    },
+                    cacheLocation: "localstorage",
+                });
+                debugLog("Auth0 client initialized successfully");
+
+                const query = window.location.search;
+                if (query.includes("code=") && query.includes("state=")) {
+                    await auth0Client.handleRedirectCallback();
+                    window.history.replaceState({}, document.title, "/");
+                }
+
+                auth0Initialized = true;
+                await updateUI();
+                resolve();
+            } catch (error) {
+                console.error("Error initializing Auth0:", error);
+                auth0Initialized = false;
+                reject(error);
+            }
+        };
+
+        initAttempt();
+    });
+}
+
+async function ensureAuth0Initialized() {
+    if (!auth0Initialized) {
+        await initAuth0();
     }
+    if (!auth0Initialized) {
+        throw new Error("Failed to initialize Auth0");
+    }
+}
+
+async function getAuthToken() {
+    await ensureAuth0Initialized();
     try {
-      auth0Client = await auth0.createAuth0Client({
-        domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
-        clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
-        authorizationParams: {
-          redirect_uri: window.location.origin,
-          audience: "https://platogram.vercel.app/",
-          scope: "openid profile email",
-        },
-        cacheLocation: "localstorage",
-      });
-      debugLog("Auth0 client initialized successfully");
-
-      const query = window.location.search;
-      if (query.includes("code=") && query.includes("state=")) {
-        await auth0Client.handleRedirectCallback();
-        window.history.replaceState({}, document.title, "/");
-      }
-
-      auth0Initialized = true;
-      await updateUI();
+        const isAuthenticated = await auth0Client.isAuthenticated();
+        if (!isAuthenticated) {
+            debugLog("User not authenticated, initiating login");
+            await login();
+            throw new Error("User authentication required. Please log in and try again.");
+        }
+        const token = await auth0Client.getTokenSilently({
+            audience: "https://platogram.vercel.app",
+        });
+        return token;
     } catch (error) {
-      console.error("Error initializing Auth0:", error);
-      auth0Initialized = false;
+        console.error("Error getting auth token:", error);
+        throw new Error("Authentication failed. Please try logging in again.");
     }
-  }
-
-  async function ensureAuth0Initialized() {
-      if (!auth0Initialized) {
-          await initAuth0();
-      }
-      if (!auth0Initialized) {
-          throw new Error("Failed to initialize Auth0");
-      }
-  }
-
-  async function getAuthToken() {
-      await ensureAuth0Initialized();
-      try {
-          const isAuthenticated = await auth0Client.isAuthenticated();
-          if (!isAuthenticated) {
-              debugLog("User not authenticated, initiating login");
-              await login();
-              throw new Error("User authentication required. Please log in and try again.");
-          }
-          const token = await auth0Client.getTokenSilently({
-              audience: "https://platogram.vercel.app",
-          });
-          return token;
-      } catch (error) {
-          console.error("Error getting auth token:", error);
-          throw new Error("Authentication failed. Please try logging in again.");
-      }
-  }
+}
 
 
 function updateUIStatus(status, message = "") {

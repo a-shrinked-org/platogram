@@ -1359,68 +1359,69 @@ function selectLanguage(lang) {
 }
 
 function pollStatus(token, isTestMode = false) {
-  return new Promise((resolve, reject) => {
-    let attemptCount = 0;
-    const maxAttempts = 120; // 10 minutes of polling at 5-second intervals
+    return new Promise((resolve, reject) => {
+      let attemptCount = 0;
+      const maxAttempts = 120; // 10 minutes of polling at 5-second intervals
 
-    async function checkStatus() {
-      if (attemptCount >= maxAttempts) {
-        clearInterval(pollingInterval);
-        updateUIStatus("error", "Conversion timed out. Please check your email for results.");
-        reject(new Error("Polling timed out"));
-        return;
-      }
-      attemptCount++;
-
-      try {
-        const response = await fetch("https://temporary.name/status", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            ...(isTestMode ? { 'X-Test-Mode': 'true' } : {})
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+      async function checkStatus() {
+        if (attemptCount >= maxAttempts) {
+          clearInterval(pollingInterval);
+          updateUIStatus("error", "Conversion timed out. Please check your email for results.");
+          reject(new Error("Polling timed out"));
+          return;
         }
+        attemptCount++;
 
-        let result;
         try {
-          result = await response.json();
-        } catch (parseError) {
-          console.error("Error parsing JSON:", parseError);
-          console.log("Raw response:", await response.text());
-          throw new Error("Invalid response format from server");
-        }
+          const response = await fetch("https://temporary.name/status", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              ...(isTestMode ? { 'X-Test-Mode': 'true' } : {})
+            },
+          });
 
-        console.log("Status update received:", result.status);
-        updateUIStatus(result.status, `Conversion ${result.status}...`);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
 
-        if (result.status === "done") {
+          let result;
+          try {
+            result = await response.json();
+          } catch (parseError) {
+            console.error("Error parsing JSON:", parseError);
+            console.log("Raw response:", await response.text());
+            throw new Error("Invalid response format from server");
+          }
+
+          console.log("Status update received:", result.status);
+          updateUIStatus(result.status, `Conversion ${result.status}...`);
+
+          if (result.status === "done") {
+            clearInterval(pollingInterval);
+            updateUIStatus("done", "Conversion completed successfully. Check your email for results.");
+            resolve(result);
+          } else if (result.status === "failed" || result.status === "error") {
+            clearInterval(pollingInterval);
+            updateUIStatus("error", result.error || "An error occurred during conversion");
+            reject(new Error(result.error || "Conversion failed"));
+          } else if (["idle", "running", "processing"].includes(result.status)) {
+            console.log(`Conversion still in progress (${result.status}), continuing to poll...`);
+          } else {
+            console.warn("Unknown status received:", result.status);
+            // For unknown statuses, we'll continue polling
+          }
+        } catch (error) {
+          console.error("Error polling status:", error);
+          updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
           clearInterval(pollingInterval);
-          updateUIStatus("done", "Conversion completed successfully. Check your email for results.");
-          resolve(result);
-        } else if (result.status === "failed" || result.status === "error") {
-          clearInterval(pollingInterval);
-          updateUIStatus("error", result.error || "An error occurred during conversion");
-          reject(new Error(result.error || "Conversion failed"));
-        } else if (["idle", "running", "processing"].includes(result.status)) {
-          console.log(`Conversion still in progress (${result.status}), continuing to poll...`);
-        } else {
-          console.warn("Unknown status received:", result.status);
+          reject(error);
         }
-      } catch (error) {
-        console.error("Error polling status:", error);
-        updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
-        clearInterval(pollingInterval);
-        reject(error);
       }
-    }
 
-    const pollingInterval = setInterval(checkStatus, 5000);
-    checkStatus(); // Start the polling process immediately
-  });
-}
+      const pollingInterval = setInterval(checkStatus, 5000);
+      checkStatus(); // Start the polling process immediately
+    });
+  }
 
 function toggleSection(sectionToShow) {
     const sections = [
@@ -1553,18 +1554,52 @@ async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
 
         await postToConvert(inputData, lang, sessionId, price, isTestMode, token);
         updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
+
+        // Start polling for status
+        try {
+            await pollStatus(token, isTestMode);
+            // If pollStatus resolves successfully, the conversion is done
+            updateUIStatus("done", "Conversion completed successfully. Check your email for results.");
+        } catch (pollError) {
+            console.error("Error during status polling:", pollError);
+            updateUIStatus("error", "An error occurred during conversion. Please try again.");
+        }
     } catch (error) {
         console.error('Error in handleConversion:', error);
         updateUIStatus("error", "Error: " + error.message);
     }
 }
+async function handleStripeSuccessRedirect() {
+    try {
+        await ensureAuth0Initialized();
 
-function handleStripeSuccessRedirect(conversionData) {
-    console.log('Handling Stripe success redirect with data:', conversionData);
-    const { inputData, lang, price, session_id, isTestMode } = conversionData;
+        const successfulPayment = sessionStorage.getItem('successfulPayment');
+        if (successfulPayment) {
+            const { session_id } = JSON.parse(successfulPayment);
+            sessionStorage.removeItem('successfulPayment');
 
-    // Start the conversion process
-    handleConversion(inputData, lang, session_id, price, isTestMode);
+            const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+            if (!pendingConversionDataString) {
+                throw new Error('No pending conversion data found');
+            }
+            const pendingConversionData = JSON.parse(pendingConversionDataString);
+            localStorage.removeItem('pendingConversionData');
+
+            console.log('Handling Stripe success redirect with data:', pendingConversionData);
+
+            const { inputData, lang, price } = pendingConversionData;
+            const isTestMode = pendingConversionData.isTestMode || session_id.startsWith('test_');
+
+            // Start the conversion process
+            await handleConversion(inputData, lang, session_id, price, isTestMode);
+        } else {
+            console.error('No successful payment data found');
+            updateUIStatus("error", "Payment data not found");
+        }
+    } catch (error) {
+        console.error('Error handling Stripe success redirect:', error);
+        updateUIStatus("error", `Error: ${error.message}`);
+    }
 }
 
 function initializeProcessingStage() {

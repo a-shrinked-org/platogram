@@ -355,37 +355,61 @@ function initStripe() {
 }
 
 async function initAuth0() {
-    try {
-      auth0Client = await auth0.createAuth0Client({
-        domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
-        clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
-        authorizationParams: {
-          redirect_uri: window.location.origin,
-          audience: "https://platogram.vercel.app/",
-          scope: "openid profile email",
-        },
-        cacheLocation: "localstorage",
-      });
-      debugLog("Auth0 client initialized successfully");
-
-      const query = window.location.search;
-      if (query.includes("code=") && query.includes("state=")) {
-        await auth0Client.handleRedirectCallback();
-        window.history.replaceState({}, document.title, "/");
-      }
-
-      await updateUI();
-    } catch (error) {
-      console.error("Error initializing Auth0:", error);
+    if (auth0Client) {
+        return auth0Client;
     }
-  }
+
+    const waitForAuth0 = () => {
+        return new Promise((resolve) => {
+            if (typeof auth0 !== 'undefined') {
+                resolve();
+            } else {
+                console.warn("Auth0 not loaded yet, retrying in 1 second...");
+                setTimeout(() => waitForAuth0().then(resolve), 1000);
+            }
+        });
+    };
+
+    try {
+        await waitForAuth0();
+
+        auth0Client = await auth0.createAuth0Client({
+            domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
+            clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
+            authorizationParams: {
+                redirect_uri: window.location.origin,
+                audience: "https://platogram.vercel.app/",
+                scope: "openid profile email",
+            },
+            cacheLocation: "localstorage",
+        });
+        debugLog("Auth0 client initialized successfully");
+
+        // Handle the redirect flow
+        if (window.location.search.includes("code=") && window.location.search.includes("state=")) {
+            await auth0Client.handleRedirectCallback();
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
+        await updateUI();
+        return auth0Client;
+    } catch (error) {
+        console.error("Error initializing Auth0:", error);
+        throw error;
+    }
+}
+async function ensureAuth0Initialized() {
+    if (!auth0Initialized) {
+        await initAuth0();
+    }
+    if (!auth0Initialized) {
+        throw new Error("Failed to initialize Auth0");
+    }
+}
 
 async function getAuthToken() {
     try {
         await initAuth0();
-        if (!auth0Client) {
-            throw new Error("Auth0 client not initialized");
-        }
         const token = await auth0Client.getTokenSilently({
             audience: "https://platogram.vercel.app",
         });
@@ -395,6 +419,7 @@ async function getAuthToken() {
         throw new Error("Authentication failed. Please try logging in again.");
     }
 }
+
 
 function updateUIStatus(status, message = "") {
     debugLog(`Updating UI status: ${status}`);
@@ -491,10 +516,7 @@ function updateUIStatus(status, message = "") {
 
 async function updateUI() {
     try {
-        await initAuth0();
-        if (!auth0Client) {
-            throw new Error("Auth0 client not initialized");
-        }
+      await initAuth0();
       const isAuthenticated = await auth0Client.isAuthenticated();
       const loginButton = document.getElementById("login-button");
       const logoutButton = document.getElementById("logout-button");
@@ -1262,29 +1284,26 @@ function getInputData() {
 }
 
 async function login() {
-  try {
-    if (!auth0Client) throw new Error("Auth0 client not initialized");
-    await auth0Client.loginWithRedirect({
-      authorizationParams: { redirect_uri: window.location.origin },
-    });
-  } catch (error) {
-    console.error("Error logging in:", error);
-    updateUIStatus("error", "Failed to log in. Please try again.");
-  }
+    try {
+        await initAuth0();
+        await auth0Client.loginWithRedirect();
+    } catch (error) {
+        console.error("Error logging in:", error);
+        updateUIStatus("error", "Failed to log in. Please try again.");
+    }
 }
 
 async function logout() {
-  try {
-    if (!auth0Client) throw new Error("Auth0 client not initialized");
-    await auth0Client.logout({
-      logoutParams: { returnTo: window.location.origin },
-    });
-  } catch (error) {
-    console.error("Error logging out:", error);
-    updateUIStatus("error", "Failed to log out. Please try again.");
-  }
+    try {
+        await initAuth0();
+        await auth0Client.logout({
+            logoutParams: { returnTo: window.location.origin },
+        });
+    } catch (error) {
+        console.error("Error logging out:", error);
+        updateUIStatus("error", "Failed to log out. Please try again.");
+    }
 }
-
 function showLanguageSelectionModal(inputData, price) {
     const modal = document.getElementById("language-modal");
     if (!modal) {
@@ -1404,11 +1423,6 @@ function pollStatus(token, isTestMode = false) {
         reject(error);
       }
     }
-
-    const pollingInterval = setInterval(checkStatus, 5000);
-    checkStatus(); // Start the polling process immediately
-  });
-}
 
     const pollingInterval = setInterval(checkStatus, 5000);
     checkStatus(); // Start the polling process immediately

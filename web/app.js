@@ -313,6 +313,7 @@ function handleFiles(files) {
         debugLog("File selected: " + file.name);
         debugLog("File size: " + file.size + " bytes");
         debugLog("File type: " + file.type);
+        debugLog("storedFileName set to: " + storedFileName);
     }
 }
 
@@ -438,6 +439,7 @@ function updateUIStatus(status, message = "") {
     const pendingConversionDataString = localStorage.getItem('pendingConversionData');
     const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
     const fileName = storedFileName || document.getElementById("file-name")?.textContent || "Unknown file";
+    debugLog("File name used in updateUIStatus: " + fileName);
     const userEmail = document.getElementById("user-email")?.textContent || "Unknown email";
 
     // Hide all sections first
@@ -931,6 +933,7 @@ function storeConversionData(inputData, lang, price) {
         fileName: fileName
     };
     localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
+    debugLog("Stored conversion data: " + JSON.stringify(conversionData));
 }
 
 async function handleSuccessfulPayment() {
@@ -1595,6 +1598,8 @@ async function handleStripeSuccessRedirect() {
             sessionStorage.removeItem('successfulPayment');
 
             const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+            debugLog("Retrieved pendingConversionDataString: " + pendingConversionDataString);
+
             if (!pendingConversionDataString) {
                 throw new Error('No pending conversion data found');
             }
@@ -1606,11 +1611,18 @@ async function handleStripeSuccessRedirect() {
             const { inputData, lang, price, fileName } = pendingConversionData;
             const isTestMode = pendingConversionData.isTestMode || session_id.startsWith('test_');
 
+            debugLog("Retrieved fileName: " + fileName);
+
             // Update the file name in the UI
             const fileNameElement = document.getElementById("file-name");
             if (fileNameElement) {
                 fileNameElement.textContent = fileName || "Unknown file";
+                debugLog("Updated file-name element with: " + fileNameElement.textContent);
             }
+
+            // Store the file name globally
+            storedFileName = fileName || "Unknown file";
+            debugLog("Set storedFileName to: " + storedFileName);
 
             // Start the conversion process
             await handleConversion(inputData, lang, session_id, price, isTestMode, fileName);

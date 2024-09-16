@@ -23,9 +23,11 @@ export default function Success() {
     }, [router.query]);
 
     return (
-        <div>
-            <h1>Payment Status</h1>
-            <p>{status}</p>
+        <div className="flex items-center justify-center min-h-screen bg-black">
+            <div className="text-center">
+                <h1 className="text-3xl font-bold mb-4 text-white">Payment Status</h1>
+                <p className="text-xl text-green-400">{status}</p>
+            </div>
         </div>
     );
 }

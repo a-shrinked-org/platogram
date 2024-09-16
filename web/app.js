@@ -423,6 +423,8 @@ function updateUIStatus(status, message = "") {
     const doneSection = document.getElementById("done-section");
     const errorSection = document.getElementById("error-section");
 
+    const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+    const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
     const fileName = document.getElementById("file-name")?.textContent || "Unknown file";
     const userEmail = document.getElementById("user-email")?.textContent || "Unknown email";
 
@@ -790,6 +792,8 @@ async function handlePaidConversion(inputData, price) {
     }
     console.log('User email retrieved', { email });
 
+    storeConversionData(inputData, selectedLanguage, price);
+
     let fileId = null;
     if (inputData instanceof File) {
         fileId = await storeFileTemporarily(inputData);
@@ -904,6 +908,15 @@ async function handleStripeSuccess(sessionId, isTestMode = false) {
     }
 }
 
+function storeConversionData(inputData, lang, price) {
+    const conversionData = {
+        inputData: inputData instanceof File ? inputData.name : inputData,
+        lang: lang,
+        price: price
+    };
+    localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
+}
+
 async function handleSuccessfulPayment() {
     const successfulPayment = sessionStorage.getItem('successfulPayment');
     if (successfulPayment) {
@@ -924,6 +937,12 @@ async function handleSuccessfulPayment() {
 
             let token;
             if (!isTestMode) {
+                const isAuthenticated = await auth0Client.isAuthenticated();
+                if (!isAuthenticated) {
+                    debugLog("User not authenticated, initiating login");
+                    await login();
+                    throw new Error("User authentication required. Please log in and try again.");
+                }
                 token = await getAuthToken();
             } else {
                 token = 'test_token';
@@ -1347,12 +1366,12 @@ function selectLanguage(lang) {
 function pollStatus(token, isTestMode = false) {
   return new Promise((resolve, reject) => {
     let attemptCount = 0;
-    const maxAttempts = 60; // 5 minutes of polling at 5-second intervals
+    const maxAttempts = 120; // 10 minutes of polling at 5-second intervals
 
     async function checkStatus() {
       if (attemptCount >= maxAttempts) {
         clearInterval(pollingInterval);
-        updateUIStatus("error", "Conversion timed out. Please try again.");
+        updateUIStatus("error", "Conversion timed out. Please check your email for results.");
         reject(new Error("Polling timed out"));
         return;
       }
@@ -1379,19 +1398,19 @@ function pollStatus(token, isTestMode = false) {
           throw new Error("Invalid response format from server");
         }
 
+        console.log("Status update received:", result.status);
         updateUIStatus(result.status, `Conversion ${result.status}...`);
 
         if (result.status === "done") {
           clearInterval(pollingInterval);
+          updateUIStatus("done", "Conversion completed successfully. Check your email for results.");
           resolve(result);
         } else if (result.status === "failed" || result.status === "error") {
           clearInterval(pollingInterval);
-          updateUIStatus("failed", result.error || "An error occurred");
+          updateUIStatus("error", result.error || "An error occurred during conversion");
           reject(new Error(result.error || "Conversion failed"));
-        } else if (result.status === "idle") {
-          console.log("Received idle status, continuing to poll...");
-        } else if (result.status === "running") {
-          // Continue polling
+        } else if (["idle", "running", "processing"].includes(result.status)) {
+          console.log(`Conversion still in progress (${result.status}), continuing to poll...`);
         } else {
           console.warn("Unknown status received:", result.status);
         }
@@ -1402,6 +1421,11 @@ function pollStatus(token, isTestMode = false) {
         reject(error);
       }
     }
+
+    const pollingInterval = setInterval(checkStatus, 5000);
+    checkStatus(); // Start the polling process immediately
+  });
+}
 
     const pollingInterval = setInterval(checkStatus, 5000);
     checkStatus(); // Start the polling process immediately

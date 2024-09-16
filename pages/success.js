@@ -19,7 +19,7 @@ export default function Success() {
             setStatus('Error: Invalid session');
             setTimeout(() => {
                 window.location.href = '/?error=invalid_session';
-            }, 3000);
+            }, 5000);
         }
     }, [router.query]);
 

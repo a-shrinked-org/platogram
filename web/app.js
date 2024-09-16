@@ -354,7 +354,11 @@ function initStripe() {
   return stripe;
 }
 
-async function initAuth0() {
+function initAuth0() {
+    if (auth0Initialized) {
+        debugLog("Auth0 already initialized");
+        return;
+    }
     try {
       auth0Client = await auth0.createAuth0Client({
         domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
@@ -394,6 +398,12 @@ async function initAuth0() {
   async function getAuthToken() {
       await ensureAuth0Initialized();
       try {
+          const isAuthenticated = await auth0Client.isAuthenticated();
+          if (!isAuthenticated) {
+              debugLog("User not authenticated, initiating login");
+              await login();
+              throw new Error("User authentication required. Please log in and try again.");
+          }
           const token = await auth0Client.getTokenSilently({
               audience: "https://platogram.vercel.app",
           });
@@ -403,6 +413,7 @@ async function initAuth0() {
           throw new Error("Authentication failed. Please try logging in again.");
       }
   }
+
 
 function updateUIStatus(status, message = "") {
     debugLog(`Updating UI status: ${status}`);
@@ -496,13 +507,8 @@ function updateUIStatus(status, message = "") {
 }
 
 async function updateUI() {
-    if (!auth0Client) {
-      console.error("Auth0 client not initialized");
-      updateUIStatus("idle"); // Set default state to idle
-      return;
-    }
-
     try {
+      await ensureAuth0Initialized();
       const isAuthenticated = await auth0Client.isAuthenticated();
       const loginButton = document.getElementById("login-button");
       const logoutButton = document.getElementById("logout-button");
@@ -916,12 +922,12 @@ async function handleSuccessfulPayment() {
 
             await ensureAuth0Initialized();
 
-            const isAuthenticated = await auth0Client.isAuthenticated();
-            if (!isTestMode && !isAuthenticated) {
-                throw new Error('User not authenticated for non-test session');
+            let token;
+            if (!isTestMode) {
+                token = await getAuthToken();
+            } else {
+                token = 'test_token';
             }
-
-            let token = isTestMode ? 'test_token' : await getAuthToken();
             await processConversion(pendingConversionData, session_id, isTestMode, token);
         } catch (error) {
             console.error('Error processing payment:', error);
@@ -1253,6 +1259,7 @@ function getInputData() {
 }
 
 async function login() {
+    await ensureAuth0Initialized();
   try {
     if (!auth0Client) throw new Error("Auth0 client not initialized");
     await auth0Client.loginWithRedirect({
@@ -1573,9 +1580,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     await initDB();
     await testIndexedDB();
 
-    // Initialize Auth0
-    await initAuth0();
-
     handleStripeRedirect();
 
     // Handle successful payment if redirected from success page
@@ -1594,6 +1598,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 document.addEventListener("DOMContentLoaded", () => {
     debugLog("DOM Content Loaded");
+    // Initialize Auth0
+    initAuth0();
     updateUIStatus("idle"); // Set initial state to idle
     initStripe();
     setupPriceUI();

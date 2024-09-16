@@ -424,6 +424,7 @@ async function getAuthToken() {
 
 
 function updateUIStatus(status, message = "") {
+    if (isConversionComplete) return; // Don't update UI if conversion is already complete
     debugLog(`Updating UI status: ${status}`);
     const inputSection = document.getElementById("input-section");
     const uploadProcessSection = document.getElementById("upload-process-section");
@@ -1359,69 +1360,66 @@ function selectLanguage(lang) {
 }
 
 function pollStatus(token, isTestMode = false) {
-    return new Promise((resolve, reject) => {
-      let attemptCount = 0;
-      const maxAttempts = 120; // 10 minutes of polling at 5-second intervals
+  return new Promise((resolve, reject) => {
+    let attemptCount = 0;
+    const maxAttempts = 120; // 10 minutes of polling at 5-second intervals
 
-      async function checkStatus() {
-        if (attemptCount >= maxAttempts) {
-          clearInterval(pollingInterval);
-          updateUIStatus("error", "Conversion timed out. Please check your email for results.");
-          reject(new Error("Polling timed out"));
-          return;
-        }
-        attemptCount++;
-
-        try {
-          const response = await fetch("https://temporary.name/status", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              ...(isTestMode ? { 'X-Test-Mode': 'true' } : {})
-            },
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          let result;
-          try {
-            result = await response.json();
-          } catch (parseError) {
-            console.error("Error parsing JSON:", parseError);
-            console.log("Raw response:", await response.text());
-            throw new Error("Invalid response format from server");
-          }
-
-          console.log("Status update received:", result.status);
-          updateUIStatus(result.status, `Conversion ${result.status}...`);
-
-          if (result.status === "done") {
-            clearInterval(pollingInterval);
-            updateUIStatus("done", "Conversion completed successfully. Check your email for results.");
-            resolve(result);
-          } else if (result.status === "failed" || result.status === "error") {
-            clearInterval(pollingInterval);
-            updateUIStatus("error", result.error || "An error occurred during conversion");
-            reject(new Error(result.error || "Conversion failed"));
-          } else if (["idle", "running", "processing"].includes(result.status)) {
-            console.log(`Conversion still in progress (${result.status}), continuing to poll...`);
-          } else {
-            console.warn("Unknown status received:", result.status);
-            // For unknown statuses, we'll continue polling
-          }
-        } catch (error) {
-          console.error("Error polling status:", error);
-          updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
-          clearInterval(pollingInterval);
-          reject(error);
-        }
+    async function checkStatus() {
+      if (isConversionComplete) {
+        clearInterval(pollingInterval);
+        resolve();
+        return;
       }
 
-      const pollingInterval = setInterval(checkStatus, 5000);
-      checkStatus(); // Start the polling process immediately
-    });
-  }
+      if (attemptCount >= maxAttempts) {
+        clearInterval(pollingInterval);
+        updateUIStatus("error", "Conversion timed out. Please check your email for results.");
+        reject(new Error("Polling timed out"));
+        return;
+      }
+      attemptCount++;
+
+      try {
+        const response = await fetch("https://temporary.name/status", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ...(isTestMode ? { 'X-Test-Mode': 'true' } : {})
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        let result = await response.json();
+        console.log("Status update received:", result.status);
+
+        if (result.status === "done") {
+          isConversionComplete = true;
+          clearInterval(pollingInterval);
+          clearProcessingStageInterval();
+          updateUIStatus("done", "Conversion completed successfully. Check your email for results.");
+          resolve(result);
+        } else if (result.status === "failed" || result.status === "error") {
+          isConversionComplete = true;
+          clearInterval(pollingInterval);
+          clearProcessingStageInterval();
+          updateUIStatus("error", result.error || "An error occurred during conversion");
+          reject(new Error(result.error || "Conversion failed"));
+        } else if (["idle", "running", "processing"].includes(result.status)) {
+          updateUIStatus(result.status, `Conversion ${result.status}...`);
+          console.log(`Conversion still in progress (${result.status}), continuing to poll...`);
+        } else {
+          console.warn("Unknown status received:", result.status);
+        }
+      } catch (error) {
+        console.error("Error polling status:", error);
+        updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
+        clearInterval(pollingInterval);
+        clearProcessingStageInterval();
+        reject(error);
+      }
+    }
 
 function toggleSection(sectionToShow) {
     const sections = [
@@ -1536,6 +1534,7 @@ function updateProcessingStage() {
 
 async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
     try {
+        isConversionComplete = false; // Reset the flag at the start of conversion
         updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
 
         let token = isTestMode ? 'test_token' : await auth0Client.getTokenSilently();
@@ -1603,6 +1602,7 @@ async function handleStripeSuccessRedirect() {
 }
 
 function initializeProcessingStage() {
+  if (isConversionComplete) return; // Don't initialize if conversion is complete
   debugLog("Initializing processing stage");
   const processingStage = document.getElementById("processing-stage");
   if (!processingStage) {

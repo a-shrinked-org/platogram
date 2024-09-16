@@ -15,6 +15,7 @@ let testMode = false;
 let isConversionInProgress = false;
 let currentView = 'cells';
 let isConversionComplete = false;
+let storedFileName = '';
 
 import('https://esm.sh/@vercel/blob@0.23.4').then(module => {
         console.log('Vercel Blob import:', module);
@@ -286,6 +287,7 @@ function handleFiles(files) {
     if (files.length > 0) {
         const file = files[0];
         uploadedFile = file;
+        storedFileName = file.name;
         const fileNameDisplay = document.getElementById('file-name-display');
         const convertFileButton = document.getElementById('convert-file-button');
         const fileUploadPrompt = document.getElementById('file-upload-prompt');
@@ -1364,42 +1366,42 @@ function selectLanguage(lang) {
     document.getElementById("language-options").classList.add("hidden");
 }
 
-function pollStatus(token, isTestMode = false) {
-  return new Promise((resolve, reject) => {
-    let attemptCount = 0;
-    const maxAttempts = 120; // 10 minutes of polling at 5-second intervals
+function pollStatus(token, isTestMode = false, fileName = "") {
+    return new Promise((resolve, reject) => {
+      let attemptCount = 0;
+      const maxAttempts = 120; // 10 minutes of polling at 5-second intervals
 
-    async function checkStatus() {
-      if (isConversionComplete) {
-        clearInterval(pollingInterval);
-        resolve();
-        return;
-      }
-
-      if (attemptCount >= maxAttempts) {
-        clearInterval(pollingInterval);
-        updateUIStatus("error", "Conversion timed out. Please check your email for results.");
-        reject(new Error("Polling timed out"));
-        return;
-      }
-      attemptCount++;
-
-      try {
-        const response = await fetch("https://temporary.name/status", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            ...(isTestMode ? { 'X-Test-Mode': 'true' } : {})
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+      async function checkStatus() {
+        if (isConversionComplete) {
+          clearInterval(pollingInterval);
+          resolve();
+          return;
         }
 
-        let result = await response.json();
-        console.log("Status update received:", result.status);
+        if (attemptCount >= maxAttempts) {
+          clearInterval(pollingInterval);
+          updateUIStatus("error", "Conversion timed out. Please check your email for results.", fileName);
+          reject(new Error("Polling timed out"));
+          return;
+        }
+        attemptCount++;
 
-        if (result.status === "done") {
+        try {
+          const response = await fetch("https://temporary.name/status", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              ...(isTestMode ? { 'X-Test-Mode': 'true' } : {})
+            },
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          let result = await response.json();
+          console.log("Status update received:", result.status);
+
+          if (result.status === "done") {
             isConversionComplete = true;
             clearInterval(pollingInterval);
             clearProcessingStageInterval();
@@ -1419,19 +1421,19 @@ function pollStatus(token, isTestMode = false) {
           } else {
             console.warn("Unknown status received:", result.status);
           }
-      } catch (error) {
-        console.error("Error polling status:", error);
-        updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
-        clearInterval(pollingInterval);
-        clearProcessingStageInterval();
-        reject(error);
+        } catch (error) {
+          console.error("Error polling status:", error);
+          updateUIStatus("error", `An error occurred while checking status: ${error.message}`, fileName);
+          clearInterval(pollingInterval);
+          clearProcessingStageInterval();
+          reject(error);
+        }
       }
-    }
 
-    const pollingInterval = setInterval(checkStatus, 5000);
-    checkStatus(); // Start the polling process immediately
-  });
-}
+      const pollingInterval = setInterval(checkStatus, 5000);
+      checkStatus(); // Start the polling process immediately
+    });
+  }
 
 function toggleSection(sectionToShow) {
     const sections = [

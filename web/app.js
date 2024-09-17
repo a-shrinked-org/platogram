@@ -957,29 +957,33 @@ function storeConversionData(inputData, lang, price) {
 async function handleSuccessfulPayment() {
     try {
         await ensureAuth0Initialized();
-
         const successfulPayment = sessionStorage.getItem('successfulPayment');
-        if (successfulPayment) {
-            const { session_id } = JSON.parse(successfulPayment);
-            sessionStorage.removeItem('successfulPayment');  // Clear the stored data
-
-            const pendingConversionDataString = localStorage.getItem('pendingConversionData');
-            if (!pendingConversionDataString) {
-                throw new Error('No pending conversion data found');
-            }
-            const pendingConversionData = JSON.parse(pendingConversionDataString);
-            localStorage.removeItem('pendingConversionData');
-
-            updateUIStatus("processing", "Processing successful payment...");
-
-            const isTestMode = pendingConversionData.isTestMode || session_id.startsWith('test_');
-            const token = isTestMode ? 'test_token' : await getAuthToken();
-
-            await processConversion(pendingConversionData, session_id, isTestMode, token);
+        if (!successfulPayment) {
+            console.log('No successful payment data found, skipping payment processing');
+            return; // Exit if no payment data is found
         }
+
+        const { session_id } = JSON.parse(successfulPayment);
+        sessionStorage.removeItem('successfulPayment');  // Clear the stored data
+
+        const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+        if (!pendingConversionDataString) {
+            console.log('No pending conversion data found, skipping payment processing');
+            return; // Exit if no conversion data is found
+        }
+
+        const pendingConversionData = JSON.parse(pendingConversionDataString);
+        localStorage.removeItem('pendingConversionData');
+
+        console.log('Processing successful payment with data:', pendingConversionData);
+
+        updateUIStatus("processing", "Processing successful payment...");
+        const isTestMode = pendingConversionData.isTestMode || session_id.startsWith('test_');
+        const token = isTestMode ? 'test_token' : await getAuthToken();
+        await processConversion(pendingConversionData, session_id, isTestMode, token);
     } catch (error) {
         console.error('Error processing payment:', error);
-        updateUIStatus("error", `Error: ${error.message}`);
+        updateUIStatus("error", `Error processing payment: ${error.message}`);
     }
 }
 
@@ -1685,8 +1689,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     await initDB();
     await testIndexedDB();
     await initAuth0();
-
-    handleStripeRedirect();
 
     // Handle successful payment if redirected from success page
     await handleSuccessfulPayment();

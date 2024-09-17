@@ -539,7 +539,7 @@ function updateUIStatus(status, message = "") {
                     <p>Email: ${userEmail}</p>
                     <p>Status: Completed</p><br>
                     ${message ? `<p>${message}</p>` : ''}
-                    <button class="mx-left mt-8 block px-4 py-2 bg-neutral-950 text-white rounded hover:bg-neutral-900" onclick="reset()">Reset</button>
+                    <button class="mx-left mt-8 block px-4 py-2 bg-black text-white rounded hover:bg-gray-950" onclick="reset()">Reset</button>
                 `;
             }
             clearProcessingStageInterval();
@@ -554,7 +554,7 @@ function updateUIStatus(status, message = "") {
                     <p>Email: ${userEmail}</p>
                     <p>Status: Error</p>
                     <p>${message || "An error occurred. Please try again."}</p>
-                    <button class="mx-left mt-8 block px-4 py-2 bg-neutral-950 text-white rounded hover:bg-neutral-900" onclick="reset()">Reset</button>
+                    <button class="mx-left mt-8 block px-4 py-2 bg-black  text-white rounded hover:bg-gray-950" onclick="reset()">Reset</button>
                 `;
             }
             clearProcessingStageInterval();

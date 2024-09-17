@@ -395,6 +395,11 @@ async function initAuth0() {
             window.history.replaceState({}, document.title, window.location.pathname);
         }
 
+        // Check if the client is properly initialized
+        if (!auth0Client) {
+            throw new Error("Auth0 client initialization failed");
+        }
+
         auth0Initialized = true;
         await updateUI();
         return auth0Client;
@@ -415,17 +420,30 @@ async function ensureAuth0Initialized() {
 
 async function getAuthToken() {
     try {
-        await initAuth0();
+        await ensureAuth0Initialized();
+        if (!auth0Client) {
+            throw new Error("Auth0 client not initialized");
+        }
+        const isAuthenticated = await auth0Client.isAuthenticated();
+        if (!isAuthenticated) {
+            throw new Error("User is not authenticated");
+        }
         const token = await auth0Client.getTokenSilently({
             audience: "https://platogram.vercel.app",
         });
+        if (!token) {
+            throw new Error("Failed to retrieve token");
+        }
         return token;
     } catch (error) {
         console.error("Error getting auth token:", error);
+        if (error.message.includes("Login required")) {
+            // Redirect to login if not authenticated
+            await login();
+        }
         throw new Error("Authentication failed. Please try logging in again.");
     }
 }
-
 
 function updateUIStatus(status, message = "") {
     if (isConversionComplete && status !== "done" && status !== "error") return; // Allow updates for final states

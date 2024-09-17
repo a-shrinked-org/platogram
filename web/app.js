@@ -1725,7 +1725,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Generate initial job ID
     updateJobIdInUI();
 
-
     // Add this line to handle Stripe success redirect
     if (window.location.pathname === '/success') {
         await handleStripeSuccessRedirect();

@@ -860,9 +860,10 @@
   </script>
 <script type="module" src="./web/app.js"></script>
 <script>
-    let testMode = true;
+    let testMode = false;
     const TEST_PRICE = 5;
     const TEST_LANG = 'en';
+    window.ENABLE_TEST_MODE = false;
 
     document.addEventListener('DOMContentLoaded', function() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -890,6 +891,12 @@
     });
 
     function createTestPanel() {
+        // Check if test mode is enabled
+        if (!window.ENABLE_TEST_MODE) {
+            console.log('Test panel disabled');
+            return;
+        }
+
         const panel = document.createElement('div');
         panel.style.border = '0px solid #ccc';
         panel.style.padding = '20px';
@@ -918,6 +925,13 @@
         }
         console.log('[Test Status]', message);
     }
+
+    // Only create the test panel if test mode is enabled
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.ENABLE_TEST_MODE) {
+            createTestPanel();
+        }
+    });
 
     async function simulateConversionFlow(isFile, inputData) {
         try {

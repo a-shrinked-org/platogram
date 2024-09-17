@@ -230,6 +230,20 @@
         #processing-stage {
             display: none !important;
         }
+        @media (min-width:480px)  {
+            .topline
+            {
+                line-height: 1.1em;
+                font-size: 30px;
+                padding: 0 25px;
+            }
+            .mobtabs
+            {
+                flex-wrap: wrap;
+                align-items: center;
+                justify-content: center;
+            }
+        }
     </style>
 </head>
 <body style="background-color: #F8EDEA !important;">
@@ -268,7 +282,7 @@
           </div>
         <main role="main">
             <h1
-                class="font-perfectly-nineties text-black font-normal lg:text-5xl lg:leading-12 sm:leading-7 sm:text-3xl mb-6 text-center max-w-2xl mx-auto">
+                class="font-perfectly-nineties topline text-black font-normal lg:text-5xl lg:leading-12 sm:leading-7 sm:text-3xl mb-6 text-center max-w-2xl mx-auto">
                 Transform spoken words into structured knowledge.
                 <span class="block pt-3">Unlock insights from audio and video — beyond transcripts, summaries, and scattered notes.</span>
                 <span class="block pt-3">10x your content understanding.</span>
@@ -344,7 +358,7 @@
                 <h2 class="text-2xl font-bold mb-4">Analyzing Your File</h2>
                 <p id="preparing-status-text"></p>
               </div>
-             <div id="done-section" class="max-w-2xl mx-auto bg-green-100 rounded-lg p-6 mb-8 hidden">
+             <div id="done-section" class="max-w-2xl mx-auto bg-green-100 rounded-lg p-6 mb-8 font-normal text-sm hidden">
               <div class="text-4xl text-green-500 mb-4 text-center">
                 ✔
               </div>
@@ -409,7 +423,7 @@
                 <p class="text-gray-600 text-center text-xl max-w-xl mx-auto m-12">
                     We're architecting a new way to store and extract knowledge at scale — from entities extraction to paragraph shrinking.
                 </p>
-                <div class="flex justify-center mt-4 space-x-4" style="margin-bottom:35px;">
+                <div class="flex justify-center mobtabs mt-4 space-x-4" style="margin-bottom:35px;">
                     <button id="cells-button" class="flex items-center justify-center px-4 py-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <i data-lucide="grid" class="w-5 h-5 mr-2"></i>
                         Abstract
@@ -440,96 +454,123 @@
             <section class="bg-white m-0" style="padding-top:75px;">
                 <div class="max-w-6xl mx-auto">
                     <h2 class="font-perfectly-nineties text-3xl text-black uppercase mb-8">Would could be Shrinked? YOU TELL US!</h2>
-                    <table class="w-full border-collapse border-separate border-spacing-2">
-                        <thead>
-                            <tr class="border-b-2 border-gray-200">
-                                <th class="text-left text-gray-400 text-sm inform">Document</th>
-                                <th class="text-left text-gray-400 text-sm inform">Description</th>
-                                <th class="text-left text-gray-400 text-sm inform">Refs</th>
-                                <th class="text-left text-gray-400 text-sm inform">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr class="border-b border-gray-200">
-                                <td class="py-4 pr-8">
-                                    <h3 class="font-perfectly-nineties font-semibold text-2xl text-left text-black">John Carmack: From Gaming Pioneer to AI Visionary</h3>
-                                </td>
-                                <td class="py-4 pr-8 mono-desc text-left text-base inform text-gray-600">5-hour podcast condensed into a structured, hierarchical document with timestamped references</td>
-                                <td class="py-4 pr-8 text-center text-gray-600">247</td>
-                                <td class="py-4 px-4 text-center">
-                                    <a href="https://drive.google.com/file/d/1_w9mv4_mBVSwK4NSnybGXtRysaT7ROFT/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base  px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
-                                        <i data-lucide="download" class="w-4 h-4 mr-2"></i>
-                                        Download
-                                    </a>
-                                </td>
-                            </tr>
-                            <tr class="border-b border-gray-200">
-                                <td class="py-4 pr-8">
-                                    <h3 class="font-perfectly-nineties font-semibold text-2xl text-left text-black">Hair Cells: The Remarkable Sensory Receptors of Hearing</h3>
-                                </td>
-                                <td class="py-4 pr-8 mono-desc text-left text-base inform text-gray-600">TED talk converted to a concise, readable format with key concepts extracted and highlighted</td>
-                                <td class="py-4 pr-8 text-center text-gray-600">42</td>
-                                <td class="py-4 px-4 text-center">
-                                    <a href="https://drive.google.com/file/d/1Kswr1tMuS6c0a0tNn9OCuZCuPuP0FLr-/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base  px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
-                                        <i data-lucide="download" class="w-4 h-4 mr-2"></i>
-                                        Download
-                                    </a>
-                                </td>
-                            </tr>
-                            <tr class="border-b border-gray-200">
-                                <td class="py-4 pr-8">
-                                    <h3 class="font-perfectly-nineties font-semibold text-2xl text-left text-black">Court Hearing: Data Disclosure and Trial Scheduling</h3>
-                                </td>
-                                <td class="py-4 pr-8 mono-desc text-left text-base inform text-gray-600">Courtroom transcript transformed into a structured document with automated topic segmentation</td>
-                                <td class="py-4 pr-8 text-center text-gray-600">89</td>
-                                <td class="py-4 px-4 text-center">
-                                    <a href="https://drive.google.com/file/d/1c_70MVz0fb7Zh0teirYt6Pc6S1hMomKV/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
-                                        <i data-lucide="download" class="w-4 h-4 mr-2"></i>
-                                        Download
-                                    </a>
-                                </td>
-                            </tr>
-                            <tr class="border-b border-gray-200">
-                                <td class="py-4 pr-8">
-                                    <h3 class="font-perfectly-nineties font-semibold text-2xl text-left text-black">Building and Training GPT-2 from Scratch</h3>
-                                </td>
-                                <td class="py-4 pr-8 mono-desc text-left text-base inform text-gray-600">Academic lecture processed into a structured, citable document with precise timestamp references</td>
-                                <td class="py-4 pr-8 text-center text-gray-600">156</td>
-                                <td class="py-4 px-4 text-center">
-                                    <a href="https://drive.google.com/file/d/1w98NFdfeSObpgr-Tmm40zB2UOYctWTaS/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
-                                        <i data-lucide="download" class="w-4 h-4 mr-2"></i>
-                                        Download
-                                    </a>
-                                </td>
-                            </tr>
-                            <tr class="border-b border-gray-200">
-                                <td class="py-4 pr-8">
-                                    <h3 class="font-perfectly-nineties font-semibold text-2xl text-left text-black">Intel Q2 2024 Earnings Call: Restructuring and Cost Cutting</h3>
-                                </td>
-                                <td class="py-4 pr-8 mono-desc text-left text-base inform text-gray-600">Business discussion analyzed and organized into a hierarchical structure with key data points extracted</td>
-                                <td class="py-4 pr-8 text-center text-gray-600">73</td>
-                                <td class="py-4 px-4 text-center">
-                                    <a href="https://drive.google.com/file/d/14HFC36r6xLGBCDrSUdRTi50Z8SXCHD7q/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
-                                        <i data-lucide="download" class="w-4 h-4 mr-2 "></i>
-                                        Download
-                                    </a>
-                                </td>
-                            </tr>
-                            <tr class="border-b border-gray-200">
-                                <td class="py-4 pr-8">
-                                    <h3 class="font-perfectly-nineties font-semibold text-2xl text-left text-black">Conversation with Mark Zuckerberg</h3>
-                                </td>
-                                <td class="py-4 pr-8 mono-desc text-left text-base inform text-gray-600">Long-form interview condensed into a structured, reference-rich format with topic-based segmentation</td>
-                                <td class="py-4 pr-8 text-center text-gray-600">201</td>
-                                <td class="py-4 px-4 text-center">
-                                    <a href="https://drive.google.com/file/d/1DbtND485AFmUv4XVb4mgZgXo27JxdkzE/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base text-white px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
-                                        <i data-lucide="download" class="w-4 h-4 mr-2"></i>
-                                        Download
-                                    </a>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                  <div class="w-full space-y-4">
+
+  <div class="flex flex-col md:flex-row md:items-center border-b-2 border-gray-200 pb-4">
+    <div class="w-full md:w-3/12 text-left text-gray-400 text-sm">Document</div>
+    <div class="w-full md:w-4/12 text-left text-gray-400 text-sm">Description</div>
+    <div class="w-full md:w-1/12 text-left text-gray-400 text-sm">Refs</div>
+    <div class="w-full md:w-2/12 text-left text-gray-400 text-sm">Action</div>
+  </div>
+
+  <div class="flex flex-col md:flex-row md:items-center border-b border-gray-200 py-4">
+    <div class="w-full md:w-3/12">
+      <h3 class="font-perfectly-nineties font-semibold text-2xl text-black">John Carmack: From Gaming Pioneer to AI Visionary</h3>
+    </div>
+    <div class="w-full md:w-4/12 text-base text-gray-600">5-hour podcast condensed into a structured, hierarchical document with timestamped references</div>
+    <div class="w-full md:w-1/12 text-center text-gray-600">247</div>
+    <div class="w-full md:w-2/12 flex justify-center md:justify-start">
+      <a href="https://drive.google.com/file/d/1_w9mv4_mBVSwK4NSnybGXtRysaT7ROFT/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download w-4 h-4 mr-2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" x2="12" y1="15" y2="3"></line>
+        </svg>
+        Download
+      </a>
+    </div>
+  </div>
+
+  <div class="flex flex-col md:flex-row md:items-center border-b border-gray-200 py-4">
+    <div class="w-full md:w-3/12">
+      <h3 class="font-perfectly-nineties font-semibold text-2xl text-black">Hair Cells: The Remarkable Sensory Receptors of Hearing</h3>
+    </div>
+    <div class="w-full md:w-4/12 text-base text-gray-600">TED talk converted to a concise, readable format with key concepts extracted and highlighted</div>
+    <div class="w-full md:w-1/12 text-center text-gray-600">42</div>
+    <div class="w-full md:w-2/12 flex justify-center md:justify-start">
+      <a href="https://drive.google.com/file/d/1Kswr1tMuS6c0a0tNn9OCuZCuPuP0FLr-/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download w-4 h-4 mr-2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" x2="12" y1="15" y2="3"></line>
+        </svg>
+        Download
+      </a>
+    </div>
+  </div>
+
+  <div class="flex flex-col md:flex-row md:items-center border-b border-gray-200 py-4">
+    <div class="w-full md:w-3/12">
+      <h3 class="font-perfectly-nineties font-semibold text-2xl text-black">Court Hearing: Data Disclosure and Trial Scheduling</h3>
+    </div>
+    <div class="w-full md:w-4/12 text-base text-gray-600">Courtroom transcript transformed into a structured document with automated topic segmentation</div>
+    <div class="w-full md:w-1/12 text-center text-gray-600">89</div>
+    <div class="w-full md:w-2/12 flex justify-center md:justify-start">
+      <a href="https://drive.google.com/file/d/1c_70MVz0fb7Zh0teirYt6Pc6S1hMomKV/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download w-4 h-4 mr-2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" x2="12" y1="15" y2="3"></line>
+        </svg>
+        Download
+      </a>
+    </div>
+  </div>
+
+  <div class="flex flex-col md:flex-row md:items-center border-b border-gray-200 py-4">
+    <div class="w-full md:w-3/12">
+      <h3 class="font-perfectly-nineties font-semibold text-2xl text-black">Building and Training GPT-2 from Scratch</h3>
+    </div>
+    <div class="w-full md:w-4/12 text-base text-gray-600">Academic lecture processed into a structured, citable document with precise timestamp references</div>
+    <div class="w-full md:w-1/12 text-center text-gray-600">156</div>
+    <div class="w-full md:w-2/12 flex justify-center md:justify-start">
+      <a href="https://drive.google.com/file/d/1w98NFdfeSObpgr-Tmm40zB2UOYctWTaS/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download w-4 h-4 mr-2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" x2="12" y1="15" y2="3"></line>
+        </svg>
+        Download
+      </a>
+    </div>
+  </div>
+
+  <div class="flex flex-col md:flex-row md:items-center border-b border-gray-200 py-4">
+    <div class="w-full md:w-3/12">
+      <h3 class="font-perfectly-nineties font-semibold text-2xl text-black">Intel Q2 2024 Earnings Call: Restructuring and Cost Cutting</h3>
+    </div>
+    <div class="w-full md:w-4/12 text-base text-gray-600">Business discussion analyzed and organized into a hierarchical structure with key data points extracted</div>
+    <div class="w-full md:w-1/12 text-center text-gray-600">73</div>
+    <div class="w-full md:w-2/12 flex justify-center md:justify-start">
+      <a href="https://drive.google.com/file/d/14HFC36r6xLGBCDrSUdRTi50Z8SXCHD7q/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download w-4 h-4 mr-2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" x2="12" y1="15" y2="3"></line>
+        </svg>
+        Download
+      </a>
+    </div>
+  </div>
+
+  <div class="flex flex-col md:flex-row md:items-center border-b border-gray-200 py-4">
+    <div class="w-full md:w-3/12">
+      <h3 class="font-perfectly-nineties font-semibold text-2xl text-black">Conversation with Mark Zuckerberg</h3>
+    </div>
+    <div class="w-full md:w-4/12 text-base text-gray-600">Long-form interview condensed into a structured, reference-rich format with topic-based segmentation</div>
+    <div class="w-full md:w-1/12 text-center text-gray-600">201</div>
+    <div class="w-full md:w-2/12 flex justify-center md:justify-start">
+      <a href="https://drive.google.com/file/d/1DbtND485AFmUv4XVb4mgZgXo27JxdkzE/view?usp=drive_link" target="_blank" class="bg-gray-200 text-gray-600 text-base px-4 py-2 rounded-full hover:bg-blue-600 transition duration-300 inline-flex items-center">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download w-4 h-4 mr-2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" x2="12" y1="15" y2="3"></line>
+        </svg>
+        Download
+      </a>
+    </div>
+  </div>
+</div>
                     </div>
                 </section>
 

@@ -87,6 +87,29 @@ function getInitials(email) {
     return email.split('@')[0].substring(0, 2).toUpperCase();
 }
 
+// jobID machine
+
+function generateJobId() {
+    // Get current timestamp
+    const timestamp = Date.now();
+
+    // Take the last 6 digits of the timestamp
+    const lastSixDigits = timestamp % 1000000;
+
+    // Pad with zeros to always have 6 digits
+    const jobId = String(lastSixDigits).padStart(6, '0');
+
+    return jobId;
+}
+
+// Function to update the job ID in the UI
+function updateJobIdInUI() {
+    const jobIdElement = document.getElementById('job-id');
+    if (jobIdElement) {
+        jobIdElement.textContent = generateJobId();
+    }
+}
+
 // coffee counting machine
 function updateTotalPrice() {
     if (selectedOption === 'basic') {
@@ -806,6 +829,9 @@ async function handleSubmit(event) {
             updateUIStatus("preparing", "File uploaded, preparing to start conversion...");
             await postToConvert(inputData, selectedLanguage, null, price, false);
         }
+
+        // Generate and update job ID
+        updateJobIdInUI();
     } catch (error) {
         console.error('Error in handleSubmit:', error);
         updateUIStatus("error", "Error: " + error.message);
@@ -932,6 +958,9 @@ async function handleStripeSuccess(sessionId, isTestMode = false) {
         // Start the conversion process
         updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
         await postToConvert(inputData, lang, sessionId, price, isTestMode);
+
+        // Generate and update job ID
+        updateJobIdInUI();
 
         // Update UI to show conversion has started
         updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
@@ -1692,6 +1721,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Handle successful payment if redirected from success page
     await handleSuccessfulPayment();
+
+    // Generate initial job ID
+    updateJobIdInUI();
+
 
     // Add this line to handle Stripe success redirect
     if (window.location.pathname === '/success') {

@@ -1132,8 +1132,7 @@ async function onConvertClick(event) {
             showLanguageSelectionModal(inputData, price);
         } else {
             console.log("User not authenticated. Preparing for login...");
-            // Store data before redirecting for authentication
-            storeConversionData(inputData, selectedLanguage, price, true);
+            await storeConversionData(inputData, selectedLanguage, price, true);
             console.log("Conversion data stored. Initiating login process...");
             login();
         }
@@ -1393,16 +1392,10 @@ async function login() {
         await initAuth0();
         console.log("Auth0 initialized. Preparing for redirect...");
 
-        // Set the authenticating flag
         sessionStorage.setItem('isAuthenticating', 'true');
         console.log("isAuthenticating flag set in sessionStorage");
 
-        // Log the current state
         console.log("Current pendingConversionData:", localStorage.getItem('pendingConversionData'));
-
-        // Add a 5-second delay (for debugging purposes, remove in production)
-        console.log("Waiting 5 seconds before redirecting to Auth0...");
-        await new Promise(resolve => setTimeout(resolve, 5000));
 
         console.log("Redirecting to Auth0 login page...");
         await auth0Client.loginWithRedirect();
@@ -1808,6 +1801,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (urlParams.get('session_id')) {
                 await handleStripeSuccess(urlParams.get('session_id'));
             }
+
+            updateUIStatus("idle");
+            updateUI().catch((error) => {
+                console.error("Error updating UI:", error);
+                updateUIStatus("idle");
+            });
 });
 
 document.addEventListener("DOMContentLoaded", () => {

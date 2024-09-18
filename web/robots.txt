@@ -2,3 +2,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://shrinked.ai/sitemap.xml
+Host: https://shrinked.ai

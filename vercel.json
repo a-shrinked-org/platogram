@@ -22,6 +22,14 @@
     {
       "src": "/$",
       "dest": "/web/index.html"
+    },
+    {
+      "src": "/sitemap.xml",
+      "dest": "/web/sitemap.xml"
+    },
+    {
+      "src": "/robots.txt",
+      "dest": "/web/robots.txt"
     }
   ],
   "buildCommand": "apt-get update && apt-get install -y texlive-xetex && pip install -r requirements.txt && pip install -e . && npm install && npm run build"

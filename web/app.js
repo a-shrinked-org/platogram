@@ -541,6 +541,11 @@ function updateUIStatus(status, message = "") {
                     ${message ? `<p>${message}</p>` : ''}
                     <button class="mx-left mt-8 block px-4 py-2 bg-black text-white rounded hover:bg-gray-950" onclick="reset()">Reset</button>
                 `;
+                // Attach event listener to the reset button
+                const resetButton = document.getElementById('reset-button');
+                if (resetButton) {
+                    resetButton.addEventListener('click', reset);
+                }
             }
             clearProcessingStageInterval();
             isConversionComplete = true;
@@ -556,6 +561,11 @@ function updateUIStatus(status, message = "") {
                     <p>${message || "An error occurred. Please try again."}</p>
                     <button class="mx-left mt-8 block px-4 py-2 bg-black  text-white rounded hover:bg-gray-950" onclick="reset()">Reset</button>
                 `;
+                // Attach event listener to the reset button
+                const resetButton = document.getElementById('reset-button');
+                if (resetButton) {
+                    resetButton.addEventListener('click', reset);
+                }
             }
             clearProcessingStageInterval();
             break;
@@ -971,7 +981,7 @@ async function handleStripeSuccess(sessionId, isTestMode = false) {
     }
 }
 
-function storeConversionData(inputData, lang, price) {
+function storeConversionData(inputData, lang, price, isAuth = false) {
     const fileName = inputData instanceof File ? inputData.name : inputData;
     const conversionData = {
         inputData: inputData instanceof File ? inputData.name : inputData,
@@ -1055,6 +1065,35 @@ function handleStripeRedirect() {
     }
 }
 
+async function handleAuthReturn() {
+    const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+    if (pendingConversionDataString) {
+        const pendingConversionData = JSON.parse(pendingConversionDataString);
+        if (pendingConversionData.isAuth) {
+            localStorage.removeItem('pendingConversionData');
+            let inputData = pendingConversionData.inputData;
+            const price = pendingConversionData.price;
+
+            // Restore the input data to the UI
+            if (pendingConversionData.fileName && pendingConversionData.fileName !== inputData) {
+                // It's a file, we need to retrieve it
+                const file = await retrieveFileFromTemporaryStorage(inputData);
+                if (file) {
+                    inputData = file;
+                    handleFiles([file]);
+                }
+            } else {
+                // It's a URL
+                const urlInput = document.getElementById('url-input');
+                if (urlInput) urlInput.value = inputData;
+            }
+
+            // Show the language selection modal
+            showLanguageSelectionModal(inputData, price);
+        }
+    }
+}
+
 function handleStripeCancel() {
   updateUIStatus('idle');
 }
@@ -1070,29 +1109,37 @@ async function onConvertClick(event) {
     if (event) event.preventDefault();
     debugLog("Convert button clicked");
     try {
-      if (!auth0Client) throw new Error("Auth0 client not initialized");
-      const inputData = getInputData();
-      if (!inputData) {
-        throw new Error("Please provide a valid URL or upload a file to be converted");
-      }
-      debugLog("Input data type: " + (inputData instanceof File ? "File" : "URL"));
-      if (inputData instanceof File) {
-        debugLog("File details:", inputData.name, inputData.type, inputData.size);
-      } else {
-        debugLog("URL input:", inputData);
-      }
-      const price = getPriceFromUI();
-      if (await auth0Client.isAuthenticated()) {
-        showLanguageSelectionModal(inputData, price);
-      } else {
-        sessionStorage.setItem('pendingConversion', JSON.stringify({ inputData: inputData instanceof File ? inputData.name : inputData, price }));
-        login();
-      }
+        if (!auth0Client) throw new Error("Auth0 client not initialized");
+        const inputData = getInputData();
+        if (!inputData) {
+            throw new Error("Please provide a valid URL or upload a file to be converted");
+        }
+        debugLog("Input data type: " + (inputData instanceof File ? "File" : "URL"));
+        if (inputData instanceof File) {
+            debugLog("File details:", inputData.name, inputData.type, inputData.size);
+        } else {
+            debugLog("URL input:", inputData);
+        }
+        const price = getPriceFromUI();
+
+        if (await auth0Client.isAuthenticated()) {
+            showLanguageSelectionModal(inputData, price);
+        } else {
+            // Store data before redirecting for authentication
+            if (inputData instanceof File) {
+                const fileId = await storeFileTemporarily(inputData);
+                storeConversionData(fileId, selectedLanguage, price, true, inputData.name);
+            } else {
+                storeConversionData(inputData, selectedLanguage, price, true);
+            }
+            sessionStorage.setItem('isAuthenticating', 'true');
+            login();
+        }
     } catch (error) {
-      console.error("Error in onConvertClick:", error);
-      updateUIStatus("error", error.message);
+        console.error("Error in onConvertClick:", error);
+        updateUIStatus("error", error.message);
     }
-  }
+}
 
   function sanitizeFileName(fileName) {
       // Remove any character that isn't a word character, number, or safe punctuation
@@ -1724,6 +1771,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Generate initial job ID
     updateJobIdInUI();
+
+     // Check if we're returning from authentication
+    const isAuthenticating = sessionStorage.getItem('isAuthenticating');
+    if (isAuthenticating) {
+        sessionStorage.removeItem('isAuthenticating');
+        await handleAuthReturn();
+    }
 
     // Add this line to handle Stripe success redirect
     if (window.location.pathname === '/success') {

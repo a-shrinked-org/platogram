@@ -98,26 +98,29 @@ function generateIntercomHash(email) {
     };
   }  
 
-function initializeIntercom(user = null) {
-    if (window.Intercom) {
-      if (user) {
-        // User is logged in
-        window.Intercom("boot", {
-          api_base: "https://api-iam.intercom.io",
-          app_id: "i1z51z2x",
-          name: user.name,
-          email: user.email,
-          created_at: Math.floor(new Date(user.updated_at).getTime() / 1000) // Convert to Unix timestamp
-        });
-      } else {
-        // User is not logged in
-        window.Intercom("boot", {
-          api_base: "https://api-iam.intercom.io",
-          app_id: "i1z51z2x"
-        });
-      }
+async function initializeIntercom(user = null) {
+  if (window.Intercom) {
+    if (user) {
+      // User is logged in
+      const hash = await generateIntercomHash(user.email);
+      window.Intercom("boot", {
+        api_base: "https://api-iam.intercom.io",
+        app_id: "i1z51z2x",
+        user_id: user.sub,
+        name: user.name,
+        email: user.email,
+        created_at: Math.floor(new Date(user.updated_at).getTime() / 1000),
+        user_hash: hash // Add this line
+      });
+    } else {
+      // User is not logged in
+      window.Intercom("boot", {
+        api_base: "https://api-iam.intercom.io",
+        app_id: "i1z51z2x"
+      });
     }
   }
+}
 
 window.updateAuthUI = function(isAuthenticated, user) {
     const loginButton = document.getElementById('login-button');

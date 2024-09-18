@@ -370,7 +370,7 @@
               <button class="mx-auto block px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600" onclick="reset()">Got it!</button>
             </div>
 
-            <div id="status-section" class="max-w-2xl mx-auto bg-blue-100 rounded-lg p-6 mb-8 hidden">
+            <div id="status-section" class="max-w-2xl mx-auto mt-20 bg-blue-100 rounded-lg p-6 mb-8 hidden">
               <p class="text-center mb-4">Working on it. You will receive an email once ready.</p>
               <p class="text-center mb-4">Processing time is quick - about 5 mins for each hour of content. Hang tight!</p>
               <div id="animation-container" class="w-48 h-48 border-2 border-blue-300 rounded-lg relative mx-auto my-4">
@@ -875,56 +875,40 @@
     let testMode = true;
     const TEST_PRICE = 5;
     const TEST_LANG = 'en';
-    window.ENABLE_TEST_MODE = false;
+    window.ENABLE_TEST_MODE = true;
 
     document.addEventListener('DOMContentLoaded', function() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const paymentSuccess = urlParams.get('paymentSuccess');
-        const conversionData = urlParams.get('conversionData');
-
-        if (paymentSuccess === 'true' && conversionData) {
-            try {
-                const decodedData = JSON.parse(decodeURIComponent(conversionData));
-                console.log('Conversion data:', decodedData);
-
-                // Call the function from app.js to handle the conversion
-                if (typeof window.handleStripeSuccessRedirect === 'function') {
-                    window.handleStripeSuccessRedirect(decodedData);
-                } else {
-                    console.error('handleStripeSuccessRedirect function not found');
-                }
-
-                // Clear the URL parameters
-                window.history.replaceState({}, document.title, window.location.pathname);
-            } catch (error) {
-                console.error('Error processing conversion data:', error);
-            }
+        if (window.ENABLE_TEST_MODE) {
+            createTestPanel();
         }
     });
 
     function createTestPanel() {
-        // Check if test mode is enabled
-        if (!window.ENABLE_TEST_MODE) {
-            console.log('Test panel disabled');
-            return;
-        }
-
         const panel = document.createElement('div');
-        panel.style.border = '0px solid #ccc';
+        panel.style.border = '1px solid #ccc';
         panel.style.padding = '20px';
         panel.style.margin = '20px 0';
         panel.innerHTML = `
-            <h2 style="">Test Panel</h2>
-            <div style="">
+            <h2>Test Panel</h2>
+            <div>
                 <input type="text" id="test-url-input" placeholder="Enter URL">
-                <button onclick="testURLInput()">Test URL Input ($5)</button>
+                <button onclick="testInput('url')">Test URL Input ($5)</button>
             </div>
             <div style="margin-top: 10px;">
                 <input type="file" id="test-file-input">
-                <button onclick="testFileInput()">Test File Input ($5)</button>
+                <button onclick="testInput('file')">Test File Input ($5)</button>
+            </div>
+            <div style="margin-top: 10px;">
+                <button onclick="retrieveStoredData()">Retrieve Stored Data</button>
+            </div>
+            <div style="margin-top: 10px;">
+                <button onclick="testStripeSuccessRedirect()">Test Stripe Success Redirect</button>
             </div>
             <div style="margin-top: 10px;">
                 <strong>Test Status:</strong> <span id="test-status"></span>
+            </div>
+            <div style="margin-top: 10px;">
+                <strong>Retrieved Data:</strong> <pre id="retrieved-data"></pre>
             </div>
         `;
         document.body.appendChild(panel);
@@ -938,71 +922,128 @@
         console.log('[Test Status]', message);
     }
 
-    // Only create the test panel if test mode is enabled
-    document.addEventListener('DOMContentLoaded', () => {
-        if (window.ENABLE_TEST_MODE) {
-            createTestPanel();
+    async function testInput(type) {
+        let inputData;
+        if (type === 'url') {
+            const urlInput = document.getElementById('test-url-input');
+            inputData = urlInput.value.trim();
+            if (!inputData) {
+                updateTestStatus("Please enter a URL");
+                return;
+            }
+        } else if (type === 'file') {
+            const fileInput = document.getElementById('test-file-input');
+            inputData = fileInput.files[0];
+            if (!inputData) {
+                updateTestStatus("Please select a file");
+                return;
+            }
         }
-    });
+        updateTestStatus(`Testing ${type} input: ${inputData instanceof File ? inputData.name : inputData}`);
+        await simulateConversionFlow(inputData);
+    }
 
-    async function simulateConversionFlow(isFile, inputData) {
+    async function simulateConversionFlow(inputData) {
         try {
+            const isFile = inputData instanceof File;
             let fileId;
             if (isFile) {
-                fileId = await storeFileTemporarily(inputData);
+                fileId = await window.storeFileTemporarily(inputData);
             }
-            // Store conversion data
             const conversionData = {
                 inputData: isFile ? fileId : inputData,
                 isFile: isFile,
                 lang: TEST_LANG,
                 price: TEST_PRICE,
-                isTestMode: true
+                isTestMode: true,
+                fileName: isFile ? inputData.name : inputData
             };
             localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
             console.log('Stored conversion data:', conversionData);
-            updateTestStatus("Conversion data stored. Simulating Stripe redirect in 3 seconds...");
+            updateTestStatus("Conversion data stored. Simulating Auth0 redirect...");
 
-            // Simulate delay before redirect to intermediate page
-            await new Promise(resolve => setTimeout(resolve, 3000));
-
-            // Simulate redirect to intermediate page
-            updateTestStatus("Redirecting to intermediate page...");
-            window.location.href = `/test-intermediate?inputData=${encodeURIComponent(JSON.stringify(conversionData))}`;
+            // Simulate Auth0 redirect and return
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            await retrieveStoredData();
         } catch (error) {
             console.error("Error in test flow:", error);
             updateTestStatus("Error: " + error.message);
         }
     }
 
-    async function testURLInput() {
-        const urlInput = document.getElementById('test-url-input');
-        const url = urlInput.value.trim();
-        if (!url) {
-            updateTestStatus("Please enter a URL");
-            return;
+    async function retrieveStoredData() {
+        try {
+            const storedDataString = localStorage.getItem('pendingConversionData');
+            if (!storedDataString) {
+                updateTestStatus("No stored conversion data found");
+                return;
+            }
+
+            const storedData = JSON.parse(storedDataString);
+            console.log("Retrieved stored conversion data:", storedData);
+
+            let retrievedData = storedData.inputData;
+            if (storedData.isFile) {
+                retrievedData = await window.retrieveFileFromTemporaryStorage(storedData.inputData);
+                retrievedData = retrievedData ? `File: ${retrievedData.name}` : "File retrieval failed";
+            }
+
+            updateTestStatus("Data retrieved successfully");
+            document.getElementById('retrieved-data').textContent = JSON.stringify({
+                inputData: retrievedData,
+                fileName: storedData.fileName,
+                lang: storedData.lang,
+                price: storedData.price
+            }, null, 2);
+
+            // Populate test inputs with retrieved data
+            if (storedData.isFile) {
+                document.getElementById('test-file-input').value = ''; // Reset file input
+                updateTestStatus("File data retrieved. Please select the file again for testing.");
+            } else {
+                document.getElementById('test-url-input').value = storedData.inputData;
+            }
+        } catch (error) {
+            console.error("Error retrieving stored data:", error);
+            updateTestStatus("Error: " + error.message);
         }
-        updateTestStatus("Testing URL input: " + url);
-        await simulateConversionFlow(false, url);
     }
 
-    async function testFileInput() {
-        const fileInput = document.getElementById('test-file-input');
-        const file = fileInput.files[0];
-        if (!file) {
-            updateTestStatus("Please select a file");
-            return;
+    async function testStripeSuccessRedirect() {
+        try {
+            const storedDataString = localStorage.getItem('pendingConversionData');
+            if (!storedDataString) {
+                updateTestStatus("No stored conversion data found. Please run a test input first.");
+                return;
+            }
+
+            const storedData = JSON.parse(storedDataString);
+            updateTestStatus("Simulating Stripe success redirect...");
+
+            // Simulate Stripe success redirect
+            const simulatedSessionId = 'test_session_' + Date.now();
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Call the actual handleStripeSuccessRedirect function
+            if (typeof window.handleStripeSuccessRedirect === 'function') {
+                await window.handleStripeSuccessRedirect({
+                    session_id: simulatedSessionId,
+                    ...storedData
+                });
+                updateTestStatus("Stripe success redirect simulation completed");
+            } else {
+                updateTestStatus("handleStripeSuccessRedirect function not found");
+            }
+        } catch (error) {
+            console.error("Error in Stripe success redirect test:", error);
+            updateTestStatus("Error: " + error.message);
         }
-        updateTestStatus("Testing file input: " + file.name);
-        await simulateConversionFlow(true, file);
     }
 
-    // Make sure these functions are globally accessible
-    window.testURLInput = testURLInput;
-    window.testFileInput = testFileInput;
-
-    // Call this function when the DOM is loaded
-    document.addEventListener('DOMContentLoaded', createTestPanel);
-    </script>
+    // Expose functions to global scope
+    window.testInput = testInput;
+    window.retrieveStoredData = retrieveStoredData;
+    window.testStripeSuccessRedirect = testStripeSuccessRedirect;
+</script>
 </body>
 </html>

@@ -1782,7 +1782,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             // Generate initial job ID
             updateJobIdInUI();
 
-            // Check if we're returning from authentication
             const isAuthenticating = sessionStorage.getItem('isAuthenticating');
             if (isAuthenticating) {
                 console.log("Returning from authentication");
@@ -1790,23 +1789,16 @@ document.addEventListener("DOMContentLoaded", async () => {
                 await handleAuthReturn();
             } else {
                 console.log("Not returning from authentication");
-            }
+                // Handle Stripe success redirect
+                if (window.location.pathname === '/success') {
+                    await handleStripeSuccessRedirect();
+                }
 
-            // Add this line to handle Stripe success redirect
-            if (window.location.pathname === '/success') {
-                await handleStripeSuccessRedirect();
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.get('session_id')) {
+                    await handleStripeSuccess(urlParams.get('session_id'));
+                }
             }
-
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('session_id')) {
-                await handleStripeSuccess(urlParams.get('session_id'));
-            }
-
-            updateUIStatus("idle");
-            updateUI().catch((error) => {
-                console.error("Error updating UI:", error);
-                updateUIStatus("idle");
-            });
 });
 
 document.addEventListener("DOMContentLoaded", () => {

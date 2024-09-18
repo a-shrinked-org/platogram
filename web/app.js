@@ -862,22 +862,10 @@ async function handlePaidConversion(inputData, price) {
     }
     console.log('User email retrieved', { email });
 
-    storeConversionData(inputData, selectedLanguage, price);
+    await storeConversionData(inputData, selectedLanguage, price, false);
 
-    let fileId = null;
-    if (inputData instanceof File) {
-        fileId = await storeFileTemporarily(inputData);
-        console.log('File stored temporarily with ID:', fileId);
-    }
-
-    const conversionData = {
-        inputData: fileId || inputData,
-        isFile: !!fileId,
-        lang: selectedLanguage,
-        price: price
-    };
-
-    localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
+    const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+    const conversionData = JSON.parse(pendingConversionDataString);
     console.log('Stored pendingConversionData:', conversionData);
 
     if (testMode) {
@@ -895,7 +883,7 @@ async function handlePaidConversion(inputData, price) {
             price: price,
             lang: selectedLanguage,
             email: email,
-            inputData: fileId || inputData
+            inputData: conversionData.inputData
         }),
     });
 
@@ -981,16 +969,30 @@ async function handleStripeSuccess(sessionId, isTestMode = false) {
     }
 }
 
-function storeConversionData(inputData, lang, price, isAuth = false) {
-    const fileName = inputData instanceof File ? inputData.name : inputData;
-    const conversionData = {
-        inputData: inputData instanceof File ? inputData.name : inputData,
-        lang: lang,
-        price: price,
-        fileName: fileName
-    };
+async function storeConversionData(inputData, lang, price, isAuth = false) {
+    let conversionData;
+    if (inputData instanceof File) {
+        const fileId = await storeFileTemporarily(inputData);
+        conversionData = {
+            inputData: fileId,
+            isFile: true,
+            fileName: inputData.name,
+            lang: lang,
+            price: price,
+            isAuth: isAuth
+        };
+    } else {
+        conversionData = {
+            inputData: inputData,
+            isFile: false,
+            fileName: inputData,
+            lang: lang,
+            price: price,
+            isAuth: isAuth
+        };
+    }
     localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
-    debugLog("Stored conversion data: " + JSON.stringify(conversionData));
+    console.log("Stored conversion data:", conversionData);
 }
 
 async function handleSuccessfulPayment() {
@@ -1066,6 +1068,7 @@ function handleStripeRedirect() {
 }
 
 async function handleAuthReturn() {
+    console.log("Handling auth return");
     const pendingConversionDataString = localStorage.getItem('pendingConversionData');
     if (pendingConversionDataString) {
         const pendingConversionData = JSON.parse(pendingConversionDataString);
@@ -1074,21 +1077,24 @@ async function handleAuthReturn() {
             let inputData = pendingConversionData.inputData;
             const price = pendingConversionData.price;
 
+            console.log("Retrieved pending conversion data:", pendingConversionData);
+
             // Restore the input data to the UI
-            if (pendingConversionData.fileName && pendingConversionData.fileName !== inputData) {
-                // It's a file, we need to retrieve it
+            if (pendingConversionData.isFile) {
+                console.log("Retrieving file from temporary storage");
                 const file = await retrieveFileFromTemporaryStorage(inputData);
                 if (file) {
                     inputData = file;
                     handleFiles([file]);
                 }
             } else {
-                // It's a URL
+                console.log("Setting URL input");
                 const urlInput = document.getElementById('url-input');
                 if (urlInput) urlInput.value = inputData;
             }
 
             // Show the language selection modal
+            console.log("Showing language selection modal");
             showLanguageSelectionModal(inputData, price);
         }
     }
@@ -1132,15 +1138,7 @@ async function onConvertClick(event) {
         } else {
             console.log("User not authenticated. Preparing for login...");
             // Store data before redirecting for authentication
-            if (inputData instanceof File) {
-                console.log("Storing file temporarily");
-                const fileId = await storeFileTemporarily(inputData);
-                console.log("File stored with ID:", fileId);
-                storeConversionData(fileId, selectedLanguage, price, true, inputData.name);
-            } else {
-                console.log("Storing URL input");
-                storeConversionData(inputData, selectedLanguage, price, true);
-            }
+            storeConversionData(inputData, selectedLanguage, price, true);
             console.log("Conversion data stored. Initiating login process...");
             login();
         }
@@ -1407,7 +1405,7 @@ async function login() {
         // Log the current state
         console.log("Current pendingConversionData:", localStorage.getItem('pendingConversionData'));
 
-        // Add a 5-second delay
+        // Add a 5-second delay (for debugging purposes, remove in production)
         console.log("Waiting 5 seconds before redirecting to Auth0...");
         await new Promise(resolve => setTimeout(resolve, 5000));
 
@@ -1797,11 +1795,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateJobIdInUI();
 
      // Check if we're returning from authentication
-    const isAuthenticating = sessionStorage.getItem('isAuthenticating');
-    if (isAuthenticating) {
-        sessionStorage.removeItem('isAuthenticating');
-        await handleAuthReturn();
-    }
+     const isAuthenticating = sessionStorage.getItem('isAuthenticating');
+     if (isAuthenticating) {
+         console.log("Returning from authentication");
+         sessionStorage.removeItem('isAuthenticating');
+         await handleAuthReturn();
+     } else {
+         console.log("Not returning from authentication");
+     }
 
     // Add this line to handle Stripe success redirect
     if (window.location.pathname === '/success') {

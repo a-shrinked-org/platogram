@@ -575,7 +575,7 @@ function updateUIStatus(status, message = "") {
 
     const pendingConversionDataString = localStorage.getItem('pendingConversionData');
     const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
-    const displayFileName = fileName || storedFileName || document.getElementById("file-name")?.textContent || "Unknown file";
+    const displayFileName = storedFileName || document.getElementById("file-name")?.textContent || "Unknown file";
     debugLog("File name used in updateUIStatus: " + displayFileName);
     const userEmail = document.getElementById("user-email")?.textContent || "Unknown email";
 
@@ -1833,10 +1833,8 @@ async function handleStripeSuccessRedirect() {
 
             console.log('Handling Stripe success redirect with data:', pendingConversionData);
 
-            let { inputData, lang, price, fileName, isFile } = pendingConversionData;
+            let { inputData, lang, price, isFile } = pendingConversionData;
             const isTestMode = pendingConversionData.isTestMode || session_id.startsWith('test_');
-
-            console.log("Retrieved fileName:", fileName);
 
             // Restore the input data to the UI
             if (isFile) {
@@ -1865,9 +1863,6 @@ async function handleStripeSuccessRedirect() {
     } catch (error) {
         console.error('Error handling Stripe success redirect:', error);
         updateUIStatus("error", `Error: ${error.message}`);
-    } finally {
-        // Clear any ongoing conversion data
-        localStorage.removeItem('pendingConversionData');
     }
 }
 

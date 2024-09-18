@@ -551,7 +551,7 @@ async function checkOngoingConversion() {
         console.log("Current conversion status:", result.status);
 
         if (result.status && result.status !== 'idle') {
-            updateUIStatus(result.status, `Conversion ${result.status}...`, storedFileName);
+            updateUIStatus(result.status, `Conversion ${result.status}...`);
             if (['running', 'processing'].includes(result.status)) {
                 pollStatus(token);
             }
@@ -1633,14 +1633,14 @@ function pollStatus(token, isTestMode = false, fileName = "") {
             isConversionComplete = true;
             clearInterval(pollingInterval);
             clearProcessingStageInterval();
-            updateUIStatus("done", "Conversion completed successfully. Check your email for results.", storedFileName);
+            updateUIStatus("done", "Conversion completed successfully. Check your email for results.");
             console.log("Conversion complete, UI updated to 'done' state");
             resolve(result);
           } else if (result.status === "failed" || result.status === "error") {
             isConversionComplete = true;
             clearInterval(pollingInterval);
             clearProcessingStageInterval();
-            updateUIStatus("error", result.error || "An error occurred during conversion", storedFileName);
+            updateUIStatus("error", result.error || "An error occurred during conversion");
             console.log("Conversion failed, UI updated to 'error' state");
             reject(new Error(result.error || "Conversion failed"));
           } else if (["idle", "running", "processing"].includes(result.status)) {
@@ -1651,7 +1651,7 @@ function pollStatus(token, isTestMode = false, fileName = "") {
           }
         } catch (error) {
           console.error("Error polling status:", error);
-          updateUIStatus("error", `An error occurred while checking status: ${error.message}`, fileName);
+          updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
           clearInterval(pollingInterval);
           clearProcessingStageInterval();
           reject(error);

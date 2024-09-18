@@ -1107,32 +1107,41 @@ if (window.location.pathname === '/success') {
 
 async function onConvertClick(event) {
     if (event) event.preventDefault();
-    debugLog("Convert button clicked");
+    console.log('Convert button clicked');
     try {
         if (!auth0Client) throw new Error("Auth0 client not initialized");
         const inputData = getInputData();
         if (!inputData) {
             throw new Error("Please provide a valid URL or upload a file to be converted");
         }
-        debugLog("Input data type: " + (inputData instanceof File ? "File" : "URL"));
+        console.log("Input data type:", inputData instanceof File ? "File" : "URL");
         if (inputData instanceof File) {
-            debugLog("File details:", inputData.name, inputData.type, inputData.size);
+            console.log("File details:", inputData.name, inputData.type, inputData.size);
         } else {
-            debugLog("URL input:", inputData);
+            console.log("URL input:", inputData);
         }
         const price = getPriceFromUI();
+        console.log("Price:", price);
 
-        if (await auth0Client.isAuthenticated()) {
+        const isAuthenticated = await auth0Client.isAuthenticated();
+        console.log("User is authenticated:", isAuthenticated);
+
+        if (isAuthenticated) {
+            console.log("Showing language selection modal");
             showLanguageSelectionModal(inputData, price);
         } else {
+            console.log("User not authenticated. Preparing for login...");
             // Store data before redirecting for authentication
             if (inputData instanceof File) {
+                console.log("Storing file temporarily");
                 const fileId = await storeFileTemporarily(inputData);
+                console.log("File stored with ID:", fileId);
                 storeConversionData(fileId, selectedLanguage, price, true, inputData.name);
             } else {
+                console.log("Storing URL input");
                 storeConversionData(inputData, selectedLanguage, price, true);
             }
-            sessionStorage.setItem('isAuthenticating', 'true');
+            console.log("Conversion data stored. Initiating login process...");
             login();
         }
     } catch (error) {
@@ -1387,11 +1396,26 @@ function getInputData() {
 
 async function login() {
     try {
+        console.log("Initializing login process...");
         await initAuth0();
+        console.log("Auth0 initialized. Preparing for redirect...");
+
+        // Set the authenticating flag
+        sessionStorage.setItem('isAuthenticating', 'true');
+        console.log("isAuthenticating flag set in sessionStorage");
+
+        // Log the current state
+        console.log("Current pendingConversionData:", localStorage.getItem('pendingConversionData'));
+
+        // Add a 5-second delay
+        console.log("Waiting 5 seconds before redirecting to Auth0...");
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        console.log("Redirecting to Auth0 login page...");
         await auth0Client.loginWithRedirect();
     } catch (error) {
-        console.error("Error logging in:", error);
-        updateUIStatus("error", "Failed to log in. Please try again.");
+        console.error("Error in login process:", error);
+        updateUIStatus("error", "Failed to initiate login. Please try again.");
     }
 }
 

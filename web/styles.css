@@ -319,13 +319,6 @@ footer a:hover {
 
 #done-section {
   background-color: #E8F5E9;
-  border: 2px solid #4CAF50;
-}
-
-#done-section p {
-  font-size: 1.2em;
-  font-weight: 600;
-  color: #2E7D32;
 }
 
 #done-section .cta {

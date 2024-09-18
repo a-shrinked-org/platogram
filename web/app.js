@@ -135,12 +135,12 @@ function handleOptionClick(option) {
     const coffee2Button = document.getElementById('coffee-2');
 
     if (basicButton) {
-        basicButton.classList.toggle('border-gray-300', option === 'basic');
-        basicButton.classList.toggle('bg-[#F9F0E8]', option === 'basic');
+        basicButton.classList.toggle('border-blue-500', option === 'basic');
+        basicButton.classList.toggle('bg-blue-50', option === 'basic');
     }
     if (coffeeButton) {
-        coffeeButton.classList.toggle('border-gray-300', option === 'coffee');
-        coffeeButton.classList.toggle('bg-[#F9F0E8]', option === 'coffee');
+        coffeeButton.classList.toggle('border-blue-500', option === 'coffee');
+        coffeeButton.classList.toggle('bg-blue-50', option === 'coffee');
     }
     if (option === 'coffee') {
         coffeeCount = 1;
@@ -148,18 +148,22 @@ function handleOptionClick(option) {
         const customPriceInput = document.getElementById('custom-price');
         if (customPriceInput) customPriceInput.value = '';
         if (coffee1Button) {
-            coffee1Button.classList.add('bg-[#F9F0E8]','text-black');
+            coffee1Button.style.backgroundColor = '#F9F0E8';
+            coffee1Button.classList.add('text-black');
         }
         if (coffee2Button) {
-            coffee2Button.classList.remove('bg-[#F9F0E8]','text-black');
+            coffee2Button.style.backgroundColor = '';
+            coffee2Button.classList.remove('text-black');
         }
     } else {
         coffeeCount = 0;
         if (coffee1Button) {
-            coffee1Button.classList.remove('bg-[#F9F0E8]','text-black');
+            coffee1Button.style.backgroundColor = '';
+            coffee1Button.classList.remove('text-black');
         }
         if (coffee2Button) {
-            coffee2Button.classList.remove('bg-[#F9F0E8]','text-black');
+            coffee2Button.style.backgroundColor = '';
+            coffee2Button.classList.remove('text-black');
         }
     }
     updateTotalPrice();
@@ -175,16 +179,20 @@ function handleCoffeeCountClick(count) {
     const coffee2Button = document.getElementById("coffee-2");
     if (coffee1Button) {
       if (count === 1) {
-        coffee1Button.classList.add("bg-[#F9F0E8]", "text-black");
+          coffee1Button.style.backgroundColor = '#F9F0E8';
+          coffee1Button.classList.add('text-black');
       } else {
-        coffee1Button.classList.remove("bg-[#F9F0E8]", "text-black");
+          coffee1Button.style.backgroundColor = '';
+          coffee1Button.classList.remove('text-black');
       }
     }
     if (coffee2Button) {
       if (count === 2) {
-        coffee2Button.classList.add("bg-[#F9F0E8]", "text-black");
+          coffee2Button.style.backgroundColor = '#F9F0E8';
+          coffee2Button.classList.add('text-black');
       } else {
-        coffee2Button.classList.remove("bg-[#F9F0E8]", "text-black");
+          coffee2Button.style.backgroundColor = '';
+          coffee2Button.classList.remove('text-black');
       }
     }
     updateTotalPrice();

@@ -837,18 +837,18 @@
               </div>
               <div class="flex items-center space-x-2 ml-7">
                 <p class="text-xs text-left text-gray-600 mb-2">Name your fare price and support what we do. No attribution needed</p>
-                <img src="./web/static/Assets/hot-beverage.png" alt="Coffee" class="w-auto h-10" />
+                <img src="./web/static/Assets/hot-beverage.png" alt="Coffee" class="w-auto h-9" />
                 <span>
-                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor"
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor"
                            viewBox="0 0 24 24">
                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
 
                 </span>
-                <button id="coffee-1" class="w-11 h-8 rounded-full border-gray-200 border-solid border-b text-gray-700 hover:bg-black hover:text-white transition-colors">1</button>
-                <button id="coffee-2" class="w-11 h-8 rounded-full border-gray-200 border-solid border-b hover:bg-black hover:text-white transition-colors">2</button>
-                <input type="text" id="custom-price" style="width:48px!important;border-color:lightgray;border-radius:6px;padding:auto!important;margin-top:10px!important" placeholder="$30" class="w-8 h-8 p-1 border border-gray-300 rounded">
+                <button id="coffee-1" class="w-14 h-7 text-sm rounded-full border-gray-300 border text-gray-700 hover:bg-black hover:text-white transition-colors">1</button>
+                <button id="coffee-2" class="w-14 h-7 text-sm rounded-full border-gray-300 border hover:bg-black hover:text-white transition-colors">2</button>
+                <input type="text" id="custom-price" style="width:48px!important;height:30px;border-color:lightgray;border-radius:6px;margin-top:10px!important" placeholder="$30" class="w-8 h-8 text-sm p-1 border border-gray-300 rounded">
               </div>
             </div>
 
@@ -858,7 +858,7 @@
                   Get your document $<span id="total-price">0.00</span>
                 </button>
 
-                <button id="cancel-btn" class="w-full mt-2 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors">
+                <button id="cancel-btn" class="w-full mt-2 bg-gray-100 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors">
                   Cancel
                 </button>
     </div>
@@ -873,8 +873,6 @@
 <script type="module" src="./web/app.js"></script>
 <script>
     let testMode = true;
-    const TEST_PRICE = 5;
-    const TEST_LANG = 'en';
     window.ENABLE_TEST_MODE = true;
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -892,23 +890,26 @@
             <h2>Test Panel</h2>
             <div>
                 <input type="text" id="test-url-input" placeholder="Enter URL">
-                <button onclick="testInput('url')">Test URL Input ($5)</button>
+                <button onclick="testInput('url')">Test URL Input</button>
             </div>
             <div style="margin-top: 10px;">
                 <input type="file" id="test-file-input">
-                <button onclick="testInput('file')">Test File Input ($5)</button>
-            </div>
-                <div style="margin-top: 10px;">
-                <button onclick="retrieveStoredData()">Retrieve Stored Data</button>
+                <button onclick="testInput('file')">Test File Input</button>
             </div>
             <div style="margin-top: 10px;">
-                <strong>Retrieved Data:</strong> <pre id="retrieved-data"></pre>
+                <button onclick="testRetrieveStoredData()">Retrieve Stored Data</button>
+            </div>
+            <div style="margin-top: 10px;">
+                <button onclick="testAuth0Redirect()">Test Auth0 Redirect</button>
             </div>
             <div style="margin-top: 10px;">
                 <button onclick="testStripeSuccessRedirect()">Test Stripe Success Redirect</button>
             </div>
             <div style="margin-top: 10px;">
                 <strong>Test Status:</strong> <span id="test-status"></span>
+            </div>
+            <div style="margin-top: 10px;">
+                <strong>Retrieved Data:</strong> <pre id="retrieved-data"></pre>
             </div>
         `;
         document.body.appendChild(panel);
@@ -940,104 +941,70 @@
             }
         }
         updateTestStatus(`Testing ${type} input: ${inputData instanceof File ? inputData.name : inputData}`);
-        await simulateConversionFlow(inputData);
-    }
 
-    async function simulateConversionFlow(inputData) {
-        try {
-            const isFile = inputData instanceof File;
-            let fileId;
-            if (isFile) {
-                fileId = await window.storeFileTemporarily(inputData);
-            }
-            const conversionData = {
-                inputData: isFile ? fileId : inputData,
-                isFile: isFile,
-                lang: TEST_LANG,
-                price: TEST_PRICE,
-                isTestMode: true,
-                fileName: isFile ? inputData.name : inputData
-            };
-            localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
-            console.log('Stored conversion data:', conversionData);
-            updateTestStatus("Conversion data stored. Simulating Auth0 redirect...");
+        // Use the actual onConvertClick function from app.js
+        if (typeof window.onConvertClick === 'function') {
+            // Create a mock event object
+            const mockEvent = { preventDefault: () => {} };
 
-            // Simulate Auth0 redirect and return
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            await retrieveStoredData();
-        } catch (error) {
-            console.error("Error in test flow:", error);
-            updateTestStatus("Error: " + error.message);
+            // Mock the getInputData function to return our test input
+            window.getInputData = () => inputData;
+
+            await window.onConvertClick(mockEvent);
+        } else {
+            updateTestStatus("onConvertClick function not found in app.js");
         }
     }
 
- async function retrieveStoredData() {
-    try {
-        const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
-        if (!pendingConversionDataString) {
+    async function testRetrieveStoredData() {
+        const storedDataString = localStorage.getItem('pendingConversionData');
+        if (!storedDataString) {
             updateTestStatus("No stored conversion data found");
             return;
         }
 
-        const pendingConversionData = JSON.parse(pendingConversionDataString);
-        console.log("Retrieved pending conversion data:", pendingConversionData);
+        const storedData = JSON.parse(storedDataString);
+        console.log("Retrieved stored conversion data:", storedData);
 
-        let inputData = pendingConversionData.inputData;
-        const price = pendingConversionData.price;
+        updateTestStatus("Data retrieved successfully");
+        document.getElementById('retrieved-data').textContent = JSON.stringify(storedData, null, 2);
+    }
 
-        if (pendingConversionData.isFile) {
-            console.log("Retrieving file from temporary storage");
-            const file = await window.retrieveFileFromTemporaryStorage(inputData);
-            if (file) {
-                inputData = file;
-                updateTestStatus(`File retrieved: ${file.name}`);
-            } else {
-                updateTestStatus("Failed to retrieve file from temporary storage");
-            }
+    async function testAuth0Redirect() {
+        updateTestStatus("Simulating Auth0 redirect...");
+
+        // Simulate Auth0 redirect and return
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Call the actual handleAuthReturn function from app.js
+        if (typeof window.handleAuthReturn === 'function') {
+            await window.handleAuthReturn();
+            updateTestStatus("Auth0 redirect simulation completed");
         } else {
-            console.log("Setting URL input");
-            document.getElementById('test-url-input').value = inputData;
-            updateTestStatus(`URL retrieved: ${inputData}`);
-        }
-
-            document.getElementById('retrieved-data').textContent = JSON.stringify(pendingConversionData, null, 2);
-        } catch (error) {
-            console.error("Error retrieving stored data:", error);
-            updateTestStatus("Error: " + error.message);
+            updateTestStatus("handleAuthReturn function not found in app.js");
         }
     }
 
     async function testStripeSuccessRedirect() {
-    try {
-        const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
-        if (!pendingConversionDataString) {
-            updateTestStatus("No stored conversion data found. Please run a test input first.");
-            return;
-        }
-
-        const pendingConversionData = JSON.parse(pendingConversionDataString);
         updateTestStatus("Simulating Stripe success redirect...");
 
         // Simulate Stripe success redirect
         const simulatedSessionId = 'test_session_' + Date.now();
         sessionStorage.setItem('successfulPayment', JSON.stringify({ session_id: simulatedSessionId }));
 
-        // Call the actual handleStripeSuccessRedirect function
+        // Call the actual handleStripeSuccessRedirect function from app.js
         if (typeof window.handleStripeSuccessRedirect === 'function') {
             await window.handleStripeSuccessRedirect();
             updateTestStatus("Stripe success redirect simulation completed");
         } else {
-            updateTestStatus("handleStripeSuccessRedirect function not found");
+            updateTestStatus("handleStripeSuccessRedirect function not found in app.js");
         }
-    } catch (error) {
-        console.error("Error in Stripe success redirect test:", error);
-        updateTestStatus("Error: " + error.message);
     }
-}
 
     // Expose functions to global scope
     window.testInput = testInput;
-    window.retrieveStoredData = retrieveStoredData;
+    window.testRetrieveStoredData = testRetrieveStoredData;
+    window.testAuth0Redirect = testAuth0Redirect;
     window.testStripeSuccessRedirect = testStripeSuccessRedirect;
 </script>
 </body>

@@ -2055,6 +2055,7 @@ if (typeof window !== 'undefined') {
     window.setupDragAndDrop = setupDragAndDrop;
     window.handleFiles = handleFiles;
     window.onConvertClick = onConvertClick;
+    window.getInputData = getInputData;
     window.login = login;
     window.logout = logout;
     window.reset = reset;
@@ -2070,4 +2071,6 @@ if (typeof window !== 'undefined') {
     window.retrieveFileFromTemporaryStorage = retrieveFileFromTemporaryStorage;
     window.uploadFile = uploadFile;
     window.postToConvert = postToConvert;
+    window.handleAuthReturn = handleAuthReturn;
+    window.handleStripeSuccessRedirect = handleStripeSuccessRedirect;
 }

@@ -846,9 +846,9 @@
                 </svg>
 
                 </span>
-                <button id="coffee-1" class="w-14 h-7 text-sm rounded-full border-gray-300 border text-gray-700 hover:bg-black hover:text-white transition-colors">1</button>
-                <button id="coffee-2" class="w-14 h-7 text-sm rounded-full border-gray-300 border hover:bg-black hover:text-white transition-colors">2</button>
-                <input type="text" id="custom-price" style="width:48px!important;height:30px;border-color:lightgray;border-radius:6px;margin-top:10px!important" placeholder="$30" class="w-8 h-8 text-sm p-1 border border-gray-300 rounded">
+                <button id="coffee-1" class="w-13 h-7 text-sm rounded-full border-gray-300 border text-gray-300 hover:bg-black hover:text-white transition-colors">1</button>
+                <button id="coffee-2" class="w-13 h-7 text-sm rounded-full border-gray-300 border text-gray-300 hover:bg-black hover:text-white transition-colors">2</button>
+                <input type="text" id="custom-price" style="width:48px!important;height:30px;border-color:lightgray;border-radius:6px;margin-top:10px!important" placeholder="$30" class="w-8 h-8 font-normal text-gray-300 text-sm p-1 border border-gray-300 rounded">
               </div>
             </div>
 
@@ -900,12 +900,6 @@
                 <button onclick="testRetrieveStoredData()">Retrieve Stored Data</button>
             </div>
             <div style="margin-top: 10px;">
-                <button onclick="testAuth0Redirect()">Test Auth0 Redirect</button>
-            </div>
-            <div style="margin-top: 10px;">
-                <button onclick="testStripeSuccessRedirect()">Test Stripe Success Redirect</button>
-            </div>
-            <div style="margin-top: 10px;">
                 <strong>Test Status:</strong> <span id="test-status"></span>
             </div>
             <div style="margin-top: 10px;">
@@ -942,17 +936,100 @@
         }
         updateTestStatus(`Testing ${type} input: ${inputData instanceof File ? inputData.name : inputData}`);
 
-        // Use the actual onConvertClick function from app.js
-        if (typeof window.onConvertClick === 'function') {
-            // Create a mock event object
-            const mockEvent = { preventDefault: () => {} };
+        // Step 1: Store data and initiate Auth flow
+        await simulateInitialDataStore(inputData);
 
-            // Mock the getInputData function to return our test input
-            window.getInputData = () => inputData;
+        // Step 2: Simulate Auth0 redirect and return
+        await simulateAuth0Redirect();
 
-            await window.onConvertClick(mockEvent);
+        // Step 3: Retrieve data and initiate Stripe flow
+        await simulateStripeFlow();
+
+        // Step 4: Simulate test-intermediate and success redirect
+        await simulateSuccessRedirect();
+
+        // Step 5: Simulate return to main page and start conversion
+        await simulateConversionStart();
+    }
+
+    async function simulateInitialDataStore(inputData) {
+        updateTestStatus("Storing initial data and simulating Auth redirect...");
+
+        // Use the actual storeConversionData function from app.js
+        if (typeof window.storeConversionData === 'function') {
+            const mockPrice = 5; // example price
+            const mockLang = 'en'; // example language
+            await window.storeConversionData(inputData, mockLang, mockPrice, true);
         } else {
-            updateTestStatus("onConvertClick function not found in app.js");
+            updateTestStatus("storeConversionData function not found in app.js");
+            return;
+        }
+
+        // Simulate redirect to Auth0
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    async function simulateAuth0Redirect() {
+        updateTestStatus("Simulating return from Auth0...");
+
+        // Call the actual handleAuthReturn function from app.js
+        if (typeof window.handleAuthReturn === 'function') {
+            await window.handleAuthReturn();
+        } else {
+            updateTestStatus("handleAuthReturn function not found in app.js");
+            return;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    async function simulateStripeFlow() {
+        updateTestStatus("Retrieving data and initiating Stripe flow...");
+
+        // This would typically be handled by the showLanguageSelectionModal and handleSubmit functions
+        // For testing, we'll simulate this by directly calling handlePaidConversion
+        if (typeof window.handlePaidConversion === 'function') {
+            const storedData = JSON.parse(localStorage.getItem('pendingConversionData'));
+            await window.handlePaidConversion(storedData.inputData, storedData.price);
+        } else {
+            updateTestStatus("handlePaidConversion function not found in app.js");
+            return;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    async function simulateSuccessRedirect() {
+        updateTestStatus("Simulating test-intermediate and success redirect...");
+
+        // Simulate Stripe success redirect
+        const simulatedSessionId = 'test_session_' + Date.now();
+        sessionStorage.setItem('successfulPayment', JSON.stringify({ session_id: simulatedSessionId }));
+
+        // Call the actual handleStripeSuccessRedirect function from app.js
+        if (typeof window.handleStripeSuccessRedirect === 'function') {
+            await window.handleStripeSuccessRedirect();
+        } else {
+            updateTestStatus("handleStripeSuccessRedirect function not found in app.js");
+            return;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    async function simulateConversionStart() {
+        updateTestStatus("Simulating return to main page and starting conversion...");
+
+        // This would typically be handled by the handleConversion function
+        // For testing, we'll check if the conversion has started
+        if (typeof window.isConversionInProgress === 'boolean') {
+            if (window.isConversionInProgress) {
+                updateTestStatus("Conversion started successfully");
+            } else {
+                updateTestStatus("Conversion did not start as expected");
+            }
+        } else {
+            updateTestStatus("Unable to determine if conversion started");
         }
     }
 
@@ -970,42 +1047,9 @@
         document.getElementById('retrieved-data').textContent = JSON.stringify(storedData, null, 2);
     }
 
-    async function testAuth0Redirect() {
-        updateTestStatus("Simulating Auth0 redirect...");
-
-        // Simulate Auth0 redirect and return
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        // Call the actual handleAuthReturn function from app.js
-        if (typeof window.handleAuthReturn === 'function') {
-            await window.handleAuthReturn();
-            updateTestStatus("Auth0 redirect simulation completed");
-        } else {
-            updateTestStatus("handleAuthReturn function not found in app.js");
-        }
-    }
-
-    async function testStripeSuccessRedirect() {
-        updateTestStatus("Simulating Stripe success redirect...");
-
-        // Simulate Stripe success redirect
-        const simulatedSessionId = 'test_session_' + Date.now();
-        sessionStorage.setItem('successfulPayment', JSON.stringify({ session_id: simulatedSessionId }));
-
-        // Call the actual handleStripeSuccessRedirect function from app.js
-        if (typeof window.handleStripeSuccessRedirect === 'function') {
-            await window.handleStripeSuccessRedirect();
-            updateTestStatus("Stripe success redirect simulation completed");
-        } else {
-            updateTestStatus("handleStripeSuccessRedirect function not found in app.js");
-        }
-    }
-
     // Expose functions to global scope
     window.testInput = testInput;
     window.testRetrieveStoredData = testRetrieveStoredData;
-    window.testAuth0Redirect = testAuth0Redirect;
-    window.testStripeSuccessRedirect = testStripeSuccessRedirect;
 </script>
 </body>
 </html>

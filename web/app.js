@@ -67,36 +67,35 @@ window.addEventListener('popstate', function() {
   }
 });
 
-function generateIntercomHash(email) {
-    // This function will be replaced by the actual implementation in production
-    console.warn('Intercom hash generation is not available in development mode');
-    return null;
+async function generateIntercomHash(email) {
+    // In development, return null or a placeholder
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      console.warn('Intercom hash generation is not available in development mode');
+      return null;
+    }
+
+    // In production
+    try {
+      // Fetch the hash from a Vercel serverless function
+      const response = await fetch('/api/intercom-hash', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate Intercom hash');
+      }
+
+      const data = await response.json();
+      return data.hash;
+    } catch (error) {
+      console.error('Error generating Intercom hash:', error);
+      return null;
+    }
   }
-
-  // In production, this function will be replaced by Vercel
-  if (process.env.NODE_ENV === 'production') {
-    generateIntercomHash = function(email) {
-      const secretKey = process.env.INTERCOM_SECRET_KEY;
-      if (!secretKey) {
-        console.error('Intercom secret key is not set');
-        return null;
-      }
-
-      // Implementation of SHA256 hashing
-      function sha256(str) {
-        // This is a simple implementation and might not be as secure as Node.js crypto
-        // Consider using a well-tested crypto library if available
-        const utf8 = new TextEncoder().encode(str);
-        return crypto.subtle.digest('SHA-256', utf8).then(hashBuffer => {
-          return Array.from(new Uint8Array(hashBuffer))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-        });
-      }
-
-      return sha256(secretKey + email);
-    };
-  }  
 
 async function initializeIntercom(user = null) {
   if (window.Intercom) {

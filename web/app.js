@@ -135,12 +135,12 @@ function handleOptionClick(option) {
     const coffee2Button = document.getElementById('coffee-2');
 
     if (basicButton) {
-        basicButton.classList.toggle('border-blue-500', option === 'basic');
-        basicButton.classList.toggle('bg-blue-50', option === 'basic');
+        basicButton.classList.toggle('border-gray-300', option === 'basic');
+        basicButton.classList.toggle('bg-[#F9F0E8]', option === 'basic');
     }
     if (coffeeButton) {
-        coffeeButton.classList.toggle('border-blue-500', option === 'coffee');
-        coffeeButton.classList.toggle('bg-blue-50', option === 'coffee');
+        coffeeButton.classList.toggle('border-gray-300', option === 'coffee');
+        coffeeButton.classList.toggle('bg-[#F9F0E8]', option === 'coffee');
     }
     if (option === 'coffee') {
         coffeeCount = 1;
@@ -148,18 +148,18 @@ function handleOptionClick(option) {
         const customPriceInput = document.getElementById('custom-price');
         if (customPriceInput) customPriceInput.value = '';
         if (coffee1Button) {
-            coffee1Button.classList.add('bg-blue-500', 'text-white');
+            coffee1Button.classList.add('bg-[#F9F0E8]','text-black');
         }
         if (coffee2Button) {
-            coffee2Button.classList.remove('bg-blue-500', 'text-white');
+            coffee2Button.classList.remove('bg-[#F9F0E8]','text-black');
         }
     } else {
         coffeeCount = 0;
         if (coffee1Button) {
-            coffee1Button.classList.remove('bg-blue-500', 'text-white');
+            coffee1Button.classList.remove('bg-[#F9F0E8]','text-black');
         }
         if (coffee2Button) {
-            coffee2Button.classList.remove('bg-blue-500', 'text-white');
+            coffee2Button.classList.remove('bg-[#F9F0E8]','text-black');
         }
     }
     updateTotalPrice();

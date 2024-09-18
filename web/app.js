@@ -60,6 +60,34 @@ async function ensureDbInitialized() {
     }
 }
 
+// Add Intercom update when the page URL changes
+window.addEventListener('popstate', function() {
+  if (window.Intercom) {
+    window.Intercom("update");
+  }
+});
+
+function initializeIntercom(user = null) {
+    if (window.Intercom) {
+      if (user) {
+        // User is logged in
+        window.Intercom("boot", {
+          api_base: "https://api-iam.intercom.io",
+          app_id: "i1z51z2x",
+          name: user.name,
+          email: user.email,
+          created_at: Math.floor(new Date(user.updated_at).getTime() / 1000) // Convert to Unix timestamp
+        });
+      } else {
+        // User is not logged in
+        window.Intercom("boot", {
+          api_base: "https://api-iam.intercom.io",
+          app_id: "i1z51z2x"
+        });
+      }
+    }
+  }
+
 window.updateAuthUI = function(isAuthenticated, user) {
     const loginButton = document.getElementById('login-button');
     const userCircle = document.getElementById('user-circle');
@@ -543,13 +571,9 @@ function updateUIStatus(status, message = "") {
                     ${message ? `<p>${message}</p>` : ''}
                     <button class="mx-left mt-8 block px-4 py-2 bg-black text-white rounded hover:bg-gray-950" onclick="reset()">Reset</button>
                 `;
-                // Attach event listener to the reset button
-                const resetButton = document.getElementById('reset-button');
-                if (resetButton) {
-                    resetButton.addEventListener('click', reset);
-                }
             }
             clearProcessingStageInterval();
+            attachResetButtonListener();
             isConversionComplete = true;
             console.log("Conversion complete, UI updated to 'done' state");
             break;
@@ -563,17 +587,21 @@ function updateUIStatus(status, message = "") {
                     <p>${message || "An error occurred. Please try again."}</p>
                     <button class="mx-left mt-8 block px-4 py-2 bg-black  text-white rounded hover:bg-gray-950" onclick="reset()">Reset</button>
                 `;
-                // Attach event listener to the reset button
-                const resetButton = document.getElementById('reset-button');
-                if (resetButton) {
-                    resetButton.addEventListener('click', reset);
-                }
             }
             clearProcessingStageInterval();
+            attachResetButtonListener();
             break;
         default:
             console.warn(`Unknown status: ${status}`);
             toggleSection("input-section");
+    }
+}
+
+function attachResetButtonListener() {
+    const resetButton = document.querySelector('#done-section button, #error-section button');
+    if (resetButton) {
+        resetButton.removeEventListener('click', reset);
+        resetButton.addEventListener('click', reset);
     }
 }
 
@@ -595,6 +623,9 @@ async function updateUI() {
         }
         window.updateAuthUI(isAuthenticated, user);
 
+        // Initialize Intercom with user data
+        initializeIntercom(user);
+
         // Only poll status if authenticated and not in idle state
         const currentStatus = getCurrentUIStatus();
         if (currentStatus !== "idle") {
@@ -608,6 +639,9 @@ async function updateUI() {
       } else {
         window.updateAuthUI(false, null);
         updateUIStatus("idle"); // Set to idle state for non-authenticated users
+
+        // Initialize Intercom without user data
+        initializeIntercom();
       }
     } catch (error) {
       console.error("Error updating UI:", error);
@@ -1407,6 +1441,10 @@ async function login() {
 
         console.log("Redirecting to Auth0 login page...");
         await auth0Client.loginWithRedirect();
+
+        // Update Intercom after successful login
+        const user = await auth0Client.getUser();
+        initializeIntercom(user);
     } catch (error) {
         console.error("Error in login process:", error);
         updateUIStatus("error", "Failed to initiate login. Please try again.");
@@ -1419,6 +1457,9 @@ async function logout() {
         await auth0Client.logout({
             logoutParams: { returnTo: window.location.origin },
         });
+
+        // Update Intercom after logout
+        initializeIntercom();
     } catch (error) {
         console.error("Error logging out:", error);
         updateUIStatus("error", "Failed to log out. Please try again.");

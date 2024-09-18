@@ -1043,7 +1043,7 @@ async function storeConversionData(inputData, lang, price, isAuth = false) {
         conversionData = {
             inputData: fileId,
             isFile: true,
-            fileName: inputData.name,
+            fileName: fileName || inputData.name,
             lang: lang,
             price: price,
             isAuth: isAuth
@@ -1052,7 +1052,7 @@ async function storeConversionData(inputData, lang, price, isAuth = false) {
         conversionData = {
             inputData: inputData,
             isFile: false,
-            fileName: inputData,
+            fileName: fileName || inputData,
             lang: lang,
             price: price,
             isAuth: isAuth
@@ -1739,7 +1739,7 @@ function updateProcessingStage() {
 async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
     try {
         isConversionComplete = false; // Reset the flag at the start of conversion
-        updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
+        updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...", storedFileName);
 
         let token = isTestMode ? 'test_token' : await auth0Client.getTokenSilently();
 
@@ -1751,12 +1751,12 @@ async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
                 throw new Error("Failed to retrieve file from temporary storage");
             }
 
-            updateUIStatus("uploading", "Uploading file...");
+            updateUIStatus("uploading", "Uploading file...", storedFileName);
             inputData = await uploadFile(file, token, isTestMode);
         }
 
         await postToConvert(inputData, lang, sessionId, price, isTestMode, token);
-        updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
+        updateUIStatus("processing", "Conversion started. You will be notified when it's complete.", storedFileName);
 
         // Start polling for status
         try {
@@ -1765,7 +1765,7 @@ async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
             updateUIStatus("done", "Conversion completed successfully. Check your email for results.");
         } catch (pollError) {
             console.error("Error during status polling:", pollError);
-            updateUIStatus("error", "An error occurred during conversion. Please try again.");
+            updateUIStatus("error", "Error: " + error.message, storedFileName);
         }
     } catch (error) {
         console.error('Error in handleConversion:', error);
@@ -1800,14 +1800,11 @@ async function handleStripeSuccessRedirect() {
 
             debugLog("Retrieved fileName: " + fileName);
 
-            // Update the file name in the UI
+            // Update the file name in the UI and store it
             const fileNameElement = document.getElementById("file-name");
             if (fileNameElement) {
                 fileNameElement.textContent = fileName || "Unknown file";
-                debugLog("Updated file-name element with: " + fileNameElement.textContent);
             }
-
-            // Store the file name globally
             storedFileName = fileName || "Unknown file";
             debugLog("Set storedFileName to: " + storedFileName);
 

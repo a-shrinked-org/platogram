@@ -1779,45 +1779,35 @@ function safeUpdateProcessingStage() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-    await initDB();
-    await testIndexedDB();
-    await initAuth0();
+            await initDB();
+            await testIndexedDB();
+            await initAuth0();
 
-    // Handle successful payment if redirected from success page
-    await handleSuccessfulPayment();
+            // Handle successful payment if redirected from success page
+            await handleSuccessfulPayment();
 
-    // Generate initial job ID
-    updateJobIdInUI();
+            // Generate initial job ID
+            updateJobIdInUI();
 
-     // Check if we're returning from authentication
-     const isAuthenticating = sessionStorage.getItem('isAuthenticating');
-     if (isAuthenticating) {
-         console.log("Returning from authentication");
-         sessionStorage.removeItem('isAuthenticating');
-         await handleAuthReturn();
-     } else {
-         console.log("Not returning from authentication");
-     }
+            // Check if we're returning from authentication
+            const isAuthenticating = sessionStorage.getItem('isAuthenticating');
+            if (isAuthenticating) {
+                console.log("Returning from authentication");
+                sessionStorage.removeItem('isAuthenticating');
+                await handleAuthReturn();
+            } else {
+                console.log("Not returning from authentication");
+            }
 
-    // Add this line to handle Stripe success redirect
-    if (window.location.pathname === '/success') {
-        await handleStripeSuccessRedirect();
-    }
+            // Add this line to handle Stripe success redirect
+            if (window.location.pathname === '/success') {
+                await handleStripeSuccessRedirect();
+            }
 
-    const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('session_id')) {
-            await handleStripeSuccess(urlParams.get('session_id'));
-        }
-
-        updateUIStatus("idle");
-        updateUI().catch((error) => {
-            console.error("Error updating UI:", error);
-            updateUIStatus("idle");
-        });
-    } catch (error) {
-        console.error("Error during initialization:", error);
-        updateUIStatus("error", "Failed to initialize application. Please refresh and try again.");
-    }
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('session_id')) {
+                await handleStripeSuccess(urlParams.get('session_id'));
+            }
 });
 
 document.addEventListener("DOMContentLoaded", () => {

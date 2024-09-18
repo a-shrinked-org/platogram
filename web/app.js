@@ -1736,10 +1736,10 @@ function updateProcessingStage() {
   }
 }
 
-async function handleConversion(inputData, lang, sessionId, price, isTestMode, fileName) {
+async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
     try {
         isConversionComplete = false; // Reset the flag at the start of conversion
-        updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...", fileName);
+        updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
 
         let token = isTestMode ? 'test_token' : await auth0Client.getTokenSilently();
 
@@ -1751,25 +1751,25 @@ async function handleConversion(inputData, lang, sessionId, price, isTestMode, f
                 throw new Error("Failed to retrieve file from temporary storage");
             }
 
-            updateUIStatus("uploading", "Uploading file...", fileName);
+            updateUIStatus("uploading", "Uploading file...");
             inputData = await uploadFile(file, token, isTestMode);
         }
 
         await postToConvert(inputData, lang, sessionId, price, isTestMode, token);
-        updateUIStatus("processing", "Conversion started. You will be notified when it's complete.", fileName);
+        updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
 
         // Start polling for status
         try {
-            await pollStatus(token, isTestMode, fileName);
+            await pollStatus(token, isTestMode);
             // If pollStatus resolves successfully, the conversion is done
-            updateUIStatus("done", "Conversion completed successfully. Check your email for results.", fileName);
+            updateUIStatus("done", "Conversion completed successfully. Check your email for results.");
         } catch (pollError) {
             console.error("Error during status polling:", pollError);
-            updateUIStatus("error", "An error occurred during conversion. Please try again.", fileName);
+            updateUIStatus("error", "An error occurred during conversion. Please try again.");
         }
     } catch (error) {
         console.error('Error in handleConversion:', error);
-        updateUIStatus("error", "Error: " + error.message, fileName);
+        updateUIStatus("error", "Error: " + error.message);
     } finally {
         isConversionComplete = true; // Ensure flag is set even if an error occurs
     }
@@ -1812,7 +1812,7 @@ async function handleStripeSuccessRedirect() {
             debugLog("Set storedFileName to: " + storedFileName);
 
             // Start the conversion process
-            await handleConversion(inputData, lang, session_id, price, isTestMode, fileName);
+            await handleConversion(inputData, lang, session_id, price, isTestMode);
         } else {
             console.error('No successful payment data found');
             updateUIStatus("error", "Payment data not found");

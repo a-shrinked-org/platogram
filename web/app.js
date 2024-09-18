@@ -598,14 +598,14 @@ function updateUIStatus(status, message = "") {
             if (processingStatusText) {
                 if (message.includes("payment confirmed")) {
                     processingStatusText.innerHTML = `
-                        <p>File/URL: ${fileName}</p>
+                        <p>File/URL: ${displayFileName}</p>
                         <p>Email: ${userEmail}</p>
                         <p>Status: Payment confirmed, preparing to start conversion</p>
                         <p>${message}</p>
                     `;
                 } else {
                     processingStatusText.innerHTML = `
-                        <p>File/URL: ${fileName}</p>
+                        <p>File/URL: ${displayFileName}</p>
                         <p>Email: ${userEmail}</p>
                         <p>Status: Preparing to start conversion</p>
                         <p>${message}</p>
@@ -618,7 +618,7 @@ function updateUIStatus(status, message = "") {
             toggleSection("status-section");
             if (statusSection) {
                 statusSection.innerHTML = `
-                    <p>File/URL: ${fileName}</p>
+                    <p>File/URL: ${displayFileName}</p>
                     <p>Email: ${userEmail}</p>
                     <p>Status: ${status}</p>
                     <p>${message}</p>
@@ -631,7 +631,7 @@ function updateUIStatus(status, message = "") {
             toggleSection("done-section");
             if (doneSection) {
                 doneSection.innerHTML = `
-                    <p>File/URL: ${fileName}</p>
+                    <p>File/URL: ${displayFileName}</p>
                     <p>Email: ${userEmail}</p>
                     <p>Status: Completed</p><br>
                     ${message ? `<p>${message}</p>` : ''}
@@ -647,7 +647,7 @@ function updateUIStatus(status, message = "") {
             toggleSection("error-section");
             if (errorSection) {
                 errorSection.innerHTML = `
-                    <p>File/URL: ${fileName}</p>
+                    <p>File/URL: ${displayFileName}</p>
                     <p>Email: ${userEmail}</p>
                     <p>Status: Error</p>
                     <p>${message || "An error occurred. Please try again."}</p>

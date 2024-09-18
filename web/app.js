@@ -528,6 +528,42 @@ async function getAuthToken() {
     }
 }
 
+async function checkOngoingConversion() {
+    try {
+        // Check if we're handling a redirect
+        if (sessionStorage.getItem('isAuthenticating') || sessionStorage.getItem('successfulPayment')) {
+            console.log("Skipping ongoing conversion check due to active redirect handling");
+            return;
+        }
+
+        const token = await getAuthToken();
+        const response = await fetch("https://temporary.name/status", {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        console.log("Current conversion status:", result.status);
+
+        if (result.status && result.status !== 'idle') {
+            updateUIStatus(result.status, `Conversion ${result.status}...`, storedFileName);
+            if (['running', 'processing'].includes(result.status)) {
+                pollStatus(token);
+            }
+        } else {
+            updateUIStatus("idle");
+        }
+    } catch (error) {
+        console.error("Error checking ongoing conversion:", error);
+        updateUIStatus("idle");
+    }
+}
+
 function updateUIStatus(status, message = "") {
     if (isConversionComplete && status !== "done" && status !== "error") return; // Allow updates for final states
     debugLog(`Updating UI status: ${status}`);
@@ -539,8 +575,8 @@ function updateUIStatus(status, message = "") {
 
     const pendingConversionDataString = localStorage.getItem('pendingConversionData');
     const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
-    const fileName = storedFileName || document.getElementById("file-name")?.textContent || "Unknown file";
-    debugLog("File name used in updateUIStatus: " + fileName);
+    const displayFileName = fileName || storedFileName || document.getElementById("file-name")?.textContent || "Unknown file";
+    debugLog("File name used in updateUIStatus: " + displayFileName);
     const userEmail = document.getElementById("user-email")?.textContent || "Unknown email";
 
     // Hide all sections first
@@ -1165,6 +1201,8 @@ async function handleAuthReturn() {
             showLanguageSelectionModal(inputData, price);
         }
     }
+    // Clear the authentication flag
+    sessionStorage.removeItem('isAuthenticating');
 }
 
 function handleStripeCancel() {
@@ -1762,14 +1800,14 @@ async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
         try {
             await pollStatus(token, isTestMode);
             // If pollStatus resolves successfully, the conversion is done
-            updateUIStatus("done", "Conversion completed successfully. Check your email for results.");
+            updateUIStatus("done", "Conversion completed successfully. Check your email for results.", storedFileName);
         } catch (pollError) {
             console.error("Error during status polling:", pollError);
-            updateUIStatus("error", "Error: " + error.message, storedFileName);
+            updateUIStatus("error", "An error occurred during conversion. Please try again.", storedFileName);
         }
     } catch (error) {
         console.error('Error in handleConversion:', error);
-        updateUIStatus("error", "Error: " + error.message);
+        updateUIStatus("error", "Error: " + error.message, storedFileName);
     } finally {
         isConversionComplete = true; // Ensure flag is set even if an error occurs
     }
@@ -1785,7 +1823,7 @@ async function handleStripeSuccessRedirect() {
             sessionStorage.removeItem('successfulPayment');
 
             const pendingConversionDataString = localStorage.getItem('pendingConversionData');
-            debugLog("Retrieved pendingConversionDataString: " + pendingConversionDataString);
+            console.log("Retrieved pendingConversionDataString:", pendingConversionDataString);
 
             if (!pendingConversionDataString) {
                 throw new Error('No pending conversion data found');
@@ -1795,24 +1833,28 @@ async function handleStripeSuccessRedirect() {
 
             console.log('Handling Stripe success redirect with data:', pendingConversionData);
 
-            const { inputData, lang, price, fileName } = pendingConversionData;
+            let { inputData, lang, price, fileName, isFile } = pendingConversionData;
             const isTestMode = pendingConversionData.isTestMode || session_id.startsWith('test_');
 
-            debugLog("Retrieved fileName: " + fileName);
+            console.log("Retrieved fileName:", fileName);
 
-            // Update the file name in the UI and store it globally
-            storedFileName = fileName || "Unknown file";
-            const fileNameElement = document.getElementById("file-name");
-            if (fileNameElement) {
-                fileNameElement.textContent = storedFileName;
-            }
-            debugLog("Set storedFileName to: " + storedFileName);
-
-            // Restore input data to UI if it's a URL
-            if (!pendingConversionData.isFile) {
+            // Restore the input data to the UI
+            if (isFile) {
+                console.log("Retrieving file from temporary storage");
+                const file = await retrieveFileFromTemporaryStorage(inputData);
+                if (file) {
+                    inputData = file;
+                    handleFiles([file]);
+                    storedFileName = file.name;
+                }
+            } else {
+                console.log("Setting URL input");
                 const urlInput = document.getElementById('url-input');
                 if (urlInput) urlInput.value = inputData;
+                storedFileName = inputData;
             }
+
+            console.log("Set storedFileName to:", storedFileName);
 
             // Start the conversion process
             await handleConversion(inputData, lang, session_id, price, isTestMode);
@@ -1823,6 +1865,9 @@ async function handleStripeSuccessRedirect() {
     } catch (error) {
         console.error('Error handling Stripe success redirect:', error);
         updateUIStatus("error", `Error: ${error.message}`);
+    } finally {
+        // Clear any ongoing conversion data
+        localStorage.removeItem('pendingConversionData');
     }
 }
 
@@ -1861,6 +1906,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             // Handle successful payment if redirected from success page
             await handleSuccessfulPayment();
 
+            await checkOngoingConversion();
+
             // Generate initial job ID
             updateJobIdInUI();
 
@@ -1871,17 +1918,17 @@ document.addEventListener("DOMContentLoaded", async () => {
                 await handleAuthReturn();
             } else {
                 console.log("Not returning from authentication");
-                // Handle Stripe success redirect
+                // Only handle Stripe redirects if not authenticating
                 if (window.location.pathname === '/success') {
                     await handleStripeSuccessRedirect();
-                }
-
-                const urlParams = new URLSearchParams(window.location.search);
-                if (urlParams.get('session_id')) {
-                    await handleStripeSuccess(urlParams.get('session_id'));
+                } else {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    if (urlParams.get('session_id')) {
+                        await handleStripeSuccess(urlParams.get('session_id'));
+                    }
                 }
             }
-});
+        });
 
 document.addEventListener("DOMContentLoaded", () => {
     debugLog("DOM Content Loaded");

@@ -898,17 +898,17 @@
                 <input type="file" id="test-file-input">
                 <button onclick="testInput('file')">Test File Input ($5)</button>
             </div>
-            <div style="margin-top: 10px;">
+                <div style="margin-top: 10px;">
                 <button onclick="retrieveStoredData()">Retrieve Stored Data</button>
+            </div>
+            <div style="margin-top: 10px;">
+                <strong>Retrieved Data:</strong> <pre id="retrieved-data"></pre>
             </div>
             <div style="margin-top: 10px;">
                 <button onclick="testStripeSuccessRedirect()">Test Stripe Success Redirect</button>
             </div>
             <div style="margin-top: 10px;">
                 <strong>Test Status:</strong> <span id="test-status"></span>
-            </div>
-            <div style="margin-top: 10px;">
-                <strong>Retrieved Data:</strong> <pre id="retrieved-data"></pre>
             </div>
         `;
         document.body.appendChild(panel);
@@ -971,38 +971,36 @@
         }
     }
 
-    async function retrieveStoredData() {
-        try {
-            const storedDataString = localStorage.getItem('pendingConversionData');
-            if (!storedDataString) {
-                updateTestStatus("No stored conversion data found");
-                return;
-            }
+ async function retrieveStoredData() {
+    try {
+        const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
+        if (!pendingConversionDataString) {
+            updateTestStatus("No stored conversion data found");
+            return;
+        }
 
-            const storedData = JSON.parse(storedDataString);
-            console.log("Retrieved stored conversion data:", storedData);
+        const pendingConversionData = JSON.parse(pendingConversionDataString);
+        console.log("Retrieved pending conversion data:", pendingConversionData);
 
-            let retrievedData = storedData.inputData;
-            if (storedData.isFile) {
-                retrievedData = await window.retrieveFileFromTemporaryStorage(storedData.inputData);
-                retrievedData = retrievedData ? `File: ${retrievedData.name}` : "File retrieval failed";
-            }
+        let inputData = pendingConversionData.inputData;
+        const price = pendingConversionData.price;
 
-            updateTestStatus("Data retrieved successfully");
-            document.getElementById('retrieved-data').textContent = JSON.stringify({
-                inputData: retrievedData,
-                fileName: storedData.fileName,
-                lang: storedData.lang,
-                price: storedData.price
-            }, null, 2);
-
-            // Populate test inputs with retrieved data
-            if (storedData.isFile) {
-                document.getElementById('test-file-input').value = ''; // Reset file input
-                updateTestStatus("File data retrieved. Please select the file again for testing.");
+        if (pendingConversionData.isFile) {
+            console.log("Retrieving file from temporary storage");
+            const file = await window.retrieveFileFromTemporaryStorage(inputData);
+            if (file) {
+                inputData = file;
+                updateTestStatus(`File retrieved: ${file.name}`);
             } else {
-                document.getElementById('test-url-input').value = storedData.inputData;
+                updateTestStatus("Failed to retrieve file from temporary storage");
             }
+        } else {
+            console.log("Setting URL input");
+            document.getElementById('test-url-input').value = inputData;
+            updateTestStatus(`URL retrieved: ${inputData}`);
+        }
+
+            document.getElementById('retrieved-data').textContent = JSON.stringify(pendingConversionData, null, 2);
         } catch (error) {
             console.error("Error retrieving stored data:", error);
             updateTestStatus("Error: " + error.message);
@@ -1010,35 +1008,32 @@
     }
 
     async function testStripeSuccessRedirect() {
-        try {
-            const storedDataString = localStorage.getItem('pendingConversionData');
-            if (!storedDataString) {
-                updateTestStatus("No stored conversion data found. Please run a test input first.");
-                return;
-            }
-
-            const storedData = JSON.parse(storedDataString);
-            updateTestStatus("Simulating Stripe success redirect...");
-
-            // Simulate Stripe success redirect
-            const simulatedSessionId = 'test_session_' + Date.now();
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            // Call the actual handleStripeSuccessRedirect function
-            if (typeof window.handleStripeSuccessRedirect === 'function') {
-                await window.handleStripeSuccessRedirect({
-                    session_id: simulatedSessionId,
-                    ...storedData
-                });
-                updateTestStatus("Stripe success redirect simulation completed");
-            } else {
-                updateTestStatus("handleStripeSuccessRedirect function not found");
-            }
-        } catch (error) {
-            console.error("Error in Stripe success redirect test:", error);
-            updateTestStatus("Error: " + error.message);
+    try {
+        const pendingConversionDataString = sessionStorage.getItem('pendingConversionData');
+        if (!pendingConversionDataString) {
+            updateTestStatus("No stored conversion data found. Please run a test input first.");
+            return;
         }
+
+        const pendingConversionData = JSON.parse(pendingConversionDataString);
+        updateTestStatus("Simulating Stripe success redirect...");
+
+        // Simulate Stripe success redirect
+        const simulatedSessionId = 'test_session_' + Date.now();
+        sessionStorage.setItem('successfulPayment', JSON.stringify({ session_id: simulatedSessionId }));
+
+        // Call the actual handleStripeSuccessRedirect function
+        if (typeof window.handleStripeSuccessRedirect === 'function') {
+            await window.handleStripeSuccessRedirect();
+            updateTestStatus("Stripe success redirect simulation completed");
+        } else {
+            updateTestStatus("handleStripeSuccessRedirect function not found");
+        }
+    } catch (error) {
+        console.error("Error in Stripe success redirect test:", error);
+        updateTestStatus("Error: " + error.message);
     }
+}
 
     // Expose functions to global scope
     window.testInput = testInput;

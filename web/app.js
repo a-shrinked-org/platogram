@@ -175,16 +175,16 @@ function handleCoffeeCountClick(count) {
     const coffee2Button = document.getElementById("coffee-2");
     if (coffee1Button) {
       if (count === 1) {
-        coffee1Button.classList.add("bg-blue-500", "text-white");
+        coffee1Button.classList.add("bg-[#F9F0E8]", "text-black");
       } else {
-        coffee1Button.classList.remove("bg-blue-500", "text-white");
+        coffee1Button.classList.remove("bg-[#F9F0E8]", "text-black");
       }
     }
     if (coffee2Button) {
       if (count === 2) {
-        coffee2Button.classList.add("bg-blue-500", "text-white");
+        coffee2Button.classList.add("bg-[#F9F0E8]", "text-black");
       } else {
-        coffee2Button.classList.remove("bg-blue-500", "text-white");
+        coffee2Button.classList.remove("bg-[#F9F0E8]", "text-black");
       }
     }
     updateTotalPrice();

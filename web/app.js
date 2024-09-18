@@ -67,22 +67,19 @@ window.addEventListener('popstate', function() {
   }
 });
 
-async function generateIntercomHash(email) {
-    // In development, return null or a placeholder
+async function generateIntercomHash(userId) {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       console.warn('Intercom hash generation is not available in development mode');
       return null;
     }
 
-    // In production
     try {
-      // Fetch the hash from a Vercel serverless function
       const response = await fetch('/api/intercom-hash', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ userId }),
       });
 
       if (!response.ok) {
@@ -97,30 +94,30 @@ async function generateIntercomHash(email) {
     }
   }
 
-async function initializeIntercom(user = null) {
-  if (window.Intercom) {
-    if (user) {
-      // User is logged in
-      const hash = await generateIntercomHash(user.email);
-      window.Intercom("boot", {
-        api_base: "https://api-iam.intercom.io",
-        app_id: "i1z51z2x",
-        user_id: user.sub,
-        name: user.name,
-        email: user.email,
-        created_at: Math.floor(new Date(user.updated_at).getTime() / 1000),
-        user_hash: hash // Add this line
-      });
-    } else {
-      // User is not logged in
-      window.Intercom("boot", {
-        api_base: "https://api-iam.intercom.io",
-        app_id: "i1z51z2x"
-      });
+  async function initializeIntercom(user = null) {
+    if (window.Intercom) {
+      if (user) {
+        // User is logged in
+        const hash = await generateIntercomHash(user.sub);
+        window.Intercom("boot", {
+          api_base: "https://api-iam.intercom.io",
+          app_id: "i1z51z2x",
+          user_id: user.sub,
+          name: user.name,
+          email: user.email,
+          created_at: Math.floor(new Date(user.updated_at).getTime() / 1000),
+          user_hash: hash
+        });
+      } else {
+        // User is not logged in
+        window.Intercom("boot", {
+          api_base: "https://api-iam.intercom.io",
+          app_id: "i1z51z2x"
+        });
+      }
     }
   }
-}
-
+  
 window.updateAuthUI = function(isAuthenticated, user) {
     const loginButton = document.getElementById('login-button');
     const userCircle = document.getElementById('user-circle');

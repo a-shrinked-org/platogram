@@ -5,9 +5,9 @@ export default function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { email } = req.body;
-  if (!email) {
-    return res.status(400).json({ error: 'Email is required' });
+  const { userId } = req.body;
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID is required' });
   }
 
   const secretKey = process.env.INTERCOM_SECRET_KEY;
@@ -15,6 +15,6 @@ export default function handler(req, res) {
     return res.status(500).json({ error: 'Intercom secret key is not set' });
   }
 
-  const hash = crypto.createHmac('sha256', secretKey).update(email).digest('hex');
+  const hash = crypto.createHmac('sha256', secretKey).update(userId).digest('hex');
   res.status(200).json({ hash });
 }

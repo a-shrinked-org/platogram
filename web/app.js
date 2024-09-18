@@ -1043,7 +1043,7 @@ async function storeConversionData(inputData, lang, price, isAuth = false) {
         conversionData = {
             inputData: fileId,
             isFile: true,
-            fileName: fileName || inputData.name,
+            fileName: inputData.name,
             lang: lang,
             price: price,
             isAuth: isAuth
@@ -1052,7 +1052,7 @@ async function storeConversionData(inputData, lang, price, isAuth = false) {
         conversionData = {
             inputData: inputData,
             isFile: false,
-            fileName: fileName || inputData,
+            fileName: inputData, // For URLs, the fileName is the URL itself
             lang: lang,
             price: price,
             isAuth: isAuth
@@ -1354,7 +1354,7 @@ async function deleteFile(fileUrl) {
   }
 
   async function postToConvert(inputData, lang, sessionId, price, isTestMode = false) {
-    debugLog("postToConvert called", { inputData, lang, sessionId, price, isTestMode });
+    debugLog("postToConvert called", { inputData, lang, sessionId, price, isTestMode, fileName: storedFileName });
     let headers = {};
 
     try {
@@ -1595,18 +1595,18 @@ function pollStatus(token, isTestMode = false, fileName = "") {
             isConversionComplete = true;
             clearInterval(pollingInterval);
             clearProcessingStageInterval();
-            updateUIStatus("done", "Conversion completed successfully. Check your email for results.", fileName);
+            updateUIStatus("done", "Conversion completed successfully. Check your email for results.", storedFileName);
             console.log("Conversion complete, UI updated to 'done' state");
             resolve(result);
           } else if (result.status === "failed" || result.status === "error") {
             isConversionComplete = true;
             clearInterval(pollingInterval);
             clearProcessingStageInterval();
-            updateUIStatus("error", result.error || "An error occurred during conversion", fileName);
+            updateUIStatus("error", result.error || "An error occurred during conversion", storedFileName);
             console.log("Conversion failed, UI updated to 'error' state");
             reject(new Error(result.error || "Conversion failed"));
           } else if (["idle", "running", "processing"].includes(result.status)) {
-            updateUIStatus(result.status, `Conversion ${result.status}...`, fileName);
+              updateUIStatus(result.status, `Conversion ${result.status}...`, storedFileName);
             console.log(`Conversion still in progress (${result.status}), continuing to poll...`);
           } else {
             console.warn("Unknown status received:", result.status);
@@ -1800,13 +1800,19 @@ async function handleStripeSuccessRedirect() {
 
             debugLog("Retrieved fileName: " + fileName);
 
-            // Update the file name in the UI and store it
+            // Update the file name in the UI and store it globally
+            storedFileName = fileName || "Unknown file";
             const fileNameElement = document.getElementById("file-name");
             if (fileNameElement) {
-                fileNameElement.textContent = fileName || "Unknown file";
+                fileNameElement.textContent = storedFileName;
             }
-            storedFileName = fileName || "Unknown file";
             debugLog("Set storedFileName to: " + storedFileName);
+
+            // Restore input data to UI if it's a URL
+            if (!pendingConversionData.isFile) {
+                const urlInput = document.getElementById('url-input');
+                if (urlInput) urlInput.value = inputData;
+            }
 
             // Start the conversion process
             await handleConversion(inputData, lang, session_id, price, isTestMode);

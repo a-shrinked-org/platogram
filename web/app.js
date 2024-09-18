@@ -410,7 +410,7 @@ async function initAuth0() {
             },
             cacheLocation: "localstorage",
         });
-        debugLog("Auth0 client initialized successfully");
+        console.log("Auth0 client initialized successfully");
 
         // Handle the redirect flow
         if (window.location.search.includes("code=") && window.location.search.includes("state=")) {
@@ -418,13 +418,7 @@ async function initAuth0() {
             window.history.replaceState({}, document.title, window.location.pathname);
         }
 
-        // Check if the client is properly initialized
-        if (!auth0Client) {
-            throw new Error("Auth0 client initialization failed");
-        }
-
         auth0Initialized = true;
-        await updateUI();
         return auth0Client;
     } catch (error) {
         console.error("Error initializing Auth0:", error);
@@ -862,7 +856,8 @@ async function handlePaidConversion(inputData, price) {
     }
     console.log('User email retrieved', { email });
 
-    await storeConversionData(inputData, selectedLanguage, price, false);
+    // Remove this line as it's already done in onConvertClick
+    // await storeConversionData(inputData, selectedLanguage, price, false);
 
     const pendingConversionDataString = localStorage.getItem('pendingConversionData');
     const conversionData = JSON.parse(pendingConversionDataString);
@@ -1810,8 +1805,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('session_id')) {
-        await handleStripeSuccess(urlParams.get('session_id'));
+        if (urlParams.get('session_id')) {
+            await handleStripeSuccess(urlParams.get('session_id'));
+        }
+
+        updateUIStatus("idle");
+        updateUI().catch((error) => {
+            console.error("Error updating UI:", error);
+            updateUIStatus("idle");
+        });
+    } catch (error) {
+        console.error("Error during initialization:", error);
+        updateUIStatus("error", "Failed to initialize application. Please refresh and try again.");
     }
 });
 

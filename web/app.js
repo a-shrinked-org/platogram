@@ -572,7 +572,7 @@ function updateUIStatus(status, message = "") {
 
     const pendingConversionDataString = localStorage.getItem('pendingConversionData');
     const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
-    const displayFileName = storedFileName || document.getElementById("file-name")?.textContent || "Unknown file";
+    const displayFileName = storedFileName || pendingConversionData?.fileName || "Unknown file";
     debugLog("File name used in updateUIStatus: " + displayFileName);
     const userEmail = document.getElementById("user-email")?.textContent || "Unknown email";
 
@@ -1343,36 +1343,41 @@ async function deleteFile(fileUrl) {
 
   async function postToConvert(inputData, lang, sessionId, price, isTestMode = false) {
     debugLog("postToConvert called", { inputData, lang, sessionId, price, isTestMode, fileName: storedFileName });
-    let headers = {};
+    let headers = {
+        'Content-Type': 'application/json'
+    };
 
     try {
         const token = await getAuthToken();
-        headers.Authorization = `Bearer ${token}`;
+        if (token) {
+            headers.Authorization = `Bearer ${token}`;
+        }
     } catch (error) {
         console.error("Error getting auth token:", error);
-        throw new Error("Authentication failed. Please try logging in again.");
+        // Continue without the token if there's an error
     }
 
-    const formData = new FormData();
-    formData.append("lang", lang);
-    if (sessionId) {
-        formData.append('session_id', sessionId);
-    } else {
-        formData.append('price', price);
-    }
-    formData.append("payload", inputData);
-    if (isTestMode) {
-        formData.append('test_mode', 'true');
-    }
+    const payload = {
+        lang: lang,
+        payload: inputData,
+        ...(sessionId ? { session_id: sessionId } : { price: price || 0 }),
+        ...(isTestMode ? { test_mode: true } : {})
+    };
 
     try {
-        console.log("Sending data to Platogram for conversion:", Object.fromEntries(formData));
+        console.log("Sending data to Platogram for conversion:", payload);
         updateUIStatus("processing", "Sending conversion request...");
-        const response = await fetch("https://temporary.name/convert", {
-            method: "POST",
-            headers: headers,
-            body: formData,
-        });
+        const response = await Promise.race([
+            fetch("https://temporary.name/convert", {
+                method: "POST",
+                headers: headers,
+                body: JSON.stringify(payload),
+                mode: 'cors'
+            }),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Request timed out')), 30000)
+            )
+        ]);
 
         if (!response.ok) {
             const errorText = await response.text();
@@ -1385,14 +1390,18 @@ async function deleteFile(fileUrl) {
 
         if (result.message === "Conversion started" || result.status === "processing") {
             updateUIStatus("processing", "Conversion in progress...");
-            return await pollStatus(await auth0Client.getTokenSilently(), isTestMode);
+            return await pollStatus(await getAuthToken(), isTestMode);
         } else {
             updateUIStatus("error", "Unexpected response from server");
             throw new Error("Unexpected response from server");
         }
     } catch (error) {
         console.error("Error in postToConvert:", error);
-        updateUIStatus("error", error.message);
+        if (error.message.includes("Access-Control-Allow-Origin")) {
+            updateUIStatus("error", "Server configuration error. Please contact support.");
+        } else {
+            updateUIStatus("error", "Failed to start conversion. Please try again later.");
+        }
         throw error;
     }
 }
@@ -1814,6 +1823,7 @@ async function handleStripeSuccess(sessionId) {
     } catch (error) {
         console.error('Error in handleStripeSuccess:', error);
         updateUIStatus("error", "Error: " + error.message);
+        clearConversionData();
     }
 }
 

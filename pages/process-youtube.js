@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 
 export default function YouTubeProcessor() {
@@ -6,7 +6,7 @@ export default function YouTubeProcessor() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const iframeRef = useRef(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,27 +25,29 @@ export default function YouTubeProcessor() {
     }
   };
 
-  const handleDownload = (jsonData) => {
+  const handleDownload = async (jsonData) => {
     try {
+      setIsDownloading(true);
       const parsedData = JSON.parse(jsonData);
       if (parsedData.audio_url) {
-        // Create a hidden iframe
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-
-        // Set the iframe's source to the audio URL
-        iframe.src = parsedData.audio_url;
-
-        // Remove the iframe after a short delay
-        setTimeout(() => {
-          document.body.removeChild(iframe);
-        }, 5000); // Adjust this delay if needed
+        const response = await fetch(parsedData.audio_url);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `${parsedData.title || 'audio'}.${parsedData.ext || 'mp3'}`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
       } else {
         setError('No audio URL found in the response');
       }
     } catch (err) {
-      setError(`Error parsing JSON data: ${err.message}`);
+      setError(`Error downloading audio: ${err.message}`);
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -83,8 +85,9 @@ export default function YouTubeProcessor() {
                 <button
                   onClick={() => handleDownload(output.data)}
                   className="px-4 py-2 bg-green-500 text-white rounded"
+                  disabled={isDownloading}
                 >
-                  Download Audio
+                  {isDownloading ? 'Downloading...' : 'Download Audio'}
                 </button>
               )}
             </div>

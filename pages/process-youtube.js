@@ -24,9 +24,9 @@ export default function YouTubeProcessor() {
     }
   };
 
-  const handleDownload = () => {
-    if (result && result.audio_url) {
-      window.open(result.audio_url, '_blank');
+  const handleDownload = (url) => {
+    if (url) {
+      window.open(url, '_blank');
     }
   };
 
@@ -57,14 +57,19 @@ export default function YouTubeProcessor() {
           <pre className="bg-gray-100 p-4 rounded overflow-x-auto">
             {JSON.stringify(result, null, 2)}
           </pre>
-          {result.audio_url && (
-            <button
-              onClick={handleDownload}
-              className="mt-4 px-4 py-2 bg-green-500 text-white rounded"
-            >
-              Download Audio
-            </button>
-          )}
+          {result.map((output, index) => (
+            <div key={index}>
+              <h3 className="text-lg font-semibold mt-4 mb-2">{output.name || `Output ${index + 1}`}</h3>
+              {output.data && output.data.audio_url && (
+                <button
+                  onClick={() => handleDownload(output.data.audio_url)}
+                  className="px-4 py-2 bg-green-500 text-white rounded"
+                >
+                  Download Audio
+                </button>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>

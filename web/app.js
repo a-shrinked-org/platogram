@@ -1008,9 +1008,10 @@ async function simulateStripeCheckout(conversionData) {
     await handleStripeSuccess(null, true);
 }
 
-async function handleStripeSuccess(sessionId, isTestMode = false) {
+async function handleStripeSuccess(sessionId) {
+    console.log("handleStripeSuccess called with sessionId:", sessionId);
     try {
-        await ensureDbInitialized();
+        await ensureAuth0Initialized();
         const pendingConversionDataString = localStorage.getItem('pendingConversionData');
         console.log("Retrieved pendingConversionDataString:", pendingConversionDataString);
 
@@ -1019,34 +1020,27 @@ async function handleStripeSuccess(sessionId, isTestMode = false) {
         }
 
         const pendingConversionData = JSON.parse(pendingConversionDataString);
-        let inputData = pendingConversionData.inputData;
-        const lang = pendingConversionData.lang;
-        const price = pendingConversionData.price;
-        isTestMode = isTestMode || pendingConversionData.isTestMode || false;
+        console.log("Parsed pendingConversionData:", pendingConversionData);
 
-        // Clear the pending conversion data early to prevent double-processing
+        let { inputData, lang, price, isFile } = pendingConversionData;
+        const isTestMode = pendingConversionData.isTestMode || false;
+
+        // Clear the pending conversion data to prevent double-processing
         localStorage.removeItem('pendingConversionData');
 
-        let token = 'test_token';
-        if (!isTestMode) {
-            if (!auth0Client) {
-                throw new Error('Auth0 client not initialized');
-            }
-            const isAuthenticated = await auth0Client.isAuthenticated();
-            if (!isAuthenticated) {
-                throw new Error('User not authenticated');
-            }
-            token = await auth0Client.getTokenSilently();
-        }
+        console.log('Processing successful payment with data:', pendingConversionData);
 
-        if (pendingConversionData.isFile) {
-            console.log("Retrieving file from temporary storage:", inputData);
+        updateUIStatus("processing", "Processing successful payment...");
+
+        let token = isTestMode ? 'test_token' : await getAuthToken();
+
+        if (isFile) {
+            console.log("File input detected, proceeding to file upload");
             updateUIStatus("uploading", "Retrieving and uploading file...");
             const file = await retrieveFileFromTemporaryStorage(inputData);
             if (!file) {
                 throw new Error("Failed to retrieve file from temporary storage");
             }
-            console.log("File retrieved, uploading to Blob storage");
             inputData = await uploadFile(file, token, isTestMode);
             console.log("File uploaded successfully, URL:", inputData);
         } else {
@@ -1056,9 +1050,6 @@ async function handleStripeSuccess(sessionId, isTestMode = false) {
         // Start the conversion process
         updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
         await postToConvert(inputData, lang, sessionId, price, isTestMode);
-
-        // Generate and update job ID
-        updateJobIdInUI();
 
         // Update UI to show conversion has started
         updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
@@ -1211,12 +1202,11 @@ function handleStripeCancel() {
   updateUIStatus('idle');
 }
 
-// Add these to your initialization code
-if (window.location.pathname === '/success') {
-  handleStripeSuccess();
-} else if (window.location.pathname === '/cancel') {
-  handleStripeCancel();
-}
+//if (window.location.pathname === '/success') {
+//  handleStripeSuccess();
+//} else if (window.location.pathname === '/cancel') {
+//  handleStripeCancel();
+//}
 
 async function onConvertClick(event) {
     if (event) event.preventDefault();
@@ -1910,28 +1900,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         await initAuth0();
         console.log("Auth0 initialized");
 
-        console.log("Checking for payment success parameter");
-        const urlParams = new URLSearchParams(window.location.search);
-        console.log("URL parameters:", Object.fromEntries(urlParams));
-
-        if (urlParams.get('payment_success') === 'true') {
-            console.log("Detected successful payment redirect");
-            const successfulPayment = localStorage.getItem('successfulPayment');
-            console.log("successfulPayment from localStorage:", successfulPayment);
-
-            if (successfulPayment) {
-                const { session_id } = JSON.parse(successfulPayment);
-                console.log("Parsed session_id:", session_id);
-                localStorage.removeItem('successfulPayment');
-                console.log("Removed successfulPayment from localStorage");
-                console.log("Calling handleStripeSuccess");
-                await handleStripeSuccess(session_id);
-            } else {
-                console.error('No successful payment data found in localStorage');
-                updateUIStatus("error", "Payment data not found");
-            }
+        // Check if we're returning from a successful Stripe payment
+        const successfulPayment = localStorage.getItem('successfulPayment');
+        if (successfulPayment) {
+            console.log("Detected successful payment");
+            const { session_id } = JSON.parse(successfulPayment);
+            localStorage.removeItem('successfulPayment');
+            await handleStripeSuccess(session_id);
         } else {
-            console.log("No payment_success parameter detected");
+            console.log("No successful payment detected");
             const isAuthenticated = await auth0Client.isAuthenticated();
             console.log("User authenticated:", isAuthenticated);
 

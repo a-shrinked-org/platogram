@@ -890,13 +890,14 @@
                 localStorage.setItem('pendingConversionData', JSON.stringify(decodedData));
 
                 // Simulate successful payment data
-                sessionStorage.setItem('successfulPayment', JSON.stringify({ session_id: 'test_session_' + Date.now() }));
+                const testSessionId = 'test_session_' + Date.now();
+                localStorage.setItem('successfulPayment', JSON.stringify({ session_id: testSessionId }));
 
                 // Call the function from app.js to handle the conversion
-                if (typeof window.handleStripeSuccessRedirect === 'function') {
-                    window.handleStripeSuccessRedirect();
+                if (typeof window.handleStripeSuccess === 'function') {
+                    window.handleStripeSuccess(testSessionId);
                 } else {
-                    console.error('handleStripeSuccessRedirect function not found');
+                    console.error('handleStripeSuccess function not found');
                 }
 
                 // Clear the URL parameters
@@ -938,39 +939,36 @@
     }
 
     async function simulateConversionFlow(isFile, inputData) {
-    try {
-        let fileId;
-        let fileName;
-        if (isFile) {
-            fileId = await window.storeFileTemporarily(inputData);
-            fileName = inputData.name;
-        } else {
-            fileName = inputData; // For URLs, fileName is the URL itself
+        try {
+            let fileId;
+            let fileName = isFile ? inputData.name : inputData;
+            if (isFile) {
+                fileId = await window.storeFileTemporarily(inputData);
+            }
+            // Store conversion data
+            const conversionData = {
+                inputData: isFile ? fileId : inputData,
+                isFile: isFile,
+                fileName: fileName,
+                lang: TEST_LANG,
+                price: TEST_PRICE,
+                isTestMode: true
+            };
+            localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
+            console.log('Stored conversion data:', conversionData);
+            updateTestStatus("Conversion data stored. Simulating Stripe redirect in 3 seconds...");
+
+            // Simulate delay before redirect to intermediate page
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // Simulate redirect to intermediate page
+            updateTestStatus("Redirecting to intermediate page...");
+            window.location.href = `/test-intermediate?paymentSuccess=true&conversionData=${encodeURIComponent(JSON.stringify(conversionData))}`;
+        } catch (error) {
+            console.error("Error in test flow:", error);
+            updateTestStatus("Error: " + error.message);
         }
-        // Store conversion data
-        const conversionData = {
-            inputData: isFile ? fileId : inputData,
-            isFile: isFile,
-            fileName: fileName,
-            lang: TEST_LANG,
-            price: TEST_PRICE,
-            isTestMode: true
-        };
-        localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
-        console.log('Stored conversion data:', conversionData);
-        updateTestStatus("Conversion data stored. Simulating Stripe redirect in 3 seconds...");
-
-        // Simulate delay before redirect
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        // Simulate Stripe success redirect
-        const testSessionId = 'test_session_' + Date.now();
-        localStorage.setItem('successfulPayment', JSON.stringify({ session_id: testSessionId }));
-    } catch (error) {
-        console.error("Error in test flow:", error);
-        updateTestStatus("Error: " + error.message);
     }
-}
 
     async function testURLInput() {
         const urlInput = document.getElementById('test-url-input');
@@ -1000,8 +998,7 @@
 
     // Call this function when the DOM is loaded
     document.addEventListener('DOMContentLoaded', createTestPanel);
-    </script>
-<script>
+</script>
     (function(){var w=window;var ic=w.Intercom;if(typeof ic==="function"){ic('reattach_activator');ic('update',w.intercomSettings);}else{var d=document;var i=function(){i.c(arguments);};i.q=[];i.c=function(args){i.q.push(args);};w.Intercom=i;var l=function(){var s=d.createElement('script');s.type='text/javascript';s.async=true;s.src='https://widget.intercom.io/widget/i1z51z2x';var x=d.getElementsByTagName('script')[0];x.parentNode.insertBefore(s,x);};if(document.readyState==='complete'){l();}else if(w.attachEvent){w.attachEvent('onload',l);}else{w.addEventListener('load',l,false);}}})();
   </script>
 </body>

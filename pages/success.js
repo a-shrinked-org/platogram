@@ -10,10 +10,13 @@ export default function Success() {
         const { session_id } = router.query;
         if (session_id) {
             setStatus('Payment successful! Redirecting...');
-            // Store the session_id in sessionStorage for app.js to access
-            sessionStorage.setItem('successfulPayment', JSON.stringify({ session_id }));
+
+            // Store the session_id and any pending conversion data in localStorage
+            localStorage.setItem('successfulPayment', JSON.stringify({ session_id }));
+
+            // Redirect to the main page with a success parameter
             setTimeout(() => {
-                window.location.href = '/';  // Redirect to the main page
+                window.location.href = '/?payment_success=true';
             }, 3000); // Redirect after 3 seconds
         } else {
             setStatus('Error: Invalid session');

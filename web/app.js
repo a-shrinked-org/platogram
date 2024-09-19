@@ -117,7 +117,7 @@ async function generateIntercomHash(userId) {
       }
     }
   }
-  
+
 window.updateAuthUI = function(isAuthenticated, user) {
     const loginButton = document.getElementById('login-button');
     const userCircle = document.getElementById('user-circle');
@@ -530,9 +530,9 @@ async function getAuthToken() {
 
 async function checkOngoingConversion() {
     try {
-        // Check if we're handling a redirect
-        if (sessionStorage.getItem('isAuthenticating') || sessionStorage.getItem('successfulPayment')) {
-            console.log("Skipping ongoing conversion check due to active redirect handling");
+        const isAuthenticated = await auth0Client.isAuthenticated();
+        if (!isAuthenticated) {
+            console.log("User not authenticated, skipping ongoing conversion check");
             return;
         }
 
@@ -551,7 +551,7 @@ async function checkOngoingConversion() {
         console.log("Current conversion status:", result.status);
 
         if (result.status && result.status !== 'idle') {
-            updateUIStatus(result.status, `Conversion ${result.status}...`);
+            updateUIStatus(result.status, `Conversion ${result.status}...`, storedFileName);
             if (['running', 'processing'].includes(result.status)) {
                 pollStatus(token);
             }
@@ -1173,7 +1173,12 @@ function handleStripeRedirect() {
 async function handleAuthReturn() {
     console.log("Handling auth return");
     const pendingConversionDataString = localStorage.getItem('pendingConversionData');
-    if (pendingConversionDataString) {
+
+    if (pendingStripeSession) {
+        console.log("Found pending Stripe session, handling success");
+        localStorage.removeItem('pendingStripeSession');
+        await handleStripeSuccess(pendingStripeSession);
+    } else {
         const pendingConversionData = JSON.parse(pendingConversionDataString);
         if (pendingConversionData.isAuth) {
             localStorage.removeItem('pendingConversionData');
@@ -1508,7 +1513,9 @@ async function login() {
         console.log("Current pendingConversionData:", localStorage.getItem('pendingConversionData'));
 
         console.log("Redirecting to Auth0 login page...");
-        await auth0Client.loginWithRedirect();
+        await auth0Client.loginWithRedirect({
+            appState: { returnTo: window.location.pathname + window.location.search }
+        });
 
         // Update Intercom after successful login
         const user = await auth0Client.getUser();
@@ -1813,55 +1820,53 @@ async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
     }
 }
 
-async function handleStripeSuccessRedirect() {
+async function handleStripeSuccess(sessionId) {
     try {
         await ensureAuth0Initialized();
+        const isAuthenticated = await auth0Client.isAuthenticated();
 
-        const successfulPayment = sessionStorage.getItem('successfulPayment');
-        if (successfulPayment) {
-            const { session_id } = JSON.parse(successfulPayment);
-            sessionStorage.removeItem('successfulPayment');
-
-            const pendingConversionDataString = localStorage.getItem('pendingConversionData');
-            console.log("Retrieved pendingConversionDataString:", pendingConversionDataString);
-
-            if (!pendingConversionDataString) {
-                throw new Error('No pending conversion data found');
-            }
-            const pendingConversionData = JSON.parse(pendingConversionDataString);
-            localStorage.removeItem('pendingConversionData');
-
-            console.log('Handling Stripe success redirect with data:', pendingConversionData);
-
-            let { inputData, lang, price, isFile } = pendingConversionData;
-            const isTestMode = pendingConversionData.isTestMode || session_id.startsWith('test_');
-
-            // Restore the input data to the UI
-            if (isFile) {
-                console.log("Retrieving file from temporary storage");
-                const file = await retrieveFileFromTemporaryStorage(inputData);
-                if (file) {
-                    inputData = file;
-                    handleFiles([file]);
-                    storedFileName = file.name;
-                }
-            } else {
-                console.log("Setting URL input");
-                const urlInput = document.getElementById('url-input');
-                if (urlInput) urlInput.value = inputData;
-                storedFileName = inputData;
-            }
-
-            console.log("Set storedFileName to:", storedFileName);
-
-            // Start the conversion process
-            await handleConversion(inputData, lang, session_id, price, isTestMode);
-        } else {
-            console.error('No successful payment data found');
-            updateUIStatus("error", "Payment data not found");
+        if (!isAuthenticated) {
+            console.log("User not authenticated, redirecting to login");
+            // Store the session ID for after login
+            localStorage.setItem('pendingStripeSession', sessionId);
+            await login();
+            return;
         }
+
+        const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+        if (!pendingConversionDataString) {
+            throw new Error('No pending conversion data found');
+        }
+
+        const pendingConversionData = JSON.parse(pendingConversionDataString);
+        localStorage.removeItem('pendingConversionData');
+
+        console.log('Handling Stripe success with data:', pendingConversionData);
+
+        let { inputData, lang, price, isFile } = pendingConversionData;
+        const isTestMode = pendingConversionData.isTestMode || sessionId.startsWith('test_');
+
+        if (isFile) {
+            console.log("Retrieving file from temporary storage");
+            const file = await retrieveFileFromTemporaryStorage(inputData);
+            if (file) {
+                inputData = file;
+                handleFiles([file]);
+                storedFileName = file.name;
+            }
+        } else {
+            console.log("Setting URL input");
+            const urlInput = document.getElementById('url-input');
+            if (urlInput) urlInput.value = inputData;
+            storedFileName = inputData;
+        }
+
+        console.log("Set storedFileName to:", storedFileName);
+
+        // Start the conversion process
+        await handleConversion(inputData, lang, sessionId, price, isTestMode);
     } catch (error) {
-        console.error('Error handling Stripe success redirect:', error);
+        console.error('Error handling Stripe success:', error);
         updateUIStatus("error", `Error: ${error.message}`);
     }
 }
@@ -1898,8 +1903,23 @@ document.addEventListener("DOMContentLoaded", async () => {
             await testIndexedDB();
             await initAuth0();
 
-            // Handle successful payment if redirected from success page
-            await handleSuccessfulPayment();
+            // Check for successful payment redirect
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('payment_success') === 'true') {
+                console.log("Detected successful payment redirect");
+                const successfulPayment = localStorage.getItem('successfulPayment');
+                if (successfulPayment) {
+                    const { session_id } = JSON.parse(successfulPayment);
+                    localStorage.removeItem('successfulPayment');  // Clear the stored data
+                    await handleStripeSuccess(session_id);
+                } else {
+                    console.error('No successful payment data found');
+                    updateUIStatus("error", "Payment data not found");
+                }
+            } else {
+                // Handle other cases
+                await checkOngoingConversion();
+            }
 
             await checkOngoingConversion();
 
@@ -1913,14 +1933,13 @@ document.addEventListener("DOMContentLoaded", async () => {
                 await handleAuthReturn();
             } else {
                 console.log("Not returning from authentication");
-                // Only handle Stripe redirects if not authenticating
-                if (window.location.pathname === '/success') {
-                    await handleStripeSuccessRedirect();
-                } else {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    if (urlParams.get('session_id')) {
-                        await handleStripeSuccess(urlParams.get('session_id'));
-                    }
+                // Check if there's any pending conversion after login
+                const pendingConversionData = localStorage.getItem('pendingConversionData');
+                if (pendingConversionData) {
+                    console.log("Found pending conversion data");
+                    const conversionData = JSON.parse(pendingConversionData);
+                    localStorage.removeItem('pendingConversionData');
+                    await handleConversion(conversionData.inputData, conversionData.lang, conversionData.sessionId, conversionData.price, conversionData.isTestMode);
                 }
             }
         });

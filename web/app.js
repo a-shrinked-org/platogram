@@ -639,6 +639,7 @@ function updateUIStatus(status, message = "") {
             attachResetButtonListener();
             isConversionComplete = true;
             console.log("Conversion complete, UI updated to 'done' state");
+            clearConversionData();
             break;
         case "error":
             toggleSection("error-section");
@@ -653,11 +654,19 @@ function updateUIStatus(status, message = "") {
             }
             clearProcessingStageInterval();
             attachResetButtonListener();
+            clearConversionData();
             break;
         default:
             console.warn(`Unknown status: ${status}`);
             toggleSection("input-section");
     }
+}
+
+// Add this function to clear all conversion-related localStorage data
+function clearConversionData() {
+    localStorage.removeItem('pendingConversionData');
+    localStorage.removeItem('successfulPayment');
+    console.log("Cleared all conversion-related localStorage data");
 }
 
 function attachResetButtonListener() {
@@ -743,6 +752,7 @@ async function reset() {
     if (fileNameElement) fileNameElement.textContent = "";
 
     updateUIStatus("idle");  // Set status to idle after reset
+    clearConversionData();
     pollStatus(token);
   } catch (error) {
     console.error("Error resetting:", error);
@@ -1863,6 +1873,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             await handleStripeSuccess(session_id);
         } else {
             console.log("No successful payment detected");
+            clearConversionData();
             const isAuthenticated = await auth0Client.isAuthenticated();
             console.log("User authenticated:", isAuthenticated);
 

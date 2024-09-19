@@ -509,7 +509,8 @@ async function getAuthToken() {
         }
         const isAuthenticated = await auth0Client.isAuthenticated();
         if (!isAuthenticated) {
-            throw new Error("User is not authenticated");
+            console.log("User is not authenticated");
+            return null;
         }
         const token = await auth0Client.getTokenSilently({
             audience: "https://platogram.vercel.app",
@@ -520,11 +521,7 @@ async function getAuthToken() {
         return token;
     } catch (error) {
         console.error("Error getting auth token:", error);
-        if (error.message.includes("Login required")) {
-            // Redirect to login if not authenticated
-            await login();
-        }
-        throw new Error("Authentication failed. Please try logging in again.");
+        return null;
     }
 }
 
@@ -693,22 +690,22 @@ async function updateUI() {
         initializeIntercom(user);
 
         // Only poll status if authenticated and not in idle state
-        const currentStatus = getCurrentUIStatus();
-        if (currentStatus !== "idle") {
-          const token = await auth0Client.getTokenSilently({
-            audience: "https://platogram.vercel.app",
-          });
-          await pollStatus(token);
+            const currentStatus = getCurrentUIStatus();
+            if (currentStatus !== "idle") {
+                const token = await auth0Client.getTokenSilently({
+                    audience: "https://platogram.vercel.app",
+                });
+                await pollStatus(token);
+            } else {
+                updateUIStatus("idle"); // Ensure idle state is set
+            }
         } else {
-          updateUIStatus("idle"); // Ensure idle state is set
-        }
-      } else {
-        window.updateAuthUI(false, null);
-        updateUIStatus("idle"); // Set to idle state for non-authenticated users
+            window.updateAuthUI(false, null);
+            updateUIStatus("idle"); // Set to idle state for non-authenticated users
 
-        // Initialize Intercom without user data
-        initializeIntercom();
-      }
+            // Initialize Intercom without user data
+            initializeIntercom();
+        }
     } catch (error) {
       console.error("Error updating UI:", error);
       updateUIStatus("idle"); // Set to idle state on error
@@ -1917,11 +1914,14 @@ document.addEventListener("DOMContentLoaded", async () => {
                     updateUIStatus("error", "Payment data not found");
                 }
             } else {
-                // Handle other cases
-                await checkOngoingConversion();
+                // Only check for ongoing conversions if the user is authenticated
+                const isAuthenticated = await auth0Client.isAuthenticated();
+                if (isAuthenticated) {
+                    await checkOngoingConversion();
+                } else {
+                    console.log("User not authenticated, skipping ongoing conversion check");
+                }
             }
-
-            await checkOngoingConversion();
 
             // Generate initial job ID
             updateJobIdInUI();
@@ -1942,6 +1942,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                     await handleConversion(conversionData.inputData, conversionData.lang, conversionData.sessionId, conversionData.price, conversionData.isTestMode);
                 }
             }
+
+            // Update UI based on authentication status
+            updateUI().catch((error) => {
+                console.error("Error updating UI:", error);
+                updateUIStatus("idle"); // Set to idle state if update fails
+            });
         });
 
 document.addEventListener("DOMContentLoaded", () => {

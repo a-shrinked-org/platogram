@@ -878,6 +878,58 @@ async function storeFileTemporarily(file) {
     });
 }
 
+async function processYoutubeUrl(youtubeUrl) {
+    try {
+        const response = await fetch('/api/process-youtube', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ youtubeUrl }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to process YouTube URL');
+        }
+
+        const result = await response.json();
+        return result[0].data; // Assuming the first item in the array contains the data we need
+    } catch (error) {
+        console.error('Error processing YouTube URL:', error);
+        throw error;
+    }
+}
+
+async function downloadYoutubeAudio(audioData) {
+    try {
+        const parsedData = JSON.parse(audioData);
+        if (parsedData.audio_url) {
+            const response = await fetch('/api/download-audio', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    url: parsedData.audio_url,
+                    title: parsedData.title
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to download audio');
+            }
+
+            const blob = await response.blob();
+            return blob;
+        } else {
+            throw new Error('No audio URL found in the response');
+        }
+    } catch (error) {
+        console.error('Error downloading YouTube audio:', error);
+        throw error;
+    }
+}
+
 // Retrieve file from IndexedDB
 async function retrieveFileFromTemporaryStorage(id) {
     await ensureDbInitialized();
@@ -943,6 +995,15 @@ async function handleSubmit(event) {
             if (inputData instanceof File) {
                 updateUIStatus("uploading", "Uploading file...");
                 const uploadedUrl = await uploadFile(inputData);
+                inputData = uploadedUrl;
+            } else if (inputData.includes('youtube.com') || inputData.includes('youtu.be')) {
+                // Process YouTube URL
+                updateUIStatus("processing", "Processing YouTube URL...");
+                const processedData = await processYoutubeUrl(inputData);
+                const audioBlob = await downloadYoutubeAudio(processedData);
+                const file = new File([audioBlob], `${JSON.parse(processedData).title}.mp3`, { type: 'audio/mpeg' });
+                updateUIStatus("uploading", "Uploading processed YouTube audio...");
+                const uploadedUrl = await uploadFile(file);
                 inputData = uploadedUrl;
             }
             updateUIStatus("preparing", "File uploaded, preparing to start conversion...");

@@ -68,7 +68,24 @@ export default async function handler(req, res) {
       const result = await pollJobStatus(jobId);
       console.log(`Job completed. Result:`, result);
 
-      return res.status(200).json(result);
+      // Parse the result to extract the audio_url and other relevant information
+      const parsedResult = result.map(output => {
+        if (output.type === 'str' && output.data) {
+          try {
+            const parsedData = JSON.parse(output.data);
+            return {
+              ...output,
+              data: parsedData
+            };
+          } catch (error) {
+            console.error('Error parsing output data:', error);
+            return output;
+          }
+        }
+        return output;
+      });
+
+      return res.status(200).json(parsedResult);
     } catch (error) {
       console.error('Error processing YouTube URL:', error);
       return res.status(500).json({ error: 'An error occurred while processing the YouTube URL', details: error.message });

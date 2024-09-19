@@ -9,7 +9,9 @@ export default async function handler(req, res) {
     }
 
     try {
-      const response = await axios.get(url, {
+      const response = await axios({
+        method: 'get',
+        url: url,
         responseType: 'stream'
       });
 
@@ -21,7 +23,7 @@ export default async function handler(req, res) {
       response.data.pipe(res);
     } catch (error) {
       console.error('Error downloading audio:', error);
-      res.status(500).json({ error: 'An error occurred while downloading the audio' });
+      res.status(500).json({ error: 'An error occurred while downloading the audio', details: error.message });
     }
   } else {
     res.setHeader('Allow', ['GET']);

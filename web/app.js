@@ -1890,6 +1890,9 @@ function safeUpdateProcessingStage() {
 document.addEventListener("DOMContentLoaded", async () => {
     console.log("DOM Content Loaded, starting initialization");
 
+    // Add a small delay
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     try {
         await initDB();
         console.log("DB initialized");
@@ -1902,10 +1905,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         // Check if we're returning from a successful Stripe payment
         const successfulPayment = localStorage.getItem('successfulPayment');
+        console.log("Checking for successfulPayment in localStorage:", successfulPayment);
+
         if (successfulPayment) {
             console.log("Detected successful payment");
             const { session_id } = JSON.parse(successfulPayment);
+            console.log("Parsed session_id:", session_id);
             localStorage.removeItem('successfulPayment');
+            console.log("Removed successfulPayment from localStorage");
             await handleStripeSuccess(session_id);
         } else {
             console.log("No successful payment detected");

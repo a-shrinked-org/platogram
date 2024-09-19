@@ -13,11 +13,12 @@ export default function Success() {
 
             // Store the session_id in localStorage
             localStorage.setItem('successfulPayment', JSON.stringify({ session_id }));
+            console.log('Stored successfulPayment in localStorage:', { session_id });
 
             // Redirect to the main page without a success parameter
             setTimeout(() => {
                 window.location.href = '/';
-            }, 3000); // Redirect after 3 seconds
+            }, 3000);  // Redirect after 3 seconds
         } else {
             setStatus('Error: Invalid session');
             setTimeout(() => {

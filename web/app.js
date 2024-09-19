@@ -1343,9 +1343,7 @@ async function deleteFile(fileUrl) {
 
   async function postToConvert(inputData, lang, sessionId, price, isTestMode = false) {
     debugLog("postToConvert called", { inputData, lang, sessionId, price, isTestMode, fileName: storedFileName });
-    let headers = {
-        'Content-Type': 'application/json'
-    };
+    let headers = {};
 
     try {
         const token = await getAuthToken();
@@ -1357,21 +1355,25 @@ async function deleteFile(fileUrl) {
         // Continue without the token if there's an error
     }
 
-    const payload = {
-        lang: lang,
-        payload: inputData,
-        ...(sessionId ? { session_id: sessionId } : { price: price || 0 }),
-        ...(isTestMode ? { test_mode: true } : {})
-    };
+    const formData = new FormData();
+    formData.append("lang", lang);
+    if (sessionId) {
+        formData.append('session_id', sessionId);
+    } else {
+        formData.append('price', price);
+    }
+    formData.append("payload", inputData);
+    if (isTestMode) {
+        formData.append('test_mode', 'true');
+    }
 
     try {
-        console.log("Sending data to Platogram for conversion:", payload);
+        console.log("Sending data to Platogram for conversion:", Object.fromEntries(formData));
         updateUIStatus("processing", "Sending conversion request...");
         const response = await fetch("https://temporary.name/convert", {
             method: "POST",
             headers: headers,
-            body: JSON.stringify(payload),
-            mode: 'cors'
+            body: formData,
         });
 
         if (!response.ok) {

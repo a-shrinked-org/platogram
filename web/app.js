@@ -1783,7 +1783,7 @@ async function handleStripeSuccess(sessionId) {
         const isTestMode = pendingConversionData.isTestMode || false;
 
         // Update storedFileName
-        storedFileName = fileName || inputData;
+        storedFileName = pendingConversionData.fileName || inputData;
 
         // Clear the pending conversion data to prevent double-processing
         localStorage.removeItem('pendingConversionData');

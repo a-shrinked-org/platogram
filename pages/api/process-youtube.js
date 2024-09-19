@@ -15,9 +15,7 @@ export default async function handler(req, res) {
         {
           function: "damn/youtube_audio_extractor",
           inputs: {
-            url: youtubeUrl,
-            resolution: "lowest-available",
-            include_audio: true
+            url: youtubeUrl
           }
         },
         {

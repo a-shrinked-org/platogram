@@ -1008,58 +1008,6 @@ async function simulateStripeCheckout(conversionData) {
     await handleStripeSuccess(null, true);
 }
 
-async function handleStripeSuccess(sessionId) {
-    console.log("handleStripeSuccess called with sessionId:", sessionId);
-    try {
-        await ensureAuth0Initialized();
-        const pendingConversionDataString = localStorage.getItem('pendingConversionData');
-        console.log("Retrieved pendingConversionDataString:", pendingConversionDataString);
-
-        if (!pendingConversionDataString) {
-            throw new Error('No pending conversion data found');
-        }
-
-        const pendingConversionData = JSON.parse(pendingConversionDataString);
-        console.log("Parsed pendingConversionData:", pendingConversionData);
-
-        let { inputData, lang, price, isFile } = pendingConversionData;
-        const isTestMode = pendingConversionData.isTestMode || false;
-
-        // Clear the pending conversion data to prevent double-processing
-        localStorage.removeItem('pendingConversionData');
-
-        console.log('Processing successful payment with data:', pendingConversionData);
-
-        updateUIStatus("processing", "Processing successful payment...");
-
-        let token = isTestMode ? 'test_token' : await getAuthToken();
-
-        if (isFile) {
-            console.log("File input detected, proceeding to file upload");
-            updateUIStatus("uploading", "Retrieving and uploading file...");
-            const file = await retrieveFileFromTemporaryStorage(inputData);
-            if (!file) {
-                throw new Error("Failed to retrieve file from temporary storage");
-            }
-            inputData = await uploadFile(file, token, isTestMode);
-            console.log("File uploaded successfully, URL:", inputData);
-        } else {
-            console.log("URL input detected, using directly:", inputData);
-        }
-
-        // Start the conversion process
-        updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
-        await postToConvert(inputData, lang, sessionId, price, isTestMode);
-
-        // Update UI to show conversion has started
-        updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
-
-    } catch (error) {
-        console.error('Error in handleStripeSuccess:', error);
-        updateUIStatus("error", "Error: " + error.message);
-    }
-}
-
 async function storeConversionData(inputData, lang, price, isAuth = false) {
     let conversionData;
     if (inputData instanceof File) {
@@ -1822,9 +1770,9 @@ async function handleStripeSuccess(sessionId) {
         console.log("Parsed pendingConversionData:", pendingConversionData);
 
         let { inputData, lang, price, isFile } = pendingConversionData;
-        isTestMode = isTestMode || pendingConversionData.isTestMode || sessionId.startsWith('test_');
+        const isTestMode = pendingConversionData.isTestMode || false;
 
-        // Clear the pending conversion data early to prevent double-processing
+        // Clear the pending conversion data to prevent double-processing
         localStorage.removeItem('pendingConversionData');
 
         console.log('Processing successful payment with data:', pendingConversionData);
@@ -1834,13 +1782,12 @@ async function handleStripeSuccess(sessionId) {
         let token = isTestMode ? 'test_token' : await getAuthToken();
 
         if (isFile) {
-            console.log("Retrieving file from temporary storage:", inputData);
+            console.log("File input detected, proceeding to file upload");
             updateUIStatus("uploading", "Retrieving and uploading file...");
             const file = await retrieveFileFromTemporaryStorage(inputData);
             if (!file) {
                 throw new Error("Failed to retrieve file from temporary storage");
             }
-            console.log("File retrieved, uploading to Blob storage");
             inputData = await uploadFile(file, token, isTestMode);
             console.log("File uploaded successfully, URL:", inputData);
         } else {

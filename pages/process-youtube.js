@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import axios from 'axios';
 
 export default function YouTubeProcessor() {
@@ -6,6 +6,7 @@ export default function YouTubeProcessor() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const iframeRef = useRef(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,9 +25,27 @@ export default function YouTubeProcessor() {
     }
   };
 
-  const handleDownload = (url) => {
-    if (url) {
-      window.open(url, '_blank');
+  const handleDownload = (jsonData) => {
+    try {
+      const parsedData = JSON.parse(jsonData);
+      if (parsedData.audio_url) {
+        // Create a hidden iframe
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+
+        // Set the iframe's source to the audio URL
+        iframe.src = parsedData.audio_url;
+
+        // Remove the iframe after a short delay
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 5000); // Adjust this delay if needed
+      } else {
+        setError('No audio URL found in the response');
+      }
+    } catch (err) {
+      setError(`Error parsing JSON data: ${err.message}`);
     }
   };
 
@@ -60,9 +79,9 @@ export default function YouTubeProcessor() {
           {result.map((output, index) => (
             <div key={index}>
               <h3 className="text-lg font-semibold mt-4 mb-2">{output.name || `Output ${index + 1}`}</h3>
-              {output.data && output.data.audio_url && (
+              {output.data && (
                 <button
-                  onClick={() => handleDownload(output.data.audio_url)}
+                  onClick={() => handleDownload(output.data)}
                   className="px-4 py-2 bg-green-500 text-white rounded"
                 >
                   Download Audio

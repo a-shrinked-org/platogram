@@ -1095,38 +1095,38 @@ async function storeConversionData(inputData, lang, price, isAuth = false) {
     console.log("Stored conversion data:", conversionData);
 }
 
-async function handleSuccessfulPayment() {
-    try {
-        await ensureAuth0Initialized();
-        const successfulPayment = sessionStorage.getItem('successfulPayment');
-        if (!successfulPayment) {
-            console.log('No successful payment data found, skipping payment processing');
-            return; // Exit if no payment data is found
-        }
+// async function handleSuccessfulPayment() {
+//     try {
+//         await ensureAuth0Initialized();
+//         const successfulPayment = sessionStorage.getItem('successfulPayment');
+//         if (!successfulPayment) {
+//             console.log('No successful payment data found, skipping payment processing');
+//             return; // Exit if no payment data is found
+//         }
 
-        const { session_id } = JSON.parse(successfulPayment);
-        sessionStorage.removeItem('successfulPayment');  // Clear the stored data
+//         const { session_id } = JSON.parse(successfulPayment);
+//         sessionStorage.removeItem('successfulPayment');  // Clear the stored data
 
-        const pendingConversionDataString = localStorage.getItem('pendingConversionData');
-        if (!pendingConversionDataString) {
-            console.log('No pending conversion data found, skipping payment processing');
-            return; // Exit if no conversion data is found
-        }
+//         const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+//         if (!pendingConversionDataString) {
+//             console.log('No pending conversion data found, skipping payment processing');
+//             return; // Exit if no conversion data is found
+//         }
 
-        const pendingConversionData = JSON.parse(pendingConversionDataString);
-        localStorage.removeItem('pendingConversionData');
+//         const pendingConversionData = JSON.parse(pendingConversionDataString);
+//         localStorage.removeItem('pendingConversionData');
 
-        console.log('Processing successful payment with data:', pendingConversionData);
+//         console.log('Processing successful payment with data:', pendingConversionData);
 
-        updateUIStatus("processing", "Processing successful payment...");
-        const isTestMode = pendingConversionData.isTestMode || session_id.startsWith('test_');
-        const token = isTestMode ? 'test_token' : await getAuthToken();
-        await processConversion(pendingConversionData, session_id, isTestMode, token);
-    } catch (error) {
-        console.error('Error processing payment:', error);
-        updateUIStatus("error", `Error processing payment: ${error.message}`);
-    }
-}
+//         updateUIStatus("processing", "Processing successful payment...");
+//         const isTestMode = pendingConversionData.isTestMode || session_id.startsWith('test_');
+//         const token = isTestMode ? 'test_token' : await getAuthToken();
+//         await processConversion(pendingConversionData, session_id, isTestMode, token);
+//     } catch (error) {
+//         console.error('Error processing payment:', error);
+//         updateUIStatus("error", `Error processing payment: ${error.message}`);
+//     }
+// }
 
 async function processConversion(conversionData, sessionId, isTestMode, token) {
     const { inputData, lang, price } = conversionData;
@@ -1824,7 +1824,6 @@ async function handleStripeSuccess(sessionId) {
 
         if (!isAuthenticated) {
             console.log("User not authenticated, redirecting to login");
-            // Store the session ID for after login
             localStorage.setItem('pendingStripeSession', sessionId);
             await login();
             return;
@@ -1838,10 +1837,12 @@ async function handleStripeSuccess(sessionId) {
         const pendingConversionData = JSON.parse(pendingConversionDataString);
         localStorage.removeItem('pendingConversionData');
 
-        console.log('Handling Stripe success with data:', pendingConversionData);
+        console.log('Processing successful payment with data:', pendingConversionData);
 
         let { inputData, lang, price, isFile } = pendingConversionData;
         const isTestMode = pendingConversionData.isTestMode || sessionId.startsWith('test_');
+
+        updateUIStatus("processing", "Processing successful payment...");
 
         if (isFile) {
             console.log("Retrieving file from temporary storage");
@@ -1860,8 +1861,8 @@ async function handleStripeSuccess(sessionId) {
 
         console.log("Set storedFileName to:", storedFileName);
 
-        // Start the conversion process
-        await handleConversion(inputData, lang, sessionId, price, isTestMode);
+        const token = isTestMode ? 'test_token' : await getAuthToken();
+        await processConversion(inputData, lang, sessionId, price, isTestMode, token);
     } catch (error) {
         console.error('Error handling Stripe success:', error);
         updateUIStatus("error", `Error: ${error.message}`);

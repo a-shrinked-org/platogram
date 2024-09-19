@@ -960,12 +960,12 @@
         console.log('Stored conversion data:', conversionData);
         updateTestStatus("Conversion data stored. Simulating Stripe redirect in 3 seconds...");
 
-        // Simulate delay before redirect to intermediate page
+        // Simulate delay before redirect
         await new Promise(resolve => setTimeout(resolve, 3000));
 
-        // Simulate redirect to intermediate page
-        updateTestStatus("Redirecting to intermediate page...");
-        window.location.href = `/test-intermediate?inputData=${encodeURIComponent(JSON.stringify(conversionData))}`;
+        // Simulate Stripe success redirect
+        const testSessionId = 'test_session_' + Date.now();
+        localStorage.setItem('successfulPayment', JSON.stringify({ session_id: testSessionId }));
     } catch (error) {
         console.error("Error in test flow:", error);
         updateTestStatus("Error: " + error.message);

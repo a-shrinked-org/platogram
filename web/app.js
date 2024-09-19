@@ -1128,18 +1128,18 @@ async function storeConversionData(inputData, lang, price, isAuth = false) {
 //     }
 // }
 
-async function processConversion(conversionData, sessionId, isTestMode, token) {
-    const { inputData, lang, price } = conversionData;
-    let processedInputData = inputData;
-    if (conversionData.isFile) {
-        updateUIStatus("uploading", "Retrieving and uploading file...");
-        const file = await retrieveFileFromTemporaryStorage(inputData);
-        processedInputData = await uploadFile(file, token, isTestMode);
-    }
-    updateUIStatus("preparing", "Starting conversion...");
-    await postToConvert(processedInputData, lang, sessionId, price, isTestMode);
-    updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
-}
+// async function processConversion(conversionData, sessionId, isTestMode, token) {
+//     const { inputData, lang, price } = conversionData;
+//     let processedInputData = inputData;
+//     if (conversionData.isFile) {
+//         updateUIStatus("uploading", "Retrieving and uploading file...");
+//         const file = await retrieveFileFromTemporaryStorage(inputData);
+//         processedInputData = await uploadFile(file, token, isTestMode);
+//    }
+//    updateUIStatus("preparing", "Starting conversion...");
+//    await postToConvert(processedInputData, lang, sessionId, price, isTestMode);
+//    updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
+//}
 
 function handleStripeRedirect() {
     const currentPath = window.location.pathname;
@@ -1817,55 +1817,53 @@ async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
     }
 }
 
-async function handleStripeSuccess(sessionId) {
+async function handleStripeSuccess(sessionId, isTestMode = false) {
     try {
         await ensureAuth0Initialized();
-        const isAuthenticated = await auth0Client.isAuthenticated();
-
-        if (!isAuthenticated) {
-            console.log("User not authenticated, redirecting to login");
-            localStorage.setItem('pendingStripeSession', sessionId);
-            await login();
-            return;
-        }
-
         const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+        console.log("Retrieved pendingConversionDataString:", pendingConversionDataString);
+
         if (!pendingConversionDataString) {
             throw new Error('No pending conversion data found');
         }
 
         const pendingConversionData = JSON.parse(pendingConversionDataString);
+        let { inputData, lang, price, isFile } = pendingConversionData;
+        isTestMode = isTestMode || pendingConversionData.isTestMode || sessionId.startsWith('test_');
+
+        // Clear the pending conversion data early to prevent double-processing
         localStorage.removeItem('pendingConversionData');
 
         console.log('Processing successful payment with data:', pendingConversionData);
 
-        let { inputData, lang, price, isFile } = pendingConversionData;
-        const isTestMode = pendingConversionData.isTestMode || sessionId.startsWith('test_');
-
         updateUIStatus("processing", "Processing successful payment...");
 
+        let token = isTestMode ? 'test_token' : await getAuthToken();
+
         if (isFile) {
-            console.log("Retrieving file from temporary storage");
+            console.log("Retrieving file from temporary storage:", inputData);
+            updateUIStatus("uploading", "Retrieving and uploading file...");
             const file = await retrieveFileFromTemporaryStorage(inputData);
-            if (file) {
-                inputData = file;
-                handleFiles([file]);
-                storedFileName = file.name;
+            if (!file) {
+                throw new Error("Failed to retrieve file from temporary storage");
             }
+            console.log("File retrieved, uploading to Blob storage");
+            inputData = await uploadFile(file, token, isTestMode);
+            console.log("File uploaded successfully, URL:", inputData);
         } else {
-            console.log("Setting URL input");
-            const urlInput = document.getElementById('url-input');
-            if (urlInput) urlInput.value = inputData;
-            storedFileName = inputData;
+            console.log("URL input detected, using directly:", inputData);
         }
 
-        console.log("Set storedFileName to:", storedFileName);
+        // Start the conversion process
+        updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
+        await postToConvert(inputData, lang, sessionId, price, isTestMode);
 
-        const token = isTestMode ? 'test_token' : await getAuthToken();
-        await processConversion(inputData, lang, sessionId, price, isTestMode, token);
+        // Update UI to show conversion has started
+        updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
+
     } catch (error) {
-        console.error('Error handling Stripe success:', error);
-        updateUIStatus("error", `Error: ${error.message}`);
+        console.error('Error in handleStripeSuccess:', error);
+        updateUIStatus("error", "Error: " + error.message);
     }
 }
 

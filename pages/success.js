@@ -11,7 +11,7 @@ export default function Success() {
         if (session_id) {
             setStatus('Payment successful! Redirecting...');
 
-            // Store the session_id and any pending conversion data in localStorage
+            // Store the session_id in localStorage
             localStorage.setItem('successfulPayment', JSON.stringify({ session_id }));
 
             // Redirect to the main page with a success parameter

@@ -6,7 +6,6 @@ export default function YouTubeProcessor() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -25,29 +24,17 @@ export default function YouTubeProcessor() {
     }
   };
 
-  const handleDownload = async (jsonData) => {
+  const handleDownload = (jsonData) => {
     try {
-      setIsDownloading(true);
       const parsedData = JSON.parse(jsonData);
       if (parsedData.audio_url) {
-        const response = await fetch(parsedData.audio_url);
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = `${parsedData.title || 'audio'}.${parsedData.ext || 'mp3'}`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+        const downloadUrl = `/api/download-audio?url=${encodeURIComponent(parsedData.audio_url)}&title=${encodeURIComponent(parsedData.title || 'audio')}`;
+        window.location.href = downloadUrl;
       } else {
         setError('No audio URL found in the response');
       }
     } catch (err) {
-      setError(`Error downloading audio: ${err.message}`);
-    } finally {
-      setIsDownloading(false);
+      setError(`Error parsing JSON data: ${err.message}`);
     }
   };
 
@@ -85,9 +72,8 @@ export default function YouTubeProcessor() {
                 <button
                   onClick={() => handleDownload(output.data)}
                   className="px-4 py-2 bg-green-500 text-white rounded"
-                  disabled={isDownloading}
                 >
-                  {isDownloading ? 'Downloading...' : 'Download Audio'}
+                  Download Audio
                 </button>
               )}
             </div>

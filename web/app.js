@@ -1817,7 +1817,8 @@ async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
     }
 }
 
-async function handleStripeSuccess(sessionId, isTestMode = false) {
+async function handleStripeSuccess(sessionId) {
+    console.log("handleStripeSuccess called with sessionId:", sessionId);
     try {
         await ensureAuth0Initialized();
         const pendingConversionDataString = localStorage.getItem('pendingConversionData');
@@ -1828,6 +1829,8 @@ async function handleStripeSuccess(sessionId, isTestMode = false) {
         }
 
         const pendingConversionData = JSON.parse(pendingConversionDataString);
+        console.log("Parsed pendingConversionData:", pendingConversionData);
+
         let { inputData, lang, price, isFile } = pendingConversionData;
         isTestMode = isTestMode || pendingConversionData.isTestMode || sessionId.startsWith('test_');
 
@@ -1895,59 +1898,56 @@ function safeUpdateProcessingStage() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
-            await initDB();
-            await testIndexedDB();
-            await initAuth0();
+    console.log("DOM Content Loaded, starting initialization");
 
-            // Check for successful payment redirect
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('payment_success') === 'true') {
-                console.log("Detected successful payment redirect");
-                const successfulPayment = localStorage.getItem('successfulPayment');
-                if (successfulPayment) {
-                    const { session_id } = JSON.parse(successfulPayment);
-                    localStorage.removeItem('successfulPayment');  // Clear the stored data
-                    await handleStripeSuccess(session_id);
-                } else {
-                    console.error('No successful payment data found');
-                    updateUIStatus("error", "Payment data not found");
-                }
+    try {
+        await initDB();
+        console.log("DB initialized");
+
+        await testIndexedDB();
+        console.log("IndexedDB tested");
+
+        await initAuth0();
+        console.log("Auth0 initialized");
+
+        console.log("Checking for payment success parameter");
+        const urlParams = new URLSearchParams(window.location.search);
+        console.log("URL parameters:", Object.fromEntries(urlParams));
+
+        if (urlParams.get('payment_success') === 'true') {
+            console.log("Detected successful payment redirect");
+            const successfulPayment = localStorage.getItem('successfulPayment');
+            console.log("successfulPayment from localStorage:", successfulPayment);
+
+            if (successfulPayment) {
+                const { session_id } = JSON.parse(successfulPayment);
+                console.log("Parsed session_id:", session_id);
+                localStorage.removeItem('successfulPayment');
+                console.log("Removed successfulPayment from localStorage");
+                console.log("Calling handleStripeSuccess");
+                await handleStripeSuccess(session_id);
             } else {
-                // Only check for ongoing conversions if the user is authenticated
-                const isAuthenticated = await auth0Client.isAuthenticated();
-                if (isAuthenticated) {
-                    await checkOngoingConversion();
-                } else {
-                    console.log("User not authenticated, skipping ongoing conversion check");
-                }
+                console.error('No successful payment data found in localStorage');
+                updateUIStatus("error", "Payment data not found");
             }
+        } else {
+            console.log("No payment_success parameter detected");
+            const isAuthenticated = await auth0Client.isAuthenticated();
+            console.log("User authenticated:", isAuthenticated);
 
-            // Generate initial job ID
-            updateJobIdInUI();
-
-            const isAuthenticating = sessionStorage.getItem('isAuthenticating');
-            if (isAuthenticating) {
-                console.log("Returning from authentication");
-                sessionStorage.removeItem('isAuthenticating');
-                await handleAuthReturn();
+            if (isAuthenticated) {
+                console.log("Checking ongoing conversion");
+                await checkOngoingConversion();
             } else {
-                console.log("Not returning from authentication");
-                // Check if there's any pending conversion after login
-                const pendingConversionData = localStorage.getItem('pendingConversionData');
-                if (pendingConversionData) {
-                    console.log("Found pending conversion data");
-                    const conversionData = JSON.parse(pendingConversionData);
-                    localStorage.removeItem('pendingConversionData');
-                    await handleConversion(conversionData.inputData, conversionData.lang, conversionData.sessionId, conversionData.price, conversionData.isTestMode);
-                }
+                console.log("User not authenticated, skipping ongoing conversion check");
             }
+        }
 
-            // Update UI based on authentication status
-            updateUI().catch((error) => {
-                console.error("Error updating UI:", error);
-                updateUIStatus("idle"); // Set to idle state if update fails
-            });
-        });
+        console.log("Initialization and checks complete");
+    } catch (error) {
+        console.error("Error during initialization or payment processing:", error);
+    }
+});
 
 document.addEventListener("DOMContentLoaded", () => {
     debugLog("DOM Content Loaded");

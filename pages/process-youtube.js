@@ -5,11 +5,13 @@ export default function YouTubeProcessor() {
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setResult(null);
+    setIsLoading(true);
 
     try {
       const response = await axios.post('/api/process-youtube', { youtubeUrl });
@@ -17,23 +19,14 @@ export default function YouTubeProcessor() {
     } catch (err) {
       setError('An error occurred while processing the YouTube URL');
       console.error(err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleDownload = () => {
     if (result && result.audio_url) {
-      // Create a hidden iframe
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
-
-      // Set the iframe's source to the audio URL
-      iframe.src = result.audio_url;
-
-      // Remove the iframe after a short delay
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-      }, 1000);
+      window.open(result.audio_url, '_blank');
     }
   };
 
@@ -49,8 +42,12 @@ export default function YouTubeProcessor() {
           className="w-full p-2 border rounded"
           required
         />
-        <button type="submit" className="mt-2 px-4 py-2 bg-blue-500 text-white rounded">
-          Process
+        <button
+          type="submit"
+          className="mt-2 px-4 py-2 bg-blue-500 text-white rounded"
+          disabled={isLoading}
+        >
+          {isLoading ? 'Processing...' : 'Process'}
         </button>
       </form>
       {error && <p className="text-red-500">{error}</p>}
@@ -60,12 +57,14 @@ export default function YouTubeProcessor() {
           <pre className="bg-gray-100 p-4 rounded overflow-x-auto">
             {JSON.stringify(result, null, 2)}
           </pre>
-          <button
-            onClick={handleDownload}
-            className="mt-4 px-4 py-2 bg-green-500 text-white rounded"
-          >
-            Download Audio
-          </button>
+          {result.audio_url && (
+            <button
+              onClick={handleDownload}
+              className="mt-4 px-4 py-2 bg-green-500 text-white rounded"
+            >
+              Download Audio
+            </button>
+          )}
         </div>
       )}
     </div>

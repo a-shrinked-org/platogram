@@ -17,7 +17,7 @@ export default function YouTubeProcessor() {
       const response = await axios.post('/api/process-youtube', { youtubeUrl });
       setResult(response.data);
     } catch (err) {
-      setError('An error occurred while processing the YouTube URL');
+      setError(`An error occurred while processing the YouTube URL: ${err.response?.data?.details || err.message}`);
       console.error(err);
     } finally {
       setIsLoading(false);

@@ -1847,9 +1847,6 @@ function safeUpdateProcessingStage() {
 document.addEventListener("DOMContentLoaded", async () => {
     console.log("DOM Content Loaded, starting initialization");
 
-    // Add a small delay
-    await new Promise(resolve => setTimeout(resolve, 100));
-
     try {
         await initDB();
         console.log("DB initialized");
@@ -1873,7 +1870,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             await handleStripeSuccess(session_id);
         } else {
             console.log("No successful payment detected");
-            clearConversionData();
             const isAuthenticated = await auth0Client.isAuthenticated();
             console.log("User authenticated:", isAuthenticated);
 
@@ -1884,6 +1880,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                 console.log("User not authenticated, skipping ongoing conversion check");
             }
         }
+
+        // Generate initial job ID
+        updateJobIdInUI();
 
         console.log("Initialization and checks complete");
     } catch (error) {
@@ -2154,5 +2153,4 @@ if (typeof window !== 'undefined') {
     window.uploadFile = uploadFile;
     window.postToConvert = postToConvert;
     window.handleAuthReturn = handleAuthReturn;
-    window.handleStripeSuccessRedirect = handleStripeSuccessRedirect;
 }

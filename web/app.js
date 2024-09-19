@@ -572,7 +572,7 @@ function updateUIStatus(status, message = "") {
 
     const pendingConversionDataString = localStorage.getItem('pendingConversionData');
     const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
-    const displayFileName = storedFileName || pendingConversionData?.fileName || "Unknown file";
+    const displayFileName = storedFileName || pendingConversionData?.fileName || document.getElementById("file-name")?.textContent || "Unknown file";
     debugLog("File name used in updateUIStatus: " + displayFileName);
     const userEmail = document.getElementById("user-email")?.textContent || "Unknown email";
 
@@ -1367,17 +1367,12 @@ async function deleteFile(fileUrl) {
     try {
         console.log("Sending data to Platogram for conversion:", payload);
         updateUIStatus("processing", "Sending conversion request...");
-        const response = await Promise.race([
-            fetch("https://temporary.name/convert", {
-                method: "POST",
-                headers: headers,
-                body: JSON.stringify(payload),
-                mode: 'cors'
-            }),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Request timed out')), 30000)
-            )
-        ]);
+        const response = await fetch("https://temporary.name/convert", {
+            method: "POST",
+            headers: headers,
+            body: JSON.stringify(payload),
+            mode: 'cors'
+        });
 
         if (!response.ok) {
             const errorText = await response.text();
@@ -1397,11 +1392,7 @@ async function deleteFile(fileUrl) {
         }
     } catch (error) {
         console.error("Error in postToConvert:", error);
-        if (error.message.includes("Access-Control-Allow-Origin")) {
-            updateUIStatus("error", "Server configuration error. Please contact support.");
-        } else {
-            updateUIStatus("error", "Failed to start conversion. Please try again later.");
-        }
+        updateUIStatus("error", "Failed to start conversion. Please try again later.");
         throw error;
     }
 }
@@ -1790,6 +1781,9 @@ async function handleStripeSuccess(sessionId) {
 
         let { inputData, lang, price, isFile } = pendingConversionData;
         const isTestMode = pendingConversionData.isTestMode || false;
+
+        // Update storedFileName
+        storedFileName = fileName || inputData;
 
         // Clear the pending conversion data to prevent double-processing
         localStorage.removeItem('pendingConversionData');

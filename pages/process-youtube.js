@@ -1,39 +1,73 @@
+import { useState } from 'react';
 import axios from 'axios';
 
-export default async function handler(req, res) {
-  if (req.method === 'POST') {
+export default function YouTubeProcessor() {
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setResult(null);
+
     try {
-      const { youtubeUrl } = req.body;
-
-      if (!youtubeUrl) {
-        return res.status(400).json({ error: 'YouTube URL is required' });
-      }
-
-      const client = axios.create();
-      const response = await client.post(
-        "https://mango.sievedata.com/v2/push",
-        {
-          function: "damn/youtube_audio_extractor",
-          inputs: {
-            url: youtubeUrl
-          }
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "X-API-Key": "B6s3PV-pbYz52uK9s-0dIC9LfMU09RoCwRokiGjjPq4",
-          }
-        }
-      );
-
-      // Return the response from the API
-      return res.status(200).json(response.data);
-    } catch (error) {
-      console.error('Error processing YouTube URL:', error);
-      return res.status(500).json({ error: 'An error occurred while processing the YouTube URL' });
+      const response = await axios.post('/api/process-youtube', { youtubeUrl });
+      setResult(response.data);
+    } catch (err) {
+      setError('An error occurred while processing the YouTube URL');
+      console.error(err);
     }
-  } else {
-    res.setHeader('Allow', ['POST']);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
-  }
+  };
+
+  const handleDownload = () => {
+    if (result && result.audio_url) {
+      // Create a hidden iframe
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+
+      // Set the iframe's source to the audio URL
+      iframe.src = result.audio_url;
+
+      // Remove the iframe after a short delay
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    }
+  };
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">YouTube Audio Extractor</h1>
+      <form onSubmit={handleSubmit} className="mb-4">
+        <input
+          type="text"
+          value={youtubeUrl}
+          onChange={(e) => setYoutubeUrl(e.target.value)}
+          placeholder="Enter YouTube URL"
+          className="w-full p-2 border rounded"
+          required
+        />
+        <button type="submit" className="mt-2 px-4 py-2 bg-blue-500 text-white rounded">
+          Process
+        </button>
+      </form>
+      {error && <p className="text-red-500">{error}</p>}
+      {result && (
+        <div>
+          <h2 className="text-xl font-semibold mb-2">Result:</h2>
+          <pre className="bg-gray-100 p-4 rounded overflow-x-auto">
+            {JSON.stringify(result, null, 2)}
+          </pre>
+          <button
+            onClick={handleDownload}
+            className="mt-4 px-4 py-2 bg-green-500 text-white rounded"
+          >
+            Download Audio
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }

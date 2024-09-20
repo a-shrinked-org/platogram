@@ -17,12 +17,13 @@ module.exports = {
   reactStrictMode: true,
 }
 
-const withMarkdoc = require('@markdoc/next.js');
-
-module.exports = withMarkdoc()({
-  pageExtensions: ['md', 'mdoc', 'js', 'jsx', 'ts', 'tsx'],
-  webpack: (config) => {
-    config.resolve.fallback = { fs: false, path: false };
-    return config;
+module.exports = {
+  async rewrites() {
+    return [
+      {
+        source: '/shrinked-vs-circleback',
+        destination: 'https://pdf.shrinked.ai/shrinked-vs-circleback/',
+      },
+    ];
   },
-});
+};

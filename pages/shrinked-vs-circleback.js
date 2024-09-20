@@ -3,40 +3,57 @@ import Head from 'next/head';
 
 export default function ShrinkdVsCirclebackPage() {
   const [content, setContent] = useState('');
-  const [frontmatter, setFrontmatter] = useState({});
 
   useEffect(() => {
-    async function loadContent() {
+    async function fetchContent() {
       try {
-        const Markdoc = (await import('@markdoc/markdoc')).default;
-        const response = await fetch('/content/shrinked-vs-circleback.md');
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const markdownContent = await response.text();
-        const ast = Markdoc.parse(markdownContent);
-        const frontmatter = Markdoc.frontmatter ? Markdoc.frontmatter(ast) : {};
-        const content = Markdoc.transform(ast);
-        const html = Markdoc.renderers.html(content);
-        setContent(html);
-        setFrontmatter(frontmatter);
+        const response = await fetch('https://pdf.shrinked.ai/shrinked-vs-circleback/');
+        const text = await response.text();
+        // Parse the HTML content and extract the main content
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(text, 'text/html');
+        const mainContent = doc.querySelector('main').innerHTML;
+        setContent(mainContent);
       } catch (error) {
-        console.error("Error loading content:", error);
-        setContent('<p>Error loading content. Please try again later.</p>');
+        console.error('Error fetching content:', error);
       }
     }
-    loadContent();
+    fetchContent();
   }, []);
 
   return (
     <>
       <Head>
-        <title>{frontmatter.title || 'Shrinked vs CircleBack'}</title>
-        <meta name="description" content={frontmatter.description || 'Comparison between Shrinked and CircleBack'} />
+        <title>Shrinked vs CircleBack: Superior Call Summarization</title>
+        <meta name="description" content="Discover why Shrinked is the better choice for summarizing calls and extracting valuable insights from audio and video content compared to CircleBack." />
+        <link rel="canonical" href="https://pdf.shrinked.ai/shrinked-vs-circleback/" />
       </Head>
-      <article className="container mx-auto px-4 py-8">
-        <div dangerouslySetInnerHTML={{ __html: content }} />
-      </article>
+      <div dangerouslySetInnerHTML={{ __html: content }} />
     </>
   );
+}
+
+// Add this for better SEO with static generation
+export async function getStaticProps() {
+  try {
+    const response = await fetch('https://pdf.shrinked.ai/shrinked-vs-circleback/');
+    const text = await response.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'text/html');
+    const mainContent = doc.querySelector('main').innerHTML;
+
+    return {
+      props: {
+        content: mainContent,
+      },
+      revalidate: 3600, // Revalidate every hour
+    };
+  } catch (error) {
+    console.error('Error fetching content:', error);
+    return {
+      props: {
+        content: '',
+      },
+    };
+  }
 }

@@ -1021,11 +1021,11 @@ async function handleSubmit(event) {
 
             // Generate and update job ID
             updateJobIdInUI();
-         finally {
-        if (submitButton) {
-            submitButton.disabled = false;
-            submitButton.textContent = "Submit";
-        }
+
+            if (submitButton) {
+                submitButton.disabled = false;
+                submitButton.textContent = "Submit";
+            }
     }
 }
 

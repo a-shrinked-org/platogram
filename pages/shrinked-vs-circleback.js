@@ -1,28 +1,10 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import Markdoc from '@markdoc/markdoc';
+import fs from 'fs';
+import path from 'path';
 
-export default function ShrinkdVsCirclebackPage() {
-  const [content, setContent] = useState('');
-  const [frontmatter, setFrontmatter] = useState({});
-
-  useEffect(() => {
-    async function loadContent() {
-      const Markdoc = (await import('@markdoc/markdoc')).default;
-      const response = await fetch('/content/shrinked-vs-circleback.md');
-      const markdownContent = await response.text();
-
-      const ast = Markdoc.parse(markdownContent);
-      const frontmatter = Markdoc.frontmatter(ast);
-      const content = Markdoc.transform(ast);
-      const html = Markdoc.renderers.html(content);
-
-      setContent(html);
-      setFrontmatter(frontmatter);
-    }
-
-    loadContent();
-  }, []);
-
+export default function ShrinkdVsCirclebackPage({ content, frontmatter }) {
   return (
     <>
       <Head>
@@ -34,4 +16,21 @@ export default function ShrinkdVsCirclebackPage() {
       </article>
     </>
   );
+}
+
+export async function getStaticProps() {
+  const filePath = path.join(process.cwd(), 'content', 'shrinked-vs-circleback.md');
+  const markdownContent = fs.readFileSync(filePath, 'utf8');
+
+  const ast = Markdoc.parse(markdownContent);
+  const frontmatter = Markdoc.frontmatter(ast);
+  const content = Markdoc.transform(ast);
+  const html = Markdoc.renderers.html(content);
+
+  return {
+    props: {
+      content: html,
+      frontmatter,
+    },
+  };
 }

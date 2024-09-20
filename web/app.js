@@ -67,6 +67,17 @@ window.addEventListener('popstate', function() {
   }
 });
 
+window.addEventListener('popstate', () => {
+  const route = window.location.pathname;
+  handleMarkdocRoute(route);
+});
+
+// Also call this on initial page load
+document.addEventListener('DOMContentLoaded', () => {
+  const route = window.location.pathname;
+  handleMarkdocRoute(route);
+});
+
 async function generateIntercomHash(userId) {
     if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
       console.warn('Intercom hash generation is not available in development mode');
@@ -953,6 +964,33 @@ async function testIndexedDB() {
     } else {
         console.error("IndexedDB test failed");
     }
+}
+
+function renderMarkdoc(content) {
+    const ast = Markdoc.parse(content);
+    const rendered = Markdoc.transform(ast);
+    return Markdoc.renderers.html(rendered);
+  }
+
+async function loadMarkdocContent(url) {
+      try {
+        const response = await fetch(url);
+        const markdocContent = await response.text();
+        return renderMarkdoc(markdocContent);
+      } catch (error) {
+        console.error('Error loading Markdoc content:', error);
+        return '<p>Error loading content.</p>';
+      }
+}
+
+async function handleMarkdocRoute(route) {
+        if (route === '/shrinked-vs-circleback') {
+          const content = await loadMarkdocContent('/shrinked-vs-circleback.md');
+          const mainContent = document.getElementById('main-content');
+          if (mainContent) {
+            mainContent.innerHTML = content;
+          }
+        }
 }
 
 function checkSessionStorage() {

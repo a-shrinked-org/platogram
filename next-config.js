@@ -16,3 +16,9 @@ module.exports = {
   pageExtensions: ['js', 'jsx', 'ts', 'tsx'],
   reactStrictMode: true,
 }
+
+const withMarkdoc = require('@markdoc/next.js');
+
+module.exports = withMarkdoc()({
+  pageExtensions: ['md', 'mdoc', 'js', 'jsx', 'ts', 'tsx']
+});

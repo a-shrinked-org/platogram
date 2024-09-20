@@ -1000,32 +1000,34 @@ async function handleSubmit(event) {
                 const uploadedUrl = await uploadFile(inputData);
                 inputData = uploadedUrl;
             } else if (inputData.includes('youtube.com') || inputData.includes('youtu.be')) {
-                try {
-                    console.log('Processing YouTube URL:', inputData);
-                    updateUIStatus("processing", "Processing YouTube URL...");
-                    const processedData = await processYoutubeUrl(inputData);
-                    console.log('Processed YouTube data:', processedData);
-                    const audioBlob = await downloadYoutubeAudio(processedData);
-                    console.log('Audio blob received:', audioBlob);
-                    const file = new File([audioBlob], `${processedData.title || 'youtube_audio'}.mp3`, { type: 'audio/mpeg' });
-                    updateUIStatus("uploading", "Uploading processed YouTube audio...");
-                    const uploadedUrl = await uploadFile(file);
-                    console.log('Uploaded URL:', uploadedUrl);
-                    inputData = uploadedUrl;
-                } catch (error) {
-                    console.error('Error processing YouTube URL:', error);
-                    updateUIStatus("error", `Error processing YouTube URL: ${error.message}`);
-                    return;
-                }
+                console.log('Processing YouTube URL:', inputData);
+                updateUIStatus("processing", "Processing YouTube URL...");
+                const processedData = await processYoutubeUrl(inputData);
+                console.log('Processed YouTube data:', processedData);
+                const audioBlob = await downloadYoutubeAudio(processedData);
+                console.log('Audio blob received:', audioBlob);
+                const file = new File([audioBlob], `${processedData.title || 'youtube_audio'}.mp3`, { type: 'audio/mpeg' });
+                updateUIStatus("uploading", "Uploading processed YouTube audio...");
+                const uploadedUrl = await uploadFile(file);
+                console.log('Uploaded URL:', uploadedUrl);
+                inputData = uploadedUrl;
             }
 
             // Generate and update job ID
             updateJobIdInUI();
+        }
 
-            if (submitButton) {
-                submitButton.disabled = false;
-                submitButton.textContent = "Submit";
-            }
+        // Call postToConvert here
+        await postToConvert(inputData, selectedLanguage, null, price, false);
+
+    } catch (error) {
+        console.error('Error in handleSubmit:', error);
+        updateUIStatus("error", `Error: ${error.message}`);
+    } finally {
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = "Submit";
+        }
     }
 }
 

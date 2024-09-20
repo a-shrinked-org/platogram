@@ -20,5 +20,9 @@ module.exports = {
 const withMarkdoc = require('@markdoc/next.js');
 
 module.exports = withMarkdoc()({
-  pageExtensions: ['md', 'mdoc', 'js', 'jsx', 'ts', 'tsx']
+  pageExtensions: ['md', 'mdoc', 'js', 'jsx', 'ts', 'tsx'],
+  webpack: (config) => {
+    config.resolve.fallback = { fs: false, path: false };
+    return config;
+  },
 });

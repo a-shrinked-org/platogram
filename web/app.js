@@ -887,12 +887,11 @@ async function processYoutubeUrl(youtubeUrl) {
             },
             body: JSON.stringify({ youtubeUrl }),
         });
-
         if (!response.ok) {
             throw new Error('Failed to process YouTube URL');
         }
-
         const result = await response.json();
+        console.log('processYoutubeUrl result:', result);
         return result[0].data; // Assuming the first item in the array contains the data we need
     } catch (error) {
         console.error('Error processing YouTube URL:', error);
@@ -902,23 +901,27 @@ async function processYoutubeUrl(youtubeUrl) {
 
 async function downloadYoutubeAudio(audioData) {
     try {
-        const parsedData = JSON.parse(audioData);
+        console.log('Raw audioData:', audioData);
+        let parsedData;
+        if (typeof audioData === 'string') {
+            parsedData = JSON.parse(audioData);
+        } else if (typeof audioData === 'object') {
+            parsedData = audioData;
+        } else {
+            throw new Error('Unexpected audioData format');
+        }
+        console.log('Parsed audioData:', parsedData);
+
         if (parsedData.audio_url) {
             const response = await fetch('/api/download-audio', {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    url: parsedData.audio_url,
-                    title: parsedData.title
-                }),
             });
-
             if (!response.ok) {
                 throw new Error('Failed to download audio');
             }
-
             const blob = await response.blob();
             return blob;
         } else {
@@ -997,17 +1000,23 @@ async function handleSubmit(event) {
                 const uploadedUrl = await uploadFile(inputData);
                 inputData = uploadedUrl;
             } else if (inputData.includes('youtube.com') || inputData.includes('youtu.be')) {
-                // Process YouTube URL
+            try {
+                console.log('Processing YouTube URL:', inputData);
                 updateUIStatus("processing", "Processing YouTube URL...");
                 const processedData = await processYoutubeUrl(inputData);
+                console.log('Processed YouTube data:', processedData);
                 const audioBlob = await downloadYoutubeAudio(processedData);
-                const file = new File([audioBlob], `${JSON.parse(processedData).title}.mp3`, { type: 'audio/mpeg' });
+                console.log('Audio blob received:', audioBlob);
+                const file = new File([audioBlob], `${processedData.title || 'youtube_audio'}.mp3`, { type: 'audio/mpeg' });
                 updateUIStatus("uploading", "Uploading processed YouTube audio...");
                 const uploadedUrl = await uploadFile(file);
+                console.log('Uploaded URL:', uploadedUrl);
                 inputData = uploadedUrl;
+            } catch (error) {
+                console.error('Error processing YouTube URL:', error);
+                updateUIStatus("error", `Error processing YouTube URL: ${error.message}`);
+                return;
             }
-            updateUIStatus("preparing", "File uploaded, preparing to start conversion...");
-            await postToConvert(inputData, selectedLanguage, null, price, false);
         }
 
         // Generate and update job ID

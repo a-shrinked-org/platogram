@@ -901,27 +901,21 @@ async function processYoutubeUrl(youtubeUrl) {
 
 async function downloadYoutubeAudio(audioData) {
     try {
-        console.log('Raw audioData:', audioData);
-        let parsedData;
-        if (typeof audioData === 'string') {
-            parsedData = JSON.parse(audioData);
-        } else if (typeof audioData === 'object') {
-            parsedData = audioData;
-        } else {
-            throw new Error('Unexpected audioData format');
-        }
-        console.log('Parsed audioData:', parsedData);
+        console.log('Parsed audioData:', audioData);
 
-        if (parsedData.audio_url) {
-            const response = await fetch('/api/download-audio', {
+        if (audioData.audio_url) {
+            const url = new URL('/api/download-audio', window.location.origin);
+            url.searchParams.append('url', audioData.audio_url);
+            url.searchParams.append('title', audioData.title || 'youtube_audio');
+
+            const response = await fetch(url, {
                 method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
             });
+
             if (!response.ok) {
-                throw new Error('Failed to download audio');
+                throw new Error(`Failed to download audio: ${response.statusText}`);
             }
+
             const blob = await response.blob();
             return blob;
         } else {

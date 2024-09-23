@@ -629,7 +629,6 @@ function updateUIStatus(status, message = "") {
             attachResetButtonListener();
             isConversionComplete = true;
             console.log("Conversion complete, UI updated to 'done' state");
-            clearConversionData();
             break;
         case "error":
             toggleSection("error-section");
@@ -1835,6 +1834,21 @@ async function handleStripeSuccess(sessionId) {
     console.log("handleStripeSuccess called with sessionId:", sessionId);
     try {
         await ensureAuth0Initialized();
+
+        // Check if the user is authenticated
+        const isAuthenticated = await auth0Client.isAuthenticated();
+        if (!isAuthenticated) {
+            console.log("User not authenticated, initiating login process");
+            await auth0Client.loginWithRedirect({
+                appState: { returnTo: window.location.pathname, pendingConversion: true }
+            });
+            return; // Exit the function as we're redirecting to login
+        }
+
+        // Fetch user details (for logging purposes)
+        const user = await auth0Client.getUser();
+        console.log("User authenticated:", user.email);
+
         const successfulPaymentString = localStorage.getItem('successfulPayment');
         console.log("Retrieved successfulPayment:", successfulPaymentString);
 

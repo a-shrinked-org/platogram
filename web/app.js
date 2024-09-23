@@ -562,7 +562,7 @@ async function checkOngoingConversion() {
 }
 
 function updateUIStatus(status, message = "") {
-    if (isConversionComplete && status !== "done" && status !== "error") return; // Allow updates for final states
+    if (isConversionComplete && status !== "done" && status !== "error" && status !== "idle") return; // Allow updates for final states
     debugLog(`Updating UI status: ${status}`);
     const inputSection = document.getElementById("input-section");
     const uploadProcessSection = document.getElementById("upload-process-section");
@@ -751,6 +751,7 @@ async function reset() {
     if (urlInput) urlInput.value = "";
     if (fileNameElement) fileNameElement.textContent = "";
 
+    isConversionComplete = false;
     updateUIStatus("idle");  // Set status to idle after reset
     clearConversionData();
     pollStatus(token);
@@ -1997,8 +1998,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // Definining image sources for each view
     const viewImages = {
         cells: './web/static/Assets/Abstract-image.png',
-        charts: './web/static/Assets/Contributors-image.png',
-        aisummary: './web/static/Assets/Chapters-image.png',
+        charts: './web/static/Assets/Chapters-image.png',
+        'ai-summary': './web/static/Assets/Contributors-image.png',
         tables: './web/static/Assets/Introduction-image.png',
         filters: './web/static/Assets/Conclusion-image.png'
     };
@@ -2025,7 +2026,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (elements.cellsButton) elements.cellsButton.addEventListener('click', () => changeImage('cells'));
     if (elements.chartsButton) elements.chartsButton.addEventListener('click', () => changeImage('charts'));
-    if (elements.aiSummaryButton) elements.aiSummaryButton.addEventListener('click', () => changeImage('aisummary'));
+    if (elements.aiSummaryButton) elements.aiSummaryButton.addEventListener('click', () => changeImage('ai-summary'));
     if (elements.tablesButton) elements.tablesButton.addEventListener('click', () => changeImage('tables'));
     if (elements.filtersButton) elements.filtersButton.addEventListener('click', () => changeImage('filters'));
 

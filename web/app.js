@@ -1172,14 +1172,22 @@ function handleStripeRedirect() {
 async function handleAuthReturn() {
     console.log("Handling auth return");
     const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+    console.log("Pending conversion data:", pendingConversionDataString);
 
-    if (pendingStripeSession) {
-        console.log("Found pending Stripe session, handling success");
-        localStorage.removeItem('pendingStripeSession');
-        await handleStripeSuccess(pendingStripeSession);
-    } else {
+     // if (pendingStripeSession) {
+    //     console.log("Found pending Stripe session, handling success");
+    //     localStorage.removeItem('pendingStripeSession');
+    //     await handleStripeSuccess(pendingStripeSession);
+    // } else {
+    //     // ... rest of the function
+    // }
+
+    // Instead, directly process the pendingConversionData
+    if (pendingConversionDataString) {
         const pendingConversionData = JSON.parse(pendingConversionDataString);
-        if (pendingConversionData.isAuth) {
+        console.log("Parsed pending conversion data:", pendingConversionData);
+
+        if (pendingConversionData && pendingConversionData.isAuth) {
             localStorage.removeItem('pendingConversionData');
             let inputData = pendingConversionData.inputData;
             const price = pendingConversionData.price;
@@ -1203,10 +1211,12 @@ async function handleAuthReturn() {
             // Show the language selection modal
             console.log("Showing language selection modal");
             showLanguageSelectionModal(inputData, price);
+        } else {
+            console.log("No auth-related pending conversion data found");
         }
+    } else {
+        console.log("No pending conversion data found");
     }
-    // Clear the authentication flag
-    sessionStorage.removeItem('isAuthenticating');
 }
 
 function handleStripeCancel() {

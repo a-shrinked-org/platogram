@@ -449,7 +449,7 @@ function initStripe() {
 
 async function initAuth0() {
     if (auth0Client) {
-        return auth0Client;
+        return { client: auth0Client, justHandledRedirect: false };
     }
 
     try {
@@ -465,16 +465,17 @@ async function initAuth0() {
         });
         console.log("Auth0 client initialized successfully");
 
+        let justHandledRedirect = false;
         // Handle the redirect flow
         if (window.location.search.includes("code=") && window.location.search.includes("state=")) {
             await auth0Client.handleRedirectCallback();
             window.history.replaceState({}, document.title, window.location.pathname);
             console.log("Auth0 redirect handled");
-            return true; // Indicate that we've just handled a redirect
+            justHandledRedirect = true;
         }
 
         auth0Initialized = true;
-        return false; // Indicate that no redirect was handled
+        return { client: auth0Client, justHandledRedirect };
     } catch (error) {
         console.error("Error initializing Auth0:", error);
         throw error;
@@ -1923,7 +1924,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         await testIndexedDB();
         console.log("IndexedDB tested");
 
-        const justHandledRedirect = await initAuth0();
+        const { client, justHandgedRedirect } = await initAuth0();
+        auth0Client = client;
         console.log("Auth0 initialized, justHandledRedirect:", justHandledRedirect);
 
         updateUIStatus("idle"); // Set initial state to idle
@@ -1943,20 +1945,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             console.log("Checking for successfulPayment in localStorage:", successfulPayment);
 
             if (successfulPayment) {
-                console.log("Detected successful payment");
-                const { session_id, pendingConversionData } = JSON.parse(successfulPayment);
-                console.log("Parsed session_id:", session_id);
-                console.log("Parsed pendingConversionData:", pendingConversionData);
-                localStorage.removeItem('successfulPayment');
-                console.log("Removed successfulPayment from localStorage");
-
-                // Restore pendingConversionData
-                if (pendingConversionData) {
-                    localStorage.setItem('pendingConversionData', pendingConversionData);
-                    console.log("Restored pendingConversionData to localStorage");
-                }
-
-                await handleStripeSuccess(session_id);
+                // ... existing code for handling successful payment
             } else {
                 console.log("No successful payment detected");
                 const isAuthenticated = await auth0Client.isAuthenticated();

@@ -553,7 +553,7 @@ async function checkOngoingConversion() {
     }
 }
 
-function updateUIStatus(status, message = "") {
+async function updateUIStatus(status, message = "") {
     if (isConversionComplete && status === "idle") {
         console.log("Preventing automatic reset to idle state");
         return; // Prevent automatic reset to idle when conversion is complete
@@ -570,7 +570,19 @@ function updateUIStatus(status, message = "") {
     const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
     const displayFileName = storedFileName || pendingConversionData?.fileName || document.getElementById("file-name")?.textContent || "Unknown file";
     debugLog("File name used in updateUIStatus: " + displayFileName);
-    const userEmail = document.getElementById("user-email")?.textContent || "Unknown email";
+
+    // Try to get the latest user email
+    let userEmail = "Unknown email";
+    try {
+        const user = await auth0Client.getUser();
+        userEmail = user.email;
+        const userEmailElement = document.getElementById("user-email");
+        if (userEmailElement) {
+            userEmailElement.textContent = userEmail;
+        }
+    } catch (error) {
+        console.error("Error fetching user email:", error);
+    }
 
     // Hide all sections first
     [inputSection, statusSection, uploadProcessSection, doneSection, errorSection].forEach(section => {
@@ -1887,9 +1899,15 @@ async function handleStripeSuccess(sessionId) {
             return; // Exit the function as we're redirecting to login
         }
 
-        // Fetch user details (for logging purposes)
+        // Fetch user details
         const user = await auth0Client.getUser();
         console.log("User authenticated:", user.email);
+
+        // Update UI with user email
+        const userEmailElement = document.getElementById("user-email");
+        if (userEmailElement) {
+            userEmailElement.textContent = user.email;
+        }
 
         const successfulPaymentString = localStorage.getItem('successfulPayment');
         console.log("Retrieved successfulPayment:", successfulPaymentString);
@@ -1944,7 +1962,6 @@ async function handleStripeSuccess(sessionId) {
             inputData = await uploadFile(file, token, isTestMode);
             console.log("File uploaded successfully, URL:", inputData);
         } else {
-            // This is a non-YouTube URL, use it directly
             console.log("Non-YouTube URL input detected, using directly:", inputData);
         }
 

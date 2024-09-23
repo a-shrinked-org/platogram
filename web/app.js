@@ -530,6 +530,12 @@ async function checkOngoingConversion() {
             }
         });
 
+        if (response.status === 502) {
+            console.log("Server is currently unavailable");
+            updateUIStatus("turn-off", "Our servers are currently undergoing maintenance. We'll be back soon!");
+            return;
+        }
+
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -546,10 +552,13 @@ async function checkOngoingConversion() {
                 console.log("Conversion complete, UI updated to 'done' state");
             }
         }
-        // Remove the else block that was setting the status to "idle"
     } catch (error) {
         console.error("Error checking ongoing conversion:", error);
-        // Don't update UI status to idle on error
+        if (error.message.includes("Load failed") || error.message.includes("NetworkError")) {
+            updateUIStatus("turn-off", "We're experiencing technical difficulties. Please try again later.");
+        } else {
+            updateUIStatus("error", "An unexpected error occurred. Please try again.");
+        }
     }
 }
 
@@ -663,6 +672,16 @@ async function updateUIStatus(status, message = "") {
             }
             clearProcessingStageInterval();
             attachResetButtonListener();
+            break;
+        case "turn-off":
+            toggleSection("turn-off-section");
+            if (turnOffSection) {
+                turnOffSection.innerHTML = `
+                    <h2 class="text-2xl font-bold mb-4">Service Temporarily Unavailable</h2>
+                    <p class="mb-4">${message}</p>
+                    <p>We apologize for the inconvenience. Please check back later.</p>
+                `;
+            }
             break;
         default:
             console.warn(`Unknown status: ${status}`);
@@ -1692,6 +1711,14 @@ function pollStatus(token, isTestMode = false, fileName = "") {
               ...(isTestMode ? { 'X-Test-Mode': 'true' } : {})
             },
           });
+
+          if (response.status === 502) {
+              console.log("Server is currently unavailable");
+              updateUIStatus("turn-off", "Our servers are currently undergoing maintenance. We'll be back soon!");
+              clearInterval(pollingInterval);
+              reject(new Error("Server unavailable"));
+              return;
+          }
 
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);

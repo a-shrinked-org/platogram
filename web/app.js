@@ -1835,8 +1835,16 @@ async function handleStripeSuccess(sessionId) {
     console.log("handleStripeSuccess called with sessionId:", sessionId);
     try {
         await ensureAuth0Initialized();
-        const pendingConversionDataString = localStorage.getItem('pendingConversionData');
-        console.log("Retrieved pendingConversionDataString:", pendingConversionDataString);
+        const successfulPaymentString = localStorage.getItem('successfulPayment');
+        console.log("Retrieved successfulPayment:", successfulPaymentString);
+
+        if (!successfulPaymentString) {
+            throw new Error('No successful payment data found');
+        }
+
+        const { session_id, pendingConversionData: pendingConversionDataString } = JSON.parse(successfulPaymentString);
+        console.log("Parsed session_id:", session_id);
+        console.log("Parsed pendingConversionDataString:", pendingConversionDataString);
 
         if (!pendingConversionDataString) {
             throw new Error('No pending conversion data found');
@@ -1845,14 +1853,13 @@ async function handleStripeSuccess(sessionId) {
         const pendingConversionData = JSON.parse(pendingConversionDataString);
         console.log("Parsed pendingConversionData:", pendingConversionData);
 
-        let { inputData, lang, price, isFile } = pendingConversionData;
-        const isTestMode = pendingConversionData.isTestMode || false;
+        let { inputData, lang, price, isFile, isTestMode } = pendingConversionData;
 
         // Update storedFileName
         storedFileName = pendingConversionData.fileName || inputData;
 
         // Clear the pending conversion data to prevent double-processing
-        localStorage.removeItem('pendingConversionData');
+        localStorage.removeItem('successfulPayment');
 
         console.log('Processing successful payment with data:', pendingConversionData);
 
@@ -1860,7 +1867,18 @@ async function handleStripeSuccess(sessionId) {
 
         let token = isTestMode ? 'test_token' : await getAuthToken();
 
-        if (isFile) {
+        if (inputData.includes('youtube.com') || inputData.includes('youtu.be')) {
+            console.log('Processing YouTube URL:', inputData);
+            updateUIStatus("processing", "Processing YouTube URL...");
+            const processedData = await processYoutubeUrl(inputData);
+            console.log('Processed YouTube data:', processedData);
+            const audioBlob = await downloadYoutubeAudio(processedData);
+            console.log('Audio blob received:', audioBlob);
+            const file = new File([audioBlob], `${processedData.title || 'youtube_audio'}.mp3`, { type: 'audio/mpeg' });
+            updateUIStatus("uploading", "Uploading processed YouTube audio...");
+            inputData = await uploadFile(file, token, isTestMode);
+            console.log('Uploaded URL:', inputData);
+        } else if (isFile) {
             console.log("File input detected, proceeding to file upload");
             updateUIStatus("uploading", "Retrieving and uploading file...");
             const file = await retrieveFileFromTemporaryStorage(inputData);
@@ -1870,12 +1888,13 @@ async function handleStripeSuccess(sessionId) {
             inputData = await uploadFile(file, token, isTestMode);
             console.log("File uploaded successfully, URL:", inputData);
         } else {
-            console.log("URL input detected, using directly:", inputData);
+            // This is a non-YouTube URL, use it directly
+            console.log("Non-YouTube URL input detected, using directly:", inputData);
         }
 
         // Start the conversion process
         updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
-        await postToConvert(inputData, lang, sessionId, price, isTestMode);
+        await postToConvert(inputData, lang, session_id, price, isTestMode);
 
         // Update UI to show conversion has started
         updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
@@ -1945,7 +1964,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             console.log("Checking for successfulPayment in localStorage:", successfulPayment);
 
             if (successfulPayment) {
-                // ... existing code for handling successful payment
+                console.log("Detected successful payment");
+                const { session_id } = JSON.parse(successfulPayment);
+                console.log("Parsed session_id:", session_id);
+                await handleStripeSuccess(session_id);
             } else {
                 console.log("No successful payment detected");
                 const isAuthenticated = await auth0Client.isAuthenticated();

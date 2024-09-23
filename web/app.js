@@ -718,37 +718,74 @@ async function updateUI() {
     }
     return "idle";
   }
-
+  
 async function reset() {
-  try {
-    if (!auth0Client) throw new Error("Auth0 client not initialized");
+    try {
+      console.log("Reset function called");
 
-    const token = await auth0Client.getTokenSilently({
-      audience: "https://platogram.vercel.app",
-    });
+      if (!auth0Client) {
+        console.error("Auth0 client not initialized");
+        throw new Error("Auth0 client not initialized");
+      }
 
-    const response = await fetch("https://temporary.name/reset", {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+      const token = await auth0Client.getTokenSilently({
+        audience: "https://platogram.vercel.app",
+      });
 
-    if (!response.ok) throw new Error("Failed to reset");
+      // Call the server-side reset endpoint
+      const response = await fetch("https://temporary.name/reset", {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    const urlInput = document.getElementById("url-input");
-    const fileNameElement = document.getElementById("file-name");
+      if (!response.ok) {
+        console.error("Server reset failed:", response.statusText);
+        throw new Error("Failed to reset on server");
+      }
 
-    if (urlInput) urlInput.value = "";
-    if (fileNameElement) fileNameElement.textContent = "";
+      console.log("Server reset successful");
 
-    isConversionComplete = false;
-    updateUIStatus("idle");  // Set status to idle after reset
-    clearConversionData();
-    pollStatus(token);
-  } catch (error) {
-    console.error("Error resetting:", error);
-    updateUIStatus("error", "Failed to reset. Please try again.");
+      // Reset UI elements
+      const urlInput = document.getElementById("url-input");
+      const fileNameElement = document.getElementById("file-name");
+      const fileNameDisplay = document.getElementById('file-name-display');
+      const convertFileButton = document.getElementById('convert-file-button');
+      const fileUploadPrompt = document.getElementById('file-upload-prompt');
+      const fileResetOption = document.getElementById('file-reset-option');
+
+      if (urlInput) urlInput.value = "";
+      if (fileNameElement) fileNameElement.textContent = "";
+      if (fileNameDisplay) fileNameDisplay.textContent = "";
+      if (convertFileButton) toggleConvertButtonState(false, convertFileButton);
+      if (fileUploadPrompt) fileUploadPrompt.classList.remove('hidden');
+      if (fileResetOption) fileResetOption.classList.add('hidden');
+
+      // Reset global variables
+      uploadedFile = null;
+      storedFileName = '';
+      isConversionComplete = false;
+      isConversionInProgress = false;
+
+      // Clear any stored conversion data
+      clearConversionData();
+
+      // Update UI status to idle
+      updateUIStatus("idle");
+
+      console.log("Reset complete, UI updated to idle state");
+
+      // Generate a new job ID
+      updateJobIdInUI();
+      pollStatus(token);
+
+      // Note: We're removing the pollStatus call as it's not necessary after a reset
+      // If you need to check the status again, it should be initiated by a new conversion process
+
+    } catch (error) {
+      console.error("Error during reset:", error);
+      updateUIStatus("error", "Failed to reset. Please try again.");
+    }
   }
-}
 
 function getPriceFromUI() {
   const coffeePrice = document.getElementById('coffee-price').textContent;

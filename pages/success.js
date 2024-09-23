@@ -11,9 +11,15 @@ export default function Success() {
         if (session_id) {
             setStatus('Payment successful! Redirecting...');
 
-            // Store the session_id in localStorage
-            localStorage.setItem('successfulPayment', JSON.stringify({ session_id }));
-            console.log('Stored successfulPayment in localStorage:', { session_id });
+            // Retrieve the existing pendingConversionData
+            const pendingConversionData = localStorage.getItem('pendingConversionData');
+
+            // Store both the session_id and pendingConversionData
+            localStorage.setItem('successfulPayment', JSON.stringify({
+                session_id,
+                pendingConversionData
+            }));
+            console.log('Stored successfulPayment in localStorage:', { session_id, pendingConversionData });
 
             // Redirect to the main page without a success parameter
             setTimeout(() => {

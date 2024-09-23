@@ -1927,27 +1927,44 @@ document.addEventListener("DOMContentLoaded", async () => {
         await initAuth0();
         console.log("Auth0 initialized");
 
-        // Check if we're returning from a successful Stripe payment
-        const successfulPayment = localStorage.getItem('successfulPayment');
-        console.log("Checking for successfulPayment in localStorage:", successfulPayment);
 
-        if (successfulPayment) {
-            console.log("Detected successful payment");
-            const { session_id } = JSON.parse(successfulPayment);
-            console.log("Parsed session_id:", session_id);
-            localStorage.removeItem('successfulPayment');
-            console.log("Removed successfulPayment from localStorage");
-            await handleStripeSuccess(session_id);
+        // Check if we're returning from Auth0
+        const isReturningFromAuth = sessionStorage.getItem('isAuthenticating');
+        if (isReturningFromAuth) {
+            console.log("Detected return from Auth0, handling auth return");
+            sessionStorage.removeItem('isAuthenticating');
+            await handleAuthReturn();
         } else {
-            console.log("No successful payment detected");
-            const isAuthenticated = await auth0Client.isAuthenticated();
-            console.log("User authenticated:", isAuthenticated);
+            // Check if we're returning from a successful Stripe payment
+            const successfulPayment = localStorage.getItem('successfulPayment');
+            console.log("Checking for successfulPayment in localStorage:", successfulPayment);
 
-            if (isAuthenticated) {
-                console.log("Checking ongoing conversion");
-                await checkOngoingConversion();
+            if (successfulPayment) {
+                console.log("Detected successful payment");
+                const { session_id, pendingConversionData } = JSON.parse(successfulPayment);
+                console.log("Parsed session_id:", session_id);
+                console.log("Parsed pendingConversionData:", pendingConversionData);
+                localStorage.removeItem('successfulPayment');
+                console.log("Removed successfulPayment from localStorage");
+
+                // Restore pendingConversionData
+                if (pendingConversionData) {
+                    localStorage.setItem('pendingConversionData', pendingConversionData);
+                    console.log("Restored pendingConversionData to localStorage");
+                }
+
+                await handleStripeSuccess(session_id);
             } else {
-                console.log("User not authenticated, skipping ongoing conversion check");
+                console.log("No successful payment detected");
+                const isAuthenticated = await auth0Client.isAuthenticated();
+                console.log("User authenticated:", isAuthenticated);
+
+                if (isAuthenticated) {
+                    console.log("Checking ongoing conversion");
+                    await checkOngoingConversion();
+                } else {
+                    console.log("User not authenticated, skipping ongoing conversion check");
+                }
             }
         }
 

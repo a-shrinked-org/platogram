@@ -545,17 +545,20 @@ async function checkOngoingConversion() {
                 isConversionComplete = true;
                 console.log("Conversion complete, UI updated to 'done' state");
             }
-        } else {
-            updateUIStatus("idle");
         }
+        // Remove the else block that was setting the status to "idle"
     } catch (error) {
         console.error("Error checking ongoing conversion:", error);
-        updateUIStatus("idle");
+        // Don't update UI status to idle on error
     }
 }
 
 function updateUIStatus(status, message = "") {
-    if (isConversionComplete && status !== "done" && status !== "error" && status !== "idle") return; // Allow updates for final states
+    if (isConversionComplete && status === "idle") {
+        console.log("Preventing automatic reset to idle state");
+        return; // Prevent automatic reset to idle when conversion is complete
+    }
+
     debugLog(`Updating UI status: ${status}`);
     const inputSection = document.getElementById("input-section");
     const uploadProcessSection = document.getElementById("upload-process-section");
@@ -632,7 +635,6 @@ function updateUIStatus(status, message = "") {
             }
             clearProcessingStageInterval();
             attachResetButtonListener();
-            clearConversionData();
             isConversionComplete = true;
             console.log("Conversion complete, UI updated to 'done' state");
             break;
@@ -649,11 +651,12 @@ function updateUIStatus(status, message = "") {
             }
             clearProcessingStageInterval();
             attachResetButtonListener();
-            clearConversionData();
             break;
         default:
             console.warn(`Unknown status: ${status}`);
-            toggleSection("input-section");
+            if (!isConversionComplete) {
+                toggleSection("input-section");
+            }
     }
 }
 
@@ -782,9 +785,6 @@ async function reset() {
 
         // Generate a new job ID
         updateJobIdInUI();
-
-        // Note: We're removing the pollStatus call as it's not necessary after a reset
-        // If you need to check the status again, it should be initiated by a new conversion process
 
     } catch (error) {
         console.error("Error during reset:", error);

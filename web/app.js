@@ -1924,7 +1924,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         await testIndexedDB();
         console.log("IndexedDB tested");
 
-        const { client, justHandgedRedirect } = await initAuth0();
+        const { client, justHandledRedirect } = await initAuth0();
         auth0Client = client;
         console.log("Auth0 initialized, justHandledRedirect:", justHandledRedirect);
 

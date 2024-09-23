@@ -452,20 +452,7 @@ async function initAuth0() {
         return auth0Client;
     }
 
-    const waitForAuth0 = () => {
-        return new Promise((resolve) => {
-            if (typeof auth0 !== 'undefined') {
-                resolve();
-            } else {
-                console.warn("Auth0 not loaded yet, retrying in 1 second...");
-                setTimeout(() => waitForAuth0().then(resolve), 1000);
-            }
-        });
-    };
-
     try {
-        await waitForAuth0();
-
         auth0Client = await auth0.createAuth0Client({
             domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
             clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
@@ -482,10 +469,12 @@ async function initAuth0() {
         if (window.location.search.includes("code=") && window.location.search.includes("state=")) {
             await auth0Client.handleRedirectCallback();
             window.history.replaceState({}, document.title, window.location.pathname);
+            console.log("Auth0 redirect handled");
+            return true; // Indicate that we've just handled a redirect
         }
 
         auth0Initialized = true;
-        return auth0Client;
+        return false; // Indicate that no redirect was handled
     } catch (error) {
         console.error("Error initializing Auth0:", error);
         throw error;
@@ -1924,15 +1913,19 @@ document.addEventListener("DOMContentLoaded", async () => {
         await testIndexedDB();
         console.log("IndexedDB tested");
 
-        await initAuth0();
-        console.log("Auth0 initialized");
+        const justHandledRedirect = await initAuth0();
+        console.log("Auth0 initialized, justHandledRedirect:", justHandledRedirect);
 
+        updateUIStatus("idle"); // Set initial state to idle
+        initStripe();
+        setupPriceUI();
 
-        // Check if we're returning from Auth0
-        const isReturningFromAuth = sessionStorage.getItem('isAuthenticating');
-        if (isReturningFromAuth) {
-            console.log("Detected return from Auth0, handling auth return");
-            sessionStorage.removeItem('isAuthenticating');
+        // Initialize Lucide icons
+        lucide.createIcons();
+        console.log('Lucide in');
+
+        if (justHandledRedirect) {
+            console.log("Just returned from Auth0, handling auth return");
             await handleAuthReturn();
         } else {
             // Check if we're returning from a successful Stripe payment
@@ -1971,22 +1964,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Generate initial job ID
         updateJobIdInUI();
 
+        // Set up UI elements and event listeners
+        setupUIElements();
+
+        // Update UI
+        await updateUI();
+
         console.log("Initialization and checks complete");
     } catch (error) {
         console.error("Error during initialization or payment processing:", error);
+        updateUIStatus("idle"); // Set to idle state if initialization fails
     }
 });
 
-document.addEventListener("DOMContentLoaded", () => {
-    debugLog("DOM Content Loaded");
-    updateUIStatus("idle"); // Set initial state to idle
-    initStripe();
-    setupPriceUI();
-
-    // Initialize Lucide icons
-    lucide.createIcons();
-    console.log('Lucide in');
-
+function setupUIElements() {
     const elements = {
         uploadIcon: document.querySelector(".upload-icon"),
         fileNameElement: document.getElementById("file-name"),
@@ -2012,33 +2003,10 @@ document.addEventListener("DOMContentLoaded", () => {
         dashboardImage: document.getElementById('dashboard-image')
     };
 
-    // Definining image sources for each view
-    const viewImages = {
-        cells: './web/static/Assets/Abstract-image.png',
-        charts: './web/static/Assets/Chapters-image.png',
-        'ai-summary': './web/static/Assets/Contributors-image.png',
-        tables: './web/static/Assets/Introduction-image.png',
-        filters: './web/static/Assets/Conclusion-image.png'
-    };
-
-    // Add event listener for userCircle
+    // Set up event listeners for UI elements
     if (elements.userCircle && elements.logoutTooltip) {
-        elements.userCircle.addEventListener('click', (event) => {
-            console.log('User circle clicked');
-            event.preventDefault();
-            event.stopPropagation();
-            elements.logoutTooltip.classList.toggle('hidden');
-            console.log('Tooltip hidden class toggled');
-            console.log('Tooltip is now ' + (elements.logoutTooltip.classList.contains('hidden') ? 'hidden' : 'visible'));
-            console.log('Tooltip classes:', elements.logoutTooltip.className);
-        });
-
-        // Add click event listener to document to close tooltip when clicking outside
-        document.addEventListener('click', (event) => {
-            if (!elements.userCircle.contains(event.target) && !elements.logoutTooltip.contains(event.target)) {
-                elements.logoutTooltip.classList.add('hidden');
-            }
-        });
+        elements.userCircle.addEventListener('click', handleUserCircleClick);
+        document.addEventListener('click', handleOutsideClick);
     }
 
     if (elements.cellsButton) elements.cellsButton.addEventListener('click', () => changeImage('cells'));
@@ -2053,101 +2021,112 @@ document.addEventListener("DOMContentLoaded", () => {
     if (enButton) enButton.onclick = () => selectLanguage('en');
     if (esButton) esButton.onclick = () => selectLanguage('es');
 
-    if (elements.uploadIcon) {
-        elements.uploadIcon.addEventListener("click", handleFileUpload);
-    }
-
-    if (elements.resetFileLink) {
-        elements.resetFileLink.addEventListener('click', (event) => {
-            event.preventDefault();
-            resetFileSelection();
-        });
-    }
-
-    if (elements.urlInput) {
-        elements.urlInput.addEventListener("input", () => {
-            if (elements.fileNameElement) elements.fileNameElement.textContent = "";
-            uploadedFile = null;
-            if (elements.convertButton) elements.convertButton.disabled = elements.urlInput.value.trim() === "";
-        });
-    }
-
-    if (elements.convertButton) {
-        elements.convertButton.addEventListener("click", onConvertClick);
-    }
-
-    if (elements.uploadFileButton) {
-        elements.uploadFileButton.addEventListener('click', () => {
-            toggleSections(elements.inputSection, elements.fileUploadSection);
-        });
-    }
-
-    if (elements.backToUrlButton) {
-        elements.backToUrlButton.addEventListener('click', () => {
-            resetFileSelection();
-            toggleSections(elements.fileUploadSection, elements.inputSection);
-        });
-    }
-
-    if (elements.fileDropArea) {
-        setupDragAndDrop(elements.fileDropArea, handleFiles);
-    }
-
-    if (elements.fileInput) {
-        elements.fileInput.addEventListener('change', (event) => {
-            handleFiles(event.target.files);
-        });
-    }
-
-    if (elements.convertFileButton) {
-        elements.convertFileButton.addEventListener('click', onConvertClick);
-    }
-
-    if (elements.loginButton) {
-        elements.loginButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            login();
-        });
-    }
-
-    if (elements.logoutButton) {
-        elements.logoutButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            logout();
-        });
-    }
-
-    function changeImage(type) {
-        if (elements.dashboardImage) {
-            elements.dashboardImage.src = viewImages[type];
-            elements.dashboardImage.alt = `Dashboard view: ${type}`;
-        }
-
-        // Update button styles
-        ['cells', 'charts', 'ai-summary', 'tables', 'filters'].forEach(viewType => {
-            const button = document.getElementById(`${viewType}-button`);
-            if (button) {
-                if (viewType === type) {
-                    button.classList.remove('bg-gray-100', 'text-gray-600');
-                    button.classList.add('bg-blue-100', 'text-blue-600');
-                } else {
-                    button.classList.remove('bg-blue-100', 'text-blue-600');
-                    button.classList.add('bg-gray-100', 'text-gray-600');
-                }
-            }
-        });
-
-        currentView = type;
-    }
+    if (elements.uploadIcon) elements.uploadIcon.addEventListener("click", handleFileUpload);
+    if (elements.resetFileLink) elements.resetFileLink.addEventListener('click', handleResetFileLink);
+    if (elements.urlInput) elements.urlInput.addEventListener("input", handleUrlInput);
+    if (elements.convertButton) elements.convertButton.addEventListener("click", onConvertClick);
+    if (elements.uploadFileButton) elements.uploadFileButton.addEventListener('click', handleUploadFileButton);
+    if (elements.backToUrlButton) elements.backToUrlButton.addEventListener('click', handleBackToUrlButton);
+    if (elements.fileDropArea) setupDragAndDrop(elements.fileDropArea, handleFiles);
+    if (elements.fileInput) elements.fileInput.addEventListener('change', handleFileInputChange);
+    if (elements.convertFileButton) elements.convertFileButton.addEventListener('click', onConvertClick);
+    if (elements.loginButton) elements.loginButton.addEventListener('click', handleLoginButton);
+    if (elements.logoutButton) elements.logoutButton.addEventListener('click', handleLogoutButton);
 
     // Initialize the default view
     changeImage(currentView);
+}
 
-    updateUI().catch((error) => {
-        console.error("Error updating UI:", error);
-        updateUIStatus("idle"); // Set to idle state if update fails
+// Add the missing changeImage function
+function changeImage(type) {
+    const image = document.getElementById('dashboard-image');
+    const viewImages = {
+        cells: './web/static/Assets/Abstract-image.png',
+        charts: './web/static/Assets/Chapters-image.png',
+        'ai-summary': './web/static/Assets/Contributors-image.png',
+        tables: './web/static/Assets/Introduction-image.png',
+        filters: './web/static/Assets/Conclusion-image.png'
+    };
+
+    if (image) {
+        image.src = viewImages[type] || '';
+        image.alt = `Dashboard view: ${type}`;
+    }
+
+    // Update button styles
+    ['cells', 'charts', 'ai-summary', 'tables', 'filters'].forEach(viewType => {
+        const button = document.getElementById(`${viewType}-button`);
+        if (button) {
+            if (viewType === type) {
+                button.classList.remove('bg-gray-100', 'text-gray-600');
+                button.classList.add('bg-blue-100', 'text-blue-600');
+            } else {
+                button.classList.remove('bg-blue-100', 'text-blue-600');
+                button.classList.add('bg-gray-100', 'text-gray-600');
+            }
+        }
     });
-});
+
+    currentView = type;
+}
+
+// Ensure all functions are in global scope
+if (typeof window !== 'undefined') {
+    // ... (keep your existing global assignments)
+    window.changeImage = changeImage;
+}
+
+// Add these handler functions
+function handleUserCircleClick(event) {
+    console.log('User circle clicked');
+    event.preventDefault();
+    event.stopPropagation();
+    document.getElementById('logout-tooltip').classList.toggle('hidden');
+}
+
+function handleOutsideClick(event) {
+    const userCircle = document.getElementById('user-circle');
+    const logoutTooltip = document.getElementById('logout-tooltip');
+    if (userCircle && logoutTooltip && !userCircle.contains(event.target) && !logoutTooltip.contains(event.target)) {
+        logoutTooltip.classList.add('hidden');
+    }
+}
+
+function handleResetFileLink(event) {
+    event.preventDefault();
+    resetFileSelection();
+}
+
+function handleUrlInput() {
+    const fileNameElement = document.getElementById("file-name");
+    const convertButton = document.getElementById('convert-button');
+    if (fileNameElement) fileNameElement.textContent = "";
+    uploadedFile = null;
+    if (convertButton) convertButton.disabled = this.value.trim() === "";
+}
+
+function handleUploadFileButton() {
+    toggleSections(document.getElementById('input-section'), document.getElementById('file-upload-section'));
+}
+
+function handleBackToUrlButton() {
+    resetFileSelection();
+    toggleSections(document.getElementById('file-upload-section'), document.getElementById('input-section'));
+}
+
+function handleFileInputChange(event) {
+    handleFiles(event.target.files);
+}
+
+function handleLoginButton(event) {
+    event.preventDefault();
+    login();
+}
+
+function handleLogoutButton(event) {
+    event.preventDefault();
+    logout();
+}
 
 let fileInput;
 

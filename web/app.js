@@ -545,7 +545,7 @@ async function checkOngoingConversion() {
         console.log("Current conversion status:", result.status);
 
         if (result.status && result.status !== 'idle') {
-            updateUIStatus(result.status, `Conversion ${result.status}...`, storedFileName);
+            updateUIStatus(result.status, `Shrinking complete. Your context-rich documents await in your inbox!`, storedFileName);
             if (['running', 'processing'].includes(result.status)) {
                 pollStatus(token);
             } else if (result.status === 'done') {
@@ -680,13 +680,24 @@ async function updateUIStatus(status, message = "") {
             attachResetButtonListener();
             break;
         case "turn-off":
-            toggleSection("turn-off-section");
             if (turnOffSection) {
+                turnOffSection.classList.remove("hidden");
                 turnOffSection.innerHTML = `
                     <h2 class="text-2xl font-bold mb-4">Service Temporarily Unavailable</h2>
                     <p class="mb-4">${message}</p>
                     <p>We apologize for the inconvenience. Please check back later.</p>
                 `;
+            } else {
+                console.error("Turn-off section not found in the DOM");
+                // Fallback to error section if turn-off section doesn't exist
+                if (errorSection) {
+                    errorSection.classList.remove("hidden");
+                    errorSection.innerHTML = `
+                        <h2 class="text-2xl font-bold mb-4">Service Temporarily Unavailable</h2>
+                        <p class="mb-4">${message}</p>
+                        <p>We apologize for the inconvenience. Please check back later.</p>
+                    `;
+                }
             }
             break;
         default:
@@ -1737,7 +1748,7 @@ function pollStatus(token, isTestMode = false, fileName = "") {
             isConversionComplete = true;
             clearInterval(pollingInterval);
             clearProcessingStageInterval();
-            updateUIStatus("done", "Conversion completed successfully. Check your email for results.");
+            updateUIStatus("done", "Shrinking complete. Your context-rich documents await in your inbox!");
             console.log("Conversion complete, UI updated to 'done' state");
             resolve(result);
           } else if (result.status === "failed" || result.status === "error") {

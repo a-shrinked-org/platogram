@@ -43,9 +43,7 @@ export default async function handler(req, res) {
       const { price, lang, email } = req.body;  // Add email to the destructured properties
 
       // Ensure HTTPS for the base URL
-      const baseUrl = process.env.NODE_ENV === 'production'
-        ? 'https://shrinked.ai'
-        : 'https://platogram.vercel.app';
+      const baseUrl = DOMAIN;
 
       // Create Stripe checkout session
       const session = await stripe.checkout.sessions.create({

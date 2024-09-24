@@ -472,9 +472,7 @@ async function initAuth0() {
             domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
             clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
             authorizationParams: {
-                redirect_uri: process.env.NODE_ENV === 'production'
-                    ? "https://shrinked.ai"
-                    : "https://platogram.vercel.app",
+                redirect_uri: DOMAIN,
                 audience: "https://platogram.vercel.app/",
                 scope: "openid profile email",
             },
@@ -743,7 +741,8 @@ function attachResetButtonListener() {
 
 async function updateUI() {
     try {
-      await initAuth0();
+      const { client } = await initAuth0();
+      auth0Client = client;
       const isAuthenticated = await auth0Client.isAuthenticated();
       const loginButton = document.getElementById("login-button");
       const logoutButton = document.getElementById("logout-button");
@@ -871,9 +870,7 @@ async function createCheckoutSession(price, lang) {
       return null;
     }
 
-    const domain = process.env.NODE_ENV === 'production'
-      ? 'https://shrinked.ai'
-      : 'https://platogram.vercel.app';
+    const domain = DOMAIN;
 
     try {
       const response = await fetch(`${domain}/api/create-checkout-session`, {

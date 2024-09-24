@@ -1107,50 +1107,63 @@ async function handleSubmit(event) {
 
 async function handlePaidConversion(inputData, price) {
     console.log('handlePaidConversion called', { price });
-    const user = await auth0Client.getUser();
-    const email = user.email || user["https://platogram.com/user_email"];
-    if (!email) {
-        throw new Error('User email not available');
-    }
-    console.log('User email retrieved', { email });
+    try {
+        const user = await auth0Client.getUser();
+        const email = user.email || user["https://platogram.com/user_email"];
+        if (!email) {
+            throw new Error('User email not available');
+        }
+        console.log('User email retrieved', { email });
 
-    // Remove this line as it's already done in onConvertClick
-    // await storeConversionData(inputData, selectedLanguage, price, false);
+        // Store the conversion data before creating the checkout session
+        await storeConversionData(inputData, selectedLanguage, price, false);
 
-    const pendingConversionDataString = localStorage.getItem('pendingConversionData');
-    const conversionData = JSON.parse(pendingConversionDataString);
-    console.log('Stored pendingConversionData:', conversionData);
+        const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+        if (!pendingConversionDataString) {
+            throw new Error('Failed to store conversion data');
+        }
 
-    if (testMode) {
-        console.log("Test mode: Simulating Stripe checkout");
-        await simulateStripeCheckout(conversionData);
-        return;
-    }
+        const conversionData = JSON.parse(pendingConversionDataString);
+        console.log('Stored pendingConversionData:', conversionData);
 
-    const response = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            price: price,
-            lang: selectedLanguage,
-            email: email,
-            inputData: conversionData.inputData
-        }),
-    });
+        if (!conversionData || !conversionData.inputData) {
+            throw new Error('Invalid conversion data');
+        }
 
-    if (!response.ok) {
-        throw new Error('Failed to create checkout session');
-    }
+        if (testMode) {
+            console.log("Test mode: Simulating Stripe checkout");
+            await simulateStripeCheckout(conversionData);
+            return;
+        }
 
-    const session = await response.json();
-    const result = await stripe.redirectToCheckout({
-        sessionId: session.id,
-    });
+        const response = await fetch('/api/create-checkout-session', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                price: price,
+                lang: selectedLanguage,
+                email: email,
+                inputData: conversionData.inputData
+            }),
+        });
 
-    if (result.error) {
-        throw new Error(result.error.message);
+        if (!response.ok) {
+            throw new Error('Failed to create checkout session');
+        }
+
+        const session = await response.json();
+        const result = await stripe.redirectToCheckout({
+            sessionId: session.id,
+        });
+
+        if (result.error) {
+            throw new Error(result.error.message);
+        }
+    } catch (error) {
+        console.error('Error in handlePaidConversion:', error);
+        updateUIStatus("error", `Error: ${error.message}`);
     }
 }
 
@@ -1163,28 +1176,33 @@ async function simulateStripeCheckout(conversionData) {
 
 async function storeConversionData(inputData, lang, price, isAuth = false) {
     let conversionData;
-    if (inputData instanceof File) {
-        const fileId = await storeFileTemporarily(inputData);
-        conversionData = {
-            inputData: fileId,
-            isFile: true,
-            fileName: inputData.name,
-            lang: lang,
-            price: price,
-            isAuth: isAuth
-        };
-    } else {
-        conversionData = {
-            inputData: inputData,
-            isFile: false,
-            fileName: inputData, // For URLs, the fileName is the URL itself
-            lang: lang,
-            price: price,
-            isAuth: isAuth
-        };
+    try {
+        if (inputData instanceof File) {
+            const fileId = await storeFileTemporarily(inputData);
+            conversionData = {
+                inputData: fileId,
+                isFile: true,
+                fileName: inputData.name,
+                lang: lang,
+                price: price,
+                isAuth: isAuth
+            };
+        } else {
+            conversionData = {
+                inputData: inputData,
+                isFile: false,
+                fileName: inputData, // For URLs, the fileName is the URL itself
+                lang: lang,
+                price: price,
+                isAuth: isAuth
+            };
+        }
+        localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
+        console.log("Stored conversion data:", conversionData);
+    } catch (error) {
+        console.error("Error storing conversion data:", error);
+        throw error;
     }
-    localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
-    console.log("Stored conversion data:", conversionData);
 }
 
 // async function handleSuccessfulPayment() {

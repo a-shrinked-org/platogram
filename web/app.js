@@ -1550,8 +1550,8 @@ async function deleteFile(fileUrl) {
     }
   }
 
-  async function postToConvert(inputData, lang, sessionId, price, isTestMode = false) {
-    debugLog("postToConvert called", { inputData, lang, sessionId, price, isTestMode, fileName: storedFileName });
+  async function postToConvert(inputData, lang, sessionId, price, isTestMode = false, saveFlag = false) {
+    debugLog("postToConvert called", { inputData, lang, sessionId, price, isTestMode, saveFlag, fileName: storedFileName });
     let headers = {};
 
     try {
@@ -1579,12 +1579,7 @@ async function deleteFile(fileUrl) {
 
     console.log("Sending data to Platogram for conversion:", Object.fromEntries(formData));
 
-    // Add the save flag from pendingConversionData
-    const pendingConversionData = JSON.parse(localStorage.getItem('pendingConversionData') || '{}');
-    formData.append("save", pendingConversionData.save || false);
-
     try {
-        console.log("Sending data to Platogram for conversion:", Object.fromEntries(formData));
         updateUIStatus("processing", "Sending conversion request...");
         const response = await fetch("https://temporary.name/convert", {
             method: "POST",

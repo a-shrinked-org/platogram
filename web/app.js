@@ -863,7 +863,7 @@ function getPriceFromUI() {
   return price;
 }
 
-async function createCheckoutSession(price, lang) {
+async function createCheckoutSession(price, lang, saveFlag) {
     const stripeInstance = initStripe();
     if (!stripeInstance) {
       console.error('Stripe has not been initialized');
@@ -1091,13 +1091,11 @@ async function handleSubmit(event) {
         const userEmailElement = document.getElementById("user-email");
         const userEmail = userEmailElement ? userEmailElement.textContent : '';
 
-        if (userEmail === "hollow666metal@gmail.com" || userEmail === "cherepukhin@damn.vc") {
-            const saveCheckbox = document.getElementById('save-checkbox');
-            if (saveCheckbox) {
-                // The save flag will be included in the storeConversionData function
-                console.log('Save checkbox state:', saveCheckbox.checked);
-            }
-        }
+        const saveCheckbox = document.getElementById('save-checkbox');
+        const saveFlag = (userEmail === "hollow666metal@gmail.com" || userEmail === "cherepukhin@damn.vc") && saveCheckbox && saveCheckbox.checked;
+
+        // Store the conversion data before proceeding
+        await storeConversionData(inputData, selectedLanguage, price, false, saveFlag);
 
         if (price > 0) {
             console.log('Non-zero price detected, initiating paid conversion');
@@ -1127,7 +1125,7 @@ async function handleSubmit(event) {
         }
 
         // Call postToConvert here
-        await postToConvert(inputData, selectedLanguage, null, price, false);
+        await postToConvert(inputData, selectedLanguage, null, price, false, saveFlag);
 
     } catch (error) {
         console.error('Error in handleSubmit:', error);
@@ -1180,7 +1178,8 @@ async function handlePaidConversion(inputData, price) {
                 price: price,
                 lang: selectedLanguage,
                 email: email,
-                inputData: conversionData.inputData
+                inputData: conversionData.inputData,
+                save: pendingConversionData.save
             }),
         });
 
@@ -1213,7 +1212,7 @@ async function storeConversionData(inputData, lang, price, isAuth = false) {
     let conversionData;
     try {
       const saveCheckbox = document.getElementById('save-checkbox');
-      const saveFlag = saveCheckbox && !saveCheckbox.classList.contains('hidden') ? saveCheckbox.checked : false;
+      const saveFlag = saveCheckbox && !saveCheckbox.classList.contains('hidden') && saveCheckbox.checked;
         if (inputData instanceof File) {
             const fileId = await storeFileTemporarily(inputData);
             conversionData = {
@@ -1576,6 +1575,9 @@ async function deleteFile(fileUrl) {
     if (isTestMode) {
         formData.append('test_mode', 'true');
     }
+    formData.append("save", saveFlag);
+
+    console.log("Sending data to Platogram for conversion:", Object.fromEntries(formData));
 
     // Add the save flag from pendingConversionData
     const pendingConversionData = JSON.parse(localStorage.getItem('pendingConversionData') || '{}');
@@ -1959,7 +1961,7 @@ function updateProcessingStage() {
   }
 }
 
-async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
+async function handleConversion(inputData, lang, sessionId, price, isTestMode, saveFlag) {
     try {
         isConversionComplete = false; // Reset the flag at the start of conversion
         updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...", storedFileName);
@@ -1978,7 +1980,7 @@ async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
             inputData = await uploadFile(file, token, isTestMode);
         }
 
-        await postToConvert(inputData, lang, sessionId, price, isTestMode, token);
+        await postToConvert(inputData, lang, sessionId, price, isTestMode, saveFlag, token);
         updateUIStatus("processing", "Conversion started. You will be notified when it's complete.", storedFileName);
 
         // Start polling for status
@@ -2039,7 +2041,7 @@ async function handleStripeSuccess(sessionId) {
       const pendingConversionData = JSON.parse(pendingConversionDataString);
       console.log("Parsed pendingConversionData:", pendingConversionData);
 
-      let { inputData, lang, price, isFile, isTestMode } = pendingConversionData;
+      let { inputData, lang, price, isFile, isTestMode, save } = pendingConversionData;
 
       storedFileName = pendingConversionData.fileName || inputData;
 
@@ -2076,7 +2078,7 @@ async function handleStripeSuccess(sessionId) {
       }
 
       updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
-      await postToConvert(inputData, lang, session_id, price, isTestMode);
+      await postToConvert(inputData, lang, session_id, price, isTestMode, save);
 
       updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
 

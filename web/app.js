@@ -1088,6 +1088,17 @@ async function handleSubmit(event) {
 
         closeLanguageModal();
 
+        const userEmailElement = document.getElementById("user-email");
+        const userEmail = userEmailElement ? userEmailElement.textContent : '';
+
+        if (userEmail === "hollow666metal@gmail.com" || userEmail === "cherepukhin@damn.vc") {
+            const saveCheckbox = document.getElementById('save-checkbox');
+            if (saveCheckbox) {
+                // The save flag will be included in the storeConversionData function
+                console.log('Save checkbox state:', saveCheckbox.checked);
+            }
+        }
+
         if (price > 0) {
             console.log('Non-zero price detected, initiating paid conversion');
             await handlePaidConversion(inputData, price);
@@ -1201,6 +1212,8 @@ async function simulateStripeCheckout(conversionData) {
 async function storeConversionData(inputData, lang, price, isAuth = false) {
     let conversionData;
     try {
+      const saveCheckbox = document.getElementById('save-checkbox');
+      const saveFlag = saveCheckbox && !saveCheckbox.classList.contains('hidden') ? saveCheckbox.checked : false;
         if (inputData instanceof File) {
             const fileId = await storeFileTemporarily(inputData);
             conversionData = {
@@ -1209,7 +1222,8 @@ async function storeConversionData(inputData, lang, price, isAuth = false) {
                 fileName: inputData.name,
                 lang: lang,
                 price: price,
-                isAuth: isAuth
+                isAuth: isAuth,
+                save: saveFlag
             };
         } else {
             conversionData = {
@@ -1218,7 +1232,8 @@ async function storeConversionData(inputData, lang, price, isAuth = false) {
                 fileName: inputData, // For URLs, the fileName is the URL itself
                 lang: lang,
                 price: price,
-                isAuth: isAuth
+                isAuth: isAuth,
+                save: saveFlag
             };
         }
         localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
@@ -1562,6 +1577,10 @@ async function deleteFile(fileUrl) {
         formData.append('test_mode', 'true');
     }
 
+    // Add the save flag from pendingConversionData
+    const pendingConversionData = JSON.parse(localStorage.getItem('pendingConversionData') || '{}');
+    formData.append("save", pendingConversionData.save || false);
+
     try {
         console.log("Sending data to Platogram for conversion:", Object.fromEntries(formData));
         updateUIStatus("processing", "Sending conversion request...");
@@ -1699,6 +1718,15 @@ function showLanguageSelectionModal(inputData, price) {
     if (priceElement) {
         priceElement.textContent = `$${price.toFixed(2)}`;
     }
+    const userEmailElement = document.getElementById("user-email");
+    const userEmail = userEmailElement ? userEmailElement.textContent : '';
+    const saveOption = document.getElementById('save-option');
+    if (userEmail === "hollow666metal@gmail.com" || userEmail === "cherepukhin@damn.vc") {
+        saveOption.classList.remove('hidden');
+    } else {
+        saveOption.classList.add('hidden');
+    }
+
     const submitBtn = document.getElementById("submit-btn");
     const cancelBtn = document.getElementById("cancel-btn");
     if (submitBtn) {

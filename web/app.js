@@ -44,10 +44,20 @@ const processingStages = [
 let currentStageIndex = 0;
 let processingStageInterval;
 
-const DOMAIN = process.env.NEXT_PUBLIC_URL ||
-    (process.env.NODE_ENV === 'production'
-      ? 'https://shrinked.ai'
-      : 'https://platogram.vercel.app');
+const DOMAIN =
+    typeof window !== 'undefined' && window.ENV && window.ENV.NEXT_PUBLIC_URL
+      ? window.ENV.NEXT_PUBLIC_URL
+      : (typeof window !== 'undefined' && window.location.hostname === 'shrinked.ai'
+          ? 'https://shrinked.ai'
+          : typeof window !== 'undefined' && window.location.hostname === 'platogram.vercel.app'
+            ? 'https://platogram.vercel.app'
+            : 'http://localhost:3000');
+
+  console.log('Current DOMAIN:', DOMAIN);
+
+  const isProduction = DOMAIN === 'https://shrinked.ai';
+
+  console.log('Is Production:', isProduction);
 
 function debugLog(message) {
   console.log(`[DEBUG] ${message}`);

@@ -44,6 +44,11 @@ const processingStages = [
 let currentStageIndex = 0;
 let processingStageInterval;
 
+const DOMAIN = process.env.NEXT_PUBLIC_URL ||
+    (process.env.NODE_ENV === 'production'
+      ? 'https://shrinked.ai'
+      : 'https://platogram.vercel.app');
+
 function debugLog(message) {
   console.log(`[DEBUG] ${message}`);
 }
@@ -457,7 +462,9 @@ async function initAuth0() {
             domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
             clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
             authorizationParams: {
-                redirect_uri: window.location.origin,
+                redirect_uri: process.env.NODE_ENV === 'production'
+                    ? "https://shrinked.ai"
+                    : "https://platogram.vercel.app",
                 audience: "https://platogram.vercel.app/",
                 scope: "openid profile email",
             },
@@ -848,37 +855,46 @@ function getPriceFromUI() {
 }
 
 async function createCheckoutSession(price, lang) {
-  const stripeInstance = initStripe();
-  if (!stripeInstance) {
-    console.error('Stripe has not been initialized');
-    return null;
-  }
-
-  try {
-    const response = await fetch('https://shrinked.ai/api/create-checkout-session', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${await auth0Client.getTokenSilently()}`,
-      },
-      body: JSON.stringify({ price, lang }),
-    });
-
-    const session = await response.json();
-
-    if (session.error) {
-      console.error('Error creating checkout session:', session.error);
-      updateUIStatus('error', 'Failed to create checkout session');
+    const stripeInstance = initStripe();
+    if (!stripeInstance) {
+      console.error('Stripe has not been initialized');
       return null;
     }
 
-    return session;
-  } catch (error) {
-    console.error('Error creating checkout session:', error);
-    updateUIStatus('error', 'Failed to create checkout session');
-    return null;
+    const domain = process.env.NODE_ENV === 'production'
+      ? 'https://shrinked.ai'
+      : 'https://platogram.vercel.app';
+
+    try {
+      const response = await fetch(`${domain}/api/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await auth0Client.getTokenSilently()}`,
+        },
+        body: JSON.stringify({
+          price,
+          lang,
+          success_url: `${domain}/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${domain}/cancel`,
+        }),
+      });
+
+      const session = await response.json();
+
+      if (session.error) {
+        console.error('Error creating checkout session:', session.error);
+        updateUIStatus('error', 'Failed to create checkout session');
+        return null;
+      }
+
+      return session;
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      updateUIStatus('error', 'Failed to create checkout session');
+      return null;
+    }
   }
-}
 
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
 
@@ -1263,7 +1279,7 @@ function handleStripeRedirect() {
             sessionStorage.setItem('successfulPayment', JSON.stringify({ session_id: sessionId }));
             updateUIStatus("success", "Payment successful! Redirecting...");
             setTimeout(() => {
-                window.location.href = '/';
+                window.location.href = DOMAIN;
             }, 6000);
         } else {
             console.error('Success route accessed without session ID');
@@ -1273,7 +1289,7 @@ function handleStripeRedirect() {
         console.log('Payment cancelled by user');
         updateUIStatus("cancelled", "Payment was cancelled. You can try again when you're ready.");
         setTimeout(() => {
-            window.location.href = '/';
+            window.location.href = DOMAIN;
         }, 6000);
     }
 }
@@ -1633,7 +1649,7 @@ async function login() {
 
         console.log("Redirecting to Auth0 login page...");
         await auth0Client.loginWithRedirect({
-            appState: { returnTo: window.location.pathname + window.location.search }
+            appState: { returnTo: `${DOMAIN}${window.location.pathname}`, pendingConversion: true }
         });
 
         // Update Intercom after successful login
@@ -1649,7 +1665,7 @@ async function logout() {
     try {
         await initAuth0();
         await auth0Client.logout({
-            logoutParams: { returnTo: window.location.origin },
+            logoutParams: { returnTo: DOMAIN },
         });
 
         // Update Intercom after logout
@@ -1950,97 +1966,91 @@ async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
 async function handleStripeSuccess(sessionId) {
     console.log("handleStripeSuccess called with sessionId:", sessionId);
     try {
-        await ensureAuth0Initialized();
+      await ensureAuth0Initialized();
 
-        // Check if the user is authenticated
-        const isAuthenticated = await auth0Client.isAuthenticated();
-        if (!isAuthenticated) {
-            console.log("User not authenticated, initiating login process");
-            await auth0Client.loginWithRedirect({
-                appState: { returnTo: window.location.pathname, pendingConversion: true }
-            });
-            return; // Exit the function as we're redirecting to login
+      const isAuthenticated = await auth0Client.isAuthenticated();
+      if (!isAuthenticated) {
+        console.log("User not authenticated, initiating login process");
+        await auth0Client.loginWithRedirect({
+          appState: { returnTo: `${DOMAIN}${window.location.pathname}`, pendingConversion: true }
+        });
+        return;
+      }
+
+      const user = await auth0Client.getUser();
+      console.log("User authenticated:", user.email);
+
+      // Update UI with user email
+      const userEmailElement = document.getElementById("user-email");
+      if (userEmailElement) {
+        userEmailElement.textContent = user.email;
+      }
+
+      const successfulPaymentString = localStorage.getItem('successfulPayment');
+      console.log("Retrieved successfulPayment:", successfulPaymentString);
+
+      if (!successfulPaymentString) {
+        throw new Error('No successful payment data found');
+      }
+
+      const { session_id, pendingConversionData: pendingConversionDataString } = JSON.parse(successfulPaymentString);
+      console.log("Parsed session_id:", session_id);
+      console.log("Parsed pendingConversionDataString:", pendingConversionDataString);
+
+      if (!pendingConversionDataString) {
+        throw new Error('No pending conversion data found');
+      }
+
+      const pendingConversionData = JSON.parse(pendingConversionDataString);
+      console.log("Parsed pendingConversionData:", pendingConversionData);
+
+      let { inputData, lang, price, isFile, isTestMode } = pendingConversionData;
+
+      storedFileName = pendingConversionData.fileName || inputData;
+
+      localStorage.removeItem('successfulPayment');
+
+      console.log('Processing successful payment with data:', pendingConversionData);
+
+      updateUIStatus("processing", "Processing successful payment...");
+
+      let token = isTestMode ? 'test_token' : await getAuthToken();
+
+      if (inputData.includes('youtube.com') || inputData.includes('youtu.be')) {
+        console.log('Processing YouTube URL:', inputData);
+        updateUIStatus("processing", "Processing YouTube URL...");
+        const processedData = await processYoutubeUrl(inputData);
+        console.log('Processed YouTube data:', processedData);
+        const audioBlob = await downloadYoutubeAudio(processedData);
+        console.log('Audio blob received:', audioBlob);
+        const file = new File([audioBlob], `${processedData.title || 'youtube_audio'}.mp3`, { type: 'audio/mpeg' });
+        updateUIStatus("uploading", "Uploading processed YouTube audio...");
+        inputData = await uploadFile(file, token, isTestMode);
+        console.log('Uploaded URL:', inputData);
+      } else if (isFile) {
+        console.log("File input detected, proceeding to file upload");
+        updateUIStatus("uploading", "Retrieving and uploading file...");
+        const file = await retrieveFileFromTemporaryStorage(inputData);
+        if (!file) {
+          throw new Error("Failed to retrieve file from temporary storage");
         }
+        inputData = await uploadFile(file, token, isTestMode);
+        console.log("File uploaded successfully, URL:", inputData);
+      } else {
+        console.log("Non-YouTube URL input detected, using directly:", inputData);
+      }
 
-        // Fetch user details
-        const user = await auth0Client.getUser();
-        console.log("User authenticated:", user.email);
+      updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
+      await postToConvert(inputData, lang, session_id, price, isTestMode);
 
-        // Update UI with user email
-        const userEmailElement = document.getElementById("user-email");
-        if (userEmailElement) {
-            userEmailElement.textContent = user.email;
-        }
-
-        const successfulPaymentString = localStorage.getItem('successfulPayment');
-        console.log("Retrieved successfulPayment:", successfulPaymentString);
-
-        if (!successfulPaymentString) {
-            throw new Error('No successful payment data found');
-        }
-
-        const { session_id, pendingConversionData: pendingConversionDataString } = JSON.parse(successfulPaymentString);
-        console.log("Parsed session_id:", session_id);
-        console.log("Parsed pendingConversionDataString:", pendingConversionDataString);
-
-        if (!pendingConversionDataString) {
-            throw new Error('No pending conversion data found');
-        }
-
-        const pendingConversionData = JSON.parse(pendingConversionDataString);
-        console.log("Parsed pendingConversionData:", pendingConversionData);
-
-        let { inputData, lang, price, isFile, isTestMode } = pendingConversionData;
-
-        // Update storedFileName
-        storedFileName = pendingConversionData.fileName || inputData;
-
-        // Clear the pending conversion data to prevent double-processing
-        localStorage.removeItem('successfulPayment');
-
-        console.log('Processing successful payment with data:', pendingConversionData);
-
-        updateUIStatus("processing", "Processing successful payment...");
-
-        let token = isTestMode ? 'test_token' : await getAuthToken();
-
-        if (inputData.includes('youtube.com') || inputData.includes('youtu.be')) {
-            console.log('Processing YouTube URL:', inputData);
-            updateUIStatus("processing", "Processing YouTube URL...");
-            const processedData = await processYoutubeUrl(inputData);
-            console.log('Processed YouTube data:', processedData);
-            const audioBlob = await downloadYoutubeAudio(processedData);
-            console.log('Audio blob received:', audioBlob);
-            const file = new File([audioBlob], `${processedData.title || 'youtube_audio'}.mp3`, { type: 'audio/mpeg' });
-            updateUIStatus("uploading", "Uploading processed YouTube audio...");
-            inputData = await uploadFile(file, token, isTestMode);
-            console.log('Uploaded URL:', inputData);
-        } else if (isFile) {
-            console.log("File input detected, proceeding to file upload");
-            updateUIStatus("uploading", "Retrieving and uploading file...");
-            const file = await retrieveFileFromTemporaryStorage(inputData);
-            if (!file) {
-                throw new Error("Failed to retrieve file from temporary storage");
-            }
-            inputData = await uploadFile(file, token, isTestMode);
-            console.log("File uploaded successfully, URL:", inputData);
-        } else {
-            console.log("Non-YouTube URL input detected, using directly:", inputData);
-        }
-
-        // Start the conversion process
-        updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
-        await postToConvert(inputData, lang, session_id, price, isTestMode);
-
-        // Update UI to show conversion has started
-        updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
+      updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
 
     } catch (error) {
-        console.error('Error in handleStripeSuccess:', error);
-        updateUIStatus("error", "Error: " + error.message);
-        clearConversionData();
+      console.error('Error in handleStripeSuccess:', error);
+      updateUIStatus("error", "Error: " + error.message);
+      clearConversionData();
     }
-}
+  }
 
 function initializeProcessingStage() {
     if (isConversionComplete) return; // Don't initialize if conversion is complete

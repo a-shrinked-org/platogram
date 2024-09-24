@@ -520,6 +520,7 @@ async function checkOngoingConversion() {
         const isAuthenticated = await auth0Client.isAuthenticated();
         if (!isAuthenticated) {
             console.log("User not authenticated, skipping ongoing conversion check");
+            updateUIStatus("idle");
             return;
         }
 
@@ -551,10 +552,12 @@ async function checkOngoingConversion() {
                 isConversionComplete = true;
                 console.log("Conversion complete, UI updated to 'done' state");
             }
+        } else {
+            updateUIStatus("idle");
         }
     } catch (error) {
         console.error("Error checking ongoing conversion:", error);
-        if (error.message.includes("Load failed") || error.message.includes("NetworkError")) {
+        if (error.message.includes("Load failed") || error.message.includes("NetworkError") || error.name === "TypeError") {
             updateUIStatus("turn-off", "We're experiencing technical difficulties. Please try again later.");
         } else {
             updateUIStatus("error", "An unexpected error occurred. Please try again.");
@@ -581,10 +584,13 @@ async function updateUIStatus(status, message = "") {
     debugLog("File name used in updateUIStatus: " + displayFileName);
 
     // Try to get the latest user email
-    let userEmail = "Unknown email";
+    let userEmail = "Not logged in";
     try {
-        const user = await auth0Client.getUser();
-        userEmail = user.email;
+        const isAuthenticated = await auth0Client.isAuthenticated();
+        if (isAuthenticated) {
+            const user = await auth0Client.getUser();
+            userEmail = user.email || "Email not available";
+        }
         const userEmailElement = document.getElementById("user-email");
         if (userEmailElement) {
             userEmailElement.textContent = userEmail;
@@ -758,7 +764,7 @@ async function updateUI() {
     }
     return "idle";
   }
-  
+
 async function reset() {
     try {
         console.log("Reset function called");

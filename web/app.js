@@ -566,9 +566,9 @@ async function checkOngoingConversion() {
 }
 
 async function updateUIStatus(status, message = "") {
-    if (isConversionComplete && status === "idle") {
-        console.log("Preventing automatic reset to idle state");
-        return; // Prevent automatic reset to idle when conversion is complete
+    if (isConversionComplete && status !== "done" && status !== "error") {
+        console.log("Preventing update to status:", status);
+        return; // Prevent updates after completion, except for "done" or "error" statuses
     }
 
     debugLog(`Updating UI status: ${status}`);
@@ -577,6 +577,7 @@ async function updateUIStatus(status, message = "") {
     const statusSection = document.getElementById("status-section");
     const doneSection = document.getElementById("done-section");
     const errorSection = document.getElementById("error-section");
+    const turnOffSection = document.getElementById("turn-off-section");
 
     const pendingConversionDataString = localStorage.getItem('pendingConversionData');
     const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
@@ -600,7 +601,7 @@ async function updateUIStatus(status, message = "") {
     }
 
     // Hide all sections first
-    [inputSection, statusSection, uploadProcessSection, doneSection, errorSection].forEach(section => {
+    [inputSection, statusSection, uploadProcessSection, doneSection, errorSection, turnOffSection].forEach(section => {
         if (section) section.classList.add("hidden");
     });
 
@@ -656,7 +657,7 @@ async function updateUIStatus(status, message = "") {
                     <p>File/URL: ${displayFileName}</p>
                     <p>Email: ${userEmail}</p>
                     <p>Status: Completed</p><br>
-                    ${message ? `<p>${message}</p>` : ''}
+                    <p>${message || "Shrinking complete. Your context-rich documents await in your inbox!"}</p>
                     <button class="mx-left mt-8 block px-4 py-2 bg-black text-white rounded hover:bg-gray-950" onclick="reset()">Reset</button>
                 `;
             }
@@ -1721,80 +1722,80 @@ function selectLanguage(lang) {
 
 function pollStatus(token, isTestMode = false, fileName = "") {
     return new Promise((resolve, reject) => {
-      let attemptCount = 0;
-      const maxAttempts = 120; // 10 minutes of polling at 5-second intervals
+        let attemptCount = 0;
+        const maxAttempts = 120; // 10 minutes of polling at 5-second intervals
 
-      async function checkStatus() {
-        if (isConversionComplete) {
-          clearInterval(pollingInterval);
-          resolve();
-          return;
+        async function checkStatus() {
+            if (isConversionComplete) {
+                clearInterval(pollingInterval);
+                resolve();
+                return;
+            }
+
+            if (attemptCount >= maxAttempts) {
+                clearInterval(pollingInterval);
+                updateUIStatus("error", "Conversion timed out. Please check your email for results.", fileName);
+                reject(new Error("Polling timed out"));
+                return;
+            }
+            attemptCount++;
+
+            try {
+                const response = await fetch("https://temporary.name/status", {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        ...(isTestMode ? { 'X-Test-Mode': 'true' } : {})
+                    },
+                });
+
+                if (response.status === 502) {
+                    console.log("Server is currently unavailable");
+                    updateUIStatus("turn-off", "Our servers are currently undergoing maintenance. We'll be back soon!");
+                    clearInterval(pollingInterval);
+                    reject(new Error("Server unavailable"));
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                let result = await response.json();
+                console.log("Status update received:", result.status);
+
+                if (result.status === "done") {
+                    isConversionComplete = true;
+                    clearInterval(pollingInterval);
+                    clearProcessingStageInterval();
+                    updateUIStatus("done", "Shrinking complete. Your context-rich documents await in your inbox!");
+                    console.log("Conversion complete, UI updated to 'done' state");
+                    resolve(result);
+                } else if (result.status === "failed" || result.status === "error") {
+                    isConversionComplete = true;
+                    clearInterval(pollingInterval);
+                    clearProcessingStageInterval();
+                    updateUIStatus("error", result.error || "An error occurred during conversion");
+                    console.log("Conversion failed, UI updated to 'error' state");
+                    reject(new Error(result.error || "Conversion failed"));
+                } else if (["idle", "running", "processing"].includes(result.status)) {
+                    updateUIStatus(result.status, `Conversion ${result.status}...`, storedFileName);
+                    console.log(`Conversion still in progress (${result.status}), continuing to poll...`);
+                } else {
+                    console.warn("Unknown status received:", result.status);
+                }
+            } catch (error) {
+                console.error("Error polling status:", error);
+                updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
+                clearInterval(pollingInterval);
+                clearProcessingStageInterval();
+                reject(error);
+            }
         }
 
-        if (attemptCount >= maxAttempts) {
-          clearInterval(pollingInterval);
-          updateUIStatus("error", "Conversion timed out. Please check your email for results.", fileName);
-          reject(new Error("Polling timed out"));
-          return;
-        }
-        attemptCount++;
-
-        try {
-          const response = await fetch("https://temporary.name/status", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              ...(isTestMode ? { 'X-Test-Mode': 'true' } : {})
-            },
-          });
-
-          if (response.status === 502) {
-              console.log("Server is currently unavailable");
-              updateUIStatus("turn-off", "Our servers are currently undergoing maintenance. We'll be back soon!");
-              clearInterval(pollingInterval);
-              reject(new Error("Server unavailable"));
-              return;
-          }
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          let result = await response.json();
-          console.log("Status update received:", result.status);
-
-          if (result.status === "done") {
-            isConversionComplete = true;
-            clearInterval(pollingInterval);
-            clearProcessingStageInterval();
-            updateUIStatus("done", "Shrinking complete. Your context-rich documents await in your inbox!");
-            console.log("Conversion complete, UI updated to 'done' state");
-            resolve(result);
-          } else if (result.status === "failed" || result.status === "error") {
-            isConversionComplete = true;
-            clearInterval(pollingInterval);
-            clearProcessingStageInterval();
-            updateUIStatus("error", result.error || "An error occurred during conversion");
-            console.log("Conversion failed, UI updated to 'error' state");
-            reject(new Error(result.error || "Conversion failed"));
-          } else if (["idle", "running", "processing"].includes(result.status)) {
-              updateUIStatus(result.status, `Conversion ${result.status}...`, storedFileName);
-            console.log(`Conversion still in progress (${result.status}), continuing to poll...`);
-          } else {
-            console.warn("Unknown status received:", result.status);
-          }
-        } catch (error) {
-          console.error("Error polling status:", error);
-          updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
-          clearInterval(pollingInterval);
-          clearProcessingStageInterval();
-          reject(error);
-        }
-      }
-
-      const pollingInterval = setInterval(checkStatus, 5000);
-      checkStatus(); // Start the polling process immediately
+        const pollingInterval = setInterval(checkStatus, 5000);
+        checkStatus(); // Start the polling process immediately
     });
-  }
+}
 
 function toggleSection(sectionToShow) {
     const sections = [

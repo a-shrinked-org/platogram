@@ -903,7 +903,7 @@ async function createCheckoutSession(price, lang, saveFlag) {
     }
   }
 
-const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+const CHUNK_SIZE = 1024 * 1024; // 5MB chunks
 
 async function uploadLargeFile(file) {
   const fileId = Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -996,7 +996,9 @@ async function processYoutubeUrl(youtubeUrl) {
         }
         const result = await response.json();
         console.log('processYoutubeUrl result:', result);
-        return result[0].data; // Assuming the first item in the array contains the data we need
+        const audioData = result[0].data;
+        const audioBlob = await downloadYoutubeAudio(audioData);
+        return { audioBlob, title: audioData.title };
     } catch (error) {
         console.error('Error processing YouTube URL:', error);
         throw error;
@@ -1008,19 +1010,47 @@ async function downloadYoutubeAudio(audioData) {
         console.log('Parsed audioData:', audioData);
 
         if (audioData.audio_url) {
-            const url = new URL('/api/download-audio', window.location.origin);
-            url.searchParams.append('url', audioData.audio_url);
-            url.searchParams.append('title', audioData.title || 'youtube_audio');
+            const chunks = [];
+            let start = 0;
+            let end = CHUNK_SIZE - 1;
+            let contentLength = 0;
 
-            const response = await fetch(url, {
-                method: 'GET',
-            });
+            while (true) {
+                const url = new URL('/api/download-audio', window.location.origin);
+                url.searchParams.append('url', audioData.audio_url);
+                url.searchParams.append('title', audioData.title || 'youtube_audio');
+                url.searchParams.append('start', start);
+                url.searchParams.append('end', end);
 
-            if (!response.ok) {
-                throw new Error(`Failed to download audio: ${response.statusText}`);
+                const response = await fetch(url, {
+                    method: 'GET',
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to download audio chunk: ${response.statusText}`);
+                }
+
+                const chunk = await response.arrayBuffer();
+                chunks.push(chunk);
+
+                const rangeHeader = response.headers.get('Content-Range');
+                if (rangeHeader) {
+                    contentLength = parseInt(rangeHeader.split('/')[1]);
+                }
+
+                const receivedLength = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+                console.log(`Download progress: ${Math.round((receivedLength / contentLength) * 100)}%`);
+
+                if (receivedLength >= contentLength) {
+                    console.log('Download completed');
+                    break;
+                }
+
+                start = end + 1;
+                end = start + CHUNK_SIZE - 1;
             }
 
-            const blob = await response.blob();
+            const blob = new Blob(chunks, { type: 'audio/mp4' });
             return blob;
         } else {
             throw new Error('No audio URL found in the response');
@@ -1109,11 +1139,9 @@ async function handleSubmit(event) {
             } else if (inputData.includes('youtube.com') || inputData.includes('youtu.be')) {
                 console.log('Processing YouTube URL:', inputData);
                 updateUIStatus("processing", "Processing YouTube URL...");
-                const processedData = await processYoutubeUrl(inputData);
-                console.log('Processed YouTube data:', processedData);
-                const audioBlob = await downloadYoutubeAudio(processedData);
+                const { audioBlob, title } = await processYoutubeUrl(inputData);
                 console.log('Audio blob received:', audioBlob);
-                const file = new File([audioBlob], `${processedData.title || 'youtube_audio'}.mp3`, { type: 'audio/mpeg' });
+                const file = new File([audioBlob], `${title || 'youtube_audio'}.mp4`, { type: 'audio/mp4' });
                 updateUIStatus("uploading", "Uploading processed YouTube audio...");
                 const uploadedUrl = await uploadFile(file);
                 console.log('Uploaded URL:', uploadedUrl);

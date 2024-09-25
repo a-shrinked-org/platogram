@@ -1,37 +1,97 @@
 import axios from 'axios';
 
-export default async function handler(req, res) {
-  if (req.method === 'GET') {
-    const { url, title, start, end } = req.query;
+const SIEVE_API_KEY = "B6s3PV-pbYz52uK9s-0dIC9LfMU09RoCwRokiGjjPq4";
+const SIEVE_API_URL = "https://mango.sievedata.com/v2";
 
-    if (!url) {
-      return res.status(400).json({ error: 'URL is required' });
+async function submitJob(youtubeUrl) {
+  const response = await axios.post(
+    `${SIEVE_API_URL}/push`,
+    {
+      function: "damn/youtube_audio_extractor",
+      inputs: {
+        url: youtubeUrl,
+      }
+    },
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": SIEVE_API_KEY,
+      }
+    }
+  );
+  return response.data.id;
+}
+
+async function getJobStatus(jobId) {
+  const response = await axios.get(`${SIEVE_API_URL}/jobs/${jobId}`, {
+    headers: {
+      "X-API-Key": SIEVE_API_KEY,
+    },
+  });
+  return response.data;
+}
+
+async function pollJobStatus(jobId) {
+  let status = 'queued';
+  let attempts = 0;
+  const maxAttempts = 30; // Adjust as needed
+
+  while ((status === 'queued' || status === 'processing') && attempts < maxAttempts) {
+    const jobData = await getJobStatus(jobId);
+    status = jobData.status;
+
+    if (status === 'finished') {
+      return jobData.outputs;
     }
 
-    console.log(`Received download request for: ${url}, start: ${start}, end: ${end}`);
+    attempts++;
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for 2 seconds before polling again
+  }
 
+  throw new Error(`Job failed or timed out with status: ${status}`);
+}
+
+export default async function handler(req, res) {
+  if (req.method === 'POST') {
     try {
-      const response = await axios({
-        method: 'get',
-        url: url,
-        responseType: 'arraybuffer',
-        headers: { Range: `bytes=${start}-${end}` }
+      const { youtubeUrl } = req.body;
+
+      if (!youtubeUrl) {
+        return res.status(400).json({ error: 'YouTube URL is required' });
+      }
+
+      console.log(`Processing YouTube URL: ${youtubeUrl}`);
+
+      const jobId = await submitJob(youtubeUrl);
+      console.log(`Job submitted with ID: ${jobId}`);
+
+      const result = await pollJobStatus(jobId);
+      console.log(`Job completed. Result:`, result);
+
+      // Parse the result to extract the audio_url and other relevant information
+      const parsedResult = result.map(output => {
+        if (output.type === 'str' && output.data) {
+          try {
+            const parsedData = JSON.parse(output.data);
+            return {
+              ...output,
+              data: parsedData
+            };
+          } catch (error) {
+            console.error('Error parsing output data:', error);
+            return output;
+          }
+        }
+        return output;
       });
 
-      res.setHeader('Content-Type', response.headers['content-type'] || 'audio/mp4');
-      res.setHeader('Content-Range', response.headers['content-range']);
-      res.setHeader('Accept-Ranges', 'bytes');
-      res.status(206); // Partial Content
-
-      res.send(Buffer.from(response.data, 'binary'));
-
-      console.log(`Chunk sent successfully: ${start}-${end}`);
+      return res.status(200).json(parsedResult);
     } catch (error) {
-      console.error('Error downloading audio chunk:', error.message);
-      res.status(500).json({ error: 'An error occurred while downloading the audio chunk', details: error.message });
+      console.error('Error processing YouTube URL:', error);
+      return res.status(500).json({ error: 'An error occurred while processing the YouTube URL', details: error.message });
     }
   } else {
-    res.setHeader('Allow', ['GET']);
+    res.setHeader('Allow', ['POST']);
     res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }

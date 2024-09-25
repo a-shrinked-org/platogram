@@ -984,6 +984,7 @@ async function storeFileTemporarily(file) {
 
 async function processYoutubeUrl(youtubeUrl) {
     try {
+        console.log('Sending request to process YouTube URL:', youtubeUrl);
         const response = await fetch('/api/process-youtube', {
             method: 'POST',
             headers: {
@@ -991,12 +992,25 @@ async function processYoutubeUrl(youtubeUrl) {
             },
             body: JSON.stringify({ youtubeUrl }),
         });
+
         if (!response.ok) {
-            throw new Error('Failed to process YouTube URL');
+            const errorText = await response.text();
+            console.error('Error response from server:', response.status, errorText);
+            throw new Error(`Failed to process YouTube URL: ${response.status} ${response.statusText}`);
         }
+
         const result = await response.json();
         console.log('processYoutubeUrl result:', result);
+
+        if (!result || !Array.isArray(result) || result.length === 0) {
+            throw new Error('Invalid response format from server');
+        }
+
         const audioData = result[0].data;
+        if (!audioData || !audioData.audio_url) {
+            throw new Error('No audio URL found in the response');
+        }
+
         const audioBlob = await downloadYoutubeAudio(audioData);
         return { audioBlob, title: audioData.title };
     } catch (error) {

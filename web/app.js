@@ -1150,11 +1150,11 @@ async function handleSubmit(event) {
                 inputData = uploadedUrl;
             } else if (inputData.includes('youtube.com') || inputData.includes('youtu.be')) {
                 console.log('Processing YouTube URL:', inputData);
-                updateUIStatus("processing", "Processing YouTube URL...");
+                updateUIStatus("processing", "Extracting audio and unstructured data from YouTube. This process involves isolating the audio stream, identifying conversations, and preparing the content for analysis. Please keep this window open to ensure successful data transfer.");
                 const { audioBlob, title } = await processYoutubeUrl(inputData);
                 console.log('Audio blob received:', audioBlob);
                 const file = new File([audioBlob], `${title || 'youtube_audio'}.mp4`, { type: 'audio/mp4' });
-                updateUIStatus("uploading", "Uploading processed YouTube audio...");
+                updateUIStatus("uploading", "Uploading processed YouTube audio ..");
                 const uploadedUrl = await uploadFile(file);
                 console.log('Uploaded URL:', uploadedUrl);
                 inputData = uploadedUrl;
@@ -1864,7 +1864,7 @@ function pollStatus(token, isTestMode = false, fileName = "") {
                     console.log("Conversion failed, UI updated to 'error' state");
                     reject(new Error(result.error || "Conversion failed"));
                 } else if (["idle", "running", "processing"].includes(result.status)) {
-                    updateUIStatus(result.status, `Conversion ${result.status}...`, storedFileName);
+                    updateUIStatus(result.status, `The audio is being shrinked, extracting key information, and organizing the data into a structured format. You may close this window if you wish - we'll email you once the process is complete.`, storedFileName);
                     console.log(`Conversion still in progress (${result.status}), continuing to poll...`);
                 } else {
                     console.warn("Unknown status received:", result.status);

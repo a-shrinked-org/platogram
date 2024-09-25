@@ -1124,14 +1124,12 @@ async function handleSubmit(event) {
         const saveCheckbox = document.getElementById('save-checkbox');
         const saveFlag = (userEmail === "hollow666metal@gmail.com" || userEmail === "cherepukhin@damn.vc") && saveCheckbox && saveCheckbox.checked;
 
-        // Store the conversion data before proceeding
         await storeConversionData(inputData, selectedLanguage, price, false, saveFlag);
 
         if (price > 0) {
             console.log('Non-zero price detected, initiating paid conversion');
             await handlePaidConversion(inputData, price);
         } else {
-            // For free conversions, proceed with upload/conversion
             if (inputData instanceof File) {
                 updateUIStatus("uploading", "Uploading file...");
                 const uploadedUrl = await uploadFile(inputData);
@@ -1148,11 +1146,9 @@ async function handleSubmit(event) {
                 inputData = uploadedUrl;
             }
 
-            // Generate and update job ID
             updateJobIdInUI();
         }
 
-        // Call postToConvert here
         await postToConvert(inputData, selectedLanguage, null, price, false, saveFlag);
 
     } catch (error) {

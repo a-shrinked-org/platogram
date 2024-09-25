@@ -24,17 +24,12 @@ export default function YouTubeProcessor() {
     }
   };
 
-  const handleDownload = (jsonData) => {
-    try {
-      const parsedData = JSON.parse(jsonData);
-      if (parsedData.audio_url) {
-        const downloadUrl = `/api/download-audio?url=${encodeURIComponent(parsedData.audio_url)}&title=${encodeURIComponent(parsedData.title || 'audio')}`;
-        window.location.href = downloadUrl;
-      } else {
-        setError('No audio URL found in the response');
-      }
-    } catch (err) {
-      setError(`Error parsing JSON data: ${err.message}`);
+  const handleDownload = (output) => {
+    if (output.data && output.data.audio_url) {
+      const downloadUrl = `/api/download-audio?url=${encodeURIComponent(output.data.audio_url)}&title=${encodeURIComponent(output.data.title || 'audio')}`;
+      window.location.href = downloadUrl;
+    } else {
+      setError('No audio URL found in the response');
     }
   };
 
@@ -68,9 +63,9 @@ export default function YouTubeProcessor() {
           {result.map((output, index) => (
             <div key={index}>
               <h3 className="text-lg font-semibold mt-4 mb-2">{output.name || `Output ${index + 1}`}</h3>
-              {output.data && (
+              {output.data && output.data.audio_url && (
                 <button
-                  onClick={() => handleDownload(output.data)}
+                  onClick={() => handleDownload(output)}
                   className="px-4 py-2 bg-green-500 text-white rounded"
                 >
                   Download Audio

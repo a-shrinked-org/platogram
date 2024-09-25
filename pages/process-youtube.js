@@ -7,17 +7,28 @@ export default function YouTubeProcessor() {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(null);
+  const [debugLog, setDebugLog] = useState([]);
+
+  const addDebugLog = (message) => {
+    setDebugLog(prevLog => [...prevLog, `${new Date().toISOString()}: ${message}`]);
+    console.log(message);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setResult(null);
     setIsLoading(true);
+    setDebugLog([]);
+    addDebugLog('Processing YouTube URL');
     try {
       const response = await axios.post('/api/process-youtube', { youtubeUrl });
       setResult(response.data);
+      addDebugLog('YouTube URL processed successfully');
     } catch (err) {
-      setError(`An error occurred while processing the YouTube URL: ${err.response?.data?.details || err.message}`);
+      const errorMessage = `An error occurred while processing the YouTube URL: ${err.response?.data?.details || err.message}`;
+      setError(errorMessage);
+      addDebugLog(`Error: ${errorMessage}`);
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -30,9 +41,16 @@ export default function YouTubeProcessor() {
 
       try {
         setDownloadProgress(0);
+        addDebugLog(`Starting download from: ${downloadUrl}`);
         const response = await fetch(downloadUrl);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
         const reader = response.body.getReader();
-        const contentLength = +response.headers.get('Content-Length');
+        const contentLength = +response.headers.get('Content-Length') || 0;
+        addDebugLog(`Content-Length: ${contentLength}`);
 
         let receivedLength = 0;
         const chunks = [];
@@ -41,32 +59,40 @@ export default function YouTubeProcessor() {
           const {done, value} = await reader.read();
 
           if (done) {
+            addDebugLog('Download completed');
             break;
           }
 
           chunks.push(value);
           receivedLength += value.length;
-          setDownloadProgress(Math.round((receivedLength / contentLength) * 100));
+          const progress = contentLength ? Math.round((receivedLength / contentLength) * 100) : 0;
+          setDownloadProgress(progress);
+          addDebugLog(`Download progress: ${progress}%`);
         }
 
         const blob = new Blob(chunks, { type: 'audio/mp4' });
-        const downloadUrl = URL.createObjectURL(blob);
+        const blobUrl = URL.createObjectURL(blob);
 
+        addDebugLog('Creating download link');
         const a = document.createElement('a');
-        a.href = downloadUrl;
+        a.href = blobUrl;
         a.download = `${output.data.title || 'audio'}.m4a`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(downloadUrl);
+        URL.revokeObjectURL(blobUrl);
 
         setDownloadProgress(null);
+        addDebugLog('Download process completed');
       } catch (err) {
-        setError(`An error occurred while downloading the audio: ${err.message}`);
+        const errorMessage = `An error occurred while downloading the audio: ${err.message}`;
+        setError(errorMessage);
+        addDebugLog(`Error: ${errorMessage}`);
         setDownloadProgress(null);
       }
     } else {
       setError('No audio URL found in the response');
+      addDebugLog('Error: No audio URL found in the response');
     }
   };
 
@@ -124,6 +150,12 @@ export default function YouTubeProcessor() {
           ))}
         </div>
       )}
+      <div className="mt-4">
+        <h3 className="text-lg font-semibold mb-2">Debug Log:</h3>
+        <pre className="bg-gray-100 p-4 rounded overflow-x-auto h-40 overflow-y-auto">
+          {debugLog.join('\n')}
+        </pre>
+      </div>
     </div>
   );
 }

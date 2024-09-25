@@ -1164,6 +1164,7 @@ async function handleSubmit(event) {
         }
 
         await postToConvert(inputData, selectedLanguage, null, price, false, saveFlag);
+        updateUIStatus("processing", "The audio is being shrinked, extracting key information, and organizing the data into a structured format. You may close this window if you wish - we'll email you once it's processed.");
 
     } catch (error) {
         console.error('Error in handleSubmit:', error);
@@ -1864,7 +1865,7 @@ function pollStatus(token, isTestMode = false, fileName = "") {
                     console.log("Conversion failed, UI updated to 'error' state");
                     reject(new Error(result.error || "Conversion failed"));
                 } else if (["idle", "running", "processing"].includes(result.status)) {
-                    updateUIStatus(result.status, `The audio is being shrinked, extracting key information, and organizing the data into a structured format. You may close this window if you wish - we'll email you once the process is complete.`, storedFileName);
+                    updateUIStatus(result.status, `Conversion ${result.status}...`, storedFileName);
                     console.log(`Conversion still in progress (${result.status}), continuing to poll...`);
                 } else {
                     console.warn("Unknown status received:", result.status);

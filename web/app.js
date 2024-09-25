@@ -1218,7 +1218,7 @@ async function handlePaidConversion(inputData, price) {
                 lang: selectedLanguage,
                 email: email,
                 inputData: conversionData.inputData,
-                save: pendingConversionData.save
+                save: conversionData.save
             }),
         });
 
@@ -2089,28 +2089,26 @@ async function handleStripeSuccess(sessionId) {
 
       if (inputData.includes('youtube.com') || inputData.includes('youtu.be')) {
         console.log('Processing YouTube URL:', inputData);
-        updateUIStatus("processing", "Processing YouTube URL...");
-        const processedData = await processYoutubeUrl(inputData);
-        console.log('Processed YouTube data:', processedData);
-        const audioBlob = await downloadYoutubeAudio(processedData);
+        updateUIStatus("processing", "Extracting audio and unstructured data from YouTube. This process involves isolating the audio stream, identifying conversations, and preparing the content for analysis.");
+        const { audioBlob, title } = await processYoutubeUrl(inputData);
         console.log('Audio blob received:', audioBlob);
-        const file = new File([audioBlob], `${processedData.title || 'youtube_audio'}.mp3`, { type: 'audio/mpeg' });
+        const file = new File([audioBlob], `${title || 'youtube_audio'}.mp4`, { type: 'audio/mp4' });
         updateUIStatus("uploading", "Uploading processed YouTube audio...");
         inputData = await uploadFile(file, token, isTestMode);
         console.log('Uploaded URL:', inputData);
-      } else if (isFile) {
+    } else if (isFile) {
         console.log("File input detected, proceeding to file upload");
         updateUIStatus("uploading", "Retrieving and uploading file...");
         const file = await retrieveFileFromTemporaryStorage(inputData);
         if (!file) {
-          throw new Error("Failed to retrieve file from temporary storage");
+            throw new Error("Failed to retrieve file from temporary storage");
         }
         inputData = await uploadFile(file, token, isTestMode);
         console.log("File uploaded successfully, URL:", inputData);
-      } else {
+    } else {
         console.log("Non-YouTube URL input detected, using directly:", inputData);
-      }
-
+    }
+      
       updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
       await postToConvert(inputData, lang, session_id, price, isTestMode, save);
 

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import axios from 'axios';
 
+const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
+
 export default function YouTubeProcessor() {
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [result, setResult] = useState(null);
@@ -37,37 +39,45 @@ export default function YouTubeProcessor() {
 
   const handleDownload = async (output) => {
     if (output.data && output.data.audio_url) {
-      const downloadUrl = `/api/download-audio?url=${encodeURIComponent(output.data.audio_url)}&title=${encodeURIComponent(output.data.title || 'audio')}`;
-
       try {
         setDownloadProgress(0);
-        addDebugLog(`Starting download from: ${downloadUrl}`);
-        const response = await fetch(downloadUrl);
+        addDebugLog(`Starting chunked download from: ${output.data.audio_url}`);
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const reader = response.body.getReader();
-        const contentLength = +response.headers.get('Content-Length') || 0;
-        addDebugLog(`Content-Length: ${contentLength}`);
-
-        let receivedLength = 0;
         const chunks = [];
+        let start = 0;
+        let end = CHUNK_SIZE - 1;
+        let contentLength = 0;
 
-        while(true) {
-          const {done, value} = await reader.read();
+        while (true) {
+          const downloadUrl = `/api/download-audio?url=${encodeURIComponent(output.data.audio_url)}&title=${encodeURIComponent(output.data.title || 'audio')}&start=${start}&end=${end}`;
 
-          if (done) {
+          addDebugLog(`Downloading chunk: ${start}-${end}`);
+          const response = await fetch(downloadUrl);
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const chunk = await response.arrayBuffer();
+          chunks.push(chunk);
+
+          const rangeHeader = response.headers.get('Content-Range');
+          if (rangeHeader) {
+            contentLength = parseInt(rangeHeader.split('/')[1]);
+          }
+
+          const receivedLength = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+          const progress = contentLength ? Math.round((receivedLength / contentLength) * 100) : 0;
+          setDownloadProgress(progress);
+          addDebugLog(`Download progress: ${progress}%`);
+
+          if (receivedLength >= contentLength) {
             addDebugLog('Download completed');
             break;
           }
 
-          chunks.push(value);
-          receivedLength += value.length;
-          const progress = contentLength ? Math.round((receivedLength / contentLength) * 100) : 0;
-          setDownloadProgress(progress);
-          addDebugLog(`Download progress: ${progress}%`);
+          start = end + 1;
+          end = start + CHUNK_SIZE - 1;
         }
 
         const blob = new Blob(chunks, { type: 'audio/mp4' });

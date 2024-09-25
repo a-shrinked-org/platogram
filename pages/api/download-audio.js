@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { pipeline } from 'stream/promises';
 
 function sanitizeFilename(filename) {
   return filename.replace(/[^a-z0-9]/gi, '_').toLowerCase();
@@ -18,10 +19,10 @@ export default async function handler(req, res) {
       const response = await axios({
         method: 'get',
         url: url,
-        responseType: 'arraybuffer'  // Changed from 'stream' to 'arraybuffer'
+        responseType: 'stream'
       });
 
-      console.log('Successfully fetched audio file');
+      console.log('Successfully initiated audio stream');
       console.log('Content-Length:', response.headers['content-length']);
       console.log('Content-Type:', response.headers['content-type']);
 
@@ -32,16 +33,19 @@ export default async function handler(req, res) {
       res.setHeader('Content-Length', response.headers['content-length']);
       res.setHeader('Content-Disposition', `attachment; filename="${sanitizedTitle}.m4a"`);
 
-      // Send the entire audio file as a buffer
-      res.send(Buffer.from(response.data, 'binary'));
+      // Use pipeline to handle the stream
+      await pipeline(response.data, res);
 
-      console.log('Audio file sent successfully');
+      console.log('Audio file streamed successfully');
     } catch (error) {
-      console.error('Error downloading audio:', error.message);
+      console.error('Error streaming audio:', error.message);
       if (error.response) {
         console.error('Error response:', error.response.status, error.response.data);
       }
-      res.status(500).json({ error: 'An error occurred while downloading the audio', details: error.message });
+      // Only send error response if headers haven't been sent yet
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'An error occurred while streaming the audio', details: error.message });
+      }
     }
   } else {
     res.setHeader('Allow', ['GET']);

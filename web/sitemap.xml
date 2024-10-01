@@ -6,6 +6,12 @@
       <changefreq>daily</changefreq>
       <priority>1.0</priority>
   </url>
+  <url>
+      <loc>https://pdf.shrinked.ai/api/sitemap.xml</loc>
+      <lastmod>2024-01-01</lastmod>
+      <changefreq>daily</changefreq>
+      <priority>1.0</priority>
+  </url>
   <!-- Add more URLs for other pages if you have them -->
   <url>
     <loc>https://pdf.shrinked.ai/shrinked-vs-circleback</loc>

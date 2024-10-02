@@ -50,10 +50,10 @@ const placeholders = [
     "Zoom recording link of a virtual book club discussing 1984",
     "YouTube video of Neil deGrasse Tyson explaining black holes",
     "Link to a startup pitch from Y Combinator Demo Day",
-    "URL to a file of a university lecture on ancient Egyptian architecture",
-    "Link to a video of Malala Yousafzai's speech at the United Nations",
+    "A link to a university lecture on ancient Egyptian architecture",
+    "Link to a video of Malala Yousafzai's speech at the UN",
     "Link to a cooking masterclass with Gordon Ramsay",
-    "URL of a Webinar on machine learning applications in healthcare"
+    "URL of a webinar on ML applications in healthcare"
 ];
 
 // Function to set a random placeholder

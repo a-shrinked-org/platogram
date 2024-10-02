@@ -45,12 +45,12 @@ let currentStageIndex = 0;
 let processingStageInterval;
 
 const placeholders = [
-    "Link to a TED Talk by Jane Goodall on chimpanzee behavior",
+    "Link to a TED talk by Jane Goodall on chimpanzee behavior",
     "URL of a panel discussion on renewable energy from COP26",
     "Zoom recording link of a virtual book club discussing 1984",
     "YouTube video of Neil deGrasse Tyson explaining black holes",
-    "Link to a startup pitch from Y Combinator Demo Day",
-    "A link to a university lecture on ancient Egyptian architecture",
+    "Link to a startup pitch from Y Combinator demo day",
+    "Link to a university lecture on ancient Egyptian architecture",
     "Link to a video of Malala Yousafzai's speech at the UN",
     "Link to a cooking masterclass with Gordon Ramsay",
     "URL of a webinar on ML applications in healthcare"

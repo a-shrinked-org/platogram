@@ -2480,6 +2480,7 @@ if (typeof window !== 'undefined') {
     window.uploadFile = uploadFile;
     window.postToConvert = postToConvert;
     window.handleAuthReturn = handleAuthReturn;
+    window.setRandomPlaceholder = setRandomPlaceholder;
 }
 
 window.addEventListener('load', setRandomPlaceholder);

@@ -50,7 +50,7 @@ const placeholders = [
     "Zoom recording link of a virtual book club discussing 1984",
     "YouTube video of Neil deGrasse Tyson explaining black holes",
     "Link to a startup pitch from Y Combinator demo day",
-    "Link to a university lecture on ancient Egyptian architecture",
+    "Link to a lecture on ancient Egyptian architecture",
     "Link to a video of Malala Yousafzai's speech at the UN",
     "Link to a cooking masterclass with Gordon Ramsay",
     "URL of a webinar on ML applications in healthcare"

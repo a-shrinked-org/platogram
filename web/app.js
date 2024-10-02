@@ -62,6 +62,9 @@ function setRandomPlaceholder() {
     if (urlInput) {
         const randomIndex = Math.floor(Math.random() * placeholders.length);
         urlInput.placeholder = placeholders[randomIndex];
+
+        // Set focus to the input field
+        urlInput.focus();
     }
 }
 

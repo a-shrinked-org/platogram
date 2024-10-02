@@ -44,6 +44,27 @@ const processingStages = [
 let currentStageIndex = 0;
 let processingStageInterval;
 
+const placeholders = [
+    "Link to a TED Talk by Jane Goodall on chimpanzee behavior",
+    "URL of a panel discussion on renewable energy from COP26",
+    "Zoom recording link of a virtual book club discussing 1984",
+    "YouTube video of Neil deGrasse Tyson explaining black holes",
+    "Link to a startup pitch from Y Combinator Demo Day",
+    "URL to a Google Drive file of a university lecture on ancient Egyptian architecture",
+    "Link to a Video of Malala Yousafzai's speech at the United Nations",
+    "Link to a cooking masterclass with Gordon Ramsay",
+    "URL of a Webinar on machine learning applications in healthcare"
+];
+
+// Function to set a random placeholder
+function setRandomPlaceholder() {
+    const urlInput = document.getElementById('url-input');
+    if (urlInput) {
+        const randomIndex = Math.floor(Math.random() * placeholders.length);
+        urlInput.placeholder = placeholders[randomIndex];
+    }
+}
+
 const DOMAIN =
     typeof window !== 'undefined' && window.ENV && window.ENV.NEXT_PUBLIC_URL
       ? window.ENV.NEXT_PUBLIC_URL
@@ -2457,3 +2478,5 @@ if (typeof window !== 'undefined') {
     window.postToConvert = postToConvert;
     window.handleAuthReturn = handleAuthReturn;
 }
+
+window.addEventListener('load', setRandomPlaceholder);

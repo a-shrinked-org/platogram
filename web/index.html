@@ -803,13 +803,22 @@
                 <h3 class="font-perfectly-nineties text-4xl text-gray-800">Shrinking your files</h3>
             </div>
 
-            <p class="text-gray-600 mb-6 text-sm">
-                We'll craft a well-organized, readable Pdf document delivered straight to your inbox.
-                Processing time varies based on content length and server load, typically ranging from 15 minutes to a few hours.
+            <p class="text-gray-800 mb-6 text-2sm" style="font-family:sans-serif">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g clip-path="url(#clip0_9_11464)">
+                    <path d="M7.00521 12.8332C10.2269 12.8332 12.8385 10.2216 12.8385 6.9999C12.8385 3.77824 10.2269 1.16656 7.00521 1.16656C3.78355 1.16656 1.17188 3.77824 1.17188 6.9999C1.17188 10.2216 3.78355 12.8332 7.00521 12.8332Z" stroke="black" stroke-width="1.16667" stroke-linecap="round" stroke-linejoin="round"></path>
+                    <path d="M7.00781 9.33323V6.9999M7.00781 4.66656H7.01365" stroke="black" stroke-width="1.16667" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </g>
+                    <defs>
+                    <clipPath id="clip0_9_11464">
+                    <rect width="14" height="14" fill="white"></rect>
+                    </clipPath>
+                    </defs>
+                  </svg> Receive a well-organized PDF delivered to your inbox. Processing usually takes 15 minutes to a few hours, depending on content length and server load.
             </p>
 
             <div class="mb-4">
-                <p class="text-sm text-gray-600 mb-2">Job #<span id="job-id" class="font-semibold">0032</span> details for <span id="user-email" class="font-semibold"></span></p>
+                <p class="text-2sm text-gray-800 tracking-tight mb-2">Job #<span id="job-id" class="font-semibold">0032</span> details for <span id="user-email" class="font-semibold"></span></p>
                 <div class="flex items-center bg-gray-100 rounded-md p-2">
                     <i data-lucide="link" class="w-5 h-5 text-gray-500 mr-2"></i>
                     <span id="file-name" class="text-gray-800"></span>
@@ -836,7 +845,7 @@
             </div>
 
             <div class="space-y-2 mb-1">
-                <button id="basic-job-button" class="w-full p-4 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
+                <button id="basic-job-button" class="w-full p-4 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors">
                  <div class="flex items-center">
                 <i data-lucide="check-circle" class="w-5 h-5 text-gray-500 mr-2 lucide-icon-filled"></i>
                 <div class="flex-grow flex items-center justify-between">
@@ -878,11 +887,11 @@
             </div>
                 <div id="card-errors" class="text-red-500 text-sm mb-4" role="alert"></div>
 
-                <button id="submit-btn" class="w-full text-white py-2 px-4 rounded-lg hover:bg-black transition-colors" style="background-color:#0F172A;">
-                  Get your document $<span id="total-price">0.00</span>
+                <button id="submit-btn" class="w-full text-white py-3 px-4 hover:bg-black transition-colors uppercase" style="background-color:#0F172A;">
+                  Get your document $ - <span id="total-price">0.00</span>
                 </button>
 
-                <button id="cancel-btn" class="w-full mt-2 bg-gray-100 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors">
+                <button id="cancel-btn" class="w-full mt-2 bg-gray-100 text-gray-800 py-3 px-4 hover:bg-gray-200 transition-colors uppercase">
                   Cancel
                 </button>
     </div>

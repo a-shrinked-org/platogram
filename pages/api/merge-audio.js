@@ -27,6 +27,16 @@ async function mergeAudioFiles(inputFiles, outputFile) {
   await fs.promises.unlink(listFile);
 }
 
+async function deleteBlob(url) {
+  try {
+    const { del } = await import('@vercel/blob');
+    await del(url);
+    console.log('Deleted Blob:', url);
+  } catch (error) {
+    console.error('Error deleting Blob:', url, error);
+  }
+}
+
 export default async function handler(req, res) {
   console.log('Request method:', req.method);
   console.log('Request headers:', req.headers);
@@ -41,7 +51,6 @@ export default async function handler(req, res) {
           console.error('BLOB_READ_WRITE_TOKEN not found in environment variables');
           return res.status(500).json({ error: 'Server configuration error' });
         }
-        console.log('Returning Blob token for client-side upload');
         return res.status(200).json({ token: process.env.BLOB_READ_WRITE_TOKEN });
       }
 
@@ -77,43 +86,64 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: 'At least two audio URLs are required' });
         }
 
-        // Create temporary directory and process files
+        // Create temporary directory
         const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'audio-merge-'));
         const inputFiles = [];
         const outputFile = path.join(tempDir, 'merged.m4a');
 
-        // Download and process files
-        for (let i = 0; i < audioUrls.length; i++) {
-          const inputFile = path.join(tempDir, `input${i}.m4a`);
-          await downloadFile(audioUrls[i], inputFile);
-          inputFiles.push(inputFile);
-        }
+        try {
+          // Download and process files
+          for (let i = 0; i < audioUrls.length; i++) {
+            const inputFile = path.join(tempDir, `input${i}.m4a`);
+            await downloadFile(audioUrls[i], inputFile);
+            inputFiles.push(inputFile);
+          }
 
-        // Merge audio files
-        await mergeAudioFiles(inputFiles, outputFile);
+          // Merge audio files
+          await mergeAudioFiles(inputFiles, outputFile);
 
-        // Upload merged file to Vercel Blob
-        const mergedFileData = await fs.promises.readFile(outputFile);
-        const { url } = await handleUpload({
-          body: mergedFileData,
-          request: {
-            headers: {
-              'content-type': 'audio/mp4',
+          // Upload merged file to Vercel Blob
+          const mergedFileData = await fs.promises.readFile(outputFile);
+          const { url } = await handleUpload({
+            body: mergedFileData,
+            request: {
+              headers: {
+                'content-type': 'audio/mp4',
+              },
             },
-          },
-          onBeforeGenerateToken: async () => ({
-            allowedContentTypes: ['audio/mp4'],
-          }),
-        });
+            onBeforeGenerateToken: async () => ({
+              allowedContentTypes: ['audio/mp4'],
+            }),
+          });
 
-        // Clean up
-        for (const file of inputFiles) {
-          await fs.promises.unlink(file);
+          // Clean up source files in Blob storage
+          console.log('Cleaning up source files from Blob storage');
+          for (const sourceUrl of audioUrls) {
+            if (sourceUrl.includes('.public.blob.vercel-storage.com')) {
+              await deleteBlob(sourceUrl);
+            }
+          }
+
+          return res.status(200).json({ url });
+        } finally {
+          // Clean up local temporary files
+          console.log('Cleaning up local temporary files');
+          for (const file of inputFiles) {
+            try {
+              await fs.promises.unlink(file);
+            } catch (error) {
+              console.error('Error deleting temp file:', file, error);
+            }
+          }
+          try {
+            if (fs.existsSync(outputFile)) {
+              await fs.promises.unlink(outputFile);
+            }
+            await fs.promises.rmdir(tempDir);
+          } catch (error) {
+            console.error('Error cleaning up temp directory:', error);
+          }
         }
-        await fs.promises.unlink(outputFile);
-        await fs.promises.rmdir(tempDir);
-
-        return res.status(200).json({ url });
       }
 
       return res.status(400).json({ error: 'Invalid request' });
@@ -141,8 +171,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'URL is required for deletion' });
       }
 
-      const { del } = await import('@vercel/blob');
-      await del(url);
+      await deleteBlob(url);
       return res.status(200).json({ message: 'File deleted successfully' });
     } catch (error) {
       console.error('Error deleting file:', error);

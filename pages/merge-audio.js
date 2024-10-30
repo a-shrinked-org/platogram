@@ -21,7 +21,6 @@ export default function AudioMerger() {
     try {
       addDebugLog(`Requesting upload token for ${file.name}`);
 
-      // First, get the Blob token
       const tokenResponse = await fetch('/api/merge-audio', {
         method: 'POST',
         headers: {
@@ -29,30 +28,23 @@ export default function AudioMerger() {
         }
       });
 
-      const tokenData = await tokenResponse.json();
+      const { token } = await tokenResponse.json();
+      addDebugLog(`Token received: ${token ? 'Yes' : 'No'}`);
 
-      addDebugLog(`Token response received: ${JSON.stringify(tokenData)}`);
-
-      if (!tokenResponse.ok) {
-        throw new Error(`Failed to get upload token: ${tokenData.error || 'Unknown error'}`);
-      }
-
-      if (!tokenData.clientToken) {
-        throw new Error('No client token received in response');
+      if (!token) {
+        throw new Error('Failed to get upload token');
       }
 
       // Create a sanitized filename
       const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-
       addDebugLog(`Starting upload for ${sanitizedName}`);
 
-      // Upload directly to Vercel Blob using client-side put
       const blob = await put(sanitizedName, file, {
         access: 'public',
-        token: tokenData.clientToken,
-        addRandomSuffix: true,
+        token: token,
         contentType: file.type || 'audio/mp4',
-        onUploadProgress: (progress) => {
+        addRandomSuffix: true,
+        onProgress: (progress) => {
           const percentage = Math.round((progress.loaded / progress.total) * 100);
           setUploadProgress(prev => ({
             ...prev,
@@ -71,10 +63,6 @@ export default function AudioMerger() {
     } catch (error) {
       console.error('Upload error:', error);
       addDebugLog(`Upload error for ${file.name}: ${error.message}`);
-      // Log more details about the error if available
-      if (error.response) {
-        addDebugLog(`Error response: ${JSON.stringify(error.response)}`);
-      }
       throw error;
     }
   };

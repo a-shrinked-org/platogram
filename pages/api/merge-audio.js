@@ -38,12 +38,9 @@ export default async function handler(req, res) {
         }
 
         try {
-          // Log the token (first few characters) for debugging
-          console.log('Providing token:', process.env.BLOB_READ_WRITE_TOKEN.substring(0, 5) + '...');
-
-          // Return the token with the correct key name
+          // Return the token with the key name expected by the client
           return res.status(200).json({
-            clientToken: process.env.BLOB_READ_WRITE_TOKEN
+            token: process.env.BLOB_READ_WRITE_TOKEN // Changed from clientToken to token
           });
         } catch (error) {
           console.error('Error providing token:', error);

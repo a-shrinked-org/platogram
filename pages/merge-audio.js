@@ -18,48 +18,56 @@ export default function AudioMerger() {
   };
 
   const uploadFile = async (file) => {
-  try {
-    // First, get the Blob token
-    const tokenResponse = await fetch('/api/merge-audio', {
-      method: 'POST',
-      headers: {
-        'x-vercel-blob-token-request': 'true',
+    try {
+      // First, get the Blob token
+      const tokenResponse = await fetch('/api/merge-audio', {
+        method: 'POST',
+        headers: {
+          'x-vercel-blob-token-request': 'true',
+        }
+      });
+
+      if (!tokenResponse.ok) {
+        const errorText = await tokenResponse.text();
+        throw new Error(`Failed to get upload token: ${errorText}`);
       }
-    });
 
-    if (!tokenResponse.ok) {
-      throw new Error('Failed to get upload token');
+      const { clientToken } = await tokenResponse.json();
+      if (!clientToken) {
+        throw new Error('No client token received');
+      }
+
+      // Create a sanitized filename
+      const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+
+      // Upload directly to Vercel Blob using client-side put
+      const blob = await put(sanitizedName, file, {
+        access: 'public',
+        token: clientToken,
+        addRandomSuffix: true,
+        contentType: file.type || 'audio/mp4',
+        onUploadProgress: (progress) => {
+          const percentage = Math.round((progress.loaded / progress.total) * 100);
+          setUploadProgress(prev => ({
+            ...prev,
+            [file.name]: percentage
+          }));
+          addDebugLog(`Upload progress for ${file.name}: ${percentage}%`);
+        },
+      });
+
+      if (!blob?.url) {
+        throw new Error('No URL received from upload');
+      }
+
+      addDebugLog(`Successfully uploaded ${file.name} to ${blob.url}`);
+      return blob;
+    } catch (error) {
+      console.error('Upload error:', error);
+      addDebugLog(`Upload error for ${file.name}: ${error.message}`);
+      throw error;
     }
-
-    const { token } = await tokenResponse.json();
-
-    // Create a sanitized filename
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-
-    // Upload directly to Vercel Blob using client-side put
-    const blob = await put(sanitizedName, file, {
-      access: 'public',
-      token,
-      handleUploadUrl: '/api/merge-audio',
-      contentType: file.type || 'audio/mp4',
-      addRandomSuffix: true,
-      onUploadProgress: (progress) => {
-        const percentage = Math.round((progress.loaded / progress.total) * 100);
-        setUploadProgress(prev => ({
-          ...prev,
-          [file.name]: percentage
-        }));
-        addDebugLog(`Upload progress for ${file.name}: ${percentage}%`);
-      },
-    });
-
-    return blob;
-  } catch (error) {
-    console.error('Upload error:', error);
-    addDebugLog(`Upload error for ${file.name}: ${error.message}`);
-    throw error;
-  }
-};
+  };
 
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);

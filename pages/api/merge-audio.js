@@ -32,7 +32,15 @@ export default async function handler(req, res) {
     try {
       // Token request handling
       if (req.headers['x-vercel-blob-token-request'] === 'true') {
-        return res.status(200).json({ token: process.env.BLOB_READ_WRITE_TOKEN });
+        if (!process.env.BLOB_READ_WRITE_TOKEN) {
+          console.error('BLOB_READ_WRITE_TOKEN not found in environment variables');
+          return res.status(500).json({ error: 'Server configuration error' });
+        }
+
+        // Return the token with the correct key name
+        return res.status(200).json({
+          clientToken: process.env.BLOB_READ_WRITE_TOKEN
+        });
       }
 
       // Merge request handling
@@ -73,7 +81,9 @@ export default async function handler(req, res) {
           // Clean up source files
           for (const sourceUrl of audioUrls) {
             if (sourceUrl.includes('.public.blob.vercel-storage.com')) {
-              await del(sourceUrl);
+              await del(sourceUrl).catch(error => {
+                console.error('Error deleting source file:', error);
+              });
             }
           }
 

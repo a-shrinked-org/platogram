@@ -79,71 +79,40 @@ export default function AudioMerger() {
     }
   };
 
-  const handleFileUpload = async (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length === 0) return;
+// Remove the duplicate handleFileUpload and keep this single version:
+const handleFileUpload = async (e) => {
+  const files = Array.from(e.target.files);
+  if (files.length === 0) return;
 
-    addDebugLog(`Starting upload process for ${files.length} files`);
+  addDebugLog(`Starting upload process for ${files.length} files`);
 
-    for (const file of files) {
-      try {
-        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
-        addDebugLog(`Initiating upload for ${file.name}`);
+  for (const file of files) {
+    try {
+      setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
+      addDebugLog(`Initiating upload for ${file.name}`);
 
-        const blob = await uploadFile(file);
+      const blob = await uploadFile(file);
 
-        setAudioFiles(prev => [...prev, {
-          type: 'local',
-          url: blob.url,
-          name: file.name,
-        }]);
+      setAudioFiles(prev => [...prev, {
+        type: 'local',
+        url: blob.url,
+        name: file.name,
+      }]);
 
-        setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
-        addDebugLog(`Successfully uploaded: ${file.name}`);
-      } catch (err) {
-        setError(`Failed to upload ${file.name}: ${err.message}`);
-        addDebugLog(`Error uploading ${file.name}: ${err.message}`);
-        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
-      }
+      setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
+      addDebugLog(`Successfully uploaded: ${file.name}`);
+    } catch (err) {
+      setError(`Failed to upload ${file.name}: ${err.message}`);
+      addDebugLog(`Error uploading ${file.name}: ${err.message}`);
+      setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
     }
+  }
 
-    // Clear file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const handleFileUpload = async (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length === 0) return;
-
-    for (const file of files) {
-      try {
-        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
-        addDebugLog(`Uploading file: ${file.name}`);
-
-        const blob = await uploadFile(file);
-
-        setAudioFiles(prev => [...prev, {
-          type: 'local',
-          url: blob.url,
-          name: file.name,
-        }]);
-
-        setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
-        addDebugLog(`Successfully uploaded: ${file.name}`);
-      } catch (err) {
-        setError(`Failed to upload ${file.name}: ${err.message}`);
-        addDebugLog(`Error uploading ${file.name}: ${err.message}`);
-        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
-      }
-    }
-
-    // Clear file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
+  // Clear file input
+  if (fileInputRef.current) {
+    fileInputRef.current.value = '';
+  }
+};
 
   const handleYouTubeProcess = async (e) => {
     e.preventDefault();

@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { AudioLines, Plus, Trash2, Loader2, Upload, Youtube } from 'lucide-react';
+import { put } from '@vercel/blob/client';
 
 export default function AudioMerger() {
   const [audioFiles, setAudioFiles] = useState([]);
@@ -16,6 +17,82 @@ export default function AudioMerger() {
     console.log(message);
   };
 
+  const uploadFile = async (file) => {
+  try {
+    // First, get the Blob token
+    const tokenResponse = await fetch('/api/merge-audio', {
+      method: 'POST',
+      headers: {
+        'x-vercel-blob-token-request': 'true',
+      }
+    });
+
+    if (!tokenResponse.ok) {
+      throw new Error('Failed to get upload token');
+    }
+
+    const { token } = await tokenResponse.json();
+
+    // Create a sanitized filename
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+
+    // Upload directly to Vercel Blob using client-side put
+    const blob = await put(sanitizedName, file, {
+      access: 'public',
+      token,
+      handleUploadUrl: '/api/merge-audio',
+      contentType: file.type || 'audio/mp4',
+      addRandomSuffix: true,
+      onUploadProgress: (progress) => {
+        const percentage = Math.round((progress.loaded / progress.total) * 100);
+        setUploadProgress(prev => ({
+          ...prev,
+          [file.name]: percentage
+        }));
+        addDebugLog(`Upload progress for ${file.name}: ${percentage}%`);
+      },
+    });
+
+    return blob;
+  } catch (error) {
+    console.error('Upload error:', error);
+    addDebugLog(`Upload error for ${file.name}: ${error.message}`);
+    throw error;
+  }
+};
+
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    for (const file of files) {
+      try {
+        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
+        addDebugLog(`Uploading file: ${file.name}`);
+
+        const blob = await uploadFile(file);
+
+        setAudioFiles(prev => [...prev, {
+          type: 'local',
+          url: blob.url,
+          name: file.name,
+        }]);
+
+        setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
+        addDebugLog(`Successfully uploaded: ${file.name}`);
+      } catch (err) {
+        setError(`Failed to upload ${file.name}: ${err.message}`);
+        addDebugLog(`Error uploading ${file.name}: ${err.message}`);
+        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
+      }
+    }
+
+    // Clear file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleYouTubeProcess = async (e) => {
     e.preventDefault();
     setError(null);
@@ -25,7 +102,10 @@ export default function AudioMerger() {
     try {
       const response = await fetch('/api/process-youtube', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await window.auth0Client.getTokenSilently()}`
+        },
         body: JSON.stringify({ youtubeUrl }),
       });
 
@@ -50,79 +130,15 @@ export default function AudioMerger() {
     }
   };
 
-  const uploadFile = async (file) => {
-    // Get Blob token first
-    const tokenResponse = await fetch('/api/merge-audio', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-vercel-blob-token-request': 'true'
-      }
-    });
-
-    if (!tokenResponse.ok) {
-      throw new Error('Failed to get upload token');
-    }
-
-    // Create form data
-    const formData = new FormData();
-    formData.append('file', file);
-
-    // Upload file using the token
-    const uploadResponse = await fetch('/api/merge-audio', {
-      method: 'POST',
-      body: formData
-    });
-
-    if (!uploadResponse.ok) {
-      const errorData = await uploadResponse.json();
-      throw new Error(errorData.error || 'Failed to upload file');
-    }
-
-    return await uploadResponse.json();
-  };
-
-  const handleFileUpload = async (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length === 0) return;
-
-    for (const file of files) {
-      try {
-        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
-        addDebugLog(`Uploading file: ${file.name}`);
-
-        const { url } = await uploadFile(file);
-
-        setAudioFiles(prev => [...prev, {
-          type: 'local',
-          url: url,
-          name: file.name,
-        }]);
-
-        setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
-        addDebugLog(`Successfully uploaded: ${file.name}`);
-      } catch (err) {
-        setError(`Failed to upload ${file.name}: ${err.message}`);
-        addDebugLog(`Error uploading ${file.name}: ${err.message}`);
-        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
-      }
-    }
-
-    // Clear file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
   const removeAudio = async (index) => {
     const file = audioFiles[index];
     try {
       if (file.type === 'local') {
-        // Delete file from Vercel Blob
         await fetch('/api/merge-audio', {
           method: 'DELETE',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${await window.auth0Client.getTokenSilently()}`
           },
           body: JSON.stringify({ url: file.url })
         });
@@ -148,7 +164,10 @@ export default function AudioMerger() {
     try {
       const response = await fetch('/api/merge-audio', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await window.auth0Client.getTokenSilently()}`
+        },
         body: JSON.stringify({
           audioUrls: audioFiles.map(file => file.url),
         }),

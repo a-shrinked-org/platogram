@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { AudioLines, Plus, Trash2, Loader2, Upload, Youtube } from 'lucide-react';
 
 export default function AudioMerger() {
@@ -9,6 +9,7 @@ export default function AudioMerger() {
   const [uploadProgress, setUploadProgress] = useState({});
   const [error, setError] = useState(null);
   const [debugLog, setDebugLog] = useState([]);
+  const [auth0Token, setAuth0Token] = useState(null);
   const fileInputRef = useRef(null);
 
   const addDebugLog = (message) => {
@@ -16,8 +17,29 @@ export default function AudioMerger() {
     console.log(message);
   };
 
+  // Initialize auth token
+  useEffect(() => {
+    async function getToken() {
+      try {
+        const token = await window.auth0Client.getTokenSilently({
+          audience: "https://platogram.vercel.app",
+        });
+        setAuth0Token(token);
+      } catch (err) {
+        console.error('Error getting auth token:', err);
+        addDebugLog(`Error getting auth token: ${err.message}`);
+      }
+    }
+    getToken();
+  }, []);
+
   const handleYouTubeProcess = async (e) => {
     e.preventDefault();
+    if (!auth0Token) {
+      setError('Please log in to continue');
+      return;
+    }
+
     setError(null);
     setIsProcessing(true);
     addDebugLog(`Processing YouTube URL: ${youtubeUrl}`);
@@ -25,7 +47,10 @@ export default function AudioMerger() {
     try {
       const response = await fetch('/api/process-youtube', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${auth0Token}`
+        },
         body: JSON.stringify({ youtubeUrl }),
       });
 
@@ -50,6 +75,45 @@ export default function AudioMerger() {
     }
   };
 
+  const uploadFile = async (file) => {
+    if (!auth0Token) {
+      throw new Error('Authentication required');
+    }
+
+    // Get Blob token
+    const tokenResponse = await fetch('/api/merge-audio', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${auth0Token}`,
+        'x-vercel-blob-token-request': 'true'
+      }
+    });
+
+    if (!tokenResponse.ok) {
+      throw new Error('Failed to get upload token');
+    }
+
+    // Create form data
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // Upload to Vercel Blob
+    const uploadResponse = await fetch('/api/merge-audio', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${auth0Token}`
+      },
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      const errorData = await uploadResponse.json();
+      throw new Error(errorData.error || 'Failed to upload file');
+    }
+
+    return await uploadResponse.json();
+  };
+
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -59,29 +123,7 @@ export default function AudioMerger() {
         setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
         addDebugLog(`Uploading file: ${file.name}`);
 
-        // Get upload token
-        const response = await fetch('/api/merge-audio', {
-          method: 'POST',
-          headers: {
-            'x-vercel-blob-token-request': 'true',
-          },
-        });
-
-        if (!response.ok) throw new Error('Failed to get upload token');
-
-        // Create form data
-        const formData = new FormData();
-        formData.append('file', file);
-
-        // Upload to Vercel Blob
-        const uploadResponse = await fetch('/api/merge-audio', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!uploadResponse.ok) throw new Error('Failed to upload file');
-
-        const { url } = await uploadResponse.json();
+        const { url } = await uploadFile(file);
 
         setAudioFiles(prev => [...prev, {
           type: 'local',
@@ -94,6 +136,7 @@ export default function AudioMerger() {
       } catch (err) {
         setError(`Failed to upload ${file.name}: ${err.message}`);
         addDebugLog(`Error uploading ${file.name}: ${err.message}`);
+        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
       }
     }
 
@@ -103,12 +146,34 @@ export default function AudioMerger() {
     }
   };
 
-  const removeAudio = (index) => {
-    setAudioFiles(prev => prev.filter((_, i) => i !== index));
-    addDebugLog(`Removed audio at index ${index}`);
+  const removeAudio = async (index) => {
+    const file = audioFiles[index];
+    try {
+      if (file.type === 'local') {
+        // Delete file from Vercel Blob
+        await fetch('/api/merge-audio', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${auth0Token}`
+          },
+          body: JSON.stringify({ url: file.url })
+        });
+      }
+      setAudioFiles(prev => prev.filter((_, i) => i !== index));
+      addDebugLog(`Removed audio at index ${index}`);
+    } catch (err) {
+      setError(`Failed to remove file: ${err.message}`);
+      addDebugLog(`Error removing file: ${err.message}`);
+    }
   };
 
   const handleMerge = async () => {
+    if (!auth0Token) {
+      setError('Please log in to continue');
+      return;
+    }
+
     if (audioFiles.length < 2) {
       setError('At least two audio files are required for merging');
       return;
@@ -121,7 +186,10 @@ export default function AudioMerger() {
     try {
       const response = await fetch('/api/merge-audio', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${auth0Token}`
+        },
         body: JSON.stringify({
           audioUrls: audioFiles.map(file => file.url),
         }),
@@ -147,6 +215,7 @@ export default function AudioMerger() {
     }
   };
 
+  // JSX remains the same as your original component
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
       <div className="space-y-4">

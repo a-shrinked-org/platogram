@@ -37,10 +37,18 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: 'Server configuration error' });
         }
 
-        // Return the token with the correct key name
-        return res.status(200).json({
-          clientToken: process.env.BLOB_READ_WRITE_TOKEN
-        });
+        try {
+          // Log the token (first few characters) for debugging
+          console.log('Providing token:', process.env.BLOB_READ_WRITE_TOKEN.substring(0, 5) + '...');
+
+          // Return the token with the correct key name
+          return res.status(200).json({
+            clientToken: process.env.BLOB_READ_WRITE_TOKEN
+          });
+        } catch (error) {
+          console.error('Error providing token:', error);
+          return res.status(500).json({ error: 'Failed to provide upload token' });
+        }
       }
 
       // Merge request handling

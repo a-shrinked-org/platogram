@@ -19,6 +19,8 @@ export default function AudioMerger() {
 
   const uploadFile = async (file) => {
     try {
+      addDebugLog(`Requesting upload token for ${file.name}`);
+
       // First, get the Blob token
       const tokenResponse = await fetch('/api/merge-audio', {
         method: 'POST',
@@ -27,23 +29,27 @@ export default function AudioMerger() {
         }
       });
 
+      const tokenData = await tokenResponse.json();
+
+      addDebugLog(`Token response received: ${JSON.stringify(tokenData)}`);
+
       if (!tokenResponse.ok) {
-        const errorText = await tokenResponse.text();
-        throw new Error(`Failed to get upload token: ${errorText}`);
+        throw new Error(`Failed to get upload token: ${tokenData.error || 'Unknown error'}`);
       }
 
-      const { clientToken } = await tokenResponse.json();
-      if (!clientToken) {
-        throw new Error('No client token received');
+      if (!tokenData.clientToken) {
+        throw new Error('No client token received in response');
       }
 
       // Create a sanitized filename
       const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
 
+      addDebugLog(`Starting upload for ${sanitizedName}`);
+
       // Upload directly to Vercel Blob using client-side put
       const blob = await put(sanitizedName, file, {
         access: 'public',
-        token: clientToken,
+        token: tokenData.clientToken,
         addRandomSuffix: true,
         contentType: file.type || 'audio/mp4',
         onUploadProgress: (progress) => {
@@ -65,7 +71,45 @@ export default function AudioMerger() {
     } catch (error) {
       console.error('Upload error:', error);
       addDebugLog(`Upload error for ${file.name}: ${error.message}`);
+      // Log more details about the error if available
+      if (error.response) {
+        addDebugLog(`Error response: ${JSON.stringify(error.response)}`);
+      }
       throw error;
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    addDebugLog(`Starting upload process for ${files.length} files`);
+
+    for (const file of files) {
+      try {
+        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
+        addDebugLog(`Initiating upload for ${file.name}`);
+
+        const blob = await uploadFile(file);
+
+        setAudioFiles(prev => [...prev, {
+          type: 'local',
+          url: blob.url,
+          name: file.name,
+        }]);
+
+        setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
+        addDebugLog(`Successfully uploaded: ${file.name}`);
+      } catch (err) {
+        setError(`Failed to upload ${file.name}: ${err.message}`);
+        addDebugLog(`Error uploading ${file.name}: ${err.message}`);
+        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
+      }
+    }
+
+    // Clear file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 

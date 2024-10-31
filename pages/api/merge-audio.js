@@ -27,73 +27,73 @@ async function mergeAudioFiles(inputFiles, outputFile) {
   await fs.promises.unlink(listFile);
 }
 
-async function handleFileUpload(req) {
-  try {
-    // Read the file data
-    const chunks = [];
-    for await (const chunk of req) {
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
-
-    // Get boundary from content type
-    const boundary = '--' + req.headers['content-type']
-      .split('boundary=')[1]
-      .trim();
-
-    // Split the buffer into parts using the boundary
-    const parts = buffer.toString().split(boundary);
-
-    // Find the file part
-    const filePart = parts.find(part =>
-      part.includes('Content-Disposition') &&
-      part.includes('filename=')
-    );
-
-    if (!filePart) {
-      throw new Error('No file found in upload');
-    }
-
-    // Parse file information
-    const filenameMatch = filePart.match(/filename="([^"]+)"/);
-    const contentTypeMatch = filePart.match(/Content-Type:\s*([^\r\n]+)/i);
-
-    if (!filenameMatch) {
-      throw new Error('Filename not found');
-    }
-
-    const filename = filenameMatch[1];
-    const contentType = contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream';
-
-    // Extract file content
-    const fileContentStart = filePart.indexOf('\r\n\r\n') + 4;
-    const fileContentEnd = filePart.lastIndexOf('\r\n');
-    const fileContent = filePart.substring(fileContentStart, fileContentEnd);
-
-    // Convert to buffer
-    const fileBuffer = Buffer.from(fileContent, 'binary');
-
-    console.log('Uploading file:', {
-      filename,
-      contentType,
-      size: fileBuffer.length
-    });
-
-    // Upload to Vercel Blob
-    const blob = await put(filename, fileBuffer, {
-      access: 'public',
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-      addRandomSuffix: true,
-      contentType: contentType
-    });
-
-    console.log('Upload successful:', blob.url);
-    return blob;
-  } catch (error) {
-    console.error('File upload error:', error);
-    throw error;
-  }
-}
+//async function handleFileUpload(req) {
+//  try {
+//    // Read the file data
+//    const chunks = [];
+//   for await (const chunk of req) {
+//      chunks.push(chunk);
+//    }
+//    const buffer = Buffer.concat(chunks);
+//
+//    // Get boundary from content type
+//    const boundary = '--' + req.headers['content-type']
+//      .split('boundary=')[1]
+//     .trim();
+//
+//    // Split the buffer into parts using the boundary
+//   const parts = buffer.toString().split(boundary);
+//
+//    // Find the file part
+//    const filePart = parts.find(part =>
+//     part.includes('Content-Disposition') &&
+//     part.includes('filename=')
+//   );
+//
+//   if (!filePart) {
+//      throw new Error('No file found in upload');
+//    }
+//
+//    // Parse file information
+//    const filenameMatch = filePart.match(/filename="([^"]+)"/);
+//    const contentTypeMatch = filePart.match(/Content-Type:\s*([^\r\n]+)/i);
+//
+//   if (!filenameMatch) {
+//      throw new Error('Filename not found');
+//   }
+//
+//    const filename = filenameMatch[1];
+//   const contentType = contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream';
+//
+//    // Extract file content
+//    const fileContentStart = filePart.indexOf('\r\n\r\n') + 4;
+//   const fileContentEnd = filePart.lastIndexOf('\r\n');
+//   const fileContent = filePart.substring(fileContentStart, fileContentEnd);
+//
+//    // Convert to buffer
+//   const fileBuffer = Buffer.from(fileContent, 'binary');
+//
+//   console.log('Uploading file:', {
+//     filename,
+//      contentType,
+//      size: fileBuffer.length
+//   });
+//
+//   // Upload to Vercel Blob
+//   const blob = await put(filename, fileBuffer, {
+//     access: 'public',
+//     token: process.env.BLOB_READ_WRITE_TOKEN,
+//     addRandomSuffix: true,
+//     contentType: contentType
+//   });
+//
+//   console.log('Upload successful:', blob.url);
+//   return blob;
+//  } catch (error) {
+//   console.error('File upload error:', error);
+//   throw error;
+// }
+//}
 
 export default async function handler(req, res) {
   if (req.method === 'POST') {
@@ -120,26 +120,22 @@ export default async function handler(req, res) {
 
     console.log('Handling file upload, content type:', req.headers['content-type'], 'Boundary:', boundary);
 
-    // Read the file data
-    const chunks = [];
-    for await (const chunk of req) {
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
+      // Read the file data
+          const buffer = Buffer.concat(await collectChunks(req));
 
-    // Split the buffer into parts using the boundary
-    const parts = buffer.toString().split('--' + boundary);
+          // Split the buffer into parts using the boundary
+          const parts = buffer.toString().split('--' + boundary);
 
-    const blobs = []; // Array to collect blob information
+          const blobs = []; // Array to collect blob information
 
-    for (let part of parts) {
-      if (part.trim() === '' || part.includes('Content-Disposition: form-data; name="file"')) {
-        continue; // Skip empty parts or non-file parts
-      }
+          for (let part of parts) {
+            if (part.trim() === '' || !part.includes('Content-Disposition')) {
+              continue; // Skip empty parts or non-file parts
+            }
 
-      // Extract filename and content type for each file part
-      const filenameMatch = part.match(/filename="((?:[^"]|\\")*)"/);
-      const contentTypeMatch = part.match(/Content-Type:\s*([^\r\n]+)/i);
+            // Extract filename and content type for each file part
+            const filenameMatch = part.match(/filename="((?:[^"]|\\")*)"/);
+            const contentTypeMatch = part.match(/Content-Type:\s*([^\r\n]+)/i);
 
       if (filenameMatch) {
         let filename = filenameMatch[1]

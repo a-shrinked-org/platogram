@@ -142,9 +142,23 @@ export default async function handler(req, res) {
       const contentTypeMatch = part.match(/Content-Type:\s*([^\r\n]+)/i);
 
       if (filenameMatch) {
-        let filename = filenameMatch[1].replace(/\\"/g, '"');
-        filename = filename.replace(/[^a-zA-Z0-9.-]/g, '_'); // Sanitize filename
-        const contentType = contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream';
+        let filename = filenameMatch[1]
+          .replace(/\\"/g, '"') // Remove escaped quotes
+          .replace(/[^a-zA-Z0-9._-]/g, '_')  // Replace all non-alphanumeric characters with underscore
+          .replace(/^_+|_+$/g, '')  // Remove underscores at the beginning or end
+          .replace(/__+/g, '_');  // Replace multiple underscores with one
+
+        // Ensure filename is not too long
+        if (filename.length > 100) {
+          filename = filename.slice(0, 97) + '_' + filename.slice(-3); // Keep last three chars for uniqueness
+        }
+
+        // Append .m4a if not present, as an example
+        if (!filename.toLowerCase().endsWith('.m4a')) {
+          filename += '.m4a'; // Assuming M4A files, change if necessary
+        }
+
+        const contentType = contentTypeMatch ? contentTypeMatch[1].trim() : 'audio/mpeg'; // Default to audio/mpeg if not specified
 
         // Extract file content
         const contentStart = part.indexOf('\r\n\r\n') + 4;

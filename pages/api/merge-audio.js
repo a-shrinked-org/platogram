@@ -99,9 +99,10 @@ export default async function handler(req, res) {
           const mockRequest = {
             headers: {
               'content-type': 'audio/mpeg',
-              'x-vercel-blob-upload': 'true'
+              'x-vercel-blob-upload': 'true',
+              authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` // Ensure the token is here
             },
-            body: mergedFileData
+            body: mergedFileData,
           };
 
           const uploadResponse = await handleUpload({

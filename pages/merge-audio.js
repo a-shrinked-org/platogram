@@ -22,11 +22,14 @@ export default function AudioMerger() {
       }
     });
     
-    if (!tokenResponse.ok) {
-      throw new Error(`Failed to retrieve token: ${await tokenResponse.text()}`);
-    }
+      const responseText = await tokenResponse.text();
+      addDebugLog(`Token Response: ${responseText}`);
 
-    const { token } = await tokenResponse.json();
+      if (!tokenResponse.ok) {
+         throw new Error(`Failed to retrieve token: ${responseText}`);
+      }
+
+      const { token } = JSON.parse(responseText);
 
       // Upload directly to Vercel Blob
       const blob = await upload(file.name, file, {

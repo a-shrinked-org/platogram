@@ -45,14 +45,7 @@ export default async function handler(req, res) {
         return res.status(200).json(response);
       }
 
-      // Rest of your code for merge handling...
-    } catch (error) {
-      console.error('Error:', error);
-      return res.status(500).json({ error: error.message });
-    }
-  }
-
-      // Merge request handling
+      // Handle merge request
       if (req.headers['content-type'] === 'application/json') {
         const chunks = [];
         for await (const chunk of req) {
@@ -109,7 +102,9 @@ export default async function handler(req, res) {
         }
       }
 
+      // If we reach here, it's an invalid request
       return res.status(400).json({ error: 'Invalid request' });
+
     } catch (error) {
       console.error('Error:', error);
       return res.status(500).json({ error: error.message });

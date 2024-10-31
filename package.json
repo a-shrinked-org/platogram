@@ -20,6 +20,8 @@
     "lucide-react": "0.454.0",
     "swr": "^2.0.0",
     "@auth0/auth0-react": "2.2.4",
+    "@aws-sdk/client-s3": "3.682.0",
+    "@aws-sdk/s3-request-presigner": "3.682.0",
     "axios": "1.7.7"
   },
   "devDependencies": {

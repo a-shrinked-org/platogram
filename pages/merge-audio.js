@@ -37,13 +37,22 @@ export default function AudioMerger() {
       const { token } = await tokenResponse.json();
       addDebugLog(`Token received, preparing to upload`);
 
+      // Sanitize file name
+      const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+
       // Create form data
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', file, sanitizedName);
+
+      // Add debug logging for file details
+      addDebugLog(`File details: name=${sanitizedName}, type=${file.type}, size=${file.size}`);
 
       // Upload the file
       const uploadResponse = await fetch('/api/merge-audio', {
         method: 'POST',
+        headers: {
+          // Don't set Content-Type here, let the browser set it with the boundary
+        },
         body: formData
       });
 
@@ -63,6 +72,9 @@ export default function AudioMerger() {
     } catch (error) {
       console.error('Upload error:', error);
       addDebugLog(`Upload error for ${file.name}: ${error.message}`);
+      if (error.details) {
+        addDebugLog(`Error details: ${JSON.stringify(error.details)}`);
+      }
       throw error;
     }
   };

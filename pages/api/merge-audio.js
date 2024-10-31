@@ -28,46 +28,71 @@ async function mergeAudioFiles(inputFiles, outputFile) {
 }
 
 async function handleFileUpload(req) {
-  // Read the file data
-  const chunks = [];
-  for await (const chunk of req) {
-    chunks.push(chunk);
+  try {
+    // Read the file data
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+
+    // Get boundary from content type
+    const boundary = '--' + req.headers['content-type']
+      .split('boundary=')[1]
+      .trim();
+
+    // Split the buffer into parts using the boundary
+    const parts = buffer.toString().split(boundary);
+
+    // Find the file part
+    const filePart = parts.find(part =>
+      part.includes('Content-Disposition') &&
+      part.includes('filename=')
+    );
+
+    if (!filePart) {
+      throw new Error('No file found in upload');
+    }
+
+    // Parse file information
+    const filenameMatch = filePart.match(/filename="([^"]+)"/);
+    const contentTypeMatch = filePart.match(/Content-Type:\s*([^\r\n]+)/i);
+
+    if (!filenameMatch) {
+      throw new Error('Filename not found');
+    }
+
+    const filename = filenameMatch[1];
+    const contentType = contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream';
+
+    // Extract file content
+    const fileContentStart = filePart.indexOf('\r\n\r\n') + 4;
+    const fileContentEnd = filePart.lastIndexOf('\r\n');
+    const fileContent = filePart.substring(fileContentStart, fileContentEnd);
+
+    // Convert to buffer
+    const fileBuffer = Buffer.from(fileContent, 'binary');
+
+    console.log('Uploading file:', {
+      filename,
+      contentType,
+      size: fileBuffer.length
+    });
+
+    // Upload to Vercel Blob
+    const blob = await put(filename, fileBuffer, {
+      access: 'public',
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      addRandomSuffix: true,
+      contentType: contentType
+    });
+
+    console.log('Upload successful:', blob.url);
+    return blob;
+  } catch (error) {
+    console.error('File upload error:', error);
+    throw error;
   }
-  const buffer = Buffer.concat(chunks);
-
-  // Parse multipart form data to get file
-  const boundary = req.headers['content-type'].split('boundary=')[1];
-  const parts = buffer.toString().split(`--${boundary}`);
-  const filePart = parts.find(part => part.includes('Content-Type:'));
-
-  if (!filePart) {
-    throw new Error('No file found in upload');
-  }
-
-  // Extract filename and content type
-  const filenameMatch = filePart.match(/filename="(.+?)"/);
-  const contentTypeMatch = filePart.match(/Content-Type: (.+?)\r\n/);
-
-  if (!filenameMatch || !contentTypeMatch) {
-    throw new Error('Invalid file upload format');
-  }
-
-  const filename = filenameMatch[1];
-  const contentType = contentTypeMatch[1];
-
-  // Get file content
-  const fileContent = filePart.split('\r\n\r\n')[1].split(`\r\n--${boundary}`)[0];
-  const fileBuffer = Buffer.from(fileContent, 'binary');
-
-  // Upload to Vercel Blob
-  const blob = await put(filename, fileBuffer, {
-    access: 'public',
-    token: process.env.BLOB_READ_WRITE_TOKEN,
-    addRandomSuffix: true,
-    contentType: contentType
-  });
-
-  return blob;
 }
 
 export default async function handler(req, res) {
@@ -84,15 +109,22 @@ export default async function handler(req, res) {
 
       // File upload handling
       if (req.headers['content-type']?.includes('multipart/form-data')) {
-        try {
-          console.log('Handling file upload');
-          const blob = await handleFileUpload(req);
-          return res.status(200).json(blob);
-        } catch (error) {
-          console.error('File upload error:', error);
-          return res.status(400).json({ error: error.message });
-        }
+      try {
+        console.log('Handling file upload, content type:', req.headers['content-type']);
+        const blob = await handleFileUpload(req);
+        return res.status(200).json(blob);
+      } catch (error) {
+        console.error('File upload error:', error);
+        return res.status(400).json({
+          error: error.message,
+          details: {
+            contentType: req.headers['content-type'],
+            errorType: error.name,
+            errorStack: error.stack
+          }
+        });
       }
+    }
 
       // Merge request handling
       if (req.headers['content-type'] === 'application/json') {

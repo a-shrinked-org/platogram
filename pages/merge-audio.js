@@ -30,43 +30,36 @@ export default function AudioMerger() {
       });
 
       if (!tokenResponse.ok) {
-        throw new Error('Failed to get upload token');
+        const errorText = await tokenResponse.text();
+        throw new Error(`Failed to get upload token: ${errorText}`);
       }
 
       const { token } = await tokenResponse.json();
-      addDebugLog(`Token received: ${token ? 'Yes' : 'No'}`);
+      addDebugLog(`Token received, preparing to upload`);
 
-      if (!token) {
-        throw new Error('No token received from server');
-      }
-
-      addDebugLog('Starting upload with token');
-
-      // Create FormData
+      // Create form data
       const formData = new FormData();
       formData.append('file', file);
 
       // Upload the file
       const uploadResponse = await fetch('/api/merge-audio', {
         method: 'POST',
-        headers: {
-          'x-token': token
-        },
         body: formData
       });
 
       if (!uploadResponse.ok) {
-        throw new Error('Upload failed');
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.error || 'Upload failed');
       }
 
-      const uploadResult = await uploadResponse.json();
+      const result = await uploadResponse.json();
 
-      if (!uploadResult?.url) {
+      if (!result?.url) {
         throw new Error('No URL received from upload');
       }
 
-      addDebugLog(`Successfully uploaded ${file.name} to ${uploadResult.url}`);
-      return uploadResult;
+      addDebugLog(`Successfully uploaded ${file.name} to ${result.url}`);
+      return result;
     } catch (error) {
       console.error('Upload error:', error);
       addDebugLog(`Upload error for ${file.name}: ${error.message}`);

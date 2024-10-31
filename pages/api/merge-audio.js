@@ -1,5 +1,4 @@
 import { put, del } from '@vercel/blob';
-import { handleUpload } from '@vercel/blob';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
@@ -28,44 +27,71 @@ async function mergeAudioFiles(inputFiles, outputFile) {
   await fs.promises.unlink(listFile);
 }
 
+async function handleFileUpload(req) {
+  // Read the file data
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(chunk);
+  }
+  const buffer = Buffer.concat(chunks);
+
+  // Parse multipart form data to get file
+  const boundary = req.headers['content-type'].split('boundary=')[1];
+  const parts = buffer.toString().split(`--${boundary}`);
+  const filePart = parts.find(part => part.includes('Content-Type:'));
+
+  if (!filePart) {
+    throw new Error('No file found in upload');
+  }
+
+  // Extract filename and content type
+  const filenameMatch = filePart.match(/filename="(.+?)"/);
+  const contentTypeMatch = filePart.match(/Content-Type: (.+?)\r\n/);
+
+  if (!filenameMatch || !contentTypeMatch) {
+    throw new Error('Invalid file upload format');
+  }
+
+  const filename = filenameMatch[1];
+  const contentType = contentTypeMatch[1];
+
+  // Get file content
+  const fileContent = filePart.split('\r\n\r\n')[1].split(`\r\n--${boundary}`)[0];
+  const fileBuffer = Buffer.from(fileContent, 'binary');
+
+  // Upload to Vercel Blob
+  const blob = await put(filename, fileBuffer, {
+    access: 'public',
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+    addRandomSuffix: true,
+    contentType: contentType
+  });
+
+  return blob;
+}
+
 export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
       // Token request handling
       if (req.headers['x-vercel-blob-token-request'] === 'true') {
-        console.log('Token request received, checking environment variables...');
-
+        console.log('Token request received');
         if (!process.env.BLOB_READ_WRITE_TOKEN) {
-          console.error('BLOB_READ_WRITE_TOKEN not found in environment');
-          return res.status(500).json({ error: 'Server configuration error - token not found' });
+          return res.status(500).json({ error: 'Server configuration error' });
         }
-
-        console.log('Token found in environment, sending response...');
         return res.status(200).json({ token: process.env.BLOB_READ_WRITE_TOKEN });
       }
 
       // File upload handling
       if (req.headers['content-type']?.includes('multipart/form-data')) {
-        console.log('Handling file upload');
-
-        // Get token from header or environment
-        const token = req.headers['x-token'] || process.env.BLOB_READ_WRITE_TOKEN;
-
-        if (!token) {
-          return res.status(400).json({ error: 'Upload token required' });
+        try {
+          console.log('Handling file upload');
+          const blob = await handleFileUpload(req);
+          return res.status(200).json(blob);
+        } catch (error) {
+          console.error('File upload error:', error);
+          return res.status(400).json({ error: error.message });
         }
-
-        const response = await handleUpload({
-          body: req,
-          request: req,
-          token: token,
-          onBeforeGenerateToken: async () => ({
-            allowedContentTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/m4a'],
-            maxSize: 100 * 1024 * 1024, // 100MB limit
-          })
-        });
-
-        return res.status(200).json(response);
       }
 
       // Merge request handling

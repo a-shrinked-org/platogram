@@ -63,10 +63,12 @@ export default function AudioMerger() {
 
       const result = await uploadResponse.json();
 
-      if (!result?.url) {
-        throw new Error('No URL received from upload');
-      }
+      console.log('Full upload result:', result);
 
+      if (!result || !result.url) {
+        throw new Error('Invalid upload response: URL not found');
+      }
+      
       addDebugLog(`Successfully uploaded ${file.name} to ${result.url}`);
       return result;
     } catch (error) {

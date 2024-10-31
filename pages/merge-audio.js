@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { AudioLines, Plus, Trash2, Loader2, Upload, Youtube } from 'lucide-react';
-import { handleUpload } from '@vercel/blob/client';
+import { upload } from '@vercel/blob/client';
 
 export default function AudioMerger() {
   const [audioFiles, setAudioFiles] = useState([]);
@@ -12,15 +12,8 @@ export default function AudioMerger() {
   const [debugLog, setDebugLog] = useState([]);
   const fileInputRef = useRef(null);
 
-  const addDebugLog = (message) => {
-    setDebugLog(prevLog => [...prevLog, `${new Date().toISOString()}: ${message}`]);
-    console.log(message);
-  };
-
-  const uploadFile = async (file) => {
+   const uploadFile = async (file) => {
     try {
-      addDebugLog(`Starting upload process for ${file.name}`);
-
       // Get the upload token
       const tokenResponse = await fetch('/api/merge-audio', {
         method: 'POST',
@@ -30,90 +23,57 @@ export default function AudioMerger() {
       });
 
       if (!tokenResponse.ok) {
-        const errorText = await tokenResponse.text();
-        throw new Error(`Failed to get upload token: ${errorText}`);
+        throw new Error('Failed to get upload token');
       }
 
       const { token } = await tokenResponse.json();
-      addDebugLog(`Token received, preparing to upload`);
 
-      // Sanitize file name
-      const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-
-      // Create form data
-      const formData = new FormData();
-      formData.append('file', file, sanitizedName);
-
-      // Add debug logging for file details
-      addDebugLog(`File details: name=${sanitizedName}, type=${file.type}, size=${file.size}`);
-
-      // Upload the file
-      const uploadResponse = await fetch('/api/merge-audio', {
-        method: 'POST',
-        headers: {
-          // Don't set Content-Type here, let the browser set it with the boundary
-        },
-        body: formData
+      // Upload directly to Vercel Blob
+      const blob = await upload(file.name, file, {
+        access: 'public',
+        token: token,
+        handleUploadUrl: '/api/merge-audio',
       });
 
-      if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json();
-        throw new Error(errorData.error || 'Upload failed');
-      }
+      const addDebugLog = (message) => {
+        setDebugLog(prev => [...prev, `${new Date().toISOString()}: ${message}`]);
+        console.log(message);
+      };
 
-      const result = await uploadResponse.json();
-
-      console.log('Full upload result:', result);
-
-      if (!result || !result.url) {
-        throw new Error('Invalid upload response: URL not found');
-      }
-      
-      addDebugLog(`Successfully uploaded ${file.name} to ${result.url}`);
-      return result;
+      return blob;
     } catch (error) {
       console.error('Upload error:', error);
-      addDebugLog(`Upload error for ${file.name}: ${error.message}`);
-      if (error.details) {
-        addDebugLog(`Error details: ${JSON.stringify(error.details)}`);
-      }
       throw error;
     }
   };
 
-const handleFileUpload = async (e) => {
-  const files = Array.from(e.target.files);
-  if (files.length === 0) return;
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
 
-  addDebugLog(`Starting upload process for ${files.length} files`);
+    for (const file of files) {
+      try {
+        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
 
-  for (const file of files) {
-    try {
-      setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
-      addDebugLog(`Initiating upload for ${file.name}`);
+        const blob = await uploadFile(file);
 
-      const blob = await uploadFile(file);
+        setAudioFiles(prev => [...prev, {
+          type: 'local',
+          url: blob.url,
+          name: file.name,
+        }]);
 
-      setAudioFiles(prev => [...prev, {
-        type: 'local',
-        url: blob.url,
-        name: file.name,
-      }]);
-
-      setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
-      addDebugLog(`Successfully uploaded: ${file.name}`);
-    } catch (err) {
-      setError(`Failed to upload ${file.name}: ${err.message}`);
-      addDebugLog(`Error uploading ${file.name}: ${err.message}`);
-      setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
+        setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
+      } catch (err) {
+        setError(`Failed to upload ${file.name}: ${err.message}`);
+        setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
+      }
     }
-  }
 
-  // Clear file input
-  if (fileInputRef.current) {
-    fileInputRef.current.value = '';
-  }
-};
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const handleYouTubeProcess = async (e) => {
     e.preventDefault();
@@ -124,10 +84,7 @@ const handleFileUpload = async (e) => {
     try {
       const response = await fetch('/api/process-youtube', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await window.auth0Client.getTokenSilently()}`
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ youtubeUrl }),
       });
 
@@ -158,10 +115,7 @@ const handleFileUpload = async (e) => {
       if (file.type === 'local') {
         await fetch('/api/merge-audio', {
           method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${await window.auth0Client.getTokenSilently()}`
-          },
+          headers: await getAuthHeaders(),
           body: JSON.stringify({ url: file.url })
         });
       }
@@ -186,10 +140,7 @@ const handleFileUpload = async (e) => {
     try {
       const response = await fetch('/api/merge-audio', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await window.auth0Client.getTokenSilently()}`
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           audioUrls: audioFiles.map(file => file.url),
         }),

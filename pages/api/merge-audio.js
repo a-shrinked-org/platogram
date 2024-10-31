@@ -1,4 +1,5 @@
-import { put, del } from '@vercel/blob';
+import { handleUpload } from '@vercel/blob';
+import { del } from '@vercel/blob';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
@@ -27,189 +28,39 @@ async function mergeAudioFiles(inputFiles, outputFile) {
   await fs.promises.unlink(listFile);
 }
 
-//async function handleFileUpload(req) {
-//  try {
-//    // Read the file data
-//    const chunks = [];
-//   for await (const chunk of req) {
-//      chunks.push(chunk);
-//    }
-//    const buffer = Buffer.concat(chunks);
-//
-//    // Get boundary from content type
-//    const boundary = '--' + req.headers['content-type']
-//      .split('boundary=')[1]
-//     .trim();
-//
-//    // Split the buffer into parts using the boundary
-//   const parts = buffer.toString().split(boundary);
-//
-//    // Find the file part
-//    const filePart = parts.find(part =>
-//     part.includes('Content-Disposition') &&
-//     part.includes('filename=')
-//   );
-//
-//   if (!filePart) {
-//      throw new Error('No file found in upload');
-//    }
-//
-//    // Parse file information
-//    const filenameMatch = filePart.match(/filename="([^"]+)"/);
-//    const contentTypeMatch = filePart.match(/Content-Type:\s*([^\r\n]+)/i);
-//
-//   if (!filenameMatch) {
-//      throw new Error('Filename not found');
-//   }
-//
-//    const filename = filenameMatch[1];
-//   const contentType = contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream';
-//
-//    // Extract file content
-//    const fileContentStart = filePart.indexOf('\r\n\r\n') + 4;
-//   const fileContentEnd = filePart.lastIndexOf('\r\n');
-//   const fileContent = filePart.substring(fileContentStart, fileContentEnd);
-//
-//    // Convert to buffer
-//   const fileBuffer = Buffer.from(fileContent, 'binary');
-//
-//   console.log('Uploading file:', {
-//     filename,
-//      contentType,
-//      size: fileBuffer.length
-//   });
-//
-//   // Upload to Vercel Blob
-//   const blob = await put(filename, fileBuffer, {
-//     access: 'public',
-//     token: process.env.BLOB_READ_WRITE_TOKEN,
-//     addRandomSuffix: true,
-//     contentType: contentType
-//   });
-//
-//   console.log('Upload successful:', blob.url);
-//   return blob;
-//  } catch (error) {
-//   console.error('File upload error:', error);
-//   throw error;
-// }
-//}
-
 export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
-      // Token request handling
+      // Handle token request for client-side upload
       if (req.headers['x-vercel-blob-token-request'] === 'true') {
-        console.log('Token request received');
         if (!process.env.BLOB_READ_WRITE_TOKEN) {
           return res.status(500).json({ error: 'Server configuration error' });
         }
         return res.status(200).json({ token: process.env.BLOB_READ_WRITE_TOKEN });
       }
 
-      // File upload handling
-      if (req.headers['content-type']?.includes('multipart/form-data')) {
-  try {
-    const boundaryRegex = /boundary=(?:"([^"]+)"|([^;]+))/i;
-    const match = req.headers['content-type'].match(boundaryRegex);
-    const boundary = match[1] || match[2];
-
-    if (!boundary) {
-      throw new Error('No boundary in Content-Type header');
-    }
-
-    console.log('Handling file upload, content type:', req.headers['content-type'], 'Boundary:', boundary);
-
-      // Read the file data
-          const buffer = Buffer.concat(await collectChunks(req));
-
-          // Split the buffer into parts using the boundary
-          const parts = buffer.toString().split('--' + boundary);
-
-          const blobs = []; // Array to collect blob information
-
-          for (let part of parts) {
-            if (part.trim() === '' || !part.includes('Content-Disposition')) {
-              continue; // Skip empty parts or non-file parts
-            }
-
-            // Extract filename and content type for each file part
-            const filenameMatch = part.match(/filename="((?:[^"]|\\")*)"/);
-            const contentTypeMatch = part.match(/Content-Type:\s*([^\r\n]+)/i);
-
-      if (filenameMatch) {
-        let filename = filenameMatch[1]
-          .replace(/\\"/g, '"') // Remove escaped quotes
-          .replace(/[^a-zA-Z0-9._-]/g, '_')  // Replace all non-alphanumeric characters with underscore
-          .replace(/^_+|_+$/g, '')  // Remove underscores at the beginning or end
-          .replace(/__+/g, '_');  // Replace multiple underscores with one
-
-        // Ensure filename is not too long
-        if (filename.length > 100) {
-          filename = filename.slice(0, 97) + '_' + filename.slice(-3); // Keep last three chars for uniqueness
-        }
-
-        // Append .m4a if not present, as an example
-        if (!filename.toLowerCase().endsWith('.m4a')) {
-          filename += '.m4a'; // Assuming M4A files, change if necessary
-        }
-
-        const contentType = contentTypeMatch ? contentTypeMatch[1].trim() : 'audio/mpeg'; // Default to audio/mpeg if not specified
-
-        // Extract file content
-        const contentStart = part.indexOf('\r\n\r\n') + 4;
-        const contentEnd = part.lastIndexOf('\r\n');
-        const fileContent = part.substring(contentStart, contentEnd);
-
-        // Convert to buffer
-        const fileBuffer = Buffer.from(fileContent, 'binary');
-
-        console.log('Uploading file:', {
-          filename,
-          contentType,
-          size: fileBuffer.length
+      // Handle client-side upload completion
+      if (req.headers['x-vercel-blob-upload']) {
+        return handleUpload({
+          req,
+          res,
+          onBeforeGenerateToken: async (pathname) => {
+            return {
+              allowedContentTypes: ['audio/*'],
+              tokenPayload: JSON.stringify({
+                pathname,
+                timestamp: Date.now(),
+              }),
+            };
+          },
+          onUploadCompleted: async ({ blob, tokenPayload }) => {
+            // Optional: Add any post-upload processing here
+            console.log('Upload completed:', blob.url);
+          },
         });
-
-        // Upload to Vercel Blob
-        const blob = await put(filename, fileBuffer, {
-          access: 'public',
-          token: process.env.BLOB_READ_WRITE_TOKEN,
-          addRandomSuffix: true,
-          contentType: contentType
-        });
-
-        console.log('Upload successful:', blob.url);
-        blobs.push(blob); // Add the blob to the array
-      }
-    }
-
-    if (blobs.length > 0) {
-      return res.status(200).json(blobs); // Return all blobs
-    } else {
-      throw new Error('No files were successfully uploaded');
-    }
-  } catch (error) {
-    console.error('File upload error:', error);
-    return res.status(400).json({
-      error: error.message,
-      details: {
-        contentType: req.headers['content-type'],
-        errorType: error.name,
-        errorStack: error.stack
-      }
-    });
-  }
-}
-
-      async function collectChunks(req) {
-        const chunks = [];
-        for await (const chunk of req) {
-          chunks.push(chunk);
-        }
-        return chunks;
       }
 
-      // Merge request handling
+      // Handle merge request
       if (req.headers['content-type'] === 'application/json') {
         const chunks = [];
         for await (const chunk of req) {
@@ -236,17 +87,43 @@ export default async function handler(req, res) {
           // Merge files
           await mergeAudioFiles(inputFiles, outputFile);
 
-          // Upload merged file with token
-          const sanitizedFilename = 'merged-audio_' + Date.now() + '.m4a'; // Adding timestamp for uniqueness
-          const mergedFileData = await fs.promises.readFile(outputFile);
+          // ... (previous code remains the same until the merge file upload part)
 
-          const blob = await put(sanitizedFilename, mergedFileData, {
-            access: 'public',
+          // Upload merged file
+          const mergedFileData = await fs.promises.readFile(outputFile);
+          const sanitizedFilename = 'merged-audio_' + Date.now() + '.m4a';
+
+          // Create a mock request object for handleUpload
+          const mockRequest = {
+            headers: {
+              'content-type': 'audio/mpeg',
+              'x-vercel-blob-upload': 'true'
+            },
+            body: mergedFileData
+          };
+
+          const uploadResponse = await handleUpload({
+            req: mockRequest,
+            res,
             token: process.env.BLOB_READ_WRITE_TOKEN,
-            addRandomSuffix: true,
-            contentType: 'audio/mpeg' // Changed from 'audio/mp4' to 'audio/mpeg' for M4A files
+            pathname: sanitizedFilename,
+            options: {
+              access: 'public',
+              addRandomSuffix: true,
+              contentType: 'audio/mpeg'
+            },
+            onBeforeGenerateToken: async (pathname) => ({
+              allowedContentTypes: ['audio/mpeg'],
+              tokenPayload: JSON.stringify({
+                type: 'merged-audio',
+                timestamp: Date.now(),
+              }),
+            }),
+            onUploadCompleted: async ({ blob, tokenPayload }) => {
+              console.log('Merged file upload completed:', blob.url);
+            },
           });
-          
+
           // Clean up source files
           for (const sourceUrl of audioUrls) {
             if (sourceUrl.includes('.public.blob.vercel-storage.com')) {
@@ -256,7 +133,9 @@ export default async function handler(req, res) {
             }
           }
 
-          return res.status(200).json({ url: blob.url });
+          // Return the URL of the merged file
+          return res.status(200).json({ url: uploadResponse.url });
+
         } finally {
           // Clean up temp files
           await Promise.all(inputFiles.map(file =>

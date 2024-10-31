@@ -100,7 +100,7 @@ export default async function handler(req, res) {
             headers: {
               'content-type': 'audio/mpeg',
               'x-vercel-blob-upload': 'true',
-              authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` // Ensure the token is here
+              authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`
             },
             body: mergedFileData,
           };

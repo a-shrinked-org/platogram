@@ -12,21 +12,27 @@ export default function AudioMerger() {
   const [debugLog, setDebugLog] = useState([]);
   const fileInputRef = useRef(null);
 
-   const uploadFile = async (file) => {
+  // Moved addDebugLog to ensure it's globally accessible
+  const addDebugLog = (message) => {
+    setDebugLog(prev => [...prev, `${new Date().toISOString()}: ${message}`]);
+    console.log(message);
+  };
+
+  const uploadFile = async (file) => {
     try {
-      // Get the upload token
+      // Request the upload token
       const tokenResponse = await fetch('/api/merge-audio', {
-      method: 'POST',
-      headers: {
-        'x-vercel-blob-token-request': 'true',
-      }
-    });
-    
+        method: 'POST',
+        headers: {
+          'x-vercel-blob-token-request': 'true',
+        }
+      });
+
       const responseText = await tokenResponse.text();
       addDebugLog(`Token Response: ${responseText}`);
 
       if (!tokenResponse.ok) {
-         throw new Error(`Failed to retrieve token: ${responseText}`);
+        throw new Error(`Failed to retrieve token: ${responseText}`);
       }
 
       const { token } = JSON.parse(responseText);
@@ -38,14 +44,10 @@ export default function AudioMerger() {
         handleUploadUrl: '/api/merge-audio',
       });
 
-      const addDebugLog = (message) => {
-        setDebugLog(prev => [...prev, `${new Date().toISOString()}: ${message}`]);
-        console.log(message);
-      };
-
       return blob;
     } catch (error) {
       console.error('Upload error:', error);
+      setError(`Failed to upload ${file.name}: ${error.message}`);
       throw error;
     }
   };
@@ -68,7 +70,6 @@ export default function AudioMerger() {
 
         setUploadProgress(prev => ({ ...prev, [file.name]: 100 }));
       } catch (err) {
-        setError(`Failed to upload ${file.name}: ${err.message}`);
         setUploadProgress(prev => ({ ...prev, [file.name]: 0 }));
       }
     }
@@ -152,7 +153,6 @@ export default function AudioMerger() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error);
 
-      // Create download link
       const a = document.createElement('a');
       a.href = data.url;
       a.download = 'merged-audio.m4a';

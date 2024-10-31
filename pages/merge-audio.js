@@ -18,60 +18,62 @@ export default function AudioMerger() {
   };
 
   const uploadFile = async (file) => {
-  try {
-    addDebugLog(`Starting upload process for ${file.name}`);
+    try {
+      addDebugLog(`Starting upload process for ${file.name}`);
 
-    // Get the upload token
-    const tokenResponse = await fetch('/api/merge-audio', {
-      method: 'POST',
-      headers: {
-        'x-vercel-blob-token-request': 'true',
+      // Get the upload token
+      const tokenResponse = await fetch('/api/merge-audio', {
+        method: 'POST',
+        headers: {
+          'x-vercel-blob-token-request': 'true',
+        }
+      });
+
+      if (!tokenResponse.ok) {
+        throw new Error('Failed to get upload token');
       }
-    });
 
-    if (!tokenResponse.ok) {
-      throw new Error('Failed to get upload token');
+      const { token } = await tokenResponse.json();
+      addDebugLog(`Token received: ${token ? 'Yes' : 'No'}`);
+
+      if (!token) {
+        throw new Error('No token received from server');
+      }
+
+      addDebugLog('Starting upload with token');
+
+      // Create FormData
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Upload the file
+      const uploadResponse = await fetch('/api/merge-audio', {
+        method: 'POST',
+        headers: {
+          'x-token': token
+        },
+        body: formData
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const uploadResult = await uploadResponse.json();
+
+      if (!uploadResult?.url) {
+        throw new Error('No URL received from upload');
+      }
+
+      addDebugLog(`Successfully uploaded ${file.name} to ${uploadResult.url}`);
+      return uploadResult;
+    } catch (error) {
+      console.error('Upload error:', error);
+      addDebugLog(`Upload error for ${file.name}: ${error.message}`);
+      throw error;
     }
+  };
 
-    const { token } = await tokenResponse.json();
-    addDebugLog(`Token received: ${token ? 'Yes' : 'No'}`);
-
-    if (!token) {
-      throw new Error('No token received from server');
-    }
-
-    // Now handle the upload with the token
-    const response = await handleUpload({
-      data: file,
-      options: {
-        access: 'public',
-        token: token,
-        handleUploadUrl: '/api/merge-audio',
-      },
-      onUploadProgress: (progress) => {
-        const percentage = Math.round((progress.loaded / progress.total) * 100);
-        setUploadProgress(prev => ({
-          ...prev,
-          [file.name]: percentage
-        }));
-        addDebugLog(`Upload progress for ${file.name}: ${percentage}%`);
-      },
-    });
-
-    if (!response?.url) {
-      throw new Error('No URL received from upload');
-    }
-
-    addDebugLog(`Successfully uploaded ${file.name} to ${response.url}`);
-    return response;
-  } catch (error) {
-    console.error('Upload error:', error);
-    addDebugLog(`Upload error for ${file.name}: ${error.message}`);
-    throw error;
-  }
-};
-
-// Remove the duplicate handleFileUpload and keep this single version:
 const handleFileUpload = async (e) => {
   const files = Array.from(e.target.files);
   if (files.length === 0) return;

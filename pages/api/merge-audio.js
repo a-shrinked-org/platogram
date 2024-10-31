@@ -1,4 +1,5 @@
 import { put, del } from '@vercel/blob';
+import { handleUpload } from '@vercel/blob';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
@@ -30,23 +31,26 @@ async function mergeAudioFiles(inputFiles, outputFile) {
 export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
-      // Token request handling
-      if (req.headers['x-vercel-blob-token-request'] === 'true') {
-        if (!process.env.BLOB_READ_WRITE_TOKEN) {
-          console.error('BLOB_READ_WRITE_TOKEN not found in environment variables');
-          return res.status(500).json({ error: 'Server configuration error' });
-        }
-
-        try {
-          // Return the token with the key name expected by the client
-          return res.status(200).json({
-            token: process.env.BLOB_READ_WRITE_TOKEN // Changed from clientToken to token
-          });
-        } catch (error) {
-          console.error('Error providing token:', error);
-          return res.status(500).json({ error: 'Failed to provide upload token' });
-        }
+      // Handle file upload request
+      if (req.headers['content-type']?.includes('multipart/form-data')) {
+        console.log('Handling file upload');
+        const response = await handleUpload({
+          body: req,
+          request: req,
+          onBeforeGenerateToken: async () => ({
+            allowedContentTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/m4a'],
+            maxSize: 100 * 1024 * 1024, // 100MB limit
+          })
+        });
+        return res.status(200).json(response);
       }
+
+      // Rest of your code for merge handling...
+    } catch (error) {
+      console.error('Error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+  }
 
       // Merge request handling
       if (req.headers['content-type'] === 'application/json') {

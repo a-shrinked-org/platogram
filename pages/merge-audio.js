@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { AudioLines, Plus, Trash2, Loader2, Upload, Youtube } from 'lucide-react';
-import { put } from '@vercel/blob/client';
+import { handleUpload } from '@vercel/blob/client';
 
 export default function AudioMerger() {
   const [audioFiles, setAudioFiles] = useState([]);
@@ -18,54 +18,37 @@ export default function AudioMerger() {
   };
 
   const uploadFile = async (file) => {
-    try {
-      addDebugLog(`Requesting upload token for ${file.name}`);
+  try {
+    addDebugLog(`Starting upload for ${file.name}`);
 
-      const tokenResponse = await fetch('/api/merge-audio', {
-        method: 'POST',
-        headers: {
-          'x-vercel-blob-token-request': 'true',
-        }
-      });
-
-      const { token } = await tokenResponse.json();
-      addDebugLog(`Token received: ${token ? 'Yes' : 'No'}`);
-
-      if (!token) {
-        throw new Error('Failed to get upload token');
-      }
-
-      // Create a sanitized filename
-      const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      addDebugLog(`Starting upload for ${sanitizedName}`);
-
-      const blob = await put(sanitizedName, file, {
+    const response = await handleUpload({
+      file,
+      options: {
         access: 'public',
-        token: token,
-        contentType: file.type || 'audio/mp4',
-        addRandomSuffix: true,
-        onProgress: (progress) => {
-          const percentage = Math.round((progress.loaded / progress.total) * 100);
-          setUploadProgress(prev => ({
-            ...prev,
-            [file.name]: percentage
-          }));
-          addDebugLog(`Upload progress for ${file.name}: ${percentage}%`);
-        },
-      });
+        handleUploadUrl: '/api/merge-audio',
+      },
+      onUploadProgress: (progress) => {
+        const percentage = Math.round((progress.loaded / progress.total) * 100);
+        setUploadProgress(prev => ({
+          ...prev,
+          [file.name]: percentage
+        }));
+        addDebugLog(`Upload progress for ${file.name}: ${percentage}%`);
+      },
+    });
 
-      if (!blob?.url) {
-        throw new Error('No URL received from upload');
-      }
-
-      addDebugLog(`Successfully uploaded ${file.name} to ${blob.url}`);
-      return blob;
-    } catch (error) {
-      console.error('Upload error:', error);
-      addDebugLog(`Upload error for ${file.name}: ${error.message}`);
-      throw error;
+    if (!response?.url) {
+      throw new Error('No URL received from upload');
     }
-  };
+
+    addDebugLog(`Successfully uploaded ${file.name} to ${response.url}`);
+    return response;
+  } catch (error) {
+    console.error('Upload error:', error);
+    addDebugLog(`Upload error for ${file.name}: ${error.message}`);
+    throw error;
+  }
+};
 
 // Remove the duplicate handleFileUpload and keep this single version:
 const handleFileUpload = async (e) => {

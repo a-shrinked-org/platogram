@@ -32,17 +32,25 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     try {
       // Handle file upload request
-      if (req.headers['content-type']?.includes('multipart/form-data')) {
-        console.log('Handling file upload');
-        const response = await handleUpload({
-          body: req,
-          request: req,
-          onBeforeGenerateToken: async () => ({
-            allowedContentTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'audio/mp4', 'audio/m4a'],
-            maxSize: 100 * 1024 * 1024, // 100MB limit
-          })
-        });
-        return res.status(200).json(response);
+      if (req.headers['x-vercel-blob-token-request'] === 'true') {
+        try {
+          console.log('Token request received, checking environment variables...');
+
+          if (!process.env.BLOB_READ_WRITE_TOKEN) {
+            console.error('BLOB_READ_WRITE_TOKEN not found in environment');
+            return res.status(500).json({ error: 'Server configuration error - token not found' });
+          }
+
+          console.log('Token found in environment, sending response...');
+
+          // Return the token
+          return res.status(200).json({
+            token: process.env.BLOB_READ_WRITE_TOKEN
+          });
+        } catch (error) {
+          console.error('Error providing token:', error);
+          return res.status(500).json({ error: 'Failed to provide upload token' });
+        }
       }
 
       // Handle merge request

@@ -19,12 +19,33 @@ export default function AudioMerger() {
 
   const uploadFile = async (file) => {
   try {
-    addDebugLog(`Starting upload for ${file.name}`);
+    addDebugLog(`Starting upload process for ${file.name}`);
 
+    // Get the upload token
+    const tokenResponse = await fetch('/api/merge-audio', {
+      method: 'POST',
+      headers: {
+        'x-vercel-blob-token-request': 'true',
+      }
+    });
+
+    if (!tokenResponse.ok) {
+      throw new Error('Failed to get upload token');
+    }
+
+    const { token } = await tokenResponse.json();
+    addDebugLog(`Token received: ${token ? 'Yes' : 'No'}`);
+
+    if (!token) {
+      throw new Error('No token received from server');
+    }
+
+    // Now handle the upload with the token
     const response = await handleUpload({
-      file,
+      data: file,
       options: {
         access: 'public',
+        token: token,
         handleUploadUrl: '/api/merge-audio',
       },
       onUploadProgress: (progress) => {

@@ -109,22 +109,87 @@ export default async function handler(req, res) {
 
       // File upload handling
       if (req.headers['content-type']?.includes('multipart/form-data')) {
-      try {
-        console.log('Handling file upload, content type:', req.headers['content-type']);
-        const blob = await handleFileUpload(req);
-        return res.status(200).json(blob);
-      } catch (error) {
-        console.error('File upload error:', error);
-        return res.status(400).json({
-          error: error.message,
-          details: {
-            contentType: req.headers['content-type'],
-            errorType: error.name,
-            errorStack: error.stack
-          }
+  try {
+    const boundaryRegex = /boundary=(?:"([^"]+)"|([^;]+))/i;
+    const match = req.headers['content-type'].match(boundaryRegex);
+    const boundary = match[1] || match[2];
+
+    if (!boundary) {
+      throw new Error('No boundary in Content-Type header');
+    }
+
+    console.log('Handling file upload, content type:', req.headers['content-type'], 'Boundary:', boundary);
+
+    // Read the file data
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+    const buffer = Buffer.concat(chunks);
+
+    // Split the buffer into parts using the boundary
+    const parts = buffer.toString().split('--' + boundary);
+
+    const blobs = []; // Array to collect blob information
+
+    for (let part of parts) {
+      if (part.trim() === '' || part.includes('Content-Disposition: form-data; name="file"')) {
+        continue; // Skip empty parts or non-file parts
+      }
+
+      // Extract filename and content type for each file part
+      const filenameMatch = part.match(/filename="((?:[^"]|\\")*)"/);
+      const contentTypeMatch = part.match(/Content-Type:\s*([^\r\n]+)/i);
+
+      if (filenameMatch) {
+        let filename = filenameMatch[1].replace(/\\"/g, '"');
+        filename = filename.replace(/[^a-zA-Z0-9.-]/g, '_'); // Sanitize filename
+        const contentType = contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream';
+
+        // Extract file content
+        const contentStart = part.indexOf('\r\n\r\n') + 4;
+        const contentEnd = part.lastIndexOf('\r\n');
+        const fileContent = part.substring(contentStart, contentEnd);
+
+        // Convert to buffer
+        const fileBuffer = Buffer.from(fileContent, 'binary');
+
+        console.log('Uploading file:', {
+          filename,
+          contentType,
+          size: fileBuffer.length
         });
+
+        // Upload to Vercel Blob
+        const blob = await put(filename, fileBuffer, {
+          access: 'public',
+          token: process.env.BLOB_READ_WRITE_TOKEN,
+          addRandomSuffix: true,
+          contentType: contentType
+        });
+
+        console.log('Upload successful:', blob.url);
+        blobs.push(blob); // Add the blob to the array
       }
     }
+
+    if (blobs.length > 0) {
+      return res.status(200).json(blobs); // Return all blobs
+    } else {
+      throw new Error('No files were successfully uploaded');
+    }
+  } catch (error) {
+    console.error('File upload error:', error);
+    return res.status(400).json({
+      error: error.message,
+      details: {
+        contentType: req.headers['content-type'],
+        errorType: error.name,
+        errorStack: error.stack
+      }
+    });
+  }
+}
 
       // Merge request handling
       if (req.headers['content-type'] === 'application/json') {

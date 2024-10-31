@@ -219,14 +219,16 @@ export default async function handler(req, res) {
           await mergeAudioFiles(inputFiles, outputFile);
 
           // Upload merged file with token
+          const sanitizedFilename = 'merged-audio_' + Date.now() + '.m4a'; // Adding timestamp for uniqueness
           const mergedFileData = await fs.promises.readFile(outputFile);
-          const blob = await put('merged-audio.m4a', mergedFileData, {
+
+          const blob = await put(sanitizedFilename, mergedFileData, {
             access: 'public',
             token: process.env.BLOB_READ_WRITE_TOKEN,
             addRandomSuffix: true,
-            contentType: 'audio/mp4'
+            contentType: 'audio/mpeg' // Changed from 'audio/mp4' to 'audio/mpeg' for M4A files
           });
-
+          
           // Clean up source files
           for (const sourceUrl of audioUrls) {
             if (sourceUrl.includes('.public.blob.vercel-storage.com')) {

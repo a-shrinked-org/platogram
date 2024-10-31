@@ -16,17 +16,17 @@ export default function AudioMerger() {
     try {
       // Get the upload token
       const tokenResponse = await fetch('/api/merge-audio', {
-        method: 'POST',
-        headers: {
-          'x-vercel-blob-token-request': 'true',
-        }
-      });
-
-      if (!tokenResponse.ok) {
-        throw new Error('Failed to get upload token');
+      method: 'POST',
+      headers: {
+        'x-vercel-blob-token-request': 'true',
       }
+    });
+    
+    if (!tokenResponse.ok) {
+      throw new Error(`Failed to retrieve token: ${await tokenResponse.text()}`);
+    }
 
-      const { token } = await tokenResponse.json();
+    const { token } = await tokenResponse.json();
 
       // Upload directly to Vercel Blob
       const blob = await upload(file.name, file, {

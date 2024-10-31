@@ -33,6 +33,8 @@ export default async function handler(req, res) {
     try {
       // Handle token request for client-side upload
       if (req.headers['x-vercel-blob-token-request'] === 'true') {
+        console.log('Token request headers:', req.headers);
+        console.log('Environment token:', process.env.BLOB_READ_WRITE_TOKEN);      
         if (!process.env.BLOB_READ_WRITE_TOKEN) {
           return res.status(500).json({ error: 'Server configuration error' });
         }

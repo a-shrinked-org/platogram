@@ -201,6 +201,14 @@ export default async function handler(req, res) {
   }
 }
 
+      async function collectChunks(req) {
+        const chunks = [];
+        for await (const chunk of req) {
+          chunks.push(chunk);
+        }
+        return chunks;
+      }
+
       // Merge request handling
       if (req.headers['content-type'] === 'application/json') {
         const chunks = [];

@@ -37,7 +37,7 @@ export default function YouTubeProcessor() {
     }
   };
 
-  const handleDownload = async (output) => {
+  const handleChunkedDownload = async (output) => {
     if (output.data && output.data.audio_url) {
       try {
         setDownloadProgress(0);
@@ -49,7 +49,7 @@ export default function YouTubeProcessor() {
         let contentLength = 0;
 
         while (true) {
-          const downloadUrl = `/api/download-audio?url=${encodeURIComponent(output.data.audio_url)}&title=${encodeURIComponent(output.data.title || 'audio')}&start=${start}&end=${end}`;
+          const downloadUrl = `/api/download-audio?url=${encodeURIComponent(output.data.audio_url)}&title=${encodeURIComponent(output.data.title || 'audio')}&start=${start}&end=${end}&useChunks=true`;
 
           addDebugLog(`Downloading chunk: ${start}-${end}`);
           const response = await fetch(downloadUrl);
@@ -80,13 +80,13 @@ export default function YouTubeProcessor() {
           end = start + CHUNK_SIZE - 1;
         }
 
-        const blob = new Blob(chunks, { type: 'audio/mp4' });
+        const blob = new Blob(chunks, { type: output.data.audio_url.includes('webm') ? 'audio/webm' : 'audio/mp4' });
         const blobUrl = URL.createObjectURL(blob);
 
         addDebugLog('Creating download link');
         const a = document.createElement('a');
         a.href = blobUrl;
-        a.download = `${output.data.title || 'audio'}.m4a`;
+        a.download = `${output.data.title || 'audio'}.${output.data.audio_url.includes('webm') ? 'webm' : 'm4a'}`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -94,6 +94,47 @@ export default function YouTubeProcessor() {
 
         setDownloadProgress(null);
         addDebugLog('Download process completed');
+      } catch (err) {
+        const errorMessage = `An error occurred while downloading the audio: ${err.message}`;
+        setError(errorMessage);
+        addDebugLog(`Error: ${errorMessage}`);
+        setDownloadProgress(null);
+      }
+    } else {
+      setError('No audio URL found in the response');
+      addDebugLog('Error: No audio URL found in the response');
+    }
+  };
+
+  const handleDirectDownload = async (output) => {
+    if (output.data && output.data.audio_url) {
+      try {
+        setDownloadProgress(0);
+        addDebugLog(`Starting direct download from: ${output.data.audio_url}`);
+
+        const downloadUrl = `/api/download-audio?url=${encodeURIComponent(output.data.audio_url)}&title=${encodeURIComponent(output.data.title || 'audio')}&useChunks=false`;
+
+        addDebugLog('Initiating direct download');
+        const response = await fetch(downloadUrl);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+
+        addDebugLog('Creating download link');
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `${output.data.title || 'audio'}.${output.data.audio_url.includes('webm') ? 'webm' : 'm4a'}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+
+        setDownloadProgress(null);
+        addDebugLog('Direct download completed');
       } catch (err) {
         const errorMessage = `An error occurred while downloading the audio: ${err.message}`;
         setError(errorMessage);
@@ -120,24 +161,31 @@ export default function YouTubeProcessor() {
         />
         <button
           type="submit"
-          className="mt-2 px-4 py-2 bg-blue-500 text-white rounded"
+          className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           disabled={isLoading}
         >
           {isLoading ? 'Processing...' : 'Process'}
         </button>
       </form>
-      {error && <p className="text-red-500">{error}</p>}
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+          <p>{error}</p>
+        </div>
+      )}
+
       {downloadProgress !== null && (
         <div className="mt-4">
           <p>Downloading: {downloadProgress}%</p>
           <div className="w-full bg-gray-200 rounded">
             <div
-              className="bg-blue-600 rounded h-2"
+              className="bg-blue-600 rounded h-2 transition-all duration-300"
               style={{ width: `${downloadProgress}%` }}
             ></div>
           </div>
         </div>
       )}
+
       {result && (
         <div>
           <h2 className="text-xl font-semibold mb-2">Result:</h2>
@@ -145,21 +193,31 @@ export default function YouTubeProcessor() {
             {JSON.stringify(result, null, 2)}
           </pre>
           {result.map((output, index) => (
-            <div key={index}>
-              <h3 className="text-lg font-semibold mt-4 mb-2">{output.name || `Output ${index + 1}`}</h3>
+            <div key={index} className="mt-4">
+              <h3 className="text-lg font-semibold mb-2">{output.data?.title || `Output ${index + 1}`}</h3>
               {output.data && output.data.audio_url && (
-                <button
-                  onClick={() => handleDownload(output)}
-                  className="px-4 py-2 bg-green-500 text-white rounded"
-                  disabled={downloadProgress !== null}
-                >
-                  {downloadProgress !== null ? 'Downloading...' : 'Download Audio'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleDirectDownload(output)}
+                    className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+                    disabled={downloadProgress !== null}
+                  >
+                    {downloadProgress !== null ? 'Downloading...' : 'Direct Download'}
+                  </button>
+                  <button
+                    onClick={() => handleChunkedDownload(output)}
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    disabled={downloadProgress !== null}
+                  >
+                    {downloadProgress !== null ? 'Downloading...' : 'Chunked Download'}
+                  </button>
+                </div>
               )}
             </div>
           ))}
         </div>
       )}
+
       <div className="mt-4">
         <h3 className="text-lg font-semibold mb-2">Debug Log:</h3>
         <pre className="bg-gray-100 p-4 rounded overflow-x-auto h-40 overflow-y-auto">

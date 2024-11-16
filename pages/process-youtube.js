@@ -38,66 +38,61 @@ export default function YouTubeProcessor() {
     };
 
     const handleXHRDownload = (output) => {
-      if (!output.data?.audio_url) {
-        setError('No audio URL found in the response');
-        addDebugLog('Error: No audio URL found in the response');
-        return;
-      }
+  if (!output.data?.audio_url) {
+    setError('No audio URL found in the response');
+    addDebugLog('Error: No audio URL found in the response');
+    return;
+  }
 
-      try {
-        setDownloadProgress(0);
-        addDebugLog(`Starting XHR download from: ${output.data.audio_url}`);
+  try {
+    setDownloadProgress(0);
+    addDebugLog(`Starting XHR download from: ${output.data.audio_url}`);
 
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', output.data.audio_url, true);
-        xhr.responseType = 'blob';
+    // Create a hidden iframe for download
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
 
-        // Add headers
-        xhr.setRequestHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36');
-        xhr.setRequestHeader('Accept', '*/*');
-        xhr.setRequestHeader('Origin', 'https://www.youtube.com');
-        xhr.setRequestHeader('Referer', 'https://www.youtube.com/');
+    // Create a form in the iframe
+    const form = iframe.contentDocument.createElement('form');
+    form.method = 'GET';
+    form.action = output.data.audio_url;
 
-        xhr.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const percentComplete = Math.round((event.loaded / event.total) * 100);
-            setDownloadProgress(percentComplete);
-            addDebugLog(`Download progress: ${percentComplete}%`);
-          }
-        };
-
-        xhr.onload = function() {
-          if (this.status === 200) {
-            const blob = new Blob([this.response], {
-              type: output.data.mime || 'audio/webm'
-            });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${output.data.title || 'audio'}.${output.data.ext || 'webm'}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-            setDownloadProgress(null);
-            addDebugLog('XHR Download completed successfully');
-          } else {
-            throw new Error(`XHR request failed with status ${this.status}`);
-          }
-        };
-
-        xhr.onerror = function() {
-          throw new Error('XHR request failed');
-        };
-
-        xhr.send();
-      } catch (err) {
-        const errorMessage = `An error occurred while downloading the audio: ${err.message}`;
-        setError(errorMessage);
-        addDebugLog(`Error: ${errorMessage}`);
-        setDownloadProgress(null);
-      }
+    // Add hidden fields for headers
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+      'Accept': '*/*',
+      'Origin': 'https://www.youtube.com',
+      'Referer': 'https://www.youtube.com/'
     };
+
+    Object.entries(headers).forEach(([key, value]) => {
+      const input = iframe.contentDocument.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = value;
+      form.appendChild(input);
+    });
+
+    iframe.contentDocument.body.appendChild(form);
+
+    addDebugLog('Submitting download form');
+    form.submit();
+
+    // Clean up after 5 seconds
+    setTimeout(() => {
+      document.body.removeChild(iframe);
+      setDownloadProgress(null);
+      addDebugLog('Download initiated');
+    }, 5000);
+
+  } catch (err) {
+    const errorMessage = `An error occurred while downloading the audio: ${err.message}`;
+    setError(errorMessage);
+    addDebugLog(`Error: ${errorMessage}`);
+    setDownloadProgress(null);
+  }
+};
 
     const handleChunkedDownload = async (output) => {
       if (output.data && output.data.audio_url) {

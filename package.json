@@ -22,7 +22,11 @@
     "@auth0/auth0-react": "2.2.4",
     "@aws-sdk/client-s3": "3.682.0",
     "@aws-sdk/s3-request-presigner": "3.682.0",
-    "axios": "1.7.7"
+    "axios": "1.7.7",
+    "fluent-ffmpeg": "^2.1.2",
+    "ytdl-core": "^4.11.5",
+    "yt-dlp-wrap": "^2.3.12",
+    "node-fetch": "^2.7.0"
   },
   "devDependencies": {
     "@types/node": "^18.0.2",

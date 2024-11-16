@@ -1,14 +1,14 @@
 import axios from 'axios';
-import ytdl from 'ytdl-core';
+import fs from 'fs';
+import path from 'path';
 
 const SIEVE_API_KEY = "B6s3PV-pbYz52uK9s-0dIC9LfMU09RoCwRokiGjjPq4";
 const SIEVE_API_URL = "https://mango.sievedata.com/v2";
 
 const axiosInstance = axios.create({
-  timeout: 120000 // 2 minutes
+  timeout: 180000 // 3 minutes
 });
 
-// Existing Sieve functions
 async function submitJob(youtubeUrl) {
   const response = await axiosInstance.post(
     `${SIEVE_API_URL}/push`,
@@ -36,7 +36,7 @@ async function getJobStatus(jobId) {
 async function pollJobStatus(jobId) {
   let status = 'queued';
   let attempts = 0;
-  const maxAttempts = 60;
+  const maxAttempts = 90; // Increased to 90 attempts (3 minutes)
   const pollInterval = 2000;
 
   while ((status === 'queued' || status === 'processing') && attempts < maxAttempts) {
@@ -53,34 +53,6 @@ async function pollJobStatus(jobId) {
   }
 
   throw new Error(`Job failed or timed out with status: ${status} after ${attempts} attempts`);
-}
-
-// New function to get direct audio URL using ytdl-core
-async function getDirectAudioUrl(youtubeUrl) {
-  try {
-    const info = await ytdl.getInfo(youtubeUrl);
-
-    // Get the best audio format
-    const audioFormat = ytdl.chooseFormat(info.formats, {
-      quality: 'highestaudio',
-      filter: 'audioonly',
-    });
-
-    if (!audioFormat) {
-      throw new Error('No audio format found');
-    }
-
-    return {
-      url: audioFormat.url,
-      title: info.videoDetails.title,
-      format: audioFormat.container,
-      quality: audioFormat.audioQuality,
-      contentLength: audioFormat.contentLength,
-    };
-  } catch (error) {
-    console.error('Error getting direct audio URL:', error);
-    return null;
-  }
 }
 
 export const config = {
@@ -104,24 +76,7 @@ export default async function handler(req, res) {
 
       console.log(`Processing YouTube URL: ${youtubeUrl}`);
 
-      // Try ytdl-core first
-      const directAudio = await getDirectAudioUrl(youtubeUrl);
-
-      if (directAudio) {
-        return res.status(200).json([{
-          type: "str",
-          data: {
-            title: directAudio.title,
-            audio_url: directAudio.url,
-            ext: directAudio.format,
-            format: `${directAudio.quality} - audio only`,
-            acodec: "opus"
-          }
-        }]);
-      }
-
-      // Fall back to Sieve if ytdl-core fails
-      console.log('Falling back to Sieve API');
+      // Process with Sieve
       const jobId = await submitJob(youtubeUrl);
       console.log(`Job submitted with ID: ${jobId}`);
 
@@ -130,13 +85,17 @@ export default async function handler(req, res) {
       const processingTime = (Date.now() - processingStartTime) / 1000;
       console.log(`Job completed in ${processingTime} seconds`);
 
+      // Parse the result and prepare the file path
       const parsedResult = result.map(output => {
         if (output.type === 'str' && output.data) {
           try {
             const parsedData = JSON.parse(output.data);
             return {
               ...output,
-              data: parsedData
+              data: {
+                ...parsedData,
+                downloadUrl: `/api/download-audio?file=${encodeURIComponent(parsedData.file_path)}`
+              }
             };
           } catch (error) {
             console.error('Error parsing output data:', error);

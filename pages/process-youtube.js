@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
 
-const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
-
 export default function YouTubeProcessor() {
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [result, setResult] = useState(null);
@@ -22,7 +20,7 @@ export default function YouTubeProcessor() {
     setResult(null);
     setIsLoading(true);
     setDebugLog([]);
-    addDebugLog('Processing YouTube URL');
+    addDebugLog('Processing YouTube URL with Sieve');
     try {
       const response = await axios.post('/api/process-youtube', { youtubeUrl });
       setResult(response.data);
@@ -37,74 +35,41 @@ export default function YouTubeProcessor() {
     }
   };
 
-  const handleDirectYTDLDownload = async () => {
+  const handleDownload = async (output) => {
+    if (!output.data?.file_path) {
+      setError('No file path found in the response');
+      addDebugLog('Error: No file path found in the response');
+      return;
+    }
+
     try {
       setDownloadProgress(0);
-      addDebugLog(`Starting direct YTDL download for: ${youtubeUrl}`);
+      addDebugLog(`Starting download for file: ${output.data.file_path}`);
 
-      // Call the download-audio endpoint with ytdl option
-      const response = await fetch(`/api/download-audio?url=${encodeURIComponent(youtubeUrl)}&method=ytdl`, {
-        method: 'GET',
-      });
+      const response = await fetch(`/api/download-audio?file=${encodeURIComponent(output.data.file_path)}`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Create blob from the response
       const blob = await response.blob();
-
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `audio.mp3`;  // YTDL will convert to MP3
+      a.download = `${output.data.title}.${output.data.ext}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
 
       setDownloadProgress(100);
-      addDebugLog('YTDL Download completed successfully');
+      addDebugLog('Download completed successfully');
     } catch (err) {
-      const errorMessage = `An error occurred while downloading with YTDL: ${err.message}`;
+      const errorMessage = `An error occurred while downloading: ${err.message}`;
       setError(errorMessage);
       addDebugLog(`Error: ${errorMessage}`);
     } finally {
       setDownloadProgress(null);
-    }
-  };
-
-  const handleSieveDownload = async (output) => {
-    if (output.data && output.data.audio_url) {
-      try {
-        setDownloadProgress(0);
-        addDebugLog(`Starting Sieve download from: ${output.data.audio_url}`);
-
-        const downloadUrl = `/api/download-audio?url=${encodeURIComponent(output.data.audio_url)}&title=${encodeURIComponent(output.data.title || 'audio')}&method=sieve`;
-
-        const response = await fetch(downloadUrl);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${output.data.title || 'audio'}.${output.data.ext}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-
-        setDownloadProgress(100);
-        addDebugLog('Sieve Download completed successfully');
-      } catch (err) {
-        const errorMessage = `An error occurred while downloading: ${err.message}`;
-        setError(errorMessage);
-        addDebugLog(`Error: ${errorMessage}`);
-      } finally {
-        setDownloadProgress(null);
-      }
     }
   };
 
@@ -126,15 +91,7 @@ export default function YouTubeProcessor() {
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
             disabled={isLoading || !youtubeUrl}
           >
-            {isLoading ? 'Processing...' : 'Process with Sieve'}
-          </button>
-          <button
-            type="button"
-            onClick={handleDirectYTDLDownload}
-            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-            disabled={isLoading || !youtubeUrl || downloadProgress !== null}
-          >
-            {downloadProgress !== null ? 'Downloading...' : 'Direct YTDL Download'}
+            {isLoading ? 'Processing...' : 'Process and Download'}
           </button>
         </div>
       </form>
@@ -159,20 +116,20 @@ export default function YouTubeProcessor() {
 
       {result && (
         <div>
-          <h2 className="text-xl font-semibold mb-2">Sieve Result:</h2>
+          <h2 className="text-xl font-semibold mb-2">Result:</h2>
           <pre className="bg-gray-100 p-4 rounded overflow-x-auto">
             {JSON.stringify(result, null, 2)}
           </pre>
           {result.map((output, index) => (
             <div key={index} className="mt-4">
               <h3 className="text-lg font-semibold mb-2">{output.data?.title || `Output ${index + 1}`}</h3>
-              {output.data && output.data.audio_url && (
+              {output.data && output.data.file_path && (
                 <button
-                  onClick={() => handleSieveDownload(output)}
-                  className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
+                  onClick={() => handleDownload(output)}
+                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
                   disabled={downloadProgress !== null}
                 >
-                  {downloadProgress !== null ? 'Downloading...' : 'Download with Sieve'}
+                  {downloadProgress !== null ? 'Downloading...' : `Download MP3`}
                 </button>
               )}
             </div>

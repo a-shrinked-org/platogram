@@ -11,10 +11,10 @@ export default function YouTubeProcessor() {
   const [downloadProgress, setDownloadProgress] = useState(null);
   const [debugLog, setDebugLog] = useState([]);
 
-  const addDebugLog = (message) => {
-    setDebugLog(prevLog => [...prevLog, `${new Date().toISOString()}: ${message}`]);
-    console.log(message);
-  };
+    const addDebugLog = (message) => {
+      setDebugLog(prevLog => [...prevLog, `${new Date().toISOString()}: ${message}`]);
+      console.log(message);
+    };
 
     const handleSubmit = async (e) => {
       e.preventDefault();
@@ -37,67 +37,7 @@ export default function YouTubeProcessor() {
       }
     };
 
-    const handleDirectDownload = async (output) => {
-      if (output.data && output.data.audio_url) {
-        try {
-          setDownloadProgress(0);
-          addDebugLog(`Starting direct browser download from: ${output.data.audio_url}`);
-
-          // Create anchor element for direct download
-          const link = document.createElement('a');
-          link.href = output.data.audio_url;
-          link.download = `${output.data.title || 'audio'}.${output.data.ext}`;
-          link.target = '_blank';
-
-          // Add custom headers
-          const headers = new Headers({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-            'Accept': '*/*',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Origin': 'https://www.youtube.com',
-            'Referer': 'https://www.youtube.com/'
-          });
-
-          // Create fetch request
-          const response = await fetch(output.data.audio_url, {
-            headers: headers,
-            mode: 'cors',
-            credentials: 'omit'
-          });
-
-          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-          // Create blob from response
-          const blob = await response.blob();
-          const blobUrl = URL.createObjectURL(blob);
-
-          // Update link href to blob URL
-          link.href = blobUrl;
-
-          // Trigger download
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-
-          // Clean up
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-
-          setDownloadProgress(100);
-          addDebugLog('Direct browser download completed');
-        } catch (err) {
-          const errorMessage = `An error occurred while downloading the audio: ${err.message}`;
-          setError(errorMessage);
-          addDebugLog(`Error: ${errorMessage}`);
-        } finally {
-          setDownloadProgress(null);
-        }
-      } else {
-        setError('No audio URL found in the response');
-        addDebugLog('Error: No audio URL found in the response');
-      }
-    };
-
-    const handleChunkedDownload = async (output) => {
+    const handleXHRDownload = (output) => {
       if (!output.data?.audio_url) {
         setError('No audio URL found in the response');
         addDebugLog('Error: No audio URL found in the response');
@@ -106,63 +46,125 @@ export default function YouTubeProcessor() {
 
       try {
         setDownloadProgress(0);
-        addDebugLog(`Starting chunked browser download from: ${output.data.audio_url}`);
+        addDebugLog(`Starting XHR download from: ${output.data.audio_url}`);
 
-        // Get file size with HEAD request
-        const response = await fetch(output.data.audio_url, {
-          method: 'HEAD',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-            'Accept': '*/*',
-            'Origin': 'https://www.youtube.com',
-            'Referer': 'https://www.youtube.com/'
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', output.data.audio_url, true);
+        xhr.responseType = 'blob';
+
+        // Add headers
+        xhr.setRequestHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36');
+        xhr.setRequestHeader('Accept', '*/*');
+        xhr.setRequestHeader('Origin', 'https://www.youtube.com');
+        xhr.setRequestHeader('Referer', 'https://www.youtube.com/');
+
+        xhr.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percentComplete = Math.round((event.loaded / event.total) * 100);
+            setDownloadProgress(percentComplete);
+            addDebugLog(`Download progress: ${percentComplete}%`);
           }
-        });
+        };
 
-        const contentLength = Number(response.headers.get('content-length'));
-        const chunks = [];
-        let downloaded = 0;
+        xhr.onload = function() {
+          if (this.status === 200) {
+            const blob = new Blob([this.response], {
+              type: output.data.mime || 'audio/webm'
+            });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${output.data.title || 'audio'}.${output.data.ext || 'webm'}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            setDownloadProgress(null);
+            addDebugLog('XHR Download completed successfully');
+          } else {
+            throw new Error(`XHR request failed with status ${this.status}`);
+          }
+        };
 
-        for (let start = 0; start < contentLength; start += CHUNK_SIZE) {
-          const end = Math.min(start + CHUNK_SIZE - 1, contentLength - 1);
-          addDebugLog(`Downloading chunk: ${start}-${end}`);
+        xhr.onerror = function() {
+          throw new Error('XHR request failed');
+        };
 
-          const chunkResponse = await fetch(output.data.audio_url, {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-              'Accept': '*/*',
-              'Origin': 'https://www.youtube.com',
-              'Referer': 'https://www.youtube.com/',
-              'Range': `bytes=${start}-${end}`
-            }
-          });
-
-          if (!chunkResponse.ok) throw new Error(`HTTP error! status: ${chunkResponse.status}`);
-
-          const chunk = await chunkResponse.arrayBuffer();
-          chunks.push(chunk);
-          downloaded += chunk.byteLength;
-          setDownloadProgress(Math.round((downloaded / contentLength) * 100));
-        }
-
-        // Combine chunks and download
-        const blob = new Blob(chunks, { type: output.data.mime });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${output.data.title || 'audio'}.${output.data.ext}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        addDebugLog('Download completed successfully');
+        xhr.send();
       } catch (err) {
         const errorMessage = `An error occurred while downloading the audio: ${err.message}`;
         setError(errorMessage);
         addDebugLog(`Error: ${errorMessage}`);
-      } finally {
         setDownloadProgress(null);
+      }
+    };
+
+    const handleChunkedDownload = async (output) => {
+      if (output.data && output.data.audio_url) {
+        try {
+          setDownloadProgress(0);
+          addDebugLog(`Starting chunked download from: ${output.data.audio_url}`);
+
+          const chunks = [];
+          let start = 0;
+          let end = CHUNK_SIZE - 1;
+          let contentLength = 0;
+
+          while (true) {
+            const downloadUrl = `/api/download-audio?url=${encodeURIComponent(output.data.audio_url)}&title=${encodeURIComponent(output.data.title || 'audio')}&start=${start}&end=${end}&useChunks=true`;
+
+            addDebugLog(`Downloading chunk: ${start}-${end}`);
+            const response = await fetch(downloadUrl);
+
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const chunk = await response.arrayBuffer();
+            chunks.push(chunk);
+
+            const rangeHeader = response.headers.get('Content-Range');
+            if (rangeHeader) {
+              contentLength = parseInt(rangeHeader.split('/')[1]);
+            }
+
+            const receivedLength = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+            const progress = contentLength ? Math.round((receivedLength / contentLength) * 100) : 0;
+            setDownloadProgress(progress);
+            addDebugLog(`Download progress: ${progress}%`);
+
+            if (receivedLength >= contentLength) {
+              addDebugLog('Download completed');
+              break;
+            }
+
+            start = end + 1;
+            end = start + CHUNK_SIZE - 1;
+          }
+
+          const blob = new Blob(chunks, { type: output.data.audio_url.includes('webm') ? 'audio/webm' : 'audio/mp4' });
+          const blobUrl = URL.createObjectURL(blob);
+
+          addDebugLog('Creating download link');
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = `${output.data.title || 'audio'}.${output.data.ext}`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+
+          setDownloadProgress(null);
+          addDebugLog('Download process completed');
+        } catch (err) {
+          const errorMessage = `An error occurred while downloading the audio: ${err.message}`;
+          setError(errorMessage);
+          addDebugLog(`Error: ${errorMessage}`);
+          setDownloadProgress(null);
+        }
+      } else {
+        setError('No audio URL found in the response');
+        addDebugLog('Error: No audio URL found in the response');
       }
     };
 
@@ -217,11 +219,11 @@ export default function YouTubeProcessor() {
                 {output.data && output.data.audio_url && (
                   <div className="flex gap-2">
                     <button
-                      onClick={() => handleDirectDownload(output)}
+                      onClick={() => handleXHRDownload(output)}
                       className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
                       disabled={downloadProgress !== null}
                     >
-                      {downloadProgress !== null ? 'Downloading...' : 'Direct Download'}
+                      {downloadProgress !== null ? 'Downloading...' : 'XHR Download'}
                     </button>
                     <button
                       onClick={() => handleChunkedDownload(output)}

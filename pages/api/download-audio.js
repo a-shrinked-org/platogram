@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import { PassThrough } from 'stream';
+import axios from 'axios';
 
 export const config = {
   api: {
@@ -13,51 +14,60 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { url, format = 'bestaudio' } = req.query;
+  const { url, method = 'ytdl' } = req.query;
 
   if (!url) {
     return res.status(400).json({ error: 'URL is required' });
   }
 
   try {
-    console.log(`Starting yt-dlp download for: ${url}`);
+    if (method === 'ytdl') {
+      console.log(`Starting yt-dlp download for: ${url}`);
 
-    // Create a pass-through stream to pipe the audio
-    const passThrough = new PassThrough();
+      const ytdlp = spawn('yt-dlp', [
+        '-f', 'bestaudio',     // Best audio format
+        '-x',                  // Extract audio
+        '--audio-format', 'mp3', // Convert to mp3
+        '--audio-quality', '0',  // Best quality
+        '-o', '-',             // Output to stdout
+        url                    // Video URL
+      ]);
 
-    // Spawn yt-dlp process
-    const ytdlp = spawn('yt-dlp', [
-      '-f', format,           // Format selection
-      '-x',                   // Extract audio
-      '--audio-format', 'mp3', // Convert to mp3
-      '--audio-quality', '0',  // Best quality
-      '-o', '-',              // Output to stdout
-      url                     // Video URL
-    ]);
+      ytdlp.stderr.on('data', (data) => {
+        console.error(`yt-dlp error: ${data}`);
+      });
 
-    // Handle errors
-    ytdlp.stderr.on('data', (data) => {
-      console.error(`yt-dlp error: ${data}`);
-    });
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Disposition', 'attachment; filename="audio.mp3"');
 
-    // Set headers for streaming
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Content-Disposition', 'attachment; filename="audio.mp3"');
+      ytdlp.stdout.pipe(res);
 
-    // Pipe the output to response
-    ytdlp.stdout.pipe(res);
-
-    // Handle completion
-    ytdlp.on('close', (code) => {
-      if (code !== 0) {
-        console.error(`yt-dlp process exited with code ${code}`);
-        if (!res.headersSent) {
-          res.status(500).json({ error: 'Download failed' });
+      ytdlp.on('close', (code) => {
+        if (code !== 0) {
+          console.error(`yt-dlp process exited with code ${code}`);
+          if (!res.headersSent) {
+            res.status(500).json({ error: 'Download failed' });
+          }
         }
-      }
-      console.log('Download completed successfully');
-    });
+        console.log('Download completed successfully');
+      });
+    } else {
+      // Handle Sieve download
+      const response = await axios({
+        method: 'get',
+        url: url,
+        responseType: 'stream',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': '*/*',
+          'Origin': 'https://www.youtube.com',
+          'Referer': 'https://www.youtube.com/'
+        }
+      });
 
+      res.setHeader('Content-Type', response.headers['content-type'] || 'audio/webm');
+      response.data.pipe(res);
+    }
   } catch (error) {
     console.error('Error:', error);
     if (!res.headersSent) {

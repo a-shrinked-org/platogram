@@ -1009,6 +1009,8 @@ async function storeFileTemporarily(file) {
 async function processYoutubeUrl(youtubeUrl) {
     try {
         console.log('Sending request to process YouTube URL:', youtubeUrl);
+
+        // Send initial request to process the YouTube URL
         const response = await fetch('/api/process-youtube', {
             method: 'POST',
             headers: {
@@ -1023,20 +1025,52 @@ async function processYoutubeUrl(youtubeUrl) {
             throw new Error(`Failed to process YouTube URL: ${response.status} ${response.statusText}`);
         }
 
-        const result = await response.json();
-        console.log('processYoutubeUrl result:', result);
+        const initialResult = await response.json();
+        console.log('Initial processYoutubeUrl result:', initialResult);
 
-        if (!result || !Array.isArray(result) || result.length === 0) {
-            throw new Error('Invalid response format from server');
+        // Check if we have a jobId to poll the status
+        if (!initialResult || !initialResult.jobId) {
+            throw new Error('Invalid initial response format from server or missing jobId');
         }
 
-        const audioData = result[0].data;
-        if (!audioData || !audioData.audio_url) {
-            throw new Error('No audio URL found in the response');
+        const jobId = initialResult.jobId;
+        let attempts = 0;
+        const maxAttempts = 60; // Retry up to 5 minutes with 5-second intervals
+
+        // Poll for the job status until it's done or failed
+        while (attempts < maxAttempts) {
+            const statusResponse = await fetch(`/api/process-youtube?jobId=${jobId}`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+            });
+
+            if (!statusResponse.ok) {
+                throw new Error(`Failed to check job status: ${statusResponse.statusText}`);
+            }
+
+            const statusResult = await statusResponse.json();
+            console.log('Job status result:', statusResult);
+
+            if (statusResult.status === 'finished' && statusResult.result) {
+                const audioData = statusResult.result;
+                if (!audioData.audio_url) {
+                    throw new Error('No audio URL found in the finished job result');
+                }
+
+                const audioBlob = await downloadYoutubeAudio(audioData);
+                return { audioBlob, title: audioData.title };
+            }
+
+            if (statusResult.status === 'failed') {
+                throw new Error('Job processing failed');
+            }
+
+            // Wait 5 seconds before the next attempt
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            attempts++;
         }
 
-        const audioBlob = await downloadYoutubeAudio(audioData);
-        return { audioBlob, title: audioData.title };
+        throw new Error('Job timed out after multiple attempts');
     } catch (error) {
         console.error('Error processing YouTube URL:', error);
         throw error;

@@ -1010,67 +1010,36 @@ async function processYoutubeUrl(youtubeUrl) {
     try {
         console.log('Sending request to process YouTube URL:', youtubeUrl);
 
-        // Send initial request to process the YouTube URL
+        // Initial request to start processing
         const response = await fetch('/api/process-youtube', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ youtubeUrl }),
+            // Add timeout for the initial request
+            signal: AbortSignal.timeout(30000) // 30 seconds timeout
         });
 
         if (!response.ok) {
+            if (response.status === 504) {
+                // Specific handling for timeout errors
+                throw new Error('Server timeout. The video might be too long or the server is busy. Please try again.');
+            }
             const errorText = await response.text();
-            console.error('Error response from server:', response.status, errorText);
-            throw new Error(`Failed to process YouTube URL: ${response.status} ${response.statusText}`);
+            throw new Error(`Failed to process YouTube URL: ${response.status} ${errorText}`);
         }
 
-        const initialResult = await response.json();
-        console.log('Initial processYoutubeUrl result:', initialResult);
+        const result = await response.json();
 
-        // Check if we have a jobId to poll the status
-        if (!initialResult || !initialResult.jobId) {
-            throw new Error('Invalid initial response format from server or missing jobId');
+        if (!result || !result[0] || !result[0].data || !result[0].data.audio_url) {
+            throw new Error('Invalid response format from server');
         }
 
-        const jobId = initialResult.jobId;
-        let attempts = 0;
-        const maxAttempts = 60; // Retry up to 5 minutes with 5-second intervals
-
-        // Poll for the job status until it's done or failed
-        while (attempts < maxAttempts) {
-            const statusResponse = await fetch(`/api/process-youtube?jobId=${jobId}`, {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' },
-            });
-
-            if (!statusResponse.ok) {
-                throw new Error(`Failed to check job status: ${statusResponse.statusText}`);
-            }
-
-            const statusResult = await statusResponse.json();
-            console.log('Job status result:', statusResult);
-
-            if (statusResult.status === 'finished' && statusResult.result) {
-                const audioData = statusResult.result;
-                if (!audioData.audio_url) {
-                    throw new Error('No audio URL found in the finished job result');
-                }
-
-                // Return the audio URL and title directly
-                return { audioUrl: audioData.audio_url, title: audioData.title };
-            }
-
-            if (statusResult.status === 'failed') {
-                throw new Error('Job processing failed');
-            }
-
-            // Wait 5 seconds before the next attempt
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            attempts++;
-        }
-
-        throw new Error('Job timed out after multiple attempts');
+        return {
+            audioUrl: result[0].data.audio_url,
+            title: result[0].data.title || 'youtube_audio'
+        };
     } catch (error) {
         console.error('Error processing YouTube URL:', error);
         throw error;

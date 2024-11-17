@@ -1032,17 +1032,16 @@ async function processYoutubeUrl(youtubeUrl) {
         }
 
         const result = await response.json();
-        console.log('Initial response:', result);
+        console.log('Received response:', result); // Add this log
 
-        // Check response format
-        if (!result || typeof result.status !== 'string' || !result.data) {
-            console.error('Invalid response structure:', result);
+        // Updated validation
+        if (!result || typeof result.status !== 'string') {
+            console.error('Invalid response format (missing status):', result);
             throw new Error('Invalid response format from server');
         }
 
-        const jobId = result.data.jobId;
-        if (!jobId) {
-            console.error('Missing jobId in response:', result);
+        if (!result.data || !result.data.jobId) {
+            console.error('Invalid response format (missing jobId):', result);
             throw new Error('Invalid response format from server');
         }
 

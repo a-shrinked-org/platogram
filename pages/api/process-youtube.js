@@ -6,7 +6,7 @@ const SIEVE_API_URL = "https://mango.sievedata.com/v2";
 const jobCache = new Map();
 
 const axiosInstance = axios.create({
-    timeout: 60000,
+    timeout: 120000,
     headers: {
         "Content-Type": "application/json",
         "X-API-Key": SIEVE_API_KEY,
@@ -98,6 +98,13 @@ setInterval(() => {
 }, 300000);
 
 export default async function handler(req, res) {
+    // Add timeout to the request
+    res.setTimeout(120000, () => {
+        res.status(504).json({
+            error: 'Request timeout',
+            details: 'The request took too long to process'
+        });
+    });
     // Handle status check requests
     if (req.method === 'GET' && req.query.jobId) {
         try {
@@ -134,25 +141,19 @@ export default async function handler(req, res) {
             const { youtubeUrl } = req.body;
             console.log('Received YouTube URL:', youtubeUrl);
 
-            if (!youtubeUrl) {
-                return res.status(400).json({ error: 'YouTube URL is required' });
-            }
-
-            const urlPattern = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[a-zA-Z0-9_-]{11}/;
-            if (!urlPattern.test(youtubeUrl)) {
-                return res.status(400).json({ error: 'Invalid YouTube URL format' });
-            }
-
             const job = await submitSieveJob(youtubeUrl);
             console.log('Job created successfully:', job.id);
 
-            // Changed from array format to single object format
-            return res.status(200).json({
+            // Add this log
+            const response = {
                 status: 'processing',
                 data: {
                     jobId: job.id
                 }
-            });
+            };
+            console.log('Sending response:', response);
+
+            return res.status(200).json(response);
         } catch (error) {
             console.error('Error processing YouTube URL:', error);
 

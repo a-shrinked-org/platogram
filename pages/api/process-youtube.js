@@ -1,11 +1,11 @@
+// process-youtube.js
 import axios from 'axios';
 
 const SIEVE_API_KEY = "B6s3PV-pbYz52uK9s-0dIC9LfMU09RoCwRokiGjjPq4";
 const SIEVE_API_URL = "https://mango.sievedata.com/v2";
 
-// Create axios instance with increased timeout
 const axiosInstance = axios.create({
-  timeout: 300000 // 5 minutes
+  timeout: 30000 // 30 seconds for initial request
 });
 
 export const config = {
@@ -16,62 +16,7 @@ export const config = {
   },
 };
 
-async function submitJob(youtubeUrl) {
-  const response = await axiosInstance.post(
-    `${SIEVE_API_URL}/push`,
-    {
-      function: "damn/youtube_to_audio",
-      inputs: { url: youtubeUrl }
-    },
-    {
-      headers: {
-        "Content-Type": "application/json",
-        "X-API-Key": SIEVE_API_KEY,
-      }
-    }
-  );
-  return response.data.id;
-}
-
-async function getJobStatus(jobId) {
-  const response = await axiosInstance.get(`${SIEVE_API_URL}/jobs/${jobId}`, {
-    headers: {
-      "X-API-Key": SIEVE_API_KEY,
-    }
-  });
-  return response.data;
-}
-
-async function pollJobStatus(jobId) {
-  let status = 'queued';
-  let attempts = 0;
-  const maxAttempts = 150; // 5 minutes with 2-second intervals
-  const pollInterval = 2000;
-
-  while ((status === 'queued' || status === 'processing') && attempts < maxAttempts) {
-    const jobData = await getJobStatus(jobId);
-    status = jobData.status;
-    console.log(`Job ${jobId} status: ${status} (attempt ${attempts + 1}/${maxAttempts})`);
-
-    if (status === 'finished') {
-      return jobData.outputs[0];  // Return first output directly
-    }
-
-    if (status === 'failed') {
-      throw new Error(`Job failed with status: ${status}`);
-    }
-
-    attempts++;
-    await new Promise(resolve => setTimeout(resolve, pollInterval));
-  }
-
-  throw new Error(`Job timed out after ${maxAttempts} attempts`);
-}
-
 export default async function handler(req, res) {
-  // Set a longer timeout for the response
-  res.setTimeout(300000); // 5 minutes
-
   if (req.method === 'POST') {
     try {
       const { youtubeUrl } = req.body;
@@ -82,30 +27,75 @@ export default async function handler(req, res) {
 
       console.log(`Processing YouTube URL: ${youtubeUrl}`);
 
-      // Submit job and get ID
-      const jobId = await submitJob(youtubeUrl);
-      console.log(`Job submitted with ID: ${jobId}`);
+      // Submit job and return job ID immediately
+      const response = await axiosInstance.post(
+        `${SIEVE_API_URL}/push`,
+        {
+          function: "damn/youtube_to_audio",
+          inputs: { url: youtubeUrl }
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-Key": SIEVE_API_KEY,
+          }
+        }
+      );
 
-      // Poll for results
-      const result = await pollJobStatus(jobId);
-      console.log('Job completed successfully');
-
-      // Return the Sieve URL directly
       return res.status(200).json({
-        url: result.url,
-        _path: result._path
+        jobId: response.data.id,
+        status: 'processing'
       });
 
     } catch (error) {
-      console.error('Error processing YouTube URL:', error);
+      console.error('Error submitting job:', error);
       return res.status(500).json({
-        error: 'An error occurred while processing the YouTube URL',
-        details: error.message,
-        timestamp: new Date().toISOString()
+        error: 'An error occurred while submitting the job',
+        details: error.message
+      });
+    }
+  } else if (req.method === 'GET') {
+    // Handle status check
+    const { jobId } = req.query;
+
+    if (!jobId) {
+      return res.status(400).json({ error: 'Job ID is required' });
+    }
+
+    try {
+      const response = await axiosInstance.get(`${SIEVE_API_URL}/jobs/${jobId}`, {
+        headers: {
+          "X-API-Key": SIEVE_API_KEY,
+        }
+      });
+
+      const status = response.data.status;
+
+      if (status === 'finished') {
+        return res.status(200).json({
+          status: 'finished',
+          result: response.data.outputs[0]
+        });
+      } else if (status === 'failed') {
+        return res.status(500).json({
+          status: 'failed',
+          error: 'Job processing failed'
+        });
+      } else {
+        return res.status(200).json({
+          status: status,
+          progress: response.data.progress || 0
+        });
+      }
+    } catch (error) {
+      console.error('Error checking status:', error);
+      return res.status(500).json({
+        error: 'An error occurred while checking job status',
+        details: error.message
       });
     }
   } else {
-    res.setHeader('Allow', ['POST']);
+    res.setHeader('Allow', ['POST', 'GET']);
     res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 }

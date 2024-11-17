@@ -32,9 +32,11 @@ export default function YouTubeProcessor() {
         if (response.data.status === 'finished') {
           clearInterval(pollInterval.current);
           setIsLoading(false);
-          if (response.data.result) {
-            addDebugLog(`Processing completed. Result URL: ${response.data.result.url}`);
-            setResult(response.data.result);
+          // Handle nested structure
+          const downloadUrl = response.data.result?.data?.url;
+          addDebugLog(`Processing completed. Result URL: ${downloadUrl}`);
+          if (downloadUrl) {
+            setResult({ url: downloadUrl }); // Store just the URL
           } else {
             addDebugLog('Processing completed but no result URL found');
             setError('No download URL available');
@@ -97,77 +99,73 @@ export default function YouTubeProcessor() {
     };
 
     return (
-      <div className="container mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-4">YouTube Audio Extractor</h1>
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">YouTube Audio Extractor</h1>
 
-        <form onSubmit={handleSubmit} className="mb-4">
-          <input
-            type="text"
-            value={youtubeUrl}
-            onChange={(e) => setYoutubeUrl(e.target.value)}
-            placeholder="Enter YouTube URL"
-            className="w-full p-2 border rounded"
-            required
-          />
-          <button
-            type="submit"
-            className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-            disabled={isLoading}
-          >
-            {isLoading ? 'Processing...' : 'Process'}
-          </button>
-        </form>
+      <form onSubmit={handleSubmit} className="mb-4">
+        <input
+          type="text"
+          value={youtubeUrl}
+          onChange={(e) => setYoutubeUrl(e.target.value)}
+          placeholder="Enter YouTube URL"
+          className="w-full p-2 border rounded"
+          required
+        />
+        <button
+          type="submit"
+          className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          disabled={isLoading}
+        >
+          {isLoading ? 'Processing...' : 'Process'}
+        </button>
+      </form>
 
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
-            <p>{error}</p>
-          </div>
-        )}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+          <p>{error}</p>
+        </div>
+      )}
 
-        {isLoading && (
-          <div className="mt-4">
-            <p>Processing: {progress}%</p>
-            <div className="w-full bg-gray-200 rounded">
-              <div
-                className="bg-blue-600 rounded h-2 transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              ></div>
-            </div>
-          </div>
-        )}
-
-        {result && (
-          <div className="mt-4">
-            <p className="mb-2">Processing completed!</p>
-            {result.url ? (
-              <button
-                onClick={() => handleDownload(result.url)}
-                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-              >
-                Download Audio
-              </button>
-            ) : (
-              <p className="text-red-600">No download URL available</p>
-            )}
-          </div>
-        )}
-
+      {isLoading && (
         <div className="mt-4">
-          <h3 className="text-lg font-semibold mb-2">Debug Log:</h3>
-          <pre className="bg-gray-100 p-4 rounded overflow-x-auto h-40 overflow-y-auto">
-            {debugLog.join('\n')}
+          <p>Processing: {progress}%</p>
+          <div className="w-full bg-gray-200 rounded">
+            <div
+              className="bg-blue-600 rounded h-2 transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+        </div>
+      )}
+
+      {result?.url && (
+        <div className="mt-4">
+          <p className="mb-2">Processing completed!</p>
+          <button
+            onClick={() => handleDownload(result.url)}
+            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+          >
+            Download Audio
+          </button>
+        </div>
+      )}
+
+      <div className="mt-4">
+        <h3 className="text-lg font-semibold mb-2">Debug Log:</h3>
+        <pre className="bg-gray-100 p-4 rounded overflow-x-auto h-40 overflow-y-auto">
+          {debugLog.join('\n')}
+        </pre>
+      </div>
+
+      {/* Debug result object */}
+      {result && (
+        <div className="mt-4">
+          <h3 className="text-lg font-semibold mb-2">Debug Result:</h3>
+          <pre className="bg-gray-100 p-4 rounded overflow-x-auto">
+            {JSON.stringify(result, null, 2)}
           </pre>
         </div>
-
-        {/* Debug result object */}
-        {result && (
-          <div className="mt-4">
-            <h3 className="text-lg font-semibold mb-2">Debug Result:</h3>
-            <pre className="bg-gray-100 p-4 rounded overflow-x-auto">
-              {JSON.stringify(result, null, 2)}
-            </pre>
-          </div>
-        )}
-      </div>
-    );
-  }
+      )}
+    </div>
+  );
+}

@@ -1024,30 +1024,58 @@ async function processYoutubeUrl(youtubeUrl) {
 
         clearTimeout(timeoutId);
 
+        // Log raw response
+        console.log('Raw response:', response);
+        console.log('Response status:', response.status);
+
         if (!response.ok) {
             const errorText = await response.text();
             console.error('Error response from server:', response.status, errorText);
             throw new Error(`Failed to process YouTube URL: ${response.status}`);
         }
 
-        const result = await response.json();
-        console.log('Received API response:', result);
+        const rawResult = await response.text(); // Get raw text first
+        console.log('Raw response text:', rawResult);
 
-        // Handle both array and object response formats
+        let result;
+        try {
+            result = JSON.parse(rawResult);
+            console.log('Parsed response:', result);
+        } catch (e) {
+            console.error('JSON parse error:', e);
+            throw new Error('Invalid JSON response from server');
+        }
+
+        // Handle both single object and array responses
         const resultData = Array.isArray(result) ? result[0] : result;
-        console.log('Normalized response data:', resultData);
+        console.log('Normalized result:', resultData);
 
-        if (!resultData || typeof resultData.status !== 'string') {
-            console.error('Invalid response format (missing/invalid status):', resultData);
+        // Detailed validation logging
+        if (!resultData) {
+            console.error('Result is null or undefined');
             throw new Error('Invalid response format from server');
         }
 
-        if (!resultData.data || !resultData.data.jobId) {
-            console.error('Invalid response format (missing jobId):', resultData);
+        if (typeof resultData.status !== 'string') {
+            console.error('Invalid status type:', typeof resultData.status);
+            console.error('Status value:', resultData.status);
+            throw new Error('Invalid response format from server');
+        }
+
+        if (!resultData.data) {
+            console.error('Missing data object in response');
+            throw new Error('Invalid response format from server');
+        }
+
+        if (!resultData.data.jobId) {
+            console.error('Missing jobId in data object');
             throw new Error('Invalid response format from server');
         }
 
         const jobId = resultData.data.jobId;
+        console.log('Successfully extracted jobId:', jobId);
+
+        // Continue with polling...
         let attempts = 0;
         const maxAttempts = 60;
         const retryDelay = 5000;

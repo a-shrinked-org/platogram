@@ -151,7 +151,7 @@ export default async function handler(req, res) {
                     jobId: job.id
                 }
             };
-            console.log('Sending response:', response);
+            console.log('About to send response:', JSON.stringify(response));
 
             return res.status(200).json(response);
         } catch (error) {

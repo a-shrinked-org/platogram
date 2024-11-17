@@ -1057,8 +1057,8 @@ async function processYoutubeUrl(youtubeUrl) {
                     throw new Error('No audio URL found in the finished job result');
                 }
 
-                const audioBlob = await downloadYoutubeAudio(audioData);
-                return { audioBlob, title: audioData.title };
+                // Return the audio URL and title directly
+                return { audioUrl: audioData.audio_url, title: audioData.title };
             }
 
             if (statusResult.status === 'failed') {

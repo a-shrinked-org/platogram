@@ -22,7 +22,12 @@ export default function YouTubeProcessor() {
     addDebugLog('Processing YouTube URL');
 
     try {
-      const response = await axios.post('/api/process-youtube', { youtubeUrl });
+      // Configure axios with longer timeout
+      const response = await axios.post('/api/process-youtube',
+        { youtubeUrl },
+        { timeout: 300000 } // 5 minutes timeout
+      );
+
       setResult(response.data);
       addDebugLog('YouTube URL processed successfully');
     } catch (err) {
@@ -36,7 +41,13 @@ export default function YouTubeProcessor() {
   };
 
   const handleDownload = (url) => {
-    window.open(url, '_blank');
+    if (url) {
+      addDebugLog('Starting download...');
+      window.open(url, '_blank');
+    } else {
+      setError('Download URL not available');
+      addDebugLog('Error: Download URL not available');
+    }
   };
 
   return (
@@ -57,7 +68,7 @@ export default function YouTubeProcessor() {
           className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           disabled={isLoading}
         >
-          {isLoading ? 'Processing...' : 'Process'}
+          {isLoading ? 'Processing... (this may take a few minutes)' : 'Process'}
         </button>
       </form>
 
@@ -67,7 +78,7 @@ export default function YouTubeProcessor() {
         </div>
       )}
 
-      {result && (
+      {result && result.url && (
         <div className="mt-4">
           <button
             onClick={() => handleDownload(result.url)}

@@ -3,6 +3,11 @@ import axios from 'axios';
 const SIEVE_API_KEY = "B6s3PV-pbYz52uK9s-0dIC9LfMU09RoCwRokiGjjPq4";
 const SIEVE_API_URL = "https://mango.sievedata.com/v2";
 
+// Create axios instance with increased timeout
+const axiosInstance = axios.create({
+  timeout: 300000 // 5 minutes
+});
+
 export const config = {
   api: {
     bodyParser: true,
@@ -11,7 +16,62 @@ export const config = {
   },
 };
 
+async function submitJob(youtubeUrl) {
+  const response = await axiosInstance.post(
+    `${SIEVE_API_URL}/push`,
+    {
+      function: "damn/youtube_to_audio",
+      inputs: { url: youtubeUrl }
+    },
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": SIEVE_API_KEY,
+      }
+    }
+  );
+  return response.data.id;
+}
+
+async function getJobStatus(jobId) {
+  const response = await axiosInstance.get(`${SIEVE_API_URL}/jobs/${jobId}`, {
+    headers: {
+      "X-API-Key": SIEVE_API_KEY,
+    }
+  });
+  return response.data;
+}
+
+async function pollJobStatus(jobId) {
+  let status = 'queued';
+  let attempts = 0;
+  const maxAttempts = 150; // 5 minutes with 2-second intervals
+  const pollInterval = 2000;
+
+  while ((status === 'queued' || status === 'processing') && attempts < maxAttempts) {
+    const jobData = await getJobStatus(jobId);
+    status = jobData.status;
+    console.log(`Job ${jobId} status: ${status} (attempt ${attempts + 1}/${maxAttempts})`);
+
+    if (status === 'finished') {
+      return jobData.outputs[0];  // Return first output directly
+    }
+
+    if (status === 'failed') {
+      throw new Error(`Job failed with status: ${status}`);
+    }
+
+    attempts++;
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
+  }
+
+  throw new Error(`Job timed out after ${maxAttempts} attempts`);
+}
+
 export default async function handler(req, res) {
+  // Set a longer timeout for the response
+  res.setTimeout(300000); // 5 minutes
+
   if (req.method === 'POST') {
     try {
       const { youtubeUrl } = req.body;
@@ -22,26 +82,20 @@ export default async function handler(req, res) {
 
       console.log(`Processing YouTube URL: ${youtubeUrl}`);
 
-      // Call Sieve API
-      const response = await axios.post(
-        `${SIEVE_API_URL}/push`,
-        {
-          function: "damn/youtube_to_audio",
-          inputs: { url: youtubeUrl }
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "X-API-Key": SIEVE_API_KEY,
-          }
-        }
-      );
+      // Submit job and get ID
+      const jobId = await submitJob(youtubeUrl);
+      console.log(`Job submitted with ID: ${jobId}`);
 
-      // Get the result URL directly
-      const jobId = response.data.id;
-      const result = await pollForResult(jobId);
+      // Poll for results
+      const result = await pollJobStatus(jobId);
+      console.log('Job completed successfully');
 
-      return res.status(200).json(result);
+      // Return the Sieve URL directly
+      return res.status(200).json({
+        url: result.url,
+        _path: result._path
+      });
+
     } catch (error) {
       console.error('Error processing YouTube URL:', error);
       return res.status(500).json({
@@ -54,27 +108,4 @@ export default async function handler(req, res) {
     res.setHeader('Allow', ['POST']);
     res.status(405).end(`Method ${req.method} Not Allowed`);
   }
-}
-
-async function pollForResult(jobId) {
-  const maxAttempts = 30;
-  const pollInterval = 2000;
-  let attempts = 0;
-
-  while (attempts < maxAttempts) {
-    const response = await axios.get(`${SIEVE_API_URL}/jobs/${jobId}`, {
-      headers: {
-        "X-API-Key": SIEVE_API_KEY,
-      }
-    });
-
-    if (response.data.status === 'finished') {
-      return response.data.outputs;
-    }
-
-    attempts++;
-    await new Promise(resolve => setTimeout(resolve, pollInterval));
-  }
-
-  throw new Error('Processing timeout');
 }

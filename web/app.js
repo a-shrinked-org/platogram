@@ -1010,7 +1010,6 @@ async function processYoutubeUrl(youtubeUrl) {
     try {
         console.log('Sending request to process YouTube URL:', youtubeUrl);
 
-        // Initial request with longer timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000);
 
@@ -1032,20 +1031,23 @@ async function processYoutubeUrl(youtubeUrl) {
         }
 
         const result = await response.json();
-        console.log('Received response:', result); // Add this log
+        console.log('Received API response:', result);
 
-        // Updated validation
-        if (!result || typeof result.status !== 'string') {
-            console.error('Invalid response format (missing status):', result);
+        // Handle both array and object response formats
+        const resultData = Array.isArray(result) ? result[0] : result;
+        console.log('Normalized response data:', resultData);
+
+        if (!resultData || typeof resultData.status !== 'string') {
+            console.error('Invalid response format (missing/invalid status):', resultData);
             throw new Error('Invalid response format from server');
         }
 
-        if (!result.data || !result.data.jobId) {
-            console.error('Invalid response format (missing jobId):', result);
+        if (!resultData.data || !resultData.data.jobId) {
+            console.error('Invalid response format (missing jobId):', resultData);
             throw new Error('Invalid response format from server');
         }
 
-        // Polling with separate timeout for each attempt
+        const jobId = resultData.data.jobId;
         let attempts = 0;
         const maxAttempts = 60;
         const retryDelay = 5000;
@@ -1074,12 +1076,14 @@ async function processYoutubeUrl(youtubeUrl) {
                 const statusResult = await statusResponse.json();
                 console.log('Status check result:', statusResult);
 
-                if (statusResult.status === 'finished' && statusResult.data) {
-                    // Fetch the audio with a new timeout
+                // Normalize status result
+                const normalizedStatus = Array.isArray(statusResult) ? statusResult[0] : statusResult;
+
+                if (normalizedStatus.status === 'finished' && normalizedStatus.data) {
                     const audioController = new AbortController();
                     const audioTimeoutId = setTimeout(() => audioController.abort(), 30000);
 
-                    const audioResponse = await fetch(statusResult.data.audio_url, {
+                    const audioResponse = await fetch(normalizedStatus.data.audio_url, {
                         signal: audioController.signal
                     });
 
@@ -1092,11 +1096,11 @@ async function processYoutubeUrl(youtubeUrl) {
                     const audioBlob = await audioResponse.blob();
                     return {
                         audioBlob,
-                        title: statusResult.data.title || 'youtube_audio'
+                        title: normalizedStatus.data.title || 'youtube_audio'
                     };
                 }
 
-                if (statusResult.status === 'failed') {
+                if (normalizedStatus.status === 'failed') {
                     throw new Error('Processing failed');
                 }
 

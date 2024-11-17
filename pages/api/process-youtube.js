@@ -116,8 +116,9 @@ export default async function handler(req, res) {
                 return res.status(200).json({
                     status: 'finished',
                     data: {
-                        audio_url: status.outputs[0].audio_url,
-                        title: status.outputs[0].title || 'youtube_audio'
+                        url: status.outputs[0].url || status.outputs[0].data.url, // Handle both formats
+                        audio_url: status.outputs[0].url || status.outputs[0].data.url, // For backwards compatibility
+                        title: status.outputs[0].title || status.outputs[0].data.title || 'youtube_audio'
                     }
                 });
             }

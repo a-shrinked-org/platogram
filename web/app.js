@@ -1069,10 +1069,12 @@ async function processYoutubeUrl(youtubeUrl) {
                 if (statusResult.status === 'finished') {
                     console.log('Full finished response:', statusResult);
 
-                    // Extract audio URL and title from response
-                    const audioUrl = statusResult.data?.url ||
-                                   statusResult.data?.audio_url ||
+                    // Extract audio URL from response with multiple fallbacks
+                    const audioUrl = statusResult.data?.audio_url ||
+                                   statusResult.data?.url ||
+                                   (statusResult.outputs && statusResult.outputs[0]?.url) ||
                                    (statusResult.outputs && statusResult.outputs[0]?.data?.url);
+
                     const title = statusResult.data?.title || 'youtube_audio';
 
                     if (!audioUrl) {
@@ -1080,8 +1082,8 @@ async function processYoutubeUrl(youtubeUrl) {
                         throw new Error('No audio URL found in response');
                     }
 
-                    console.log('Audio URL:', audioUrl);
-                    console.log('Title:', title);
+                    console.log('Extracted audio URL:', audioUrl);
+                    console.log('Extracted title:', title);
 
                     // Use the chunked download approach
                     const audioData = {

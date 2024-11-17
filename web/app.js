@@ -1010,39 +1010,56 @@ async function processYoutubeUrl(youtubeUrl) {
     try {
         console.log('Sending request to process YouTube URL:', youtubeUrl);
 
-        // Initial request to start processing
+        // Send initial request to start processing
         const response = await fetch('/api/process-youtube', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ youtubeUrl }),
-            // Add timeout for the initial request
-            signal: AbortSignal.timeout(30000) // 30 seconds timeout
+            signal: AbortSignal.timeout(60000) // 60 seconds timeout
         });
 
         if (!response.ok) {
-            if (response.status === 504) {
-                // Specific handling for timeout errors
-                throw new Error('Server timeout. The video might be too long or the server is busy. Please try again.');
-            }
             const errorText = await response.text();
-            throw new Error(`Failed to process YouTube URL: ${response.status} ${errorText}`);
+            console.error('Error response from server:', response.status, errorText);
+            throw new Error(`Failed to process YouTube URL: ${response.status}`);
         }
 
         const result = await response.json();
+        console.log('API Response:', result);
 
-        if (!result || !result[0] || !result[0].data || !result[0].data.audio_url) {
+        if (!Array.isArray(result) || !result[0] || !result[0].data) {
             throw new Error('Invalid response format from server');
         }
 
+        const { audio_url, title } = result[0].data;
+        if (!audio_url) {
+            throw new Error('No audio URL in response');
+        }
+
+        // Get the audio file
+        console.log('Downloading audio from:', audio_url);
+        const audioResponse = await fetch(audio_url);
+        if (!audioResponse.ok) {
+            throw new Error('Failed to download audio file');
+        }
+
+        const audioBlob = await audioResponse.blob();
         return {
-            audioUrl: result[0].data.audio_url,
-            title: result[0].data.title || 'youtube_audio'
+            audioBlob,
+            title: title || 'youtube_audio'
         };
     } catch (error) {
         console.error('Error processing YouTube URL:', error);
-        throw error;
+
+        if (error.name === 'AbortError') {
+            throw new Error('Request timed out. The server took too long to respond.');
+        } else if (error.message.includes('504')) {
+            throw new Error('Server timeout. The video might be too long or the server is busy. Please try again later.');
+        } else {
+            throw error;
+        }
     }
 }
 

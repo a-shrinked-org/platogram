@@ -1092,12 +1092,31 @@ async function processYoutubeUrl(youtubeUrl) {
                 // Normalize status result
                 const normalizedStatus = Array.isArray(statusResult) ? statusResult[0] : statusResult;
 
-                if (normalizedStatus.status === 'finished' && normalizedStatus.outputs?.length > 0) {
-                    const audioUrl = normalizedStatus.outputs[0].data?.url;
-                    const title = normalizedStatus.outputs[0].data?.title || 'youtube_audio';
+                if (normalizedStatus.status === 'finished') {
+                    // Log the entire response structure to debug
+                    console.log('Full finished response:', normalizedStatus);
+
+                    // Try to find the audio URL in various possible locations
+                    let audioUrl;
+                    let title = 'youtube_audio';
+
+                    if (normalizedStatus.outputs && normalizedStatus.outputs.length > 0) {
+                        const output = normalizedStatus.outputs[0];
+                        if (output.data) {
+                            audioUrl = output.data.url || output.data.audio_url;
+                            title = output.data.title || title;
+                        }
+                    } else if (normalizedStatus.data) {
+                        audioUrl = normalizedStatus.data.url || normalizedStatus.data.audio_url;
+                        title = normalizedStatus.data.title || title;
+                    }
+
+                    console.log('Extracted audio URL:', audioUrl);
+                    console.log('Extracted title:', title);
 
                     if (!audioUrl) {
-                        throw new Error('No audio URL in response');
+                        console.error('No audio URL found in response:', normalizedStatus);
+                        throw new Error('No audio URL found in response');
                     }
 
                     const audioController = new AbortController();
@@ -1110,13 +1129,13 @@ async function processYoutubeUrl(youtubeUrl) {
                     clearTimeout(audioTimeoutId);
 
                     if (!audioResponse.ok) {
-                        throw new Error('Failed to download audio');
+                        throw new Error(`Failed to download audio: ${audioResponse.status}`);
                     }
 
                     const audioBlob = await audioResponse.blob();
                     return {
                         audioBlob,
-                        title: title
+                        title
                     };
                 }
 

@@ -146,7 +146,7 @@ export default async function handler(req, res) {
             const job = await submitSieveJob(youtubeUrl);
             console.log('Job created successfully:', job.id);
 
-            // Changed response format to match frontend expectations
+            // Changed from array format to single object format
             return res.status(200).json({
                 status: 'processing',
                 data: {

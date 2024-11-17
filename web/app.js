@@ -1024,9 +1024,6 @@ async function processYoutubeUrl(youtubeUrl) {
 
         clearTimeout(timeoutId);
 
-        console.log('Raw response:', response);
-        console.log('Response status:', response.status);
-
         if (!response.ok) {
             const errorText = await response.text();
             console.error('Error response from server:', response.status, errorText);
@@ -1036,24 +1033,10 @@ async function processYoutubeUrl(youtubeUrl) {
         const rawResult = await response.text();
         console.log('Raw response text:', rawResult);
 
-        let result;
-        try {
-            result = JSON.parse(rawResult);
-            console.log('Parsed response:', result);
-        } catch (e) {
-            console.error('JSON parse error:', e);
-            throw new Error('Invalid JSON response from server');
-        }
+        let result = JSON.parse(rawResult);
+        console.log('Parsed response:', result);
 
-        // Handle both single object and array responses
-        const resultData = Array.isArray(result) ? result[0] : result;
-        console.log('Normalized result:', resultData);
-
-        if (!resultData) {
-            throw new Error('Invalid response format from server');
-        }
-
-        const jobId = resultData.data?.jobId;
+        const jobId = result.data?.jobId;
         if (!jobId) {
             throw new Error('Missing jobId in response');
         }
@@ -1069,18 +1052,12 @@ async function processYoutubeUrl(youtubeUrl) {
             try {
                 console.log(`Polling attempt ${attempts + 1} for job ${jobId}`);
 
-                const statusController = new AbortController();
-                const statusTimeoutId = setTimeout(() => statusController.abort(), 10000);
-
                 const statusResponse = await fetch(`/api/process-youtube?jobId=${jobId}`, {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json'
-                    },
-                    signal: statusController.signal
+                    }
                 });
-
-                clearTimeout(statusTimeoutId);
 
                 if (!statusResponse.ok) {
                     throw new Error(`Status check failed: ${statusResponse.status}`);
@@ -1089,63 +1066,44 @@ async function processYoutubeUrl(youtubeUrl) {
                 const statusResult = await statusResponse.json();
                 console.log('Status check result:', statusResult);
 
-                // Normalize status result
-                const normalizedStatus = Array.isArray(statusResult) ? statusResult[0] : statusResult;
+                if (statusResult.status === 'finished') {
+                    console.log('Full finished response:', statusResult);
 
-                if (normalizedStatus.status === 'finished') {
-                    // Log the entire response structure to debug
-                    console.log('Full finished response:', normalizedStatus);
-
-                    // Try to find the audio URL in various possible locations
-                    let audioUrl;
-                    let title = 'youtube_audio';
-
-                    if (normalizedStatus.outputs && normalizedStatus.outputs.length > 0) {
-                        const output = normalizedStatus.outputs[0];
-                        if (output.data) {
-                            audioUrl = output.data.url || output.data.audio_url;
-                            title = output.data.title || title;
-                        }
-                    } else if (normalizedStatus.data) {
-                        audioUrl = normalizedStatus.data.url || normalizedStatus.data.audio_url;
-                        title = normalizedStatus.data.title || title;
-                    }
-
-                    console.log('Extracted audio URL:', audioUrl);
-                    console.log('Extracted title:', title);
+                    // Extract audio URL and title from response
+                    const audioUrl = statusResult.data?.url ||
+                                   statusResult.data?.audio_url ||
+                                   (statusResult.outputs && statusResult.outputs[0]?.data?.url);
+                    const title = statusResult.data?.title || 'youtube_audio';
 
                     if (!audioUrl) {
-                        console.error('No audio URL found in response:', normalizedStatus);
+                        console.error('No audio URL found in response:', statusResult);
                         throw new Error('No audio URL found in response');
                     }
 
-                    const audioController = new AbortController();
-                    const audioTimeoutId = setTimeout(() => audioController.abort(), 30000);
+                    console.log('Audio URL:', audioUrl);
+                    console.log('Title:', title);
 
-                    const audioResponse = await fetch(audioUrl, {
-                        signal: audioController.signal
-                    });
+                    // Use the chunked download approach
+                    const audioData = {
+                        audio_url: audioUrl,
+                        title: title
+                    };
 
-                    clearTimeout(audioTimeoutId);
-
-                    if (!audioResponse.ok) {
-                        throw new Error(`Failed to download audio: ${audioResponse.status}`);
-                    }
-
-                    const audioBlob = await audioResponse.blob();
+                    const audioBlob = await downloadYoutubeAudio(audioData);
                     return {
                         audioBlob,
                         title
                     };
                 }
 
-                if (normalizedStatus.status === 'failed') {
-                    throw new Error(normalizedStatus.error || 'Processing failed');
+                if (statusResult.status === 'failed') {
+                    throw new Error(statusResult.error || 'Processing failed');
                 }
 
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
                 attempts++;
             } catch (error) {
+                console.error('Error in polling loop:', error);
                 if (error.name === 'AbortError') {
                     console.log('Request timed out, retrying...');
                     attempts++;
@@ -1158,6 +1116,66 @@ async function processYoutubeUrl(youtubeUrl) {
         throw new Error('Processing timed out');
     } catch (error) {
         console.error('Error processing YouTube URL:', error);
+        throw error;
+    }
+}
+
+const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
+
+async function downloadYoutubeAudio(audioData) {
+    try {
+        console.log('Starting chunked download with audioData:', audioData);
+
+        if (!audioData.audio_url) {
+            throw new Error('No audio URL provided for download');
+        }
+
+        const chunks = [];
+        let start = 0;
+        let end = CHUNK_SIZE - 1;
+        let contentLength = 0;
+
+        while (true) {
+            const url = new URL('/api/download-audio', window.location.origin);
+            url.searchParams.append('url', audioData.audio_url);
+            url.searchParams.append('title', audioData.title || 'youtube_audio');
+            url.searchParams.append('start', start);
+            url.searchParams.append('end', end);
+
+            console.log(`Downloading chunk from ${start} to ${end}`);
+
+            const response = await fetch(url, {
+                method: 'GET',
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to download audio chunk: ${response.status} ${response.statusText}`);
+            }
+
+            const chunk = await response.arrayBuffer();
+            chunks.push(chunk);
+
+            const rangeHeader = response.headers.get('Content-Range');
+            if (rangeHeader) {
+                contentLength = parseInt(rangeHeader.split('/')[1]);
+            }
+
+            const receivedLength = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+            console.log(`Download progress: ${Math.round((receivedLength / contentLength) * 100)}%`);
+
+            if (receivedLength >= contentLength) {
+                console.log('Download completed');
+                break;
+            }
+
+            start = end + 1;
+            end = start + CHUNK_SIZE - 1;
+        }
+
+        const blob = new Blob(chunks, { type: 'audio/mp4' });
+        return blob;
+    } catch (error) {
+        console.error('Error downloading YouTube audio:', error);
         throw error;
     }
 }

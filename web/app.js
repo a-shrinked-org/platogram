@@ -1024,7 +1024,6 @@ async function processYoutubeUrl(youtubeUrl) {
 
         clearTimeout(timeoutId);
 
-        // Log raw response
         console.log('Raw response:', response);
         console.log('Response status:', response.status);
 
@@ -1034,7 +1033,7 @@ async function processYoutubeUrl(youtubeUrl) {
             throw new Error(`Failed to process YouTube URL: ${response.status}`);
         }
 
-        const rawResult = await response.text(); // Get raw text first
+        const rawResult = await response.text();
         console.log('Raw response text:', rawResult);
 
         let result;
@@ -1050,32 +1049,18 @@ async function processYoutubeUrl(youtubeUrl) {
         const resultData = Array.isArray(result) ? result[0] : result;
         console.log('Normalized result:', resultData);
 
-        // Detailed validation logging
         if (!resultData) {
-            console.error('Result is null or undefined');
             throw new Error('Invalid response format from server');
         }
 
-        if (typeof resultData.status !== 'string') {
-            console.error('Invalid status type:', typeof resultData.status);
-            console.error('Status value:', resultData.status);
-            throw new Error('Invalid response format from server');
+        const jobId = resultData.data?.jobId;
+        if (!jobId) {
+            throw new Error('Missing jobId in response');
         }
 
-        if (!resultData.data) {
-            console.error('Missing data object in response');
-            throw new Error('Invalid response format from server');
-        }
-
-        if (!resultData.data.jobId) {
-            console.error('Missing jobId in data object');
-            throw new Error('Invalid response format from server');
-        }
-
-        const jobId = resultData.data.jobId;
         console.log('Successfully extracted jobId:', jobId);
 
-        // Continue with polling...
+        // Poll for status
         let attempts = 0;
         const maxAttempts = 60;
         const retryDelay = 5000;
@@ -1107,11 +1092,18 @@ async function processYoutubeUrl(youtubeUrl) {
                 // Normalize status result
                 const normalizedStatus = Array.isArray(statusResult) ? statusResult[0] : statusResult;
 
-                if (normalizedStatus.status === 'finished' && normalizedStatus.data) {
+                if (normalizedStatus.status === 'finished' && normalizedStatus.outputs?.length > 0) {
+                    const audioUrl = normalizedStatus.outputs[0].data?.url;
+                    const title = normalizedStatus.outputs[0].data?.title || 'youtube_audio';
+
+                    if (!audioUrl) {
+                        throw new Error('No audio URL in response');
+                    }
+
                     const audioController = new AbortController();
                     const audioTimeoutId = setTimeout(() => audioController.abort(), 30000);
 
-                    const audioResponse = await fetch(normalizedStatus.data.audio_url, {
+                    const audioResponse = await fetch(audioUrl, {
                         signal: audioController.signal
                     });
 
@@ -1124,12 +1116,12 @@ async function processYoutubeUrl(youtubeUrl) {
                     const audioBlob = await audioResponse.blob();
                     return {
                         audioBlob,
-                        title: normalizedStatus.data.title || 'youtube_audio'
+                        title: title
                     };
                 }
 
                 if (normalizedStatus.status === 'failed') {
-                    throw new Error('Processing failed');
+                    throw new Error(normalizedStatus.error || 'Processing failed');
                 }
 
                 await new Promise(resolve => setTimeout(resolve, retryDelay));

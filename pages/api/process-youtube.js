@@ -24,6 +24,7 @@ export const config = {
 
 async function submitSieveJob(url) {
     try {
+        console.log('Submitting job to Sieve:', url);
         const response = await axiosInstance.post(`${SIEVE_API_URL}/push`, {
             function: "damn/youtube_to_audio",
             inputs: { url }
@@ -39,6 +40,7 @@ async function submitSieveJob(url) {
             timestamp: Date.now()
         });
 
+        console.log('Job submitted successfully:', response.data.id);
         return response.data;
     } catch (error) {
         if (axios.isAxiosError(error)) {
@@ -55,9 +57,11 @@ async function submitSieveJob(url) {
 
 async function checkJobStatus(jobId) {
     try {
+        console.log('Checking job status:', jobId);
         // Check cache first
         const cachedJob = jobCache.get(jobId);
         if (cachedJob && cachedJob.status === 'finished') {
+            console.log('Found finished job in cache');
             return {
                 status: 'finished',
                 outputs: [cachedJob.data]
@@ -65,6 +69,7 @@ async function checkJobStatus(jobId) {
         }
 
         const response = await axiosInstance.get(`${SIEVE_API_URL}/jobs/${jobId}`);
+        console.log('Job status response:', response.data);
 
         // Update cache if job is finished
         if (response.data.status === 'finished' && response.data.outputs && response.data.outputs[0]) {
@@ -82,7 +87,7 @@ async function checkJobStatus(jobId) {
     }
 }
 
-// Cache cleanup (keep this as is)
+// Cache cleanup
 setInterval(() => {
     const now = Date.now();
     for (const [jobId, job] of jobCache.entries()) {
@@ -97,15 +102,22 @@ export default async function handler(req, res) {
     if (req.method === 'GET' && req.query.jobId) {
         try {
             const status = await checkJobStatus(req.query.jobId);
+            console.log('Status check result:', status);
 
-            // Format the response to match what the frontend expects
+            // Modified status response to match frontend expectations
+            if (status.status === 'finished' && status.outputs) {
+                return res.status(200).json({
+                    status: 'finished',
+                    data: {
+                        audio_url: status.outputs[0].audio_url,
+                        title: status.outputs[0].title || 'youtube_audio'
+                    }
+                });
+            }
+
             return res.status(200).json({
                 status: status.status,
-                data: status.status === 'finished' && status.outputs ? {
-                    audio_url: status.outputs[0].audio_url,
-                    title: status.outputs[0].title || 'youtube_audio',
-                    duration: status.outputs[0].duration || 0
-                } : null
+                data: null
             });
         } catch (error) {
             console.error('Status check error:', error);
@@ -120,6 +132,7 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
         try {
             const { youtubeUrl } = req.body;
+            console.log('Received YouTube URL:', youtubeUrl);
 
             if (!youtubeUrl) {
                 return res.status(400).json({ error: 'YouTube URL is required' });
@@ -130,16 +143,16 @@ export default async function handler(req, res) {
                 return res.status(400).json({ error: 'Invalid YouTube URL format' });
             }
 
-            console.log(`Processing YouTube URL: ${youtubeUrl}`);
-
             const job = await submitSieveJob(youtubeUrl);
+            console.log('Job created successfully:', job.id);
 
-            // Return the response in the format the frontend expects
-            return res.status(200).json([{
+            // Changed response format to match frontend expectations
+            return res.status(200).json({
                 status: 'processing',
-                jobId: job.id
-            }]);
-
+                data: {
+                    jobId: job.id
+                }
+            });
         } catch (error) {
             console.error('Error processing YouTube URL:', error);
 

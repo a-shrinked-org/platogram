@@ -1010,14 +1010,14 @@ async function processYoutubeUrl(youtubeUrl) {
     try {
         console.log('Sending request to process YouTube URL:', youtubeUrl);
 
-        // Send initial request to start processing
+        // Initial request to start processing
         const response = await fetch('/api/process-youtube', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ youtubeUrl }),
-            signal: AbortSignal.timeout(60000) // 60 seconds timeout
+            signal: AbortSignal.timeout(60000)
         });
 
         if (!response.ok) {
@@ -1027,39 +1027,61 @@ async function processYoutubeUrl(youtubeUrl) {
         }
 
         const result = await response.json();
-        console.log('API Response:', result);
+        console.log('Initial response:', result);
 
-        if (!Array.isArray(result) || !result[0] || !result[0].data) {
+        if (!result.status || !result.data || !result.data.jobId) {
             throw new Error('Invalid response format from server');
         }
 
-        const { audio_url, title } = result[0].data;
-        if (!audio_url) {
-            throw new Error('No audio URL in response');
+        const jobId = result.data.jobId;
+        let attempts = 0;
+        const maxAttempts = 60; // 5 minutes polling
+        const retryDelay = 5000;
+
+        // Poll for completion
+        while (attempts < maxAttempts) {
+            console.log(`Polling attempt ${attempts + 1} for job ${jobId}`);
+
+            const statusResponse = await fetch(`/api/process-youtube?jobId=${jobId}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                signal: AbortSignal.timeout(10000)
+            });
+
+            if (!statusResponse.ok) {
+                console.error(`Status check failed:`, statusResponse.status);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                attempts++;
+                continue;
+            }
+
+            const statusResult = await statusResponse.json();
+            console.log('Status check result:', statusResult);
+
+            if (statusResult.status === 'finished' && statusResult.data) {
+                return {
+                    audioBlob: await (await fetch(statusResult.data.audio_url)).blob(),
+                    title: statusResult.data.title || 'youtube_audio'
+                };
+            }
+
+            if (statusResult.status === 'failed') {
+                throw new Error('Processing failed');
+            }
+
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            attempts++;
         }
 
-        // Get the audio file
-        console.log('Downloading audio from:', audio_url);
-        const audioResponse = await fetch(audio_url);
-        if (!audioResponse.ok) {
-            throw new Error('Failed to download audio file');
-        }
-
-        const audioBlob = await audioResponse.blob();
-        return {
-            audioBlob,
-            title: title || 'youtube_audio'
-        };
+        throw new Error('Processing timed out');
     } catch (error) {
         console.error('Error processing YouTube URL:', error);
-
         if (error.name === 'AbortError') {
-            throw new Error('Request timed out. The server took too long to respond.');
-        } else if (error.message.includes('504')) {
-            throw new Error('Server timeout. The video might be too long or the server is busy. Please try again later.');
-        } else {
-            throw error;
+            throw new Error('Request timed out. Please try again.');
         }
+        throw error;
     }
 }
 

@@ -679,18 +679,20 @@ async function updateUIStatus(status, message = "") {
             break;
         case "processing":
         case "running":
-            toggleSection("status-section");
-            if (statusSection) {
-                statusSection.innerHTML = `
-                    <p>File/URL: ${displayFileName}</p>
-                    <p>Email: ${userEmail}</p>
-                    <p>Status: ${status}</p>
-                    <p>Your job is processing. You'll receive an email when done. Jobs list and custom prompts coming soon.</p>
-                    <div id="processing-stage"></div>
-                `;
-                initializeProcessingStage();
-            }
-            break;
+          toggleSection("status-section");
+          if (statusSection) {
+              const defaultMessage = "The extracted audio is being shrinked into structured data. We'll email you when it's ready.";
+
+              statusSection.innerHTML = `
+                  <p>File/URL: ${displayFileName}</p>
+                  <p>Email: ${userEmail}</p>
+                  <p>Status: In Progress</p>
+                  <p>${message || defaultMessage}</p>
+                  <div id="processing-stage"></div>
+              `;
+              initializeProcessingStage();
+          }
+          break;
         case "done":
             toggleSection("done-section");
             if (doneSection) {
@@ -1244,7 +1246,7 @@ async function handleSubmit(event) {
                 inputData = uploadedUrl;
             } else if (inputData.includes('youtube.com') || inputData.includes('youtu.be')) {
                 console.log('Processing YouTube URL:', inputData);
-                updateUIStatus("processing", "Extracting audio and unstructured data from YouTube. This process involves isolating the audio stream, identifying conversations, and preparing the content for analysis. Please keep this window open to ensure successful data transfer.");
+                updateUIStatus("processing", " Identifying conversations and getting audio stream from YouTube. Keep this window open - we're almost there!");
                 const { audioBlob, title } = await processYoutubeUrl(inputData);
                 console.log('Audio blob received:', audioBlob);
                 const file = new File([audioBlob], `${title || 'youtube_audio'}.mp4`, { type: 'audio/mp4' });
@@ -1748,7 +1750,7 @@ async function deleteFile(fileUrl) {
         console.log("Conversion API response:", result);
 
         if (result.message === "Conversion started" || result.status === "processing") {
-            updateUIStatus("processing", "Conversion in progress...");
+            updateUIStatus("processing", "Your job is processing. You'll receive an email when done. Jobs list and custom prompts coming soon.");
             return await pollStatus(await getAuthToken(), isTestMode);
         } else {
             updateUIStatus("error", "Unexpected response from server");
@@ -1977,11 +1979,12 @@ function pollStatus(token, isTestMode = false, fileName = "") {
                     console.log("Conversion failed, UI updated to 'error' state");
                     reject(new Error(result.error || "Conversion failed"));
                 } else if (["idle", "running", "processing"].includes(result.status)) {
-                    updateUIStatus(result.status, `Conversion ${result.status}...`, storedFileName);
-                    console.log(`Conversion still in progress (${result.status}), continuing to poll...`);
-                } else {
-                    console.warn("Unknown status received:", result.status);
-                }
+                  // Only update the status, keep the existing message
+                  updateUIStatus(result.status);
+                  console.log(`Conversion still in progress (${result.status}), continuing to poll...`);
+              } else {
+                  console.warn("Unknown status received:", result.status);
+              }
             } catch (error) {
                 console.error("Error polling status:", error);
                 updateUIStatus("error", `An error occurred while checking status: ${error.message}`);

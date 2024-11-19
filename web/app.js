@@ -1008,111 +1008,63 @@ async function storeFileTemporarily(file) {
 
 async function processYoutubeUrl(youtubeUrl) {
     try {
-        console.log('Sending request to process YouTube URL:', youtubeUrl);
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        console.log('Processing YouTube URL:', youtubeUrl);
 
         const response = await fetch('/api/process-youtube', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ youtubeUrl }),
-            signal: controller.signal
+            body: JSON.stringify({ youtubeUrl })
         });
 
-        clearTimeout(timeoutId);
-
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Error response from server:', response.status, errorText);
             throw new Error(`Failed to process YouTube URL: ${response.status}`);
         }
 
-        const rawResult = await response.text();
-        console.log('Raw response text:', rawResult);
+        const result = await response.json();
+        console.log('Initial response:', result);
 
-        let result = JSON.parse(rawResult);
-        console.log('Parsed response:', result);
-
-        const jobId = result.data?.jobId;
-        if (!jobId) {
-            throw new Error('Missing jobId in response');
-        }
-
-        console.log('Successfully extracted jobId:', jobId);
-
-        // Poll for status
         let attempts = 0;
         const maxAttempts = 60;
         const retryDelay = 5000;
 
         while (attempts < maxAttempts) {
-            try {
-                console.log(`Polling attempt ${attempts + 1} for job ${jobId}`);
+            console.log(`Polling attempt ${attempts + 1} for job ${result.data.jobId}`);
 
-                const statusResponse = await fetch(`/api/process-youtube?jobId=${jobId}`, {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
+            const statusResponse = await fetch(`/api/process-youtube?jobId=${result.data.jobId}`);
+
+            if (!statusResponse.ok) {
+                throw new Error(`Status check failed: ${statusResponse.status}`);
+            }
+
+            const statusResult = await statusResponse.json();
+            console.log('Status check result:', statusResult);
+
+            if (statusResult.status === 'finished') {
+                console.log('Full finished response:', statusResult);
+
+                if (!statusResult.data?.audio_url) {
+                    throw new Error('No audio URL in response');
+                }
+
+                const audioBlob = await downloadYoutubeAudio({
+                    audio_url: statusResult.data.audio_url,
+                    title: statusResult.data.title || 'youtube_audio'
                 });
 
-                if (!statusResponse.ok) {
-                    throw new Error(`Status check failed: ${statusResponse.status}`);
-                }
-
-                const statusResult = await statusResponse.json();
-                console.log('Status check result:', statusResult);
-
-                if (statusResult.status === 'finished') {
-                    console.log('Full finished response:', statusResult);
-
-                    // Extract audio URL from response with multiple fallbacks
-                    const audioUrl = statusResult.data?.audio_url ||
-                                   statusResult.data?.url ||
-                                   (statusResult.outputs && statusResult.outputs[0]?.url) ||
-                                   (statusResult.outputs && statusResult.outputs[0]?.data?.url);
-
-                    const title = statusResult.data?.title || 'youtube_audio';
-
-                    if (!audioUrl) {
-                        console.error('No audio URL found in response:', statusResult);
-                        throw new Error('No audio URL found in response');
-                    }
-
-                    console.log('Extracted audio URL:', audioUrl);
-                    console.log('Extracted title:', title);
-
-                    // Use the chunked download approach
-                    const audioData = {
-                        audio_url: audioUrl,
-                        title: title
-                    };
-
-                    const audioBlob = await downloadYoutubeAudio(audioData);
-                    return {
-                        audioBlob,
-                        title
-                    };
-                }
-
-                if (statusResult.status === 'failed') {
-                    throw new Error(statusResult.error || 'Processing failed');
-                }
-
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                attempts++;
-            } catch (error) {
-                console.error('Error in polling loop:', error);
-                if (error.name === 'AbortError') {
-                    console.log('Request timed out, retrying...');
-                    attempts++;
-                    continue;
-                }
-                throw error;
+                return {
+                    audioBlob,
+                    title: statusResult.data.title || 'youtube_audio'
+                };
             }
+
+            if (statusResult.status === 'failed') {
+                throw new Error(statusResult.error || 'Processing failed');
+            }
+
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            attempts++;
         }
 
         throw new Error('Processing timed out');
@@ -1124,55 +1076,20 @@ async function processYoutubeUrl(youtubeUrl) {
 
 async function downloadYoutubeAudio(audioData) {
     try {
-        console.log('Starting chunked download with audioData:', audioData);
+        console.log('Starting audio download:', audioData);
 
         if (!audioData.audio_url) {
             throw new Error('No audio URL provided for download');
         }
 
-        const chunks = [];
-        let start = 0;
-        let end = CHUNK_SIZE - 1;  // Uses the globally defined CHUNK_SIZE
-        let contentLength = 0;
+        // Directly fetch from the Sieve URL
+        const response = await fetch(audioData.audio_url);
 
-        while (true) {
-            const url = new URL('/api/download-audio', window.location.origin);
-            url.searchParams.append('url', audioData.audio_url);
-            url.searchParams.append('title', audioData.title || 'youtube_audio');
-            url.searchParams.append('start', start);
-            url.searchParams.append('end', end);
-
-            console.log(`Downloading chunk from ${start} to ${end}`);
-
-            const response = await fetch(url, {
-                method: 'GET',
-            });
-
-            if (!response.ok) {
-                throw new Error(`Failed to download audio chunk: ${response.status} ${response.statusText}`);
-            }
-
-            const chunk = await response.arrayBuffer();
-            chunks.push(chunk);
-
-            const rangeHeader = response.headers.get('Content-Range');
-            if (rangeHeader) {
-                contentLength = parseInt(rangeHeader.split('/')[1]);
-            }
-
-            const receivedLength = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
-            console.log(`Download progress: ${Math.round((receivedLength / contentLength) * 100)}%`);
-
-            if (receivedLength >= contentLength) {
-                console.log('Download completed');
-                break;
-            }
-
-            start = end + 1;
-            end = start + CHUNK_SIZE - 1;
+        if (!response.ok) {
+            throw new Error(`Failed to download audio: ${response.status} ${response.statusText}`);
         }
 
-        const blob = new Blob(chunks, { type: 'audio/mp4' });
+        const blob = await response.blob();
         return blob;
     } catch (error) {
         console.error('Error downloading YouTube audio:', error);

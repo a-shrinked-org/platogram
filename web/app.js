@@ -16,6 +16,8 @@ let isConversionInProgress = false;
 let currentView = 'cells';
 let isConversionComplete = false;
 let storedFileName = '';
+let uploadProgressInterval;
+let currentProgress = 0;
 
 import('https://esm.sh/@vercel/blob@0.23.4').then(module => {
         console.log('Vercel Blob import:', module);
@@ -967,12 +969,65 @@ async function uploadLargeFile(file) {
 function updateUploadProgress(progress) {
     const uploadProgressBar = document.getElementById('upload-progress-bar');
     const uploadProgressText = document.getElementById('upload-progress-text');
-    if (uploadProgressBar && uploadProgressText) {
-        uploadProgressBar.style.width = `${progress}%`;
-        uploadProgressText.textContent = `Uploading: ${progress.toFixed(2)}%`;
-    } else {
+
+    if (!uploadProgressBar || !uploadProgressText) {
         console.error('Progress bar or text element not found');
+        return;
     }
+
+    // Use non-linear easing for more realistic progress simulation
+    if (progress === 0) {
+        // Start the simulated progress when upload begins
+        startSimulatedProgress();
+    } else if (progress === 100) {
+        // Clear interval and set to 100% when upload is complete
+        clearInterval(uploadProgressInterval);
+        uploadProgressBar.style.width = '100%';
+        uploadProgressText.textContent = 'Upload complete!';
+    }
+}
+
+function startSimulatedProgress() {
+    currentProgress = 0;
+    let step = 1;
+
+    // Clear any existing interval
+    if (uploadProgressInterval) {
+        clearInterval(uploadProgressInterval);
+    }
+
+    uploadProgressInterval = setInterval(() => {
+        const uploadProgressBar = document.getElementById('upload-progress-bar');
+        const uploadProgressText = document.getElementById('upload-progress-text');
+
+        if (!uploadProgressBar || !uploadProgressText) {
+            clearInterval(uploadProgressInterval);
+            return;
+        }
+
+        // Non-linear progress simulation
+        if (currentProgress < 70) {
+            step = 1;
+        } else if (currentProgress < 90) {
+            step = 0.2;
+        } else if (currentProgress < 95) {
+            step = 0.1;
+        } else {
+            step = 0.05;
+        }
+
+        currentProgress += step;
+
+        // Ensure we don't exceed 99% (save 100% for actual completion)
+        if (currentProgress > 99) {
+            currentProgress = 99;
+        }
+
+        const displayProgress = Math.min(Math.round(currentProgress), 99);
+        uploadProgressBar.style.width = `${displayProgress}%`;
+        uploadProgressBar.style.transition = 'width 0.5s ease-in-out';
+        uploadProgressText.textContent = `Uploading: ${displayProgress}%`;
+    }, 100);
 }
 
 // Initialize IndexedDB
@@ -1512,6 +1567,8 @@ async function onConvertClick(event) {
             closeLanguageModal();
             updateUIStatus("uploading", "Uploading file...");
 
+            updateUploadProgress(0);
+
             // Get the Auth0 token
             let token;
             try {
@@ -1554,11 +1611,16 @@ async function onConvertClick(event) {
                 token: blobToken,
                 handleUploadUrl: '/api/upload-file',
                 onUploadProgress: (progress) => {
-                    console.log(`Upload progress: ${progress}%`);
-                    updateUploadProgress(progress);
-                },
-            });
+                  console.log(`Actual upload progress: ${progress}%`);
+                  // If we get a 100% progress, complete the animation
+                  if (progress === 100) {
+                      updateUploadProgress(100);
+                  }
+              },
+          });
 
+            // Clear the interval if it's still running
+            clearInterval(uploadProgressInterval);
             console.log('Blob metadata:', blob);
 
             if (!blob.url) {
@@ -1569,6 +1631,7 @@ async function onConvertClick(event) {
             updateUIStatus("running", "File uploaded, starting conversion...");
             return blob.url;
         } catch (error) {
+            clearInterval(uploadProgressInterval);
             console.error('Error uploading file:', error);
             console.error('Error stack:', error.stack);
             updateUIStatus("error", error.message || 'An unknown error occurred during file upload');

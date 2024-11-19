@@ -1132,7 +1132,7 @@ async function downloadYoutubeAudio(audioData) {
 
         const chunks = [];
         let start = 0;
-        let end = CHUNK_SIZE - 1;
+        let end = CHUNK_SIZE - 1;  // Uses the globally defined CHUNK_SIZE
         let contentLength = 0;
 
         while (true) {

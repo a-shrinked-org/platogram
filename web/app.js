@@ -1122,8 +1122,6 @@ async function processYoutubeUrl(youtubeUrl) {
     }
 }
 
-const CHUNK_SIZE = 1024 * 1024; // 1MB chunks
-
 async function downloadYoutubeAudio(audioData) {
     try {
         console.log('Starting chunked download with audioData:', audioData);

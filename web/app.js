@@ -1180,62 +1180,6 @@ async function downloadYoutubeAudio(audioData) {
     }
 }
 
-async function downloadYoutubeAudio(audioData) {
-    try {
-        console.log('Parsed audioData:', audioData);
-
-        if (audioData.audio_url) {
-            const chunks = [];
-            let start = 0;
-            let end = CHUNK_SIZE - 1;
-            let contentLength = 0;
-
-            while (true) {
-                const url = new URL('/api/download-audio', window.location.origin);
-                url.searchParams.append('url', audioData.audio_url);
-                url.searchParams.append('title', audioData.title || 'youtube_audio');
-                url.searchParams.append('start', start);
-                url.searchParams.append('end', end);
-
-                const response = await fetch(url, {
-                    method: 'GET',
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Failed to download audio chunk: ${response.statusText}`);
-                }
-
-                const chunk = await response.arrayBuffer();
-                chunks.push(chunk);
-
-                const rangeHeader = response.headers.get('Content-Range');
-                if (rangeHeader) {
-                    contentLength = parseInt(rangeHeader.split('/')[1]);
-                }
-
-                const receivedLength = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
-                console.log(`Download progress: ${Math.round((receivedLength / contentLength) * 100)}%`);
-
-                if (receivedLength >= contentLength) {
-                    console.log('Download completed');
-                    break;
-                }
-
-                start = end + 1;
-                end = start + CHUNK_SIZE - 1;
-            }
-
-            const blob = new Blob(chunks, { type: 'audio/mp4' });
-            return blob;
-        } else {
-            throw new Error('No audio URL found in the response');
-        }
-    } catch (error) {
-        console.error('Error downloading YouTube audio:', error);
-        throw error;
-    }
-}
-
 // Retrieve file from IndexedDB
 async function retrieveFileFromTemporaryStorage(id) {
     await ensureDbInitialized();

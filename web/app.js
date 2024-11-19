@@ -966,6 +966,22 @@ async function uploadLargeFile(file) {
   return fileId;
 }
 
+function initializeUploadProgressBar() {
+    const uploadProgressBar = document.getElementById('upload-progress-bar');
+    if (uploadProgressBar) {
+        uploadProgressBar.style.transition = 'width 0.5s ease-in-out';
+        // You can change these colors to match your theme
+        uploadProgressBar.style.backgroundColor = '#3B82F6'; // Blue color
+        uploadProgressBar.style.borderRadius = '0.5rem';
+    }
+
+    const uploadProgressContainer = document.getElementById('upload-progress-container');
+    if (uploadProgressContainer) {
+        uploadProgressContainer.style.backgroundColor = '#EFF6FF'; // Light blue background
+        uploadProgressContainer.style.borderRadius = '0.5rem';
+    }
+}
+
 function updateUploadProgress(progress) {
     const uploadProgressBar = document.getElementById('upload-progress-bar');
     const uploadProgressText = document.getElementById('upload-progress-text');
@@ -978,6 +994,7 @@ function updateUploadProgress(progress) {
     // Use non-linear easing for more realistic progress simulation
     if (progress === 0) {
         // Start the simulated progress when upload begins
+        initializeUploadProgressBar();
         startSimulatedProgress();
     } else if (progress === 100) {
         // Clear interval and set to 100% when upload is complete
@@ -1618,10 +1635,20 @@ async function onConvertClick(event) {
                   }
               },
           });
+            // Wait for the progress bar to reach near completion
+            await new Promise(resolve => setTimeout(resolve, 1500));
 
-            // Clear the interval if it's still running
+            // Ensure progress hits 100% before changing status
             clearInterval(uploadProgressInterval);
-            console.log('Blob metadata:', blob);
+            const uploadProgressBar = document.getElementById('upload-progress-bar');
+            const uploadProgressText = document.getElementById('upload-progress-text');
+            if (uploadProgressBar && uploadProgressText) {
+                uploadProgressBar.style.width = '100%';
+                uploadProgressText.textContent = 'Upload complete!';
+            }
+
+            // Wait a moment to show 100% completion
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
             if (!blob.url) {
                 throw new Error('Invalid response from upload file endpoint: missing URL');

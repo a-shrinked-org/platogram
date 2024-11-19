@@ -683,7 +683,7 @@ async function updateUIStatus(status, message = "") {
                     <p>File/URL: ${displayFileName}</p>
                     <p>Email: ${userEmail}</p>
                     <p>Status: ${status}</p>
-                    <p>${message}</p>
+                    <p>Your job is processing. You'll receive an email when done. Jobs list and custom prompts coming soon.</p>
                     <div id="processing-stage"></div>
                 `;
                 initializeProcessingStage();

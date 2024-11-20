@@ -424,7 +424,8 @@ function handleFiles(files) {
         const fileResetOption = document.getElementById('file-reset-option');
 
         if (fileNameDisplay) {
-            fileNameDisplay.textContent = file.name;
+            fileNameDisplay.textContent = truncateText(file.name);
+            fileNameDisplay.title = file.name;
         }
         if (convertFileButton) {
             toggleConvertButtonState(true, convertFileButton);
@@ -1851,6 +1852,23 @@ async function logout() {
         updateUIStatus("error", "Failed to log out. Please try again.");
     }
 }
+function truncateText(text, maxLength = 50) {
+    if (text.length <= maxLength) return text;
+
+    // For URLs, try to preserve the domain and end part
+    if (text.startsWith('http')) {
+        const match = text.match(/^(https?:\/\/[^\/]+).*?([\w&=-]{10,})\/?$/);
+        if (match) {
+            // Show domain start and end part
+            return `${match[1]}/.../${match[2]}`;
+        }
+    }
+
+    // Default truncation in the middle
+    const start = Math.ceil(maxLength / 2);
+    const end = text.length - Math.floor(maxLength / 2);
+    return text.slice(0, start) + '...' + text.slice(end);
+}
 function showLanguageSelectionModal(inputData, price) {
     const modal = document.getElementById("language-modal");
     if (!modal) {
@@ -1861,7 +1879,9 @@ function showLanguageSelectionModal(inputData, price) {
     modal.style.display = "block";
     const fileNameElement = modal.querySelector("#file-name");
     if (fileNameElement) {
-        fileNameElement.textContent = inputData instanceof File ? inputData.name : inputData;
+        const displayText = inputData instanceof File ? inputData.name : inputData;
+        fileNameElement.textContent = truncateText(displayText);
+        fileNameElement.title = displayText; // Show full text on hover
         console.log("Setting modal file name to:", fileNameElement.textContent); // Debug log
     }
     const priceElement = modal.querySelector("#modal-price");
@@ -2452,9 +2472,19 @@ function handleResetFileLink(event) {
 function handleUrlInput() {
     const fileNameElement = document.getElementById("file-name");
     const convertButton = document.getElementById('convert-button');
-    if (fileNameElement) fileNameElement.textContent = "";
+    const urlInput = this;
+
+    if (fileNameElement) {
+        const url = urlInput.value.trim();
+        if (url) {
+            fileNameElement.textContent = truncateText(url);
+            fileNameElement.title = url; // Show full URL on hover
+        } else {
+            fileNameElement.textContent = "";
+        }
+    }
     uploadedFile = null;
-    if (convertButton) convertButton.disabled = this.value.trim() === "";
+    if (convertButton) convertButton.disabled = urlInput.value.trim() === "";
 }
 
 function handleUploadFileButton() {

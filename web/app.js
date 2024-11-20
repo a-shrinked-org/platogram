@@ -1857,35 +1857,20 @@ function truncateText(text, maxLength = 50) {
     if (!text) return "";
     if (text.length <= maxLength) return text;
 
-    try {
-        // For URLs
-        if (text.startsWith('http')) {
-            try {
-                const url = new URL(text);
-                const domain = url.hostname;
-                const lastSegment = url.pathname.split('/').filter(Boolean).pop() || '';
-                const params = url.search ? '?' + url.search.slice(1, 15) + '...' : '';
-                return `${domain}/.../${lastSegment}${params}`;
-            } catch (e) {
-                // If URL parsing fails, fall back to simple truncation
-                console.log('URL parsing failed, using simple truncation');
-                return text.slice(0, 20) + '...' + text.slice(-20);
-            }
+    // For URLs, simplify to just show domain and filename
+    if (text.startsWith('http')) {
+        try {
+            const url = new URL(text);
+            const filename = url.pathname.split('/').pop() || '';
+            return `${url.hostname}/.../${filename}`;
+        } catch (e) {
+            console.log('URL parsing failed, using simple truncation');
+            return text.slice(0, 20) + '...' + text.slice(-20);
         }
-
-        // For non-URLs (like filenames)
-        if (text.length > maxLength) {
-            const start = Math.ceil(maxLength / 2);
-            const end = text.length - Math.floor(maxLength / 2);
-            return text.slice(0, start) + '...' + text.slice(-Math.floor(maxLength / 3));
-        }
-
-        return text;
-    } catch (error) {
-        console.error('Error in truncateText:', error);
-        // Fallback to simple truncation
-        return text.slice(0, 20) + '...' + text.slice(-20);
     }
+
+    // For non-URLs (like filenames)
+    return text.slice(0, 20) + '...' + text.slice(-20);
 }
 
 function showLanguageSelectionModal(inputData, price) {
@@ -1894,25 +1879,22 @@ function showLanguageSelectionModal(inputData, price) {
         console.error("Language modal not found in the DOM");
         return;
     }
-
     modal.classList.remove("hidden");
     modal.style.display = "block";
 
-    // Fix the file name display - simplified and direct approach
-    const fileNameElement = document.getElementById("file-name"); // Changed from modal.querySelector to document.getElementById
+    // Immediately truncate the display text
+    const fileNameElement = document.getElementById("file-name");
     if (fileNameElement) {
         const displayText = inputData instanceof File ? inputData.name : inputData;
-        try {
-            const truncatedText = truncateText(displayText, 50);
-            console.log('Original text:', displayText);
-            console.log('Truncated text:', truncatedText);
-            // Directly set the text content
+        const truncatedText = truncateText(displayText);
+        console.log('Original text:', displayText);
+        console.log('Truncated text:', truncatedText);
+
+        // Force immediate update
+        requestAnimationFrame(() => {
             fileNameElement.textContent = truncatedText;
-            fileNameElement.title = displayText; // Full text on hover
-        } catch (error) {
-            console.error('Error setting modal name:', error);
-            fileNameElement.textContent = displayText;
-        }
+            fileNameElement.title = displayText; // Show full text on hover
+        });
     }
     const priceElement = modal.querySelector("#modal-price");
     if (priceElement) {

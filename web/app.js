@@ -424,7 +424,8 @@ function handleFiles(files) {
         const fileResetOption = document.getElementById('file-reset-option');
 
         if (fileNameDisplay) {
-            fileNameDisplay.textContent = truncateText(file.name);
+            const truncatedName = truncateText(file.name);
+            fileNameDisplay.textContent = truncatedName;
             fileNameDisplay.title = file.name; // Show full name on hover
         }
         if (convertFileButton) {
@@ -1856,22 +1857,35 @@ function truncateText(text, maxLength = 50) {
     if (!text) return "";
     if (text.length <= maxLength) return text;
 
-    // For URLs, preserve domain and key parameters
-    if (text.startsWith('http')) {
-        // Extract domain and last path segment with parameters
-        const urlObj = new URL(text);
-        const domain = urlObj.hostname;
-        const lastSegment = urlObj.pathname.split('/').filter(Boolean).pop() || '';
-        const params = urlObj.search ? '?' + urlObj.search.slice(1, 15) + '...' : '';
+    try {
+        // For URLs
+        if (text.startsWith('http')) {
+            try {
+                const url = new URL(text);
+                const domain = url.hostname;
+                const lastSegment = url.pathname.split('/').filter(Boolean).pop() || '';
+                const params = url.search ? '?' + url.search.slice(1, 15) + '...' : '';
+                return `${domain}/.../${lastSegment}${params}`;
+            } catch (e) {
+                // If URL parsing fails, fall back to simple truncation
+                console.log('URL parsing failed, using simple truncation');
+                return text.slice(0, 20) + '...' + text.slice(-20);
+            }
+        }
 
-        // Construct truncated URL
-        return `${domain}/.../${lastSegment}${params}`;
+        // For non-URLs (like filenames)
+        if (text.length > maxLength) {
+            const start = Math.ceil(maxLength / 2);
+            const end = text.length - Math.floor(maxLength / 2);
+            return text.slice(0, start) + '...' + text.slice(-Math.floor(maxLength / 3));
+        }
+
+        return text;
+    } catch (error) {
+        console.error('Error in truncateText:', error);
+        // Fallback to simple truncation
+        return text.slice(0, 20) + '...' + text.slice(-20);
     }
-
-    // Default truncation for non-URLs
-    const start = Math.ceil(maxLength / 2);
-    const end = text.length - Math.floor(maxLength / 2);
-    return text.slice(0, start) + '...' + text.slice(end);
 }
 
 function showLanguageSelectionModal(inputData, price) {
@@ -1883,18 +1897,15 @@ function showLanguageSelectionModal(inputData, price) {
     modal.classList.remove("hidden");
     modal.style.display = "block";
 
+    // Handle file name display
     const fileNameElement = modal.querySelector("#file-name");
     if (fileNameElement) {
         const displayText = inputData instanceof File ? inputData.name : inputData;
-        try {
-            const truncatedText = truncateText(displayText);
-            fileNameElement.textContent = truncatedText;
-            fileNameElement.title = displayText; // Show full text on hover
-            console.log("Setting modal file name to:", truncatedText);
-        } catch (error) {
-            console.error("Error truncating text:", error);
-            fileNameElement.textContent = displayText;
-        }
+        const truncatedText = truncateText(displayText);
+        console.log('Original text:', displayText);
+        console.log('Truncated text:', truncatedText);
+        fileNameElement.textContent = truncatedText;
+        fileNameElement.title = displayText; // Show full text on hover
     }
     const priceElement = modal.querySelector("#modal-price");
     if (priceElement) {
@@ -2489,13 +2500,9 @@ function handleUrlInput() {
     if (fileNameElement) {
         const url = urlInput.value.trim();
         if (url) {
-            try {
-                fileNameElement.textContent = truncateText(url);
-                fileNameElement.title = url; // Show full URL on hover
-            } catch (error) {
-                console.error("Error truncating URL:", error);
-                fileNameElement.textContent = url;
-            }
+            const truncatedUrl = truncateText(url);
+            fileNameElement.textContent = truncatedUrl;
+            fileNameElement.title = url; // Show full URL on hover
         } else {
             fileNameElement.textContent = "";
         }
@@ -2620,6 +2627,7 @@ if (typeof window !== 'undefined') {
     window.postToConvert = postToConvert;
     window.handleAuthReturn = handleAuthReturn;
     window.setRandomPlaceholder = setRandomPlaceholder;
+    window.truncateText = truncateText;
 }
 
 window.addEventListener('load', setRandomPlaceholder);

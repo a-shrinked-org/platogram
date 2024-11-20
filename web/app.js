@@ -1894,18 +1894,25 @@ function showLanguageSelectionModal(inputData, price) {
         console.error("Language modal not found in the DOM");
         return;
     }
+
     modal.classList.remove("hidden");
     modal.style.display = "block";
 
-    // Handle file name display
-    const fileNameElement = modal.querySelector("#file-name");
+    // Fix the file name display - simplified and direct approach
+    const fileNameElement = document.getElementById("file-name"); // Changed from modal.querySelector to document.getElementById
     if (fileNameElement) {
         const displayText = inputData instanceof File ? inputData.name : inputData;
-        const truncatedText = truncateText(displayText);
-        console.log('Original text:', displayText);
-        console.log('Truncated text:', truncatedText);
-        fileNameElement.textContent = truncatedText;
-        fileNameElement.title = displayText; // Show full text on hover
+        try {
+            const truncatedText = truncateText(displayText, 50);
+            console.log('Original text:', displayText);
+            console.log('Truncated text:', truncatedText);
+            // Directly set the text content
+            fileNameElement.textContent = truncatedText;
+            fileNameElement.title = displayText; // Full text on hover
+        } catch (error) {
+            console.error('Error setting modal name:', error);
+            fileNameElement.textContent = displayText;
+        }
     }
     const priceElement = modal.querySelector("#modal-price");
     if (priceElement) {

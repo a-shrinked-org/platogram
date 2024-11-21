@@ -232,6 +232,7 @@ function handleOptionClick(option) {
     const coffeeButton = document.getElementById('coffee-button');
     const coffee1Button = document.getElementById('coffee-1');
     const coffee2Button = document.getElementById('coffee-2');
+    const coffeePriceElement = document.getElementById('coffee-price');
 
     // Handle basic button
     if (basicButton) {
@@ -252,7 +253,7 @@ function handleOptionClick(option) {
             flexContainer.insertBefore(newIcon, flexContainer.firstChild);
         }
 
-        basicButton.classList.toggle('border-2', option === 'basic');
+        basicButton.classList.toggle('border', option === 'basic');
         basicButton.classList.toggle('border-blue-500', option === 'basic');
         basicButton.classList.toggle('border', option !== 'basic');
         basicButton.classList.toggle('bg-blue-50', option === 'basic');
@@ -277,7 +278,7 @@ function handleOptionClick(option) {
             flexContainer.insertBefore(newIcon, flexContainer.firstChild);
         }
 
-        coffeeButton.classList.toggle('border-2', option === 'coffee');
+        coffeeButton.classList.toggle('border', option === 'coffee');
         coffeeButton.classList.toggle('border-blue-500', option === 'coffee');
         coffeeButton.classList.toggle('border', option !== 'coffee');
         coffeeButton.classList.toggle('bg-blue-50', option === 'coffee');
@@ -288,7 +289,7 @@ function handleOptionClick(option) {
         lucide.createIcons();
     }
 
-    // Rest of your coffee button logic
+    // The coffee button logic
     if (option === 'coffee') {
         coffeeCount = 1;
         customPrice = '';
@@ -302,8 +303,9 @@ function handleOptionClick(option) {
             coffee2Button.style.backgroundColor = '';
             coffee2Button.classList.remove('text-black');
         }
+        if (coffeePriceElement) coffeePriceElement.textContent = '5.00';
     } else {
-        coffeeCount = 0;
+        // Don't reset coffeeCount when selecting basic option
         if (coffee1Button) {
             coffee1Button.style.backgroundColor = '';
             coffee1Button.classList.remove('text-black');
@@ -311,6 +313,10 @@ function handleOptionClick(option) {
         if (coffee2Button) {
             coffee2Button.style.backgroundColor = '';
             coffee2Button.classList.remove('text-black');
+        }
+        // Keep coffee price display at its current value
+        if (coffeePriceElement && !coffeePriceElement.textContent) {
+            coffeePriceElement.textContent = '5.00';
         }
     }
 

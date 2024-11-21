@@ -240,7 +240,7 @@ function handleOptionClick(option) {
                 existingIcon.remove();
             }
             const newIcon = document.createElement('i');
-            newIcon.setAttribute('data-lucide', option === 'basic' ? 'circle-dot' : 'circle');
+            newIcon.setAttribute('data-lucide', option === 'basic' ? 'circle-check-big' : 'circle');
             newIcon.className = `w-5 h-5 text-${option === 'basic' ? 'blue' : 'gray'}-500 mr-2`;
             flexContainer.insertBefore(newIcon, flexContainer.firstChild);
         }
@@ -263,7 +263,7 @@ function handleOptionClick(option) {
                 existingIcon.remove();
             }
             const newIcon = document.createElement('i');
-            newIcon.setAttribute('data-lucide', option === 'coffee' ? 'circle-dot' : 'circle');
+            newIcon.setAttribute('data-lucide', option === 'coffee' ? 'circle-check-big' : 'circle');
             newIcon.className = `w-5 h-5 text-${option === 'coffee' ? 'blue' : 'gray'}-500 mr-2`;
             flexContainer.insertBefore(newIcon, flexContainer.firstChild);
         }

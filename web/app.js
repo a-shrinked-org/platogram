@@ -290,14 +290,12 @@ function handleOptionClick(option) {
         if (customPriceInput) customPriceInput.value = '';
         if (coffee1Button) {
           coffee1Button.style.backgroundColor = '#0F172A';
-          coffee1Button.classList.remove('text-gray-300');
           coffee1Button.classList.add('text-white');
           coffee1Button.classList.remove('border-gray-300');
         }
         if (coffee2Button) {
             coffee2Button.style.backgroundColor = '';
             coffee2Button.classList.remove('text-black');
-            coffee1Button.classList.add('text-gray-300');
         }
     } else {
         // For basic option, reset coffee buttons

@@ -490,3 +490,7 @@ footer a:hover {
 .modal:not(.hidden) {
   display: block; /* or flex, depending on your layout needs */
 }
+#basic-job-button, #coffee-button
+{
+  background: #8F3429;
+}

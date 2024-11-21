@@ -297,12 +297,14 @@ function handleOptionClick(option) {
         if (coffee2Button) {
             coffee2Button.style.backgroundColor = '';
             coffee2Button.classList.remove('text-black');
+            coffee1Button.classList.add('text-gray-300');
         }
     } else {
         // For basic option, reset coffee buttons
         if (coffee1Button) {
             coffee1Button.style.backgroundColor = '';
             coffee1Button.classList.remove('text-black');
+            coffee1Button.classList.add('text-gray-300');
         }
         if (coffee2Button) {
             coffee2Button.style.backgroundColor = '';

@@ -289,8 +289,10 @@ function handleOptionClick(option) {
         const customPriceInput = document.getElementById('custom-price');
         if (customPriceInput) customPriceInput.value = '';
         if (coffee1Button) {
-            coffee1Button.style.backgroundColor = '#F9F0E8';
-            coffee1Button.classList.add('text-black');
+          coffee1Button.style.backgroundColor = '#0F172A';
+          coffee1Button.classList.remove('text-gray-300');
+          coffee1Button.classList.add('text-white');
+          coffee1Button.classList.remove('border-gray-300');
         }
         if (coffee2Button) {
             coffee2Button.style.backgroundColor = '';
@@ -345,10 +347,11 @@ function handleCoffeeCountClick(count) {
             coffee1Button.style.backgroundColor = '#0F172A';
             coffee1Button.classList.remove('text-gray-300');
             coffee1Button.classList.add('text-white');
-            coffee1Button.classList.add('border-0');
+            coffee1Button.classList.remove('border-gray-300');
         } else {
             coffee1Button.style.backgroundColor = '';
             coffee1Button.classList.remove('text-white');
+            coffee1Button.classList.add('border-gray-300');
         }
     }
 
@@ -357,10 +360,12 @@ function handleCoffeeCountClick(count) {
             coffee2Button.style.backgroundColor = '#0F172A';
             coffee1Button.classList.remove('text-gray-300');
             coffee2Button.classList.add('text-white');
-            coffee1Button.classList.add('border-0');
+            coffee2Button.classList.add('border-0');
+            coffee2Button.classList.remove('border-gray-300');
         } else {
             coffee2Button.style.backgroundColor = '';
             coffee2Button.classList.remove('text-white');
+            coffee2Button.classList.add('border-gray-300');
         }
     }
 

@@ -334,34 +334,39 @@ function handleCoffeeCountClick(count) {
     customPrice = "";
     selectedOption = "coffee";
     const customPriceInput = document.getElementById("custom-price");
-    if (customPriceInput) customPriceInput.value = "";
     const coffee1Button = document.getElementById("coffee-1");
     const coffee2Button = document.getElementById("coffee-2");
+    const coffeePriceElement = document.getElementById('coffee-price'); // Add this line
+
+    if (customPriceInput) customPriceInput.value = "";
+
     if (coffee1Button) {
-      if (count === 1) {
-          coffee1Button.style.backgroundColor = '#F9F0E8';
-          coffee1Button.classList.add('text-black');
-      } else {
-          coffee1Button.style.backgroundColor = '';
-          coffee1Button.classList.remove('text-black');
-      }
+        if (count === 1) {
+            coffee1Button.style.backgroundColor = '#F9F0E8';
+            coffee1Button.classList.add('text-black');
+        } else {
+            coffee1Button.style.backgroundColor = '';
+            coffee1Button.classList.remove('text-black');
+        }
     }
+
     if (coffee2Button) {
-      if (count === 2) {
-          coffee2Button.style.backgroundColor = '#F9F0E8';
-          coffee2Button.classList.add('text-black');
-      } else {
-          coffee2Button.style.backgroundColor = '';
-          coffee2Button.classList.remove('text-black');
-      }
+        if (count === 2) {
+            coffee2Button.style.backgroundColor = '#F9F0E8';
+            coffee2Button.classList.add('text-black');
+        } else {
+            coffee2Button.style.backgroundColor = '';
+            coffee2Button.classList.remove('text-black');
+        }
     }
-    // Update prices
+
     totalPrice = count * 5;
     if (coffeePriceElement) {
         coffeePriceElement.textContent = totalPrice.toFixed(2);
     }
+
     updateTotalPrice();
-  }
+}
 
 function handleCustomPriceChange(e) {
     const value = e.target.value;

@@ -235,29 +235,18 @@ function handleOptionClick(option) {
 
     // Handle basic button
     if (basicButton) {
-        const basicIconContainer = basicButton.querySelector('[data-lucide]');
-        if (basicIconContainer) {
+        const basicIcon = basicButton.querySelector('[data-lucide]');
+        if (basicIcon) {
+            const iconParent = basicIcon.parentNode;
             // Remove existing icon
-            basicIconContainer.remove();
-
-            // Create new icon element
+            basicIcon.remove();
+            // Create new icon
             const newIcon = document.createElement('i');
             newIcon.setAttribute('data-lucide', option === 'basic' ? 'circle-dot' : 'circle');
             newIcon.className = option === 'basic' ? 'text-blue-500' : 'text-gray-500';
-
-            // Insert new icon
-            const iconWrapper = basicButton.querySelector('.w-5');
-            iconWrapper.appendChild(newIcon);
-
-            // Reinitialize Lucide icons
-            lucide.createIcons({
-                icons: {
-                    'circle': true,
-                    'circle-dot': true
-                }
-            });
+            // Add new icon back to the same parent
+            iconParent.appendChild(newIcon);
         }
-
         basicButton.classList.toggle('border-2', option === 'basic');
         basicButton.classList.toggle('border-blue-500', option === 'basic');
         basicButton.classList.toggle('border', option !== 'basic');
@@ -266,33 +255,27 @@ function handleOptionClick(option) {
 
     // Handle coffee button
     if (coffeeButton) {
-        const coffeeIconContainer = coffeeButton.querySelector('[data-lucide]');
-        if (coffeeIconContainer) {
+        const coffeeIcon = coffeeButton.querySelector('[data-lucide]');
+        if (coffeeIcon) {
+            const iconParent = coffeeIcon.parentNode;
             // Remove existing icon
-            coffeeIconContainer.remove();
-
-            // Create new icon element
+            coffeeIcon.remove();
+            // Create new icon
             const newIcon = document.createElement('i');
             newIcon.setAttribute('data-lucide', option === 'coffee' ? 'circle-dot' : 'circle');
             newIcon.className = option === 'coffee' ? 'text-blue-500' : 'text-gray-500';
-
-            // Insert new icon
-            const iconWrapper = coffeeButton.querySelector('.w-5');
-            iconWrapper.appendChild(newIcon);
-
-            // Reinitialize Lucide icons
-            lucide.createIcons({
-                icons: {
-                    'circle': true,
-                    'circle-dot': true
-                }
-            });
+            // Add new icon back to the same parent
+            iconParent.appendChild(newIcon);
         }
-
         coffeeButton.classList.toggle('border-2', option === 'coffee');
         coffeeButton.classList.toggle('border-blue-500', option === 'coffee');
         coffeeButton.classList.toggle('border', option !== 'coffee');
         coffeeButton.classList.toggle('bg-blue-50', option === 'coffee');
+    }
+
+    // Initialize Lucide icons after adding new icons
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
     }
 
     // Rest of your coffee button logic

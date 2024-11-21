@@ -233,10 +233,24 @@ function handleOptionClick(option) {
     const coffee1Button = document.getElementById('coffee-1');
     const coffee2Button = document.getElementById('coffee-2');
 
+    // Add these lines to handle the icon and color changes
     if (basicButton) {
+        const basicIcon = basicButton.querySelector('[data-lucide]');
+        if (basicIcon) {
+            // Update icon type
+            basicIcon.setAttribute('data-lucide', option === 'basic' ? 'circle-dot' : 'circle');
+            // Update color
+            basicIcon.classList.toggle('text-blue-500', option === 'basic');
+            basicIcon.classList.toggle('text-gray-500', option !== 'basic');
+            // Re-render Lucide icon
+            lucide.createIcons();
+        }
+
         basicButton.classList.toggle('border-blue-500', option === 'basic');
         basicButton.classList.toggle('bg-blue-50', option === 'basic');
     }
+
+    // Rest of your existing code stays the same...
     if (coffeeButton) {
         coffeeButton.classList.toggle('border-blue-500', option === 'coffee');
         coffeeButton.classList.toggle('bg-blue-50', option === 'coffee');

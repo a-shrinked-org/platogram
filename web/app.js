@@ -247,12 +247,18 @@ function handleOptionClick(option) {
 
         // Simplified border handling
         if (option === 'basic') {
-            basicButton.classList.add('border', 'border-blue-500', 'bg-blue-50');
-        } else {
-            basicButton.classList.remove('border-blue-500', 'bg-blue-50');
-            basicButton.classList.add('border-gray-300');
-        }
-    }
+          totalPrice = 0;
+          const totalPriceElement = document.getElementById('total-price');
+          const coffeePriceElement = document.getElementById('coffee-price');
+          if (totalPriceElement) totalPriceElement.textContent = '0.00';
+          // Keep coffee price display at default when basic is selected
+          if (coffeePriceElement) coffeePriceElement.textContent = '5.00';
+      } else {
+          if (!customPrice && coffeeCount === 0) {
+              coffeeCount = 1;  // Set default coffee count if none selected
+          }
+          updateTotalPrice();
+      }
 
     // Handle coffee button
     if (coffeeButton) {
@@ -351,6 +357,11 @@ function handleCoffeeCountClick(count) {
           coffee2Button.style.backgroundColor = '';
           coffee2Button.classList.remove('text-black');
       }
+    }
+    // Update prices
+    totalPrice = count * 5;
+    if (coffeePriceElement) {
+        coffeePriceElement.textContent = totalPrice.toFixed(2);
     }
     updateTotalPrice();
   }
@@ -948,7 +959,7 @@ async function reset() {
 function getPriceFromUI() {
   const coffeePrice = document.getElementById('coffee-price').textContent;
   const price = parseFloat(coffeePrice.replace('$', ''));
-  return price;
+  return totalPrice;
 }
 
 async function createCheckoutSession(price, lang, saveFlag) {
@@ -1271,6 +1282,7 @@ async function handleSubmit(event) {
     if (event) event.preventDefault();
     console.log('handleSubmit called');
     const price = getPriceFromUI();
+    console.log('Submitting with price:', price);
     let inputData = getInputData();
     const submitButton = document.getElementById('submit-btn');
 

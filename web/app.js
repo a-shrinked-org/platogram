@@ -1908,12 +1908,23 @@ function truncateText(text, maxLength = 50) {
     if (!text) return "";
     if (text.length <= maxLength) return text;
 
-    // For URLs, simplify to just show domain and filename
+    // For URLs, simplify to just show domain and filename/video ID
     if (text.startsWith('http')) {
         try {
             const url = new URL(text);
-            const filename = url.pathname.split('/').pop() || '';
-            return `${url.hostname}/.../${filename}`;
+
+            // Extract the meaningful part based on the domain
+            let identifier;
+            if (url.hostname.includes('youtube.com')) {
+                // For YouTube, get the video ID from the URL parameters
+                const videoId = url.searchParams.get('v');
+                identifier = videoId || url.pathname.split('/').pop();
+            } else {
+                // For other URLs, get the last part of the path
+                identifier = url.pathname.split('/').pop();
+            }
+
+            return `${url.hostname}/.../${identifier}`;
         } catch (e) {
             console.log('URL parsing failed, using simple truncation');
             return text.slice(0, 20) + '...' + text.slice(-20);

@@ -235,18 +235,23 @@ function handleOptionClick(option) {
 
     // Handle basic button
     if (basicButton) {
-        const basicIcon = basicButton.querySelector('[data-lucide]');
-        if (basicIcon) {
-            const iconParent = basicIcon.parentNode;
-            // Remove existing icon
-            basicIcon.remove();
+        const flexContainer = basicButton.querySelector('.flex.items-center');
+        if (flexContainer) {
+            // Remove existing icon if it exists
+            const existingIcon = flexContainer.querySelector('[data-lucide]');
+            if (existingIcon) {
+                existingIcon.remove();
+            }
+
             // Create new icon
             const newIcon = document.createElement('i');
             newIcon.setAttribute('data-lucide', option === 'basic' ? 'circle-dot' : 'circle');
-            newIcon.className = option === 'basic' ? 'text-blue-500' : 'text-gray-500';
-            // Add new icon back to the same parent
-            iconParent.appendChild(newIcon);
+            newIcon.className = `w-5 h-5 text-${option === 'basic' ? 'blue' : 'gray'}-500 mr-2`;
+
+            // Insert at the beginning of flex container
+            flexContainer.insertBefore(newIcon, flexContainer.firstChild);
         }
+
         basicButton.classList.toggle('border-2', option === 'basic');
         basicButton.classList.toggle('border-blue-500', option === 'basic');
         basicButton.classList.toggle('border', option !== 'basic');
@@ -255,18 +260,23 @@ function handleOptionClick(option) {
 
     // Handle coffee button
     if (coffeeButton) {
-        const coffeeIcon = coffeeButton.querySelector('[data-lucide]');
-        if (coffeeIcon) {
-            const iconParent = coffeeIcon.parentNode;
-            // Remove existing icon
-            coffeeIcon.remove();
+        const flexContainer = coffeeButton.querySelector('.flex.items-center');
+        if (flexContainer) {
+            // Remove existing icon if it exists
+            const existingIcon = flexContainer.querySelector('[data-lucide]');
+            if (existingIcon) {
+                existingIcon.remove();
+            }
+
             // Create new icon
             const newIcon = document.createElement('i');
             newIcon.setAttribute('data-lucide', option === 'coffee' ? 'circle-dot' : 'circle');
-            newIcon.className = option === 'coffee' ? 'text-blue-500' : 'text-gray-500';
-            // Add new icon back to the same parent
-            iconParent.appendChild(newIcon);
+            newIcon.className = `w-5 h-5 text-${option === 'coffee' ? 'blue' : 'gray'}-500 mr-2`;
+
+            // Insert at the beginning of flex container
+            flexContainer.insertBefore(newIcon, flexContainer.firstChild);
         }
+
         coffeeButton.classList.toggle('border-2', option === 'coffee');
         coffeeButton.classList.toggle('border-blue-500', option === 'coffee');
         coffeeButton.classList.toggle('border', option !== 'coffee');

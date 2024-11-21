@@ -221,9 +221,7 @@ function updateTotalPrice() {
         }
     }
     const totalPriceElement = document.getElementById('total-price');
-    const coffeePriceElement = document.getElementById('coffee-price');
     if (totalPriceElement) totalPriceElement.textContent = totalPrice.toFixed(2);
-    if (coffeePriceElement) coffeePriceElement.textContent = totalPrice.toFixed(2);
 }
 
 function handleOptionClick(option) {
@@ -284,7 +282,7 @@ function handleOptionClick(option) {
         lucide.createIcons();
     }
 
-    // The coffee button logic
+    // Handle coffee state and price updates
     if (option === 'coffee') {
         coffeeCount = 1;
         customPrice = '';
@@ -299,6 +297,7 @@ function handleOptionClick(option) {
             coffee2Button.classList.remove('text-black');
         }
     } else {
+        // For basic option, reset coffee buttons but keep price display
         if (coffee1Button) {
             coffee1Button.style.backgroundColor = '';
             coffee1Button.classList.remove('text-black');
@@ -309,13 +308,21 @@ function handleOptionClick(option) {
         }
     }
 
-    // Update total price first
-    updateTotalPrice();
-
-    // Then ensure coffee price display maintains its value
-    const coffeePriceElement = document.getElementById('coffee-price');
-    if (coffeePriceElement) {
-        coffeePriceElement.textContent = (customPrice || (coffeeCount * 5)).toFixed(2);
+    // Update total price and displays
+    if (option === 'basic') {
+        totalPrice = 0;
+        const totalPriceElement = document.getElementById('total-price');
+        if (totalPriceElement) totalPriceElement.textContent = '0.00';
+        // Keep coffee price display at $5
+        const coffeePriceElement = document.getElementById('coffee-price');
+        if (coffeePriceElement) coffeePriceElement.textContent = '5.00';
+    } else {
+        updateTotalPrice();
+        // Update coffee price display
+        const coffeePriceElement = document.getElementById('coffee-price');
+        if (coffeePriceElement) {
+            coffeePriceElement.textContent = (customPrice || (coffeeCount * 5)).toFixed(2);
+        }
     }
 }
 

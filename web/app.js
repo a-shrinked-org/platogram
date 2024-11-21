@@ -232,56 +232,51 @@ function handleOptionClick(option) {
     const coffeeButton = document.getElementById('coffee-button');
     const coffee1Button = document.getElementById('coffee-1');
     const coffee2Button = document.getElementById('coffee-2');
-    const coffeePriceElement = document.getElementById('coffee-price');
 
     // Handle basic button
     if (basicButton) {
         const flexContainer = basicButton.querySelector('.flex.items-center');
         if (flexContainer) {
-            // Remove existing icon if it exists
             const existingIcon = flexContainer.querySelector('[data-lucide]');
             if (existingIcon) {
                 existingIcon.remove();
             }
-
-            // Create new icon
             const newIcon = document.createElement('i');
             newIcon.setAttribute('data-lucide', option === 'basic' ? 'circle-dot' : 'circle');
             newIcon.className = `w-5 h-5 text-${option === 'basic' ? 'blue' : 'gray'}-500 mr-2`;
-
-            // Insert at the beginning of flex container
             flexContainer.insertBefore(newIcon, flexContainer.firstChild);
         }
 
-        basicButton.classList.toggle('border', option === 'basic');
-        basicButton.classList.toggle('border-blue-500', option === 'basic');
-        basicButton.classList.toggle('border', option !== 'basic');
-        basicButton.classList.toggle('bg-blue-50', option === 'basic');
+        // Simplified border handling
+        if (option === 'basic') {
+            basicButton.classList.add('border', 'border-blue-500', 'bg-blue-50');
+        } else {
+            basicButton.classList.remove('border-blue-500', 'bg-blue-50');
+            basicButton.classList.add('border-gray-300');
+        }
     }
 
     // Handle coffee button
     if (coffeeButton) {
         const flexContainer = coffeeButton.querySelector('.flex.items-center');
         if (flexContainer) {
-            // Remove existing icon if it exists
             const existingIcon = flexContainer.querySelector('[data-lucide]');
             if (existingIcon) {
                 existingIcon.remove();
             }
-
-            // Create new icon
             const newIcon = document.createElement('i');
             newIcon.setAttribute('data-lucide', option === 'coffee' ? 'circle-dot' : 'circle');
             newIcon.className = `w-5 h-5 text-${option === 'coffee' ? 'blue' : 'gray'}-500 mr-2`;
-
-            // Insert at the beginning of flex container
             flexContainer.insertBefore(newIcon, flexContainer.firstChild);
         }
 
-        coffeeButton.classList.toggle('border', option === 'coffee');
-        coffeeButton.classList.toggle('border-blue-500', option === 'coffee');
-        coffeeButton.classList.toggle('border', option !== 'coffee');
-        coffeeButton.classList.toggle('bg-blue-50', option === 'coffee');
+        // Simplified border handling
+        if (option === 'coffee') {
+            coffeeButton.classList.add('border', 'border-blue-500', 'bg-blue-50');
+        } else {
+            coffeeButton.classList.remove('border-blue-500', 'bg-blue-50');
+            coffeeButton.classList.add('border-gray-300');
+        }
     }
 
     // Initialize Lucide icons after adding new icons
@@ -303,9 +298,7 @@ function handleOptionClick(option) {
             coffee2Button.style.backgroundColor = '';
             coffee2Button.classList.remove('text-black');
         }
-        if (coffeePriceElement) coffeePriceElement.textContent = '5.00';
     } else {
-        // Don't reset coffeeCount when selecting basic option
         if (coffee1Button) {
             coffee1Button.style.backgroundColor = '';
             coffee1Button.classList.remove('text-black');
@@ -314,13 +307,16 @@ function handleOptionClick(option) {
             coffee2Button.style.backgroundColor = '';
             coffee2Button.classList.remove('text-black');
         }
-        // Keep coffee price display at its current value
-        if (coffeePriceElement && !coffeePriceElement.textContent) {
-            coffeePriceElement.textContent = '5.00';
-        }
     }
 
+    // Update total price first
     updateTotalPrice();
+
+    // Then ensure coffee price display maintains its value
+    const coffeePriceElement = document.getElementById('coffee-price');
+    if (coffeePriceElement) {
+        coffeePriceElement.textContent = (customPrice || (coffeeCount * 5)).toFixed(2);
+    }
 }
 
 function handleCoffeeCountClick(count) {

@@ -342,21 +342,25 @@ function handleCoffeeCountClick(count) {
 
     if (coffee1Button) {
         if (count === 1) {
-            coffee1Button.style.backgroundColor = '#F9F0E8';
-            coffee1Button.classList.add('text-black');
+            coffee1Button.style.backgroundColor = '#0F172A';
+            coffee1Button.classList.remove('text-gray-300');
+            coffee1Button.classList.add('text-white');
+            coffee1Button.classList.add('border-0');
         } else {
             coffee1Button.style.backgroundColor = '';
-            coffee1Button.classList.remove('text-black');
+            coffee1Button.classList.remove('text-white');
         }
     }
 
     if (coffee2Button) {
         if (count === 2) {
-            coffee2Button.style.backgroundColor = '#F9F0E8';
-            coffee2Button.classList.add('text-black');
+            coffee2Button.style.backgroundColor = '#0F172A';
+            coffee1Button.classList.remove('text-gray-300');
+            coffee2Button.classList.add('text-white');
+            coffee1Button.classList.add('border-0');
         } else {
             coffee2Button.style.backgroundColor = '';
-            coffee2Button.classList.remove('text-black');
+            coffee2Button.classList.remove('text-white');
         }
     }
 

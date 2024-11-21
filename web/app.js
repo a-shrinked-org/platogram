@@ -247,18 +247,12 @@ function handleOptionClick(option) {
 
         // Simplified border handling
         if (option === 'basic') {
-          totalPrice = 0;
-          const totalPriceElement = document.getElementById('total-price');
-          const coffeePriceElement = document.getElementById('coffee-price');
-          if (totalPriceElement) totalPriceElement.textContent = '0.00';
-          // Keep coffee price display at default when basic is selected
-          if (coffeePriceElement) coffeePriceElement.textContent = '5.00';
-      } else {
-          if (!customPrice && coffeeCount === 0) {
-              coffeeCount = 1;  // Set default coffee count if none selected
-          }
-          updateTotalPrice();
-      }
+            basicButton.classList.add('border', 'border-blue-500', 'bg-blue-50');
+        } else {
+            basicButton.classList.remove('border-blue-500', 'bg-blue-50');
+            basicButton.classList.add('border-gray-300');
+        }
+    }
 
     // Handle coffee button
     if (coffeeButton) {
@@ -288,7 +282,7 @@ function handleOptionClick(option) {
         lucide.createIcons();
     }
 
-    // Handle coffee state and price updates
+    // Handle coffee state updates
     if (option === 'coffee') {
         coffeeCount = 1;
         customPrice = '';
@@ -303,7 +297,7 @@ function handleOptionClick(option) {
             coffee2Button.classList.remove('text-black');
         }
     } else {
-        // For basic option, reset coffee buttons but keep price display
+        // For basic option, reset coffee buttons
         if (coffee1Button) {
             coffee1Button.style.backgroundColor = '';
             coffee1Button.classList.remove('text-black');
@@ -314,7 +308,7 @@ function handleOptionClick(option) {
         }
     }
 
-    // Update total price and displays
+    // Unified price handling at the end
     if (option === 'basic') {
         totalPrice = 0;
         const totalPriceElement = document.getElementById('total-price');
@@ -323,6 +317,9 @@ function handleOptionClick(option) {
         const coffeePriceElement = document.getElementById('coffee-price');
         if (coffeePriceElement) coffeePriceElement.textContent = '5.00';
     } else {
+        if (!customPrice && coffeeCount === 0) {
+            coffeeCount = 1;  // Set default coffee count if none selected
+        }
         updateTotalPrice();
         // Update coffee price display
         const coffeePriceElement = document.getElementById('coffee-price');

@@ -233,31 +233,69 @@ function handleOptionClick(option) {
     const coffee1Button = document.getElementById('coffee-1');
     const coffee2Button = document.getElementById('coffee-2');
 
-    // Standardize the styling for basic button
+    // Handle basic button
     if (basicButton) {
-        const basicIcon = basicButton.querySelector('[data-lucide]');
-        if (basicIcon) {
-            basicIcon.setAttribute('data-lucide', option === 'basic' ? 'circle-dot' : 'circle');
-            basicIcon.classList.toggle('text-blue-500', option === 'basic');
-            basicIcon.classList.toggle('text-gray-500', option !== 'basic');
-            lucide.createIcons();
+        const basicIconContainer = basicButton.querySelector('[data-lucide]');
+        if (basicIconContainer) {
+            // Remove existing icon
+            basicIconContainer.remove();
+
+            // Create new icon element
+            const newIcon = document.createElement('i');
+            newIcon.setAttribute('data-lucide', option === 'basic' ? 'circle-dot' : 'circle');
+            newIcon.className = option === 'basic' ? 'text-blue-500' : 'text-gray-500';
+
+            // Insert new icon
+            const iconWrapper = basicButton.querySelector('.w-5');
+            iconWrapper.appendChild(newIcon);
+
+            // Reinitialize Lucide icons
+            lucide.createIcons({
+                icons: {
+                    'circle': true,
+                    'circle-dot': true
+                }
+            });
         }
 
-        basicButton.classList.toggle('border-2', option === 'basic');  // Add thicker border
+        basicButton.classList.toggle('border-2', option === 'basic');
         basicButton.classList.toggle('border-blue-500', option === 'basic');
         basicButton.classList.toggle('border', option !== 'basic');
         basicButton.classList.toggle('bg-blue-50', option === 'basic');
     }
 
-    // Match the same styling for coffee button
+    // Handle coffee button
     if (coffeeButton) {
-        coffeeButton.classList.toggle('border-2', option === 'coffee');  // Add thicker border
+        const coffeeIconContainer = coffeeButton.querySelector('[data-lucide]');
+        if (coffeeIconContainer) {
+            // Remove existing icon
+            coffeeIconContainer.remove();
+
+            // Create new icon element
+            const newIcon = document.createElement('i');
+            newIcon.setAttribute('data-lucide', option === 'coffee' ? 'circle-dot' : 'circle');
+            newIcon.className = option === 'coffee' ? 'text-blue-500' : 'text-gray-500';
+
+            // Insert new icon
+            const iconWrapper = coffeeButton.querySelector('.w-5');
+            iconWrapper.appendChild(newIcon);
+
+            // Reinitialize Lucide icons
+            lucide.createIcons({
+                icons: {
+                    'circle': true,
+                    'circle-dot': true
+                }
+            });
+        }
+
+        coffeeButton.classList.toggle('border-2', option === 'coffee');
         coffeeButton.classList.toggle('border-blue-500', option === 'coffee');
         coffeeButton.classList.toggle('border', option !== 'coffee');
         coffeeButton.classList.toggle('bg-blue-50', option === 'coffee');
     }
 
-    // Rest of the coffee button logic remains the same
+    // Rest of your coffee button logic
     if (option === 'coffee') {
         coffeeCount = 1;
         customPrice = '';
@@ -282,6 +320,7 @@ function handleOptionClick(option) {
             coffee2Button.classList.remove('text-black');
         }
     }
+
     updateTotalPrice();
 }
 

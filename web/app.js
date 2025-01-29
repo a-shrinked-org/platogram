@@ -1756,7 +1756,6 @@ async function onConvertClick(event) {
                 multipart: file.size > 50 * 1024 * 1024, // Lower threshold to 50MB
                 partSize: getOptimalChunkSize(file.size), // Dynamic chunk size
                 maxConcurrency: getOptimalConcurrency(file.size), // Dynamic concurrency
-                addRandomSuffix: false, // Avoid extra processing
                 onUploadProgress: (progress) => {
                     console.log(`Actual upload progress: ${progress}%`);
                     if (progress === 100) {

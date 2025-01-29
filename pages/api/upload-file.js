@@ -45,6 +45,16 @@ async function verifyToken(token) {
 export default async function handler(req, res) {
   debugLog('Request method:', req.method);
   debugLog('Request headers:', req.headers);
+  
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  // Handle preflight request
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
 
   if (req.method === 'POST') {
     try {

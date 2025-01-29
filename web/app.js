@@ -1078,33 +1078,21 @@ function updateUploadProgress(progress) {
         return;
     }
 
-    if (progress === 0) {
-        initializeUploadProgressBar();
-        uploadProgressBar.style.width = '0%';
-        uploadProgressText.textContent = 'Starting upload...';
+    // Update progress bar
+    uploadProgressBar.style.width = `${progress}%`;
+    uploadProgressBar.style.transition = 'width 0.3s ease-in-out';
+    
+    // Change color based on progress
+    if (progress < 30) {
+        uploadProgressBar.style.backgroundColor = '#60A5FA';
+    } else if (progress < 70) {
+        uploadProgressBar.style.backgroundColor = '#3B82F6';
     } else {
-        clearInterval(uploadProgressInterval); // Clear any existing simulation
-        
-        // Update progress bar
-        uploadProgressBar.style.width = `${progress}%`;
-        uploadProgressBar.style.transition = 'width 0.3s ease-in-out';
-        
-        // Change color based on progress
-        if (progress < 30) {
-            uploadProgressBar.style.backgroundColor = '#60A5FA'; // lighter blue
-        } else if (progress < 70) {
-            uploadProgressBar.style.backgroundColor = '#3B82F6'; // medium blue
-        } else {
-            uploadProgressBar.style.backgroundColor = '#2563EB'; // darker blue
-        }
-
-        // Update text
-        if (progress === 100) {
-            uploadProgressText.textContent = 'Upload complete!';
-        } else {
-            uploadProgressText.textContent = `Uploading: ${Math.round(progress)}%`;
-        }
+        uploadProgressBar.style.backgroundColor = '#2563EB';
     }
+
+    // Progress text is now handled in the upload function
+    // to show more detailed information
 }
 
 // Helper function to format file sizes
@@ -1707,9 +1695,6 @@ async function onConvertClick(event) {
             updateUIStatus("uploading", "Uploading file...");
             updateUploadProgress(0);
     
-            // Start progress simulation immediately
-            startSimulatedProgress();
-    
             // Get the Auth0 token
             let token;
             try {
@@ -1722,67 +1707,31 @@ async function onConvertClick(event) {
                 throw new Error('Authentication failed. Please try logging in again.');
             }
     
-            // Get the Blob token
-            let blobToken;
-            try {
-                const blobTokenResponse = await fetch('/api/upload-file', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'X-Vercel-Blob-Token-Request': 'true'
-                    }
-                });
-                if (!blobTokenResponse.ok) {
-                    const errorText = await blobTokenResponse.text();
-                    throw new Error(`Failed to get Blob token: ${blobTokenResponse.status} ${errorText}`);
-                }
-                ({ token: blobToken } = await blobTokenResponse.json());
-            } catch (blobTokenError) {
-                console.error('Error getting Blob token:', blobTokenError);
-                throw new Error('Failed to initialize file upload. Please try again.');
-            }
-    
+            // Using Vercel's upload function with native progress tracking
             console.log('Initiating Vercel Blob upload');
-            if (typeof vercelBlobUpload !== 'function') {
-                throw new Error('Vercel Blob upload function not available');
-            }
-    
-            // Optimized upload settings
-            const isLargeFile = file.size > 100 * 1024 * 1024; // 100MB threshold
-            const optimizedSettings = {
+            const blob = await upload(sanitizedFileName, file, {
                 access: 'public',
-                token: blobToken,
                 handleUploadUrl: '/api/upload-file',
-                multipart: file.size > 50 * 1024 * 1024, // Lower threshold to 50MB
-                partSize: getOptimalChunkSize(file.size), // Dynamic chunk size
-                maxConcurrency: getOptimalConcurrency(file.size), // Dynamic concurrency
+                maximumSizeInBytes: 5 * 1024 * 1024 * 1024, // 5GB max
                 onUploadProgress: (progress) => {
-                    console.log(`Actual upload progress: ${progress}%`);
-                    if (progress === 100) {
-                        clearInterval(uploadProgressInterval);
-                        updateUploadProgress(100);
-                    } else {
-                        currentProgress = progress;
+                    console.log(`Upload progress: ${progress.percentage}%`);
+                    updateUploadProgress(progress.percentage);
+                    
+                    // Update UI with more detailed information
+                    const uploadProgressText = document.getElementById('upload-progress-text');
+                    if (uploadProgressText) {
+                        const uploaded = formatFileSize(progress.loaded);
+                        const total = formatFileSize(progress.total);
+                        uploadProgressText.textContent = `Uploading: ${Math.round(progress.percentage)}% (${uploaded} of ${total})`;
                     }
-                },
-            };
-    
-            const blob = await vercelBlobUpload(sanitizedFileName, file, optimizedSettings);
-    
-            // Clear simulation and ensure 100% is shown
-            clearInterval(uploadProgressInterval);
-            updateUploadProgress(100);
+                }
+            });
     
             // Show completion state
-            const uploadProgressBar = document.getElementById('upload-progress-bar');
+            updateUploadProgress(100);
             const uploadProgressText = document.getElementById('upload-progress-text');
-            if (uploadProgressBar && uploadProgressText) {
-                uploadProgressBar.style.width = '100%';
+            if (uploadProgressText) {
                 uploadProgressText.textContent = 'Upload complete!';
-                
-                // Add completion animation
-                uploadProgressBar.style.backgroundColor = '#2563EB';
-                uploadProgressBar.style.transition = 'all 0.3s ease-in-out';
             }
     
             // Wait a moment to show completion
@@ -1797,7 +1746,6 @@ async function onConvertClick(event) {
             return blob.url;
     
         } catch (error) {
-            clearInterval(uploadProgressInterval);
             console.error('Error uploading file:', error);
             console.error('Error stack:', error.stack);
             updateUIStatus("error", error.message || 'An unknown error occurred during file upload');

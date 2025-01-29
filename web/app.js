@@ -10,6 +10,7 @@ let coffeeCount = 1;
 let customPrice = '';
 let totalPrice = 5;
 let vercelBlobUpload;
+let vercelBlobUploader;
 let db;
 let testMode = false;
 let isConversionInProgress = false;
@@ -23,6 +24,7 @@ import('https://esm.sh/@vercel/blob@0.23.4').then(module => {
         console.log('Vercel Blob import:', module);
         if (module.put && typeof module.put === 'function') {
           vercelBlobUpload = module.put;
+          vercelBlobUploader = module.upload;
           console.log('Vercel Blob upload function found:', vercelBlobUpload);
         } else {
           console.error('Vercel Blob upload function not found in module');
@@ -1709,7 +1711,7 @@ async function onConvertClick(event) {
     
             // Using Vercel's upload function with native progress tracking
             console.log('Initiating Vercel Blob upload');
-            const blob = await upload(sanitizedFileName, file, {
+            const blob = await vercelBlobUploader(sanitizedFileName, file, {
                 access: 'public',
                 handleUploadUrl: '/api/upload-file',
                 maximumSizeInBytes: 5 * 1024 * 1024 * 1024, // 5GB max

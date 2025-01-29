@@ -1744,14 +1744,15 @@ async function onConvertClick(event) {
                   handleUploadUrl: '/api/upload-file',
                   maximumSizeInBytes: 5 * 1024 * 1024 * 1024, // 5GB max
                   onUploadProgress: (progress) => {
-                      console.log(`Upload progress: ${progress.percentage}%`);
-                      updateUploadProgress(progress.percentage);
+                      const percentage = progress.percentage ?? Math.round((progress.loaded / progress.total) * 100);
+                      console.log(`Upload progress: ${percentage}%`);
+                      updateUploadProgress(percentage);
                       
                       const uploadProgressText = document.getElementById('upload-progress-text');
                       if (uploadProgressText) {
-                          const uploaded = formatFileSize(progress.loaded);
-                          const total = formatFileSize(progress.total);
-                          uploadProgressText.textContent = `Uploading: ${Math.round(progress.percentage)}% (${uploaded} of ${total})`;
+                          const uploaded = formatFileSize(progress.loaded ?? 0);
+                          const total = formatFileSize(progress.total ?? file.size);
+                          uploadProgressText.textContent = `Uploading: ${Math.round(percentage)}% (${uploaded} of ${total})`;
                       }
                   }
               });
@@ -1767,16 +1768,27 @@ async function onConvertClick(event) {
                   partSize: getOptimalChunkSize(file.size),
                   maxConcurrency: getOptimalConcurrency(file.size),
                   onUploadProgress: (progress) => {
-                      console.log(`Upload progress: ${progress}%`);
-                      updateUploadProgress(progress);
+                      // Handle both new and old progress format
+                      const percentage = typeof progress === 'object' ? 
+                          (progress.percentage ?? Math.round((progress.loaded / progress.total) * 100)) : 
+                          progress;
+                      
+                      console.log(`Upload progress: ${percentage}%`);
+                      updateUploadProgress(percentage);
                       
                       const uploadProgressText = document.getElementById('upload-progress-text');
                       if (uploadProgressText) {
-                          const total = formatFileSize(file.size);
-                          const uploaded = formatFileSize((progress / 100) * file.size);
-                          uploadProgressText.textContent = `Uploading: ${Math.round(progress)}% (${uploaded} of ${total})`;
+                          if (typeof progress === 'object' && progress.loaded && progress.total) {
+                              const uploaded = formatFileSize(progress.loaded);
+                              const total = formatFileSize(progress.total);
+                              uploadProgressText.textContent = `Uploading: ${Math.round(percentage)}% (${uploaded} of ${total})`;
+                          } else {
+                              const uploaded = formatFileSize((percentage / 100) * file.size);
+                              const total = formatFileSize(file.size);
+                              uploadProgressText.textContent = `Uploading: ${Math.round(percentage)}% (${uploaded} of ${total})`;
+                          }
                       }
-                  },
+                  }
               });
           } else {
               throw new Error('No compatible Vercel Blob upload function available');

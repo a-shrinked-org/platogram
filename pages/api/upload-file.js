@@ -1,3 +1,4 @@
+// api/upload-file.js
 import { handleUpload } from '@vercel/blob/client';
 import jwt from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
@@ -16,6 +17,7 @@ function getKey(header, callback) {
 export const config = {
   api: {
     bodyParser: false,
+    maxDuration: 300, // 5 minutes for large uploads
   },
 };
 
@@ -72,8 +74,8 @@ export default async function handler(req, res) {
         debugLog('Returning Blob token for client-side upload');
         return res.status(200).json({ token: process.env.BLOB_READ_WRITE_TOKEN });
       } else {
-        // Handle server-side upload (keeping existing functionality)
-        debugLog('Initiating handleUpload');
+        // Handle server-side upload with multipart support
+        debugLog('Initiating handleUpload with multipart support');
         const response = await handleUpload({
           body: req,
           request: req,
@@ -81,6 +83,7 @@ export default async function handler(req, res) {
             debugLog('onBeforeGenerateToken called');
             return {
               allowedContentTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'video/mp4', 'text/vtt', 'text/plain'],
+              maximumSizeInBytes: 5 * 1024 * 1024 * 1024, // 5GB max
               tokenPayload: JSON.stringify({
                 userId: decoded.sub,
               }),
@@ -98,6 +101,7 @@ export default async function handler(req, res) {
             }
           },
         });
+        
         debugLog('Upload successful, sending response');
         return res.status(200).json(response);
       }

@@ -240,7 +240,7 @@ function handleOptionClick(option) {
                 existingIcon.remove();
             }
             const newIcon = document.createElement('i');
-            newIcon.setAttribute('data-lucide', option === 'basic' ? 'circle-check-big' : 'circle');
+            newIcon.setAttribute('data-lucide', option === 'basic' ? 'circle-dot' : 'circle');
             newIcon.className = `w-5 h-5 text-${option === 'basic' ? 'blue' : 'gray'}-500 mr-2`;
             flexContainer.insertBefore(newIcon, flexContainer.firstChild);
         }
@@ -263,7 +263,7 @@ function handleOptionClick(option) {
                 existingIcon.remove();
             }
             const newIcon = document.createElement('i');
-            newIcon.setAttribute('data-lucide', option === 'coffee' ? 'circle-check-big' : 'circle');
+            newIcon.setAttribute('data-lucide', option === 'coffee' ? 'circle-dot' : 'circle');
             newIcon.className = `w-5 h-5 text-${option === 'coffee' ? 'blue' : 'gray'}-500 mr-2`;
             flexContainer.insertBefore(newIcon, flexContainer.firstChild);
         }
@@ -1069,22 +1069,66 @@ function initializeUploadProgressBar() {
 function updateUploadProgress(progress) {
     const uploadProgressBar = document.getElementById('upload-progress-bar');
     const uploadProgressText = document.getElementById('upload-progress-text');
-
+    
     if (!uploadProgressBar || !uploadProgressText) {
         console.error('Progress bar or text element not found');
         return;
     }
 
-    // Use non-linear easing for more realistic progress simulation
     if (progress === 0) {
-        // Start the simulated progress when upload begins
         initializeUploadProgressBar();
-        startSimulatedProgress();
-    } else if (progress === 100) {
-        // Clear interval and set to 100% when upload is complete
-        clearInterval(uploadProgressInterval);
-        uploadProgressBar.style.width = '100%';
-        uploadProgressText.textContent = 'Upload complete!';
+        uploadProgressBar.style.width = '0%';
+        uploadProgressText.textContent = 'Starting upload...';
+    } else {
+        clearInterval(uploadProgressInterval); // Clear any existing simulation
+        
+        // Update progress bar
+        uploadProgressBar.style.width = `${progress}%`;
+        uploadProgressBar.style.transition = 'width 0.3s ease-in-out';
+        
+        // Change color based on progress
+        if (progress < 30) {
+            uploadProgressBar.style.backgroundColor = '#60A5FA'; // lighter blue
+        } else if (progress < 70) {
+            uploadProgressBar.style.backgroundColor = '#3B82F6'; // medium blue
+        } else {
+            uploadProgressBar.style.backgroundColor = '#2563EB'; // darker blue
+        }
+
+        // Update text
+        if (progress === 100) {
+            uploadProgressText.textContent = 'Upload complete!';
+        } else {
+            uploadProgressText.textContent = `Uploading: ${Math.round(progress)}%`;
+        }
+    }
+}
+
+// Helper function to format file sizes
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Initialize progress bar with improved styling
+function initializeUploadProgressBar() {
+    const uploadProgressBar = document.getElementById('upload-progress-bar');
+    const uploadProgressContainer = document.getElementById('upload-progress-container');
+    
+    if (uploadProgressBar) {
+        uploadProgressBar.style.transition = 'width 0.3s ease-in-out';
+        uploadProgressBar.style.backgroundColor = '#60A5FA';
+        uploadProgressBar.style.borderRadius = '0.5rem';
+        uploadProgressBar.style.width = '0%';
+    }
+
+    if (uploadProgressContainer) {
+        uploadProgressContainer.style.backgroundColor = '#EFF6FF';
+        uploadProgressContainer.style.borderRadius = '0.5rem';
+        uploadProgressContainer.style.overflow = 'hidden';
     }
 }
 
@@ -1661,16 +1705,15 @@ async function onConvertClick(event) {
     async function uploadFile(file) {
         console.log('Starting file upload process');
         console.log('File details:', file.name, file.type, file.size);
-
+        
         const sanitizedFileName = sanitizeFileName(file.name);
         console.log('Sanitized file name:', sanitizedFileName);
-
+    
         try {
             closeLanguageModal();
             updateUIStatus("uploading", "Uploading file...");
-
             updateUploadProgress(0);
-
+    
             // Get the Auth0 token
             let token;
             try {
@@ -1682,7 +1725,7 @@ async function onConvertClick(event) {
                 console.error('Error getting Auth0 token:', authError);
                 throw new Error('Authentication failed. Please try logging in again.');
             }
-
+    
             // Get the Blob token
             let blobToken;
             try {
@@ -1702,46 +1745,59 @@ async function onConvertClick(event) {
                 console.error('Error getting Blob token:', blobTokenError);
                 throw new Error('Failed to initialize file upload. Please try again.');
             }
-
+    
             console.log('Initiating Vercel Blob upload');
             if (typeof vercelBlobUpload !== 'function') {
                 throw new Error('Vercel Blob upload function not available');
             }
-
+    
+            // Use multipart upload for large files (> 100MB)
+            const isLargeFile = file.size > 100 * 1024 * 1024;
+            
             const blob = await vercelBlobUpload(sanitizedFileName, file, {
                 access: 'public',
                 token: blobToken,
                 handleUploadUrl: '/api/upload-file',
+                multipart: isLargeFile, // Enable multipart for large files
+                maxConcurrency: 3, // Maximum concurrent chunk uploads
+                partSize: 10 * 1024 * 1024, // 10MB chunks for better performance
                 onUploadProgress: (progress) => {
-                  console.log(`Actual upload progress: ${progress}%`);
-                  // If we get a 100% progress, complete the animation
-                  if (progress === 100) {
-                      updateUploadProgress(100);
-                  }
-              },
-          });
-            // Wait for the progress bar to reach near completion
-            await new Promise(resolve => setTimeout(resolve, 1500));
-
-            // Ensure progress hits 100% before changing status
+                    console.log(`Actual upload progress: ${progress}%`);
+                    updateUploadProgress(progress);
+                    
+                    // Update UI with more detailed progress
+                    const uploadProgressText = document.getElementById('upload-progress-text');
+                    if (uploadProgressText) {
+                        if (isLargeFile) {
+                            uploadProgressText.textContent = `Uploading large file (${formatFileSize(file.size)}): ${Math.round(progress)}%`;
+                        } else {
+                            uploadProgressText.textContent = `Uploading: ${Math.round(progress)}%`;
+                        }
+                    }
+                },
+            });
+    
+            // Handle upload completion
             clearInterval(uploadProgressInterval);
             const uploadProgressBar = document.getElementById('upload-progress-bar');
             const uploadProgressText = document.getElementById('upload-progress-text');
+            
             if (uploadProgressBar && uploadProgressText) {
                 uploadProgressBar.style.width = '100%';
                 uploadProgressText.textContent = 'Upload complete!';
             }
-
-            // Wait a moment to show 100% completion
+    
+            // Wait a moment to show completion
             await new Promise(resolve => setTimeout(resolve, 1000));
-
+    
             if (!blob.url) {
                 throw new Error('Invalid response from upload file endpoint: missing URL');
             }
-
+    
             console.log('File uploaded successfully. URL:', blob.url);
             updateUIStatus("running", "File uploaded, starting conversion...");
             return blob.url;
+    
         } catch (error) {
             clearInterval(uploadProgressInterval);
             console.error('Error uploading file:', error);

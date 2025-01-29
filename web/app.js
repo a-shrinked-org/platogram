@@ -22,16 +22,16 @@ let currentProgress = 0;
 
 import('https://esm.sh/@vercel/blob@0.27.1').then(module => {
   console.log('Vercel Blob import:', module);
-  if (module.put && typeof module.put === 'function') {
+  
+  // Check for both legacy and new upload methods
+  if (module.upload && typeof module.upload === 'function') {
+    vercelBlobUploader = module.upload;
+    console.log('Modern Vercel Blob upload function found:', vercelBlobUploader);
+  } else if (module.put && typeof module.put === 'function') {
     vercelBlobUpload = module.put;
-    if (module.upload && typeof module.upload === 'function') {
-      vercelBlobUploader = module.upload;
-      console.log('Vercel Blob upload function found:', vercelBlobUploader);
-    } else {
-      console.error('Vercel Blob upload function not found in module');
-    }
+    console.log('Legacy Vercel Blob upload function found:', vercelBlobUpload);
   } else {
-    console.error('Vercel Blob functions not found in module');
+    console.error('No compatible Vercel Blob upload function found');
   }
 }).catch(error => {
   console.error('Error importing Vercel Blob:', error);
@@ -1689,123 +1689,124 @@ async function onConvertClick(event) {
       return sanitized;
     }
 
-   async function uploadFile(file) {
-       console.log('Starting file upload process');
-       console.log('File details:', file.name, file.type, file.size);
-       
-       const sanitizedFileName = sanitizeFileName(file.name);
-       console.log('Sanitized file name:', sanitizedFileName);
-   
-       try {
-           closeLanguageModal();
-           updateUIStatus("uploading", "Uploading file...");
-           updateUploadProgress(0);
-   
-           // Get the Auth0 token
-           let token;
-           try {
-               token = await auth0Client.getTokenSilently({
-                   audience: "https://platogram.vercel.app",
-               });
-               console.log('Auth token obtained');
-           } catch (authError) {
-               console.error('Error getting Auth0 token:', authError);
-               throw new Error('Authentication failed. Please try logging in again.');
-           }
-   
-           // Get the Blob token
-           let blobToken;
-           try {
-               const blobTokenResponse = await fetch('/api/upload-file', {
-                   method: 'POST',
-                   headers: {
-                       'Authorization': `Bearer ${token}`,
-                       'X-Vercel-Blob-Token-Request': 'true'
-                   }
-               });
-               if (!blobTokenResponse.ok) {
-                   const errorText = await blobTokenResponse.text();
-                   throw new Error(`Failed to get Blob token: ${blobTokenResponse.status} ${errorText}`);
-               }
-               ({ token: blobToken } = await blobTokenResponse.json());
-           } catch (blobTokenError) {
-               console.error('Error getting Blob token:', blobTokenError);
-               throw new Error('Failed to initialize file upload. Please try again.');
-           }
-   
-           console.log('Initiating Vercel Blob upload');
-           let blob;
-   
-           if (!vercelBlobUploader) {
-               console.log('Falling back to vercelBlobUpload');
-               // Use the old upload method if the new one isn't available
-               if (!vercelBlobUpload) {
-                   throw new Error('No upload function available');
-               }
-               blob = await vercelBlobUpload(sanitizedFileName, file, {
-                   access: 'public',
-                   token: blobToken,
-                   handleUploadUrl: '/api/upload-file',
-                   multipart: file.size > 50 * 1024 * 1024,
-                   partSize: getOptimalChunkSize(file.size),
-                   maxConcurrency: getOptimalConcurrency(file.size),
-                   onUploadProgress: (progress) => {
-                       console.log(`Upload progress: ${progress}%`);
-                       updateUploadProgress(progress);
-                       
-                       const uploadProgressText = document.getElementById('upload-progress-text');
-                       if (uploadProgressText) {
-                           const total = formatFileSize(file.size);
-                           const uploaded = formatFileSize((progress / 100) * file.size);
-                           uploadProgressText.textContent = `Uploading: ${Math.round(progress)}% (${uploaded} of ${total})`;
-                       }
-                   },
-               });
-           } else {
-               // Use the new upload method
-               blob = await vercelBlobUploader(sanitizedFileName, file, {
-                   access: 'public',
-                   handleUploadUrl: '/api/upload-file',
-                   maximumSizeInBytes: 5 * 1024 * 1024 * 1024, // 5GB max
-                   onUploadProgress: (progress) => {
-                       console.log(`Upload progress: ${progress.percentage}%`);
-                       updateUploadProgress(progress.percentage);
-                       
-                       const uploadProgressText = document.getElementById('upload-progress-text');
-                       if (uploadProgressText) {
-                           const uploaded = formatFileSize(progress.loaded);
-                           const total = formatFileSize(progress.total);
-                           uploadProgressText.textContent = `Uploading: ${Math.round(progress.percentage)}% (${uploaded} of ${total})`;
-                       }
-                   }
-               });
-           }
-   
-           // Show completion state
-           updateUploadProgress(100);
-           const uploadProgressText = document.getElementById('upload-progress-text');
-           if (uploadProgressText) {
-               uploadProgressText.textContent = 'Upload complete!';
-           }
-   
-           // Wait a moment to show completion
-           await new Promise(resolve => setTimeout(resolve, 1000));
-   
-           if (!blob.url) {
-               throw new Error('Invalid response from upload file endpoint: missing URL');
-           }
-   
-           console.log('File uploaded successfully. URL:', blob.url);
-           updateUIStatus("running", "File uploaded, starting conversion...");
-           return blob.url;
-   
-       } catch (error) {
-           console.error('Error uploading file:', error);
-           console.error('Error stack:', error.stack);
-           updateUIStatus("error", error.message || 'An unknown error occurred during file upload');
-           throw error;
-       }
-   }
+  async function uploadFile(file) {
+      console.log('Starting file upload process');
+      console.log('File details:', file.name, file.type, file.size);
+      
+      const sanitizedFileName = sanitizeFileName(file.name);
+      console.log('Sanitized file name:', sanitizedFileName);
+  
+      try {
+          closeLanguageModal();
+          updateUIStatus("uploading", "Uploading file...");
+          updateUploadProgress(0);
+  
+          // Get the Auth0 token
+          let token;
+          try {
+              token = await auth0Client.getTokenSilently({
+                  audience: "https://platogram.vercel.app",
+              });
+              console.log('Auth token obtained');
+          } catch (authError) {
+              console.error('Error getting Auth0 token:', authError);
+              throw new Error('Authentication failed. Please try logging in again.');
+          }
+  
+          // Get the Blob token
+          let blobToken;
+          try {
+              const blobTokenResponse = await fetch('/api/upload-file', {
+                  method: 'POST',
+                  headers: {
+                      'Authorization': `Bearer ${token}`,
+                      'X-Vercel-Blob-Token-Request': 'true'
+                  }
+              });
+              if (!blobTokenResponse.ok) {
+                  const errorText = await blobTokenResponse.text();
+                  throw new Error(`Failed to get Blob token: ${blobTokenResponse.status} ${errorText}`);
+              }
+              ({ token: blobToken } = await blobTokenResponse.json());
+          } catch (blobTokenError) {
+              console.error('Error getting Blob token:', blobTokenError);
+              throw new Error('Failed to initialize file upload. Please try again.');
+          }
+  
+          console.log('Initiating Vercel Blob upload');
+          let blob;
+  
+          // Try modern uploader first
+          if (vercelBlobUploader && typeof vercelBlobUploader === 'function') {
+              console.log('Using modern Vercel Blob uploader');
+              blob = await vercelBlobUploader(sanitizedFileName, file, {
+                  access: 'public',
+                  handleUploadUrl: '/api/upload-file',
+                  maximumSizeInBytes: 5 * 1024 * 1024 * 1024, // 5GB max
+                  onUploadProgress: (progress) => {
+                      console.log(`Upload progress: ${progress.percentage}%`);
+                      updateUploadProgress(progress.percentage);
+                      
+                      const uploadProgressText = document.getElementById('upload-progress-text');
+                      if (uploadProgressText) {
+                          const uploaded = formatFileSize(progress.loaded);
+                          const total = formatFileSize(progress.total);
+                          uploadProgressText.textContent = `Uploading: ${Math.round(progress.percentage)}% (${uploaded} of ${total})`;
+                      }
+                  }
+              });
+          } 
+          // Fall back to legacy uploader
+          else if (vercelBlobUpload && typeof vercelBlobUpload === 'function') {
+              console.log('Falling back to legacy Vercel Blob upload');
+              blob = await vercelBlobUpload(sanitizedFileName, file, {
+                  access: 'public',
+                  token: blobToken,
+                  handleUploadUrl: '/api/upload-file',
+                  multipart: file.size > 50 * 1024 * 1024,
+                  partSize: getOptimalChunkSize(file.size),
+                  maxConcurrency: getOptimalConcurrency(file.size),
+                  onUploadProgress: (progress) => {
+                      console.log(`Upload progress: ${progress}%`);
+                      updateUploadProgress(progress);
+                      
+                      const uploadProgressText = document.getElementById('upload-progress-text');
+                      if (uploadProgressText) {
+                          const total = formatFileSize(file.size);
+                          const uploaded = formatFileSize((progress / 100) * file.size);
+                          uploadProgressText.textContent = `Uploading: ${Math.round(progress)}% (${uploaded} of ${total})`;
+                      }
+                  },
+              });
+          } else {
+              throw new Error('No compatible Vercel Blob upload function available');
+          }
+  
+          // Show completion state
+          updateUploadProgress(100);
+          const uploadProgressText = document.getElementById('upload-progress-text');
+          if (uploadProgressText) {
+              uploadProgressText.textContent = 'Upload complete!';
+          }
+  
+          // Wait a moment to show completion
+          await new Promise(resolve => setTimeout(resolve, 1000));
+  
+          if (!blob.url) {
+              throw new Error('Invalid response from upload file endpoint: missing URL');
+          }
+  
+          console.log('File uploaded successfully. URL:', blob.url);
+          updateUIStatus("running", "File uploaded, starting conversion...");
+          return blob.url;
+  
+      } catch (error) {
+          console.error('Error uploading file:', error);
+          console.error('Error stack:', error.stack);
+          updateUIStatus("error", error.message || 'An unknown error occurred during file upload');
+          throw error;
+      }
+  }
 
 function getOptimalChunkSize(fileSize) {
         // For files over 1GB

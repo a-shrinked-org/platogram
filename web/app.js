@@ -1753,16 +1753,16 @@ async function onConvertClick(event) {
                 access: 'public',
                 token: blobToken,
                 handleUploadUrl: '/api/upload-file',
-                multipart: isLargeFile,
-                partSize: 20 * 1024 * 1024, // 20MB chunks
-                maxConcurrency: 4, // Increased concurrent uploads
+                multipart: file.size > 50 * 1024 * 1024, // Lower threshold to 50MB
+                partSize: getOptimalChunkSize(file.size), // Dynamic chunk size
+                maxConcurrency: getOptimalConcurrency(file.size), // Dynamic concurrency
+                addRandomSuffix: false, // Avoid extra processing
                 onUploadProgress: (progress) => {
                     console.log(`Actual upload progress: ${progress}%`);
                     if (progress === 100) {
                         clearInterval(uploadProgressInterval);
                         updateUploadProgress(100);
                     } else {
-                        // Update the simulated progress with actual progress
                         currentProgress = progress;
                     }
                 },
@@ -1804,6 +1804,33 @@ async function onConvertClick(event) {
             updateUIStatus("error", error.message || 'An unknown error occurred during file upload');
             throw error;
         }
+    }
+
+function getOptimalChunkSize(fileSize) {
+        // For files over 1GB
+        if (fileSize > 1024 * 1024 * 1024) {
+            return 50 * 1024 * 1024; // 50MB chunks
+        }
+        // For files over 100MB
+        if (fileSize > 100 * 1024 * 1024) {
+            return 25 * 1024 * 1024; // 25MB chunks
+        }
+        // For smaller files
+        return 10 * 1024 * 1024; // 10MB chunks
+    }
+    
+    // Helper function to determine optimal concurrency based on file size
+function getOptimalConcurrency(fileSize) {
+        // For files over 1GB
+        if (fileSize > 1024 * 1024 * 1024) {
+            return 6; // More concurrent uploads for very large files
+        }
+        // For files over 100MB
+        if (fileSize > 100 * 1024 * 1024) {
+            return 4; // Standard concurrency for large files
+        }
+        // For smaller files
+        return 2; // Less concurrency for smaller files
     }
 
 //function updateUploadProgress(progress) {

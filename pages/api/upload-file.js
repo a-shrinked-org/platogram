@@ -17,7 +17,8 @@ function getKey(header, callback) {
 export const config = {
   api: {
     bodyParser: false,
-    maxDuration: 300, // 5 minutes for large uploads
+    maxDuration: 600, // 10 minutes for very large uploads
+    responseLimit: false,
   },
 };
 
@@ -84,6 +85,7 @@ export default async function handler(req, res) {
             return {
               allowedContentTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'video/mp4', 'text/vtt', 'text/plain'],
               maximumSizeInBytes: 5 * 1024 * 1024 * 1024, // 5GB max
+              cacheControlMaxAge: 31536000, // 1 year cache
               tokenPayload: JSON.stringify({
                 userId: decoded.sub,
               }),

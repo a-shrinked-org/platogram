@@ -1118,7 +1118,6 @@ function formatFileSize(bytes) {
 
 function startSimulatedProgress() {
     currentProgress = 0;
-    let step = 1;
 
     // Clear any existing interval
     if (uploadProgressInterval) {
@@ -1134,31 +1133,41 @@ function startSimulatedProgress() {
             return;
         }
 
-        // Non-linear progress simulation
-        if (currentProgress < 70) {
-            step = 1;
-        } else if (currentProgress < 90) {
-            step = 0.2;
-        } else if (currentProgress < 95) {
-            step = 0.1;
+        // More realistic progress simulation
+        let increment;
+        if (currentProgress < 30) {
+            increment = 1;
+        } else if (currentProgress < 60) {
+            increment = 0.5;
+        } else if (currentProgress < 85) {
+            increment = 0.2;
         } else {
-            step = 0.05;
+            increment = 0.1;
         }
 
-        currentProgress += step;
+        currentProgress += increment;
 
-        // Ensure we don't exceed 99% (save 100% for actual completion)
-        if (currentProgress > 99) {
-            currentProgress = 99;
+        // Cap at 95% for simulation (real progress will override this)
+        if (currentProgress > 95) {
+            currentProgress = 95;
         }
 
-        const displayProgress = Math.min(Math.round(currentProgress), 99);
+        const displayProgress = Math.min(Math.round(currentProgress), 95);
         uploadProgressBar.style.width = `${displayProgress}%`;
         uploadProgressBar.style.transition = 'width 0.5s ease-in-out';
+        
+        // Change color based on progress
+        if (displayProgress < 30) {
+            uploadProgressBar.style.backgroundColor = '#60A5FA';
+        } else if (displayProgress < 70) {
+            uploadProgressBar.style.backgroundColor = '#3B82F6';
+        } else {
+            uploadProgressBar.style.backgroundColor = '#2563EB';
+        }
+
         uploadProgressText.textContent = `Uploading: ${displayProgress}%`;
     }, 100);
 }
-
 // Initialize IndexedDB
 function initDB() {
     return new Promise((resolve, reject) => {
@@ -1698,6 +1707,9 @@ async function onConvertClick(event) {
             updateUIStatus("uploading", "Uploading file...");
             updateUploadProgress(0);
     
+            // Start progress simulation immediately
+            startSimulatedProgress();
+    
             // Get the Auth0 token
             let token;
             try {
@@ -1735,40 +1747,43 @@ async function onConvertClick(event) {
                 throw new Error('Vercel Blob upload function not available');
             }
     
-            // Use multipart upload for large files (> 100MB)
-            const isLargeFile = file.size > 100 * 1024 * 1024;
-            
-            const blob = await vercelBlobUpload(sanitizedFileName, file, {
+            // Optimized upload settings
+            const isLargeFile = file.size > 100 * 1024 * 1024; // 100MB threshold
+            const optimizedSettings = {
                 access: 'public',
                 token: blobToken,
                 handleUploadUrl: '/api/upload-file',
-                multipart: isLargeFile, // Enable multipart for large files
-                maxConcurrency: 3, // Maximum concurrent chunk uploads
-                partSize: 10 * 1024 * 1024, // 10MB chunks for better performance
+                multipart: isLargeFile,
+                partSize: 20 * 1024 * 1024, // 20MB chunks
+                maxConcurrency: 4, // Increased concurrent uploads
                 onUploadProgress: (progress) => {
                     console.log(`Actual upload progress: ${progress}%`);
-                    updateUploadProgress(progress);
-                    
-                    // Update UI with more detailed progress
-                    const uploadProgressText = document.getElementById('upload-progress-text');
-                    if (uploadProgressText) {
-                        if (isLargeFile) {
-                            uploadProgressText.textContent = `Uploading large file (${formatFileSize(file.size)}): ${Math.round(progress)}%`;
-                        } else {
-                            uploadProgressText.textContent = `Uploading: ${Math.round(progress)}%`;
-                        }
+                    if (progress === 100) {
+                        clearInterval(uploadProgressInterval);
+                        updateUploadProgress(100);
+                    } else {
+                        // Update the simulated progress with actual progress
+                        currentProgress = progress;
                     }
                 },
-            });
+            };
     
-            // Handle upload completion
+            const blob = await vercelBlobUpload(sanitizedFileName, file, optimizedSettings);
+    
+            // Clear simulation and ensure 100% is shown
             clearInterval(uploadProgressInterval);
+            updateUploadProgress(100);
+    
+            // Show completion state
             const uploadProgressBar = document.getElementById('upload-progress-bar');
             const uploadProgressText = document.getElementById('upload-progress-text');
-            
             if (uploadProgressBar && uploadProgressText) {
                 uploadProgressBar.style.width = '100%';
                 uploadProgressText.textContent = 'Upload complete!';
+                
+                // Add completion animation
+                uploadProgressBar.style.backgroundColor = '#2563EB';
+                uploadProgressBar.style.transition = 'all 0.3s ease-in-out';
             }
     
             // Wait a moment to show completion

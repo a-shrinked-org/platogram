@@ -1050,19 +1050,22 @@ async function uploadLargeFile(file) {
   return fileId;
 }
 
+// Initialize progress bar with improved styling
 function initializeUploadProgressBar() {
     const uploadProgressBar = document.getElementById('upload-progress-bar');
+    const uploadProgressContainer = document.getElementById('upload-progress-container');
+    
     if (uploadProgressBar) {
-        uploadProgressBar.style.transition = 'width 0.5s ease-in-out';
-        // You can change these colors to match your theme
-        uploadProgressBar.style.backgroundColor = '#3B82F6'; // Blue color
+        uploadProgressBar.style.transition = 'width 0.3s ease-in-out';
+        uploadProgressBar.style.backgroundColor = '#60A5FA';
         uploadProgressBar.style.borderRadius = '0.5rem';
+        uploadProgressBar.style.width = '0%';
     }
 
-    const uploadProgressContainer = document.getElementById('upload-progress-container');
     if (uploadProgressContainer) {
-        uploadProgressContainer.style.backgroundColor = '#EFF6FF'; // Light blue background
+        uploadProgressContainer.style.backgroundColor = '#EFF6FF';
         uploadProgressContainer.style.borderRadius = '0.5rem';
+        uploadProgressContainer.style.overflow = 'hidden';
     }
 }
 
@@ -1111,25 +1114,6 @@ function formatFileSize(bytes) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-// Initialize progress bar with improved styling
-function initializeUploadProgressBar() {
-    const uploadProgressBar = document.getElementById('upload-progress-bar');
-    const uploadProgressContainer = document.getElementById('upload-progress-container');
-    
-    if (uploadProgressBar) {
-        uploadProgressBar.style.transition = 'width 0.3s ease-in-out';
-        uploadProgressBar.style.backgroundColor = '#60A5FA';
-        uploadProgressBar.style.borderRadius = '0.5rem';
-        uploadProgressBar.style.width = '0%';
-    }
-
-    if (uploadProgressContainer) {
-        uploadProgressContainer.style.backgroundColor = '#EFF6FF';
-        uploadProgressContainer.style.borderRadius = '0.5rem';
-        uploadProgressContainer.style.overflow = 'hidden';
-    }
 }
 
 function startSimulatedProgress() {

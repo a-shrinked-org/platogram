@@ -903,6 +903,8 @@
     import { put } from 'https://esm.sh/@vercel/blob/client';
     window.vercelBlobPut = put;
   </script>
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.js"></script>
+<script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/util.js"></script>
 <script type="module" src="./web/app.js"></script>
 <script>
     let testMode = false;
@@ -1041,7 +1043,5 @@
       window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
     </script>
     <script defer src="/_vercel/insights/script.js"></script>
-    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.js"></script>
-    <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/util.js"></script>
 </body>
 </html>

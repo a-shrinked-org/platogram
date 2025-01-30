@@ -1694,31 +1694,31 @@ async function extractAudioFromVideo(file) {
         console.log('Starting audio extraction from video:', file.name);
         updateUIStatus("processing", "Extracting audio from video...");
         
-        // Use the globally available FFmpeg
-        const ffmpeg = new FFmpeg.FFmpeg();
-        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+        // Use the globally available FFmpeg object
+        const ffmpeg = new ffmpeg.FFmpeg();
+        console.log('FFmpeg instance created');
+    
+        // Load FFmpeg
+        await ffmpeg.load();
+        console.log('FFmpeg loaded');
+    
+        // Write input file
+        const inputFileName = 'input' + file.name.substring(file.name.lastIndexOf('.'));
+        const outputFileName = 'output.mp3';
         
-        await ffmpeg.load({
-          coreURL: `${baseURL}/ffmpeg-core.js`,
-          wasmURL: `${baseURL}/ffmpeg-core.wasm`,
-          workerURL: `${baseURL}/ffmpeg-core.worker.js`
-        });
+        // Use the global FFmpegUtil for fetchFile
+        await ffmpeg.writeFile(inputFileName, await FFmpegUtil.fetchFile(file));
+        console.log('Input file written');
     
         // Set up progress handler
-        ffmpeg.on('progress', ({ progress }) => {
-          const percentage = Math.round(progress * 100);
+        ffmpeg.on('progress', ({ ratio }) => {
+          const percentage = Math.round(ratio * 100);
           console.log(`Extraction progress: ${percentage}%`);
           const uploadProgressText = document.getElementById('upload-progress-text');
           if (uploadProgressText) {
             uploadProgressText.textContent = `Extracting audio: ${percentage}%`;
           }
         });
-    
-        // Write input file using fetchFile utility
-        const inputFileName = 'input' + file.name.substring(file.name.lastIndexOf('.'));
-        const outputFileName = 'output.mp3';
-        
-        await ffmpeg.writeFile(inputFileName, await FFmpegUtil.fetchFile(file));
     
         // Run FFmpeg command
         await ffmpeg.exec([
@@ -1728,6 +1728,7 @@ async function extractAudioFromVideo(file) {
           '-q:a', '2',  // High quality (0-9, lower is better)
           outputFileName
         ]);
+        console.log('FFmpeg command executed');
     
         // Read the result
         const data = await ffmpeg.readFile(outputFileName);

@@ -1694,28 +1694,30 @@ async function extractAudioFromVideo(file) {
         console.log('Starting audio extraction from video:', file.name);
         updateUIStatus("processing", "Extracting audio from video...");
     
-        // Access FFmpeg utilities from global scope
-        const { createFFmpeg } = window.FFmpeg;
-        const { fetchFile } = window.FFmpegUtil;
+        // Access the FFmpeg utilities correctly
+        const createFFmpeg = window.FFmpeg.createFFmpeg;
+        const fetchFile = window.FFmpegUtil.fetchFile;
     
-        // Create FFmpeg instance with core configuration
+        // Initialize FFmpeg with proper core configuration
         const ffmpeg = createFFmpeg({
-          corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/ffmpeg-core.js',
+          corePath: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/ffmpeg-core.js',
           log: true
         });
     
         console.log('FFmpeg instance created');
     
         // Load FFmpeg
-        await ffmpeg.load();
+        if (!ffmpeg.isLoaded()) {
+          await ffmpeg.load();
+        }
         console.log('FFmpeg loaded');
     
         // File handling
         const inputFileName = 'input' + file.name.substring(file.name.lastIndexOf('.'));
         const outputFileName = 'output.mp3';
-        const fileData = await fetchFile(file);
-    
-        await ffmpeg.FS('writeFile', inputFileName, fileData);
+        
+        // Write input file
+        await ffmpeg.FS('writeFile', inputFileName, await fetchFile(file));
         console.log('Input file written');
     
         // Progress handler

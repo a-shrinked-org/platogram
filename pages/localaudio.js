@@ -13,18 +13,15 @@ const LocalAudioExtractor = () => {
   useEffect(() => {
     const loadFfmpeg = async () => {
       try {
-        // Import the correct package
+        // Import ffmpeg
         const { createFFmpeg } = await import('@ffmpeg/core-wasm');
         
-        // Create FFmpeg instance with logging and progress
+        // Create instance
         const ffmpegInstance = createFFmpeg({
           log: true,
-          progress: ({ ratio }) => {
-            setProgress(Math.round(ratio * 100));
-          },
+          corePath: 'https://unpkg.com/@ffmpeg/core-wasm@0.7.1/dist/ffmpeg-core.wasm'
         });
         
-        // Load FFmpeg
         await ffmpegInstance.load();
         setFfmpeg(ffmpegInstance);
       } catch (error) {
@@ -35,7 +32,7 @@ const LocalAudioExtractor = () => {
 
     loadFfmpeg();
   }, []);
-
+  
   const extractAudio = async (file) => {
     if (!ffmpeg) return;
 

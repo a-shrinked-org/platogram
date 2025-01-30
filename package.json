@@ -3,8 +3,7 @@
   "scripts": {
     "dev": "next",
     "build": "next build",
-    "start": "next start",
-    "postinstall": "mkdir -p public/ffmpeg && cp node_modules/@ffmpeg/core-wasm/dist/* public/ffmpeg/"
+    "start": "next start"
   },
   "dependencies": {
     "pg": "^8.7.1",

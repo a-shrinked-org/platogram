@@ -1694,36 +1694,38 @@ async function extractAudioFromVideo(file) {
         console.log('Starting audio extraction from video:', file.name);
         updateUIStatus("processing", "Extracting audio from video...");
         
-        // Log available global objects
-        console.log('Available globals:', {
-          FFmpeg: !!self.FFmpeg,
-          FFmpegUtil: !!self.FFmpegUtil,
-          hasFetchFile: !!(self.FFmpegUtil && self.FFmpegUtil.fetchFile)
-        });
-    
-        if (!self.FFmpeg) {
-          throw new Error('FFmpeg not loaded');
+        // Wait for FFmpeg to be available
+        let attempts = 0;
+        while (!window.FFmpeg && attempts < 20) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
         }
     
-        // Create new FFmpeg instance
-        const ffmpeg = new self.FFmpeg();
+        if (!window.FFmpeg) {
+          throw new Error('FFmpeg failed to load after 2 seconds');
+        }
+    
+        console.log('FFmpeg loaded:', !!window.FFmpeg);
+        
+        // Create FFmpeg instance
+        const ffmpeg = new window.FFmpeg();
         console.log('FFmpeg instance created');
     
-        // Load FFmpeg core
+        // Load FFmpeg without URLs since they're loaded via script tags
         await ffmpeg.load();
         console.log('FFmpeg loaded');
     
-        // Write input file
+        // Write input file using the global fetchFile utility
         const inputFileName = 'input' + file.name.substring(file.name.lastIndexOf('.'));
         const outputFileName = 'output.mp3';
         
-        // Create file data using fetchFile utility
-        const fileData = await self.FFmpegUtil.fetchFile(file);
-        await ffmpeg.writeFile(inputFileName, fileData);
+        // Use global FFmpegUtil
+        const fileData = await window.FFmpegUtil.fetchFile(file);
+        await ffmpeg.FS('writeFile', inputFileName, fileData);
         console.log('Input file written');
     
         // Set up progress handler
-        ffmpeg.on('progress', ({ ratio }) => {
+        ffmpeg.setProgress(({ ratio }) => {
           const percentage = Math.round(ratio * 100);
           console.log(`Extraction progress: ${percentage}%`);
           const uploadProgressText = document.getElementById('upload-progress-text');
@@ -1733,18 +1735,18 @@ async function extractAudioFromVideo(file) {
         });
     
         // Run FFmpeg command
-        await ffmpeg.exec([
+        await ffmpeg.run(
           '-i', inputFileName,
           '-vn',  // Remove video stream
           '-acodec', 'libmp3lame',  // Use MP3 codec
           '-q:a', '2',  // High quality (0-9, lower is better)
           outputFileName
-        ]);
+        );
         console.log('FFmpeg command executed');
     
         // Read the result
-        const data = await ffmpeg.readFile(outputFileName);
-        const audioBlob = new Blob([data], { type: 'audio/mp3' });
+        const data = ffmpeg.FS('readFile', outputFileName);
+        const audioBlob = new Blob([data.buffer], { type: 'audio/mp3' });
         const audioFile = new File(
           [audioBlob], 
           file.name.replace(/\.[^/.]+$/, '.mp3'), 
@@ -1752,8 +1754,8 @@ async function extractAudioFromVideo(file) {
         );
     
         // Clean up files
-        await ffmpeg.deleteFile(inputFileName);
-        await ffmpeg.deleteFile(outputFileName);
+        ffmpeg.FS('unlink', inputFileName);
+        ffmpeg.FS('unlink', outputFileName);
     
         console.log('Audio extraction complete:', audioFile.name, audioFile.size);
         return audioFile;

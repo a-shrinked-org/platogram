@@ -19,6 +19,8 @@ let isConversionComplete = false;
 let storedFileName = '';
 let uploadProgressInterval;
 let currentProgress = 0;
+let ffmpegInstance = null;
+let fetchFile = null;
 
 import('https://esm.sh/@vercel/blob@0.27.1').then(module => {
   console.log('Vercel Blob import:', module);
@@ -1690,74 +1692,85 @@ async function onConvertClick(event) {
     }
 
 async function extractAudioFromVideo(file) {
-      try {
-        console.log('Starting audio extraction from video:', file.name);
-        updateUIStatus("processing", "Extracting audio from video...");
+        try {
+            console.log('Starting audio extraction from video:', file.name);
+            updateUIStatus("processing", "Extracting audio from video...");
     
-        // Access the FFmpeg utilities correctly
-        const createFFmpeg = window.FFmpeg.createFFmpeg;
-        const fetchFile = window.FFmpegUtil.fetchFile;
+            // Load FFmpeg resources
+            if (!window.FFmpeg) {
+                await loadScript('https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/index.js');
+                await loadScript('https://unpkg.com/@ffmpeg/util@0.12.6/dist/umd/index.js');
+            }
     
-        // Initialize FFmpeg with proper core configuration
-        const ffmpeg = createFFmpeg({
-          corePath: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/ffmpeg-core.js',
-          log: true
-        });
+            const { FFmpeg } = window.FFmpeg;
+            const { fetchFile } = window.FFmpegUtil;
     
-        console.log('FFmpeg instance created');
+            const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+            const ffmpeg = new FFmpeg();
+            
+            // Load FFmpeg with explicit core paths
+            await ffmpeg.load({
+                coreURL: `${baseURL}/ffmpeg-core.js`,
+                wasmURL: `${baseURL}/ffmpeg-core.wasm`,
+                workerURL: `${baseURL}/ffmpeg-core.worker.js`
+            });
     
-        // Load FFmpeg
-        if (!ffmpeg.isLoaded()) {
-          await ffmpeg.load();
+            console.log('FFmpeg loaded successfully');
+    
+            // File handling
+            const inputFileName = `input${file.name.substring(file.name.lastIndexOf('.'))}`;
+            const outputFileName = 'output.mp3';
+    
+            // Write input file
+            await ffmpeg.writeFile(inputFileName, await fetchFile(file));
+    
+            // Progress handler
+            ffmpeg.on('progress', ({ progress }) => {
+                const percentage = Math.round(progress * 100);
+                console.log(`Extraction progress: ${percentage}%`);
+                const uploadProgressText = document.getElementById('upload-progress-text');
+                if (uploadProgressText) {
+                    uploadProgressText.textContent = `Extracting audio: ${percentage}%`;
+                }
+            });
+    
+            // Execute FFmpeg command
+            await ffmpeg.exec([
+                '-i', inputFileName,
+                '-vn',
+                '-acodec', 'libmp3lame',
+                '-q:a', '2',
+                outputFileName
+            ]);
+    
+            // Read output
+            const data = await ffmpeg.readFile(outputFileName);
+            const audioBlob = new Blob([data], { type: 'audio/mp3' });
+    
+            // Cleanup
+            await ffmpeg.deleteFile(inputFileName);
+            await ffmpeg.deleteFile(outputFileName);
+    
+            console.log('Audio extraction complete');
+            return new File([audioBlob], file.name.replace(/\.[^.]+$/, '.mp3'), {
+                type: 'audio/mp3'
+            });
+    
+        } catch (error) {
+            console.error('Error extracting audio:', error);
+            throw new Error('Failed to extract audio from video: ' + error.message);
         }
-        console.log('FFmpeg loaded');
+    }
     
-        // File handling
-        const inputFileName = 'input' + file.name.substring(file.name.lastIndexOf('.'));
-        const outputFileName = 'output.mp3';
-        
-        // Write input file
-        await ffmpeg.FS('writeFile', inputFileName, await fetchFile(file));
-        console.log('Input file written');
-    
-        // Progress handler
-        ffmpeg.setProgress(({ ratio }) => {
-          const percentage = Math.round(ratio * 100);
-          console.log(`Extraction progress: ${percentage}%`);
-          const uploadProgressText = document.getElementById('upload-progress-text');
-          if (uploadProgressText) {
-            uploadProgressText.textContent = `Extracting audio: ${percentage}%`;
-          }
+    // Helper function to load scripts
+    function loadScript(src) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
         });
-    
-        // Execute FFmpeg command
-        await ffmpeg.run(
-          '-i', inputFileName,
-          '-vn',
-          '-acodec', 'libmp3lame',
-          '-q:a', '2',
-          outputFileName
-        );
-    
-        // Read output
-        const data = ffmpeg.FS('readFile', outputFileName);
-        const audioBlob = new Blob([data.buffer], { type: 'audio/mp3' });
-        const audioFile = new File(
-          [audioBlob],
-          file.name.replace(/\.[^/.]+$/, '.mp3'),
-          { type: 'audio/mp3' }
-        );
-    
-        // Cleanup
-        ffmpeg.FS('unlink', inputFileName);
-        ffmpeg.FS('unlink', outputFileName);
-    
-        console.log('Audio extraction complete:', audioFile.name, audioFile.size);
-        return audioFile;
-      } catch (error) {
-        console.error('Error extracting audio:', error);
-        throw new Error('Failed to extract audio from video: ' + error.message);
-      }
     }
     
     async function uploadFile(file) {

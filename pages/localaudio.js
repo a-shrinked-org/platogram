@@ -1,30 +1,42 @@
-import React, { useState } from 'react';
-import { AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+// pages/localaudio.js
+import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 
+// Disable SSR for this component since we need browser APIs
 const LocalAudioExtractor = () => {
   const [status, setStatus] = useState('');
   const [progress, setProgress] = useState(0);
   const [audioUrl, setAudioUrl] = useState('');
   const [startTime, setStartTime] = useState('');
   const [duration, setDuration] = useState('');
+  const [ffmpeg, setFfmpeg] = useState(null);
 
-  const loadFFmpeg = async () => {
-    const { createFFmpeg } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/esm/index.js');
-    return createFFmpeg({ 
-      log: true,
-      progress: ({ ratio }) => {
-        setProgress(Math.round(ratio * 100));
-      },
-    });
-  };
+  useEffect(() => {
+    // Dynamic import ffmpeg only on client side
+    const loadFfmpeg = async () => {
+      try {
+        const FFmpeg = (await import('@ffmpeg/ffmpeg')).createFFmpeg;
+        const ffmpegInstance = FFmpeg({ 
+          log: true,
+          progress: ({ ratio }) => {
+            setProgress(Math.round(ratio * 100));
+          },
+        });
+        await ffmpegInstance.load();
+        setFfmpeg(ffmpegInstance);
+      } catch (error) {
+        console.error('Error loading FFmpeg:', error);
+        setStatus('error');
+      }
+    };
+
+    loadFfmpeg();
+  }, []);
 
   const extractAudio = async (file) => {
+    if (!ffmpeg) return;
+
     try {
-      setStatus('loading');
-      const ffmpeg = await loadFFmpeg();
-      await ffmpeg.load();
-      
       setStatus('processing');
       setProgress(0);
 
@@ -78,6 +90,14 @@ const LocalAudioExtractor = () => {
     document.body.removeChild(a);
   };
 
+  if (!ffmpeg) return (
+    <div className="p-4 max-w-xl mx-auto">
+      <div className="p-4 bg-blue-50 text-blue-700 rounded-md">
+        Loading FFmpeg...
+      </div>
+    </div>
+  );
+
   return (
     <div className="p-4 max-w-xl mx-auto">
       <h2 className="text-2xl font-bold mb-4">Local Audio Extractor</h2>
@@ -122,40 +142,23 @@ const LocalAudioExtractor = () => {
         />
       </div>
 
-      {(status === 'loading' || status === 'processing') && (
-        <Alert className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>
-            {status === 'loading' ? 'Loading FFmpeg' : 'Processing'}
-          </AlertTitle>
-          <AlertDescription>
-            {status === 'loading' 
-              ? 'Please wait while FFmpeg loads...'
-              : `Converting... ${progress}%`
-            }
-          </AlertDescription>
-        </Alert>
+      {status === 'processing' && (
+        <div className="p-4 mb-4 bg-blue-50 text-blue-700 rounded-md">
+          Converting... {progress}%
+        </div>
       )}
       
       {status === 'error' && (
-        <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error</AlertTitle>
-          <AlertDescription>
-            Failed to extract audio. Please try again.
-          </AlertDescription>
-        </Alert>
+        <div className="p-4 mb-4 bg-red-50 text-red-700 rounded-md">
+          Failed to extract audio. Please try again.
+        </div>
       )}
       
       {status === 'complete' && (
         <div className="space-y-4">
-          <Alert variant="default" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Success</AlertTitle>
-            <AlertDescription>
-              Audio extracted successfully!
-            </AlertDescription>
-          </Alert>
+          <div className="p-4 mb-4 bg-green-50 text-green-700 rounded-md">
+            Audio extracted successfully!
+          </div>
           
           <audio controls src={audioUrl} className="w-full" />
           
@@ -171,4 +174,7 @@ const LocalAudioExtractor = () => {
   );
 };
 
-export default LocalAudioExtractor;
+// Prevent SSR for this component
+export default dynamic(() => Promise.resolve(LocalAudioExtractor), {
+  ssr: false
+});

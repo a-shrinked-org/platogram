@@ -1694,11 +1694,22 @@ async function extractAudioFromVideo(file) {
         console.log('Starting audio extraction from video:', file.name);
         updateUIStatus("processing", "Extracting audio from video...");
         
-        // Use the globally available FFmpeg object
-        const ffmpeg = new ffmpeg.FFmpeg();
+        // Log available global objects
+        console.log('Available globals:', {
+          FFmpeg: !!self.FFmpeg,
+          FFmpegUtil: !!self.FFmpegUtil,
+          hasFetchFile: !!(self.FFmpegUtil && self.FFmpegUtil.fetchFile)
+        });
+    
+        if (!self.FFmpeg) {
+          throw new Error('FFmpeg not loaded');
+        }
+    
+        // Create new FFmpeg instance
+        const ffmpeg = new self.FFmpeg();
         console.log('FFmpeg instance created');
     
-        // Load FFmpeg
+        // Load FFmpeg core
         await ffmpeg.load();
         console.log('FFmpeg loaded');
     
@@ -1706,8 +1717,9 @@ async function extractAudioFromVideo(file) {
         const inputFileName = 'input' + file.name.substring(file.name.lastIndexOf('.'));
         const outputFileName = 'output.mp3';
         
-        // Use the global FFmpegUtil for fetchFile
-        await ffmpeg.writeFile(inputFileName, await FFmpegUtil.fetchFile(file));
+        // Create file data using fetchFile utility
+        const fileData = await self.FFmpegUtil.fetchFile(file);
+        await ffmpeg.writeFile(inputFileName, fileData);
         console.log('Input file written');
     
         // Set up progress handler
@@ -1724,7 +1736,7 @@ async function extractAudioFromVideo(file) {
         await ffmpeg.exec([
           '-i', inputFileName,
           '-vn',  // Remove video stream
-          '-acodec', 'libmp3lame',
+          '-acodec', 'libmp3lame',  // Use MP3 codec
           '-q:a', '2',  // High quality (0-9, lower is better)
           outputFileName
         ]);

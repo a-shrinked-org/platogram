@@ -1703,9 +1703,8 @@ async function extractAudioFromVideo(file) {
             const ffmpeg = new FFmpeg();
             
             await ffmpeg.load({
-                coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.15/dist/umd/ffmpeg-core.js',
-                wasmURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.15/dist/umd/ffmpeg-core.wasm',
-                workerURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.15/dist/umd/ffmpeg-core.worker.js'
+                coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
+                wasmURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm'
             });
     
             // File handling

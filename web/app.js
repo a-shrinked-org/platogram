@@ -1694,13 +1694,9 @@ async function extractAudioFromVideo(file) {
         console.log('Starting audio extraction from video:', file.name);
         updateUIStatus("processing", "Extracting audio from video...");
         
-        // Import both FFmpeg and util
-        const { FFmpeg } = await import('@ffmpeg/ffmpeg');
-        const { fetchFile } = await import('@ffmpeg/util');
-        
-        // Initialize FFmpeg with CDN URLs
+        // Use the globally available FFmpeg
+        const ffmpeg = new FFmpeg.FFmpeg();
         const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-        const ffmpeg = new FFmpeg();
         
         await ffmpeg.load({
           coreURL: `${baseURL}/ffmpeg-core.js`,
@@ -1722,7 +1718,7 @@ async function extractAudioFromVideo(file) {
         const inputFileName = 'input' + file.name.substring(file.name.lastIndexOf('.'));
         const outputFileName = 'output.mp3';
         
-        await ffmpeg.writeFile(inputFileName, await fetchFile(file));
+        await ffmpeg.writeFile(inputFileName, await FFmpegUtil.fetchFile(file));
     
         // Run FFmpeg command
         await ffmpeg.exec([
@@ -1759,12 +1755,12 @@ async function extractAudioFromVideo(file) {
       console.log('File details:', file.name, file.type, file.size);
       
       try {
-        // Extract audio if it's a video file
-        if (file.type.startsWith('video/')) {
-          console.log('Video file detected, extracting audio first');
-          file = await extractAudioFromVideo(file);
-          console.log('Using extracted audio file:', file.name, file.size);
-        }
+      // Extract audio if it's a video file
+      if (file.type.startsWith('video/')) {
+        console.log('Video file detected, extracting audio first');
+        file = await extractAudioFromVideo(file);
+        console.log('Using extracted audio file:', file.name, file.size);
+      }
     
         const sanitizedFileName = sanitizeFileName(file.name);
         console.log('Sanitized file name:', sanitizedFileName);

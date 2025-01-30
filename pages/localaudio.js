@@ -13,19 +13,19 @@ const LocalAudioExtractor = () => {
   useEffect(() => {
     const loadFfmpeg = async () => {
       try {
-        // Updated import syntax
-        const { FFmpeg } = await import('@ffmpeg/ffmpeg');
-        const { toBlobURL } = await import('@ffmpeg/util');
+        // Import the correct package
+        const { createFFmpeg } = await import('@ffmpeg/core-wasm');
         
-        // Create FFmpeg instance
-        const ffmpegInstance = new FFmpeg();
-        
-        // Load FFmpeg core
-        await ffmpegInstance.load({
-          coreURL: await toBlobURL(`/ffmpeg-core.wasm`, 'text/wasm'),
-          wasmURL: await toBlobURL(`/ffmpeg.wasm`, 'text/wasm')
+        // Create FFmpeg instance with logging and progress
+        const ffmpegInstance = createFFmpeg({
+          log: true,
+          progress: ({ ratio }) => {
+            setProgress(Math.round(ratio * 100));
+          },
         });
         
+        // Load FFmpeg
+        await ffmpegInstance.load();
         setFfmpeg(ffmpegInstance);
       } catch (error) {
         console.error('Error loading FFmpeg:', error);
@@ -43,17 +43,11 @@ const LocalAudioExtractor = () => {
       setStatus('processing');
       setProgress(0);
 
-      // Updated file system operations for newer FFmpeg version
+      // Write input file
       const inputFileName = 'input' + file.name.substring(file.name.lastIndexOf('.'));
       const outputFileName = 'output.mp3';
       
-      // Write input file
-      await ffmpeg.writeFile(inputFileName, new Uint8Array(await file.arrayBuffer()));
-
-      // Set up progress handler
-      ffmpeg.on('progress', ({ progress }) => {
-        setProgress(Math.round(progress * 100));
-      });
+      ffmpeg.FS('writeFile', inputFileName, new Uint8Array(await file.arrayBuffer()));
 
       // Prepare FFmpeg command
       const ffmpegArgs = [
@@ -67,15 +61,15 @@ const LocalAudioExtractor = () => {
       ];
 
       // Run FFmpeg command
-      await ffmpeg.exec(ffmpegArgs);
+      await ffmpeg.run(...ffmpegArgs);
 
       // Read the result
-      const data = await ffmpeg.readFile(outputFileName);
-      const blob = new Blob([data], { type: 'audio/mp3' });
+      const data = ffmpeg.FS('readFile', outputFileName);
+      const blob = new Blob([data.buffer], { type: 'audio/mp3' });
       
-      // Clean up files
-      await ffmpeg.deleteFile(inputFileName);
-      await ffmpeg.deleteFile(outputFileName);
+      // Clean up
+      ffmpeg.FS('unlink', inputFileName);
+      ffmpeg.FS('unlink', outputFileName);
 
       setAudioUrl(URL.createObjectURL(blob));
       setStatus('complete');

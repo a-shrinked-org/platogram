@@ -35,6 +35,12 @@ const nextConfig = {
       },
     ];
   },
+  // Add this section to handle WASM files
+  experimental: {
+    outputFileTracingIncludes: {
+      '/**': ['node_modules/@ffmpeg/core/dist/*']
+    }
+  },
   async rewrites() {
     return [
       {

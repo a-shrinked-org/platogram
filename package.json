@@ -27,7 +27,8 @@
     "ytdl-core": "^4.11.5",
     "yt-dlp-wrap": "^2.3.12",
     "node-fetch": "^2.7.0",
-    "@ffmpeg/ffmpeg": "^0.12.15"
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2"
   },
   "devDependencies": {
     "@types/node": "^18.0.2",

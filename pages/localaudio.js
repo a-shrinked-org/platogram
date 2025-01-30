@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 
-// Disable SSR for this component since we need browser APIs
 const LocalAudioExtractor = () => {
   const [status, setStatus] = useState('');
   const [progress, setProgress] = useState(0);
@@ -12,17 +11,21 @@ const LocalAudioExtractor = () => {
   const [ffmpeg, setFfmpeg] = useState(null);
 
   useEffect(() => {
-    // Dynamic import ffmpeg only on client side
     const loadFfmpeg = async () => {
       try {
-        const FFmpeg = (await import('@ffmpeg/ffmpeg')).createFFmpeg;
-        const ffmpegInstance = FFmpeg({ 
-          log: true,
-          progress: ({ ratio }) => {
-            setProgress(Math.round(ratio * 100));
-          },
+        // Updated import syntax
+        const { FFmpeg } = await import('@ffmpeg/ffmpeg');
+        const { toBlobURL } = await import('@ffmpeg/util');
+        
+        // Create FFmpeg instance
+        const ffmpegInstance = new FFmpeg();
+        
+        // Load FFmpeg core
+        await ffmpegInstance.load({
+          coreURL: await toBlobURL(`/ffmpeg-core.wasm`, 'text/wasm'),
+          wasmURL: await toBlobURL(`/ffmpeg.wasm`, 'text/wasm')
         });
-        await ffmpegInstance.load();
+        
         setFfmpeg(ffmpegInstance);
       } catch (error) {
         console.error('Error loading FFmpeg:', error);
@@ -40,12 +43,19 @@ const LocalAudioExtractor = () => {
       setStatus('processing');
       setProgress(0);
 
-      // Write the input file to FFmpeg's virtual filesystem
+      // Updated file system operations for newer FFmpeg version
       const inputFileName = 'input' + file.name.substring(file.name.lastIndexOf('.'));
-      ffmpeg.FS('writeFile', inputFileName, new Uint8Array(await file.arrayBuffer()));
+      const outputFileName = 'output.mp3';
+      
+      // Write input file
+      await ffmpeg.writeFile(inputFileName, new Uint8Array(await file.arrayBuffer()));
+
+      // Set up progress handler
+      ffmpeg.on('progress', ({ progress }) => {
+        setProgress(Math.round(progress * 100));
+      });
 
       // Prepare FFmpeg command
-      const outputFileName = 'output.mp3';
       const ffmpegArgs = [
         '-i', inputFileName,
         ...(startTime ? ['-ss', startTime] : []),
@@ -57,15 +67,15 @@ const LocalAudioExtractor = () => {
       ];
 
       // Run FFmpeg command
-      await ffmpeg.run(...ffmpegArgs);
+      await ffmpeg.exec(ffmpegArgs);
 
       // Read the result
-      const data = ffmpeg.FS('readFile', outputFileName);
-      const blob = new Blob([data.buffer], { type: 'audio/mp3' });
+      const data = await ffmpeg.readFile(outputFileName);
+      const blob = new Blob([data], { type: 'audio/mp3' });
       
-      // Clean up files from virtual filesystem
-      ffmpeg.FS('unlink', inputFileName);
-      ffmpeg.FS('unlink', outputFileName);
+      // Clean up files
+      await ffmpeg.deleteFile(inputFileName);
+      await ffmpeg.deleteFile(outputFileName);
 
       setAudioUrl(URL.createObjectURL(blob));
       setStatus('complete');

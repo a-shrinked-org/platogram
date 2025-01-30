@@ -16,8 +16,15 @@ const LocalAudioExtractor = () => {
         const { FFmpeg } = await import('@ffmpeg/ffmpeg');
         const { fetchFile } = await import('@ffmpeg/util');
         
+        // Initialize FFmpeg with specific CDN URLs
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+        
         const ffmpegInstance = new FFmpeg();
-        await ffmpegInstance.load();
+        await ffmpegInstance.load({
+          coreURL: `${baseURL}/ffmpeg-core.js`,
+          wasmURL: `${baseURL}/ffmpeg-core.wasm`,
+          workerURL: `${baseURL}/ffmpeg-core.worker.js`
+        });
         
         // Store both FFmpeg instance and fetchFile utility
         setFfmpeg({ instance: ffmpegInstance, fetchFile });

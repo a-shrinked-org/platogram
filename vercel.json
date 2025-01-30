@@ -32,5 +32,24 @@
       "dest": "/web/robots.txt"
     }
   ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cross-Origin-Embedder-Policy",
+          "value": "require-corp"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Cross-Origin-Resource-Policy",
+          "value": "cross-origin"
+        }
+      ]
+    }
+  ],
   "buildCommand": "apt-get update && apt-get install -y texlive-xetex && pip install -r requirements.txt && pip install -e . && npm install && npm run build"
 }

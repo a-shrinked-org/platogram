@@ -1698,8 +1698,8 @@ async function extractAudioFromVideo(file) {
     
             // Load FFmpeg resources
             if (!window.FFmpeg) {
-                await loadScript('https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/umd/index.js');
-                await loadScript('https://unpkg.com/@ffmpeg/util@0.12.6/dist/umd/index.js');
+                await loadScript('https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/umd/index.min.js');
+                await loadScript('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.min.js');
             }
     
             const { FFmpeg } = window.FFmpeg;

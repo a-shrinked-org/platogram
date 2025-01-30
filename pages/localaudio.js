@@ -13,17 +13,14 @@ const LocalAudioExtractor = () => {
   useEffect(() => {
     const loadFfmpeg = async () => {
       try {
-        // Import ffmpeg
-        const { createFFmpeg } = await import('@ffmpeg/core-wasm');
+        const { FFmpeg } = await import('@ffmpeg/ffmpeg');
+        const { fetchFile } = await import('@ffmpeg/util');
         
-        // Create instance
-        const ffmpegInstance = createFFmpeg({
-          log: true,
-          corePath: 'https://unpkg.com/@ffmpeg/core-wasm@0.7.1/dist/ffmpeg-core.wasm'
-        });
-        
+        const ffmpegInstance = new FFmpeg();
         await ffmpegInstance.load();
-        setFfmpeg(ffmpegInstance);
+        
+        // Store both FFmpeg instance and fetchFile utility
+        setFfmpeg({ instance: ffmpegInstance, fetchFile });
       } catch (error) {
         console.error('Error loading FFmpeg:', error);
         setStatus('error');
@@ -32,19 +29,26 @@ const LocalAudioExtractor = () => {
 
     loadFfmpeg();
   }, []);
-  
+
   const extractAudio = async (file) => {
-    if (!ffmpeg) return;
+    if (!ffmpeg?.instance) return;
 
     try {
       setStatus('processing');
       setProgress(0);
 
+      const { instance: ffmpegInstance, fetchFile } = ffmpeg;
+
       // Write input file
       const inputFileName = 'input' + file.name.substring(file.name.lastIndexOf('.'));
       const outputFileName = 'output.mp3';
       
-      ffmpeg.FS('writeFile', inputFileName, new Uint8Array(await file.arrayBuffer()));
+      await ffmpegInstance.writeFile(inputFileName, await fetchFile(file));
+
+      // Set up progress handler
+      ffmpegInstance.on('progress', ({ progress }) => {
+        setProgress(Math.round(progress * 100));
+      });
 
       // Prepare FFmpeg command
       const ffmpegArgs = [
@@ -58,15 +62,15 @@ const LocalAudioExtractor = () => {
       ];
 
       // Run FFmpeg command
-      await ffmpeg.run(...ffmpegArgs);
+      await ffmpegInstance.exec(ffmpegArgs);
 
       // Read the result
-      const data = ffmpeg.FS('readFile', outputFileName);
-      const blob = new Blob([data.buffer], { type: 'audio/mp3' });
+      const data = await ffmpegInstance.readFile(outputFileName);
+      const blob = new Blob([data], { type: 'audio/mp3' });
       
-      // Clean up
-      ffmpeg.FS('unlink', inputFileName);
-      ffmpeg.FS('unlink', outputFileName);
+      // Clean up files
+      await ffmpegInstance.deleteFile(inputFileName);
+      await ffmpegInstance.deleteFile(outputFileName);
 
       setAudioUrl(URL.createObjectURL(blob));
       setStatus('complete');
@@ -91,7 +95,7 @@ const LocalAudioExtractor = () => {
     document.body.removeChild(a);
   };
 
-  if (!ffmpeg) return (
+  if (!ffmpeg?.instance) return (
     <div className="p-4 max-w-xl mx-auto">
       <div className="p-4 bg-blue-50 text-blue-700 rounded-md">
         Loading FFmpeg...

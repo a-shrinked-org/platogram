@@ -14,6 +14,9 @@ const nextConfig = {
       ...config.resolve.fallback,
       fs: false,
       path: false,
+      crypto: false,
+      os: false,
+      perf_hooks: false
     };
     
     return config;
@@ -34,12 +37,6 @@ const nextConfig = {
         ],
       },
     ];
-  },
-  // Add this section to handle WASM files
-  experimental: {
-    outputFileTracingIncludes: {
-      '/**': ['node_modules/@ffmpeg/core/dist/*']
-    }
   },
   async rewrites() {
     return [

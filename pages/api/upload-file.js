@@ -1,3 +1,4 @@
+// api/upload-file.js
 import { handleUpload } from '@vercel/blob/client';
 import jwt from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
@@ -16,6 +17,8 @@ function getKey(header, callback) {
 export const config = {
   api: {
     bodyParser: false,
+    maxDuration: 600, // 10 minutes for very large uploads
+    responseLimit: false,
   },
 };
 
@@ -42,6 +45,16 @@ async function verifyToken(token) {
 export default async function handler(req, res) {
   debugLog('Request method:', req.method);
   debugLog('Request headers:', req.headers);
+  
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  // Handle preflight request
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
 
   if (req.method === 'POST') {
     try {
@@ -72,8 +85,8 @@ export default async function handler(req, res) {
         debugLog('Returning Blob token for client-side upload');
         return res.status(200).json({ token: process.env.BLOB_READ_WRITE_TOKEN });
       } else {
-        // Handle server-side upload (keeping existing functionality)
-        debugLog('Initiating handleUpload');
+        // Handle server-side upload with multipart support
+        debugLog('Initiating handleUpload with multipart support');
         const response = await handleUpload({
           body: req,
           request: req,
@@ -81,6 +94,8 @@ export default async function handler(req, res) {
             debugLog('onBeforeGenerateToken called');
             return {
               allowedContentTypes: ['audio/mpeg', 'audio/wav', 'audio/ogg', 'video/mp4', 'text/vtt', 'text/plain'],
+              maximumSizeInBytes: 5 * 1024 * 1024 * 1024, // 5GB max
+              cacheControlMaxAge: 31536000, // 1 year cache
               tokenPayload: JSON.stringify({
                 userId: decoded.sub,
               }),
@@ -98,6 +113,7 @@ export default async function handler(req, res) {
             }
           },
         });
+        
         debugLog('Upload successful, sending response');
         return res.status(200).json(response);
       }

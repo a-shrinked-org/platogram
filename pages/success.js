@@ -5,27 +5,31 @@ import Head from 'next/head';
 export default function Success() {
     const [status, setStatus] = useState('Processing payment...');
     const router = useRouter();
+    const domain = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
 
     useEffect(() => {
         const { session_id } = router.query;
         if (session_id) {
             setStatus('Payment successful! Redirecting...');
-
-            // Store the session_id in localStorage
-            localStorage.setItem('successfulPayment', JSON.stringify({ session_id }));
-            console.log('Stored successfulPayment in localStorage:', { session_id });
-
+            // Retrieve the existing pendingConversionData
+            const pendingConversionData = localStorage.getItem('pendingConversionData');
+            // Store both the session_id and pendingConversionData
+            localStorage.setItem('successfulPayment', JSON.stringify({
+                session_id,
+                pendingConversionData
+            }));
+            console.log('Stored successfulPayment in localStorage:', { session_id, pendingConversionData });
             // Redirect to the main page without a success parameter
             setTimeout(() => {
-                window.location.href = '/';
+                window.location.href = domain;
             }, 3000);  // Redirect after 3 seconds
         } else {
             setStatus('Error: Invalid session');
             setTimeout(() => {
-                window.location.href = '/?error=invalid_session';
+                window.location.href = `${domain}?error=invalid_session`;
             }, 5000);
         }
-    }, [router.query]);
+    }, [router.query, domain]);
 
     return (
         <>

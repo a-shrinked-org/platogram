@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 export default function YouTubeProcessor() {
@@ -6,41 +6,102 @@ export default function YouTubeProcessor() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [jobId, setJobId] = useState(null);
+  const [debugLog, setDebugLog] = useState([]);
+  const [progress, setProgress] = useState(0);
+  const pollInterval = useRef();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
-    setResult(null);
-    setIsLoading(true);
+    const addDebugLog = (message) => {
+      setDebugLog(prevLog => [...prevLog, `${new Date().toISOString()}: ${message}`]);
+      console.log(message);
+    };
 
-    try {
-      const response = await axios.post('/api/process-youtube', { youtubeUrl });
-      setResult(response.data);
-    } catch (err) {
-      setError(`An error occurred while processing the YouTube URL: ${err.response?.data?.details || err.message}`);
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    useEffect(() => {
+      return () => {
+        if (pollInterval.current) {
+          clearInterval(pollInterval.current);
+        }
+      };
+    }, []);
 
-  const handleDownload = (jsonData) => {
-    try {
-      const parsedData = JSON.parse(jsonData);
-      if (parsedData.audio_url) {
-        const downloadUrl = `/api/download-audio?url=${encodeURIComponent(parsedData.audio_url)}&title=${encodeURIComponent(parsedData.title || 'audio')}`;
-        window.location.href = downloadUrl;
-      } else {
-        setError('No audio URL found in the response');
+    const checkStatus = async (id) => {
+      try {
+        const response = await axios.get(`/api/process-youtube?jobId=${id}`);
+        addDebugLog(`Received status response: ${JSON.stringify(response.data)}`);
+
+        if (response.data.status === 'finished') {
+          clearInterval(pollInterval.current);
+          setIsLoading(false);
+          // Handle nested structure
+          const downloadUrl = response.data.result?.data?.url;
+          addDebugLog(`Processing completed. Result URL: ${downloadUrl}`);
+          if (downloadUrl) {
+            setResult({ url: downloadUrl }); // Store just the URL
+          } else {
+            addDebugLog('Processing completed but no result URL found');
+            setError('No download URL available');
+          }
+        } else if (response.data.status === 'failed') {
+          clearInterval(pollInterval.current);
+          setIsLoading(false);
+          setError('Processing failed');
+          addDebugLog('Processing failed');
+        } else {
+          setProgress(response.data.progress || 0);
+          addDebugLog(`Processing status: ${response.data.status}`);
+        }
+      } catch (error) {
+        clearInterval(pollInterval.current);
+        setIsLoading(false);
+        setError('Failed to check status');
+        addDebugLog(`Error checking status: ${error.message}`);
       }
-    } catch (err) {
-      setError(`Error parsing JSON data: ${err.message}`);
-    }
-  };
+    };
 
-  return (
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      setError(null);
+      setResult(null);
+      setIsLoading(true);
+      setProgress(0);
+      setDebugLog([]);
+      addDebugLog('Submitting YouTube URL');
+
+      try {
+        const response = await axios.post('/api/process-youtube', { youtubeUrl });
+        setJobId(response.data.jobId);
+        addDebugLog(`Job submitted with ID: ${response.data.jobId}`);
+
+        // Start polling for status
+        if (pollInterval.current) {
+          clearInterval(pollInterval.current);
+        }
+
+        pollInterval.current = setInterval(() => {
+          checkStatus(response.data.jobId);
+        }, 2000);
+
+      } catch (err) {
+        setError(`Failed to submit job: ${err.message}`);
+        addDebugLog(`Error: ${err.message}`);
+        setIsLoading(false);
+      }
+    };
+
+    const handleDownload = (url) => {
+      if (url) {
+        addDebugLog(`Initiating download from URL: ${url}`);
+        window.open(url, '_blank');
+      } else {
+        setError('Download URL not available');
+        addDebugLog('Error: Download URL not available');
+      }
+    };
+
+    return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">YouTube Audio Extractor</h1>
+
       <form onSubmit={handleSubmit} className="mb-4">
         <input
           type="text"
@@ -52,32 +113,57 @@ export default function YouTubeProcessor() {
         />
         <button
           type="submit"
-          className="mt-2 px-4 py-2 bg-blue-500 text-white rounded"
+          className="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           disabled={isLoading}
         >
           {isLoading ? 'Processing...' : 'Process'}
         </button>
       </form>
-      {error && <p className="text-red-500">{error}</p>}
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+          <p>{error}</p>
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="mt-4">
+          <p>Processing: {progress}%</p>
+          <div className="w-full bg-gray-200 rounded">
+            <div
+              className="bg-blue-600 rounded h-2 transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+        </div>
+      )}
+
+      {result?.url && (
+        <div className="mt-4">
+          <p className="mb-2">Processing completed!</p>
+          <button
+            onClick={() => handleDownload(result.url)}
+            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+          >
+            Download Audio
+          </button>
+        </div>
+      )}
+
+      <div className="mt-4">
+        <h3 className="text-lg font-semibold mb-2">Debug Log:</h3>
+        <pre className="bg-gray-100 p-4 rounded overflow-x-auto h-40 overflow-y-auto">
+          {debugLog.join('\n')}
+        </pre>
+      </div>
+
+      {/* Debug result object */}
       {result && (
-        <div>
-          <h2 className="text-xl font-semibold mb-2">Result:</h2>
+        <div className="mt-4">
+          <h3 className="text-lg font-semibold mb-2">Debug Result:</h3>
           <pre className="bg-gray-100 p-4 rounded overflow-x-auto">
             {JSON.stringify(result, null, 2)}
           </pre>
-          {result.map((output, index) => (
-            <div key={index}>
-              <h3 className="text-lg font-semibold mt-4 mb-2">{output.name || `Output ${index + 1}`}</h3>
-              {output.data && (
-                <button
-                  onClick={() => handleDownload(output.data)}
-                  className="px-4 py-2 bg-green-500 text-white rounded"
-                >
-                  Download Audio
-                </button>
-              )}
-            </div>
-          ))}
         </div>
       )}
     </div>

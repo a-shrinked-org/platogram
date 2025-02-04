@@ -10,24 +10,34 @@ let coffeeCount = 1;
 let customPrice = '';
 let totalPrice = 5;
 let vercelBlobUpload;
+let vercelBlobUploader;
 let db;
 let testMode = false;
 let isConversionInProgress = false;
 let currentView = 'cells';
 let isConversionComplete = false;
 let storedFileName = '';
+let uploadProgressInterval;
+let currentProgress = 0;
+let ffmpegInstance = null;
+let fetchFile = null;
 
-import('https://esm.sh/@vercel/blob@0.23.4').then(module => {
-        console.log('Vercel Blob import:', module);
-        if (module.put && typeof module.put === 'function') {
-          vercelBlobUpload = module.put;
-          console.log('Vercel Blob upload function found:', vercelBlobUpload);
-        } else {
-          console.error('Vercel Blob upload function not found in module');
-        }
-      }).catch(error => {
-        console.error('Error importing Vercel Blob:', error);
-      });
+import('https://esm.sh/@vercel/blob@0.27.1').then(module => {
+  console.log('Vercel Blob import:', module);
+  
+  // Check for both legacy and new upload methods
+  if (module.upload && typeof module.upload === 'function') {
+    vercelBlobUploader = module.upload;
+    console.log('Modern Vercel Blob upload function found:', vercelBlobUploader);
+  } else if (module.put && typeof module.put === 'function') {
+    vercelBlobUpload = module.put;
+    console.log('Legacy Vercel Blob upload function found:', vercelBlobUpload);
+  } else {
+    console.error('No compatible Vercel Blob upload function found');
+  }
+}).catch(error => {
+  console.error('Error importing Vercel Blob:', error);
+});
 
 const processingStages = [
   "Byte Whispering",
@@ -43,6 +53,45 @@ const processingStages = [
 ];
 let currentStageIndex = 0;
 let processingStageInterval;
+
+const placeholders = [
+    "Link to a TED talk by Jane Goodall on chimpanzee behavior",
+    "URL of a panel discussion on renewable energy from COP26",
+    "Zoom recording link of a virtual book club discussing 1984",
+    "YouTube video of Neil deGrasse Tyson explaining black holes",
+    "Link to a startup pitch from Y Combinator demo day",
+    "Link to a lecture on ancient Egyptian architecture",
+    "Link to a video of Malala Yousafzai's speech at the UN",
+    "Link to a cooking masterclass with Gordon Ramsay",
+    "URL of a webinar on ML applications in healthcare"
+];
+
+// Function to set a random placeholder
+function setRandomPlaceholder() {
+    const urlInput = document.getElementById('url-input');
+    if (urlInput) {
+        const randomIndex = Math.floor(Math.random() * placeholders.length);
+        urlInput.placeholder = placeholders[randomIndex];
+
+        // Set focus to the input field
+        urlInput.focus();
+    }
+}
+
+const DOMAIN =
+    typeof window !== 'undefined' && window.ENV && window.ENV.NEXT_PUBLIC_URL
+      ? window.ENV.NEXT_PUBLIC_URL
+      : (typeof window !== 'undefined' && window.location.hostname === 'shrinked.ai'
+          ? 'https://shrinked.ai'
+          : typeof window !== 'undefined' && window.location.hostname === 'platogram.vercel.app'
+            ? 'https://platogram.vercel.app'
+            : 'http://localhost:3000');
+
+  console.log('Current DOMAIN:', DOMAIN);
+
+  const isProduction = DOMAIN === 'https://shrinked.ai';
+
+  console.log('Is Production:', isProduction);
 
 function debugLog(message) {
   console.log(`[DEBUG] ${message}`);
@@ -180,9 +229,7 @@ function updateTotalPrice() {
         }
     }
     const totalPriceElement = document.getElementById('total-price');
-    const coffeePriceElement = document.getElementById('coffee-price');
     if (totalPriceElement) totalPriceElement.textContent = totalPrice.toFixed(2);
-    if (coffeePriceElement) coffeePriceElement.textContent = totalPrice.toFixed(2);
 }
 
 function handleOptionClick(option) {
@@ -192,39 +239,104 @@ function handleOptionClick(option) {
     const coffee1Button = document.getElementById('coffee-1');
     const coffee2Button = document.getElementById('coffee-2');
 
+    // Handle basic button
     if (basicButton) {
-        basicButton.classList.toggle('border-blue-500', option === 'basic');
-        basicButton.classList.toggle('bg-blue-50', option === 'basic');
+        const flexContainer = basicButton.querySelector('.flex.items-center');
+        if (flexContainer) {
+            const existingIcon = flexContainer.querySelector('[data-lucide]');
+            if (existingIcon) {
+                existingIcon.remove();
+            }
+            const newIcon = document.createElement('i');
+            newIcon.setAttribute('data-lucide', option === 'basic' ? 'circle-dot' : 'circle');
+            newIcon.className = `w-5 h-5 text-${option === 'basic' ? 'blue' : 'gray'}-500 mr-2`;
+            flexContainer.insertBefore(newIcon, flexContainer.firstChild);
+        }
+
+        // Simplified border handling
+        if (option === 'basic') {
+            basicButton.classList.add('border', 'border-blue-500', 'bg-blue-50');
+        } else {
+            basicButton.classList.remove('border-blue-500', 'bg-blue-50');
+            basicButton.classList.add('border-gray-300');
+        }
     }
+
+    // Handle coffee button
     if (coffeeButton) {
-        coffeeButton.classList.toggle('border-blue-500', option === 'coffee');
-        coffeeButton.classList.toggle('bg-blue-50', option === 'coffee');
+        const flexContainer = coffeeButton.querySelector('.flex.items-center');
+        if (flexContainer) {
+            const existingIcon = flexContainer.querySelector('[data-lucide]');
+            if (existingIcon) {
+                existingIcon.remove();
+            }
+            const newIcon = document.createElement('i');
+            newIcon.setAttribute('data-lucide', option === 'coffee' ? 'circle-dot' : 'circle');
+            newIcon.className = `w-5 h-5 text-${option === 'coffee' ? 'blue' : 'gray'}-500 mr-2`;
+            flexContainer.insertBefore(newIcon, flexContainer.firstChild);
+        }
+
+        // Simplified border handling
+        if (option === 'coffee') {
+            coffeeButton.classList.add('border', 'border-blue-500', 'bg-blue-50');
+        } else {
+            coffeeButton.classList.remove('border-blue-500', 'bg-blue-50');
+            coffeeButton.classList.add('border-gray-300');
+        }
     }
+
+    // Initialize Lucide icons after adding new icons
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+
+    // Handle coffee state updates
     if (option === 'coffee') {
         coffeeCount = 1;
         customPrice = '';
         const customPriceInput = document.getElementById('custom-price');
         if (customPriceInput) customPriceInput.value = '';
         if (coffee1Button) {
-            coffee1Button.style.backgroundColor = '#F9F0E8';
-            coffee1Button.classList.add('text-black');
+          coffee1Button.style.backgroundColor = '#0F172A';
+          coffee1Button.classList.add('text-white');
+          coffee1Button.classList.remove('border-gray-300');
         }
         if (coffee2Button) {
             coffee2Button.style.backgroundColor = '';
             coffee2Button.classList.remove('text-black');
         }
     } else {
-        coffeeCount = 0;
+        // For basic option, reset coffee buttons
         if (coffee1Button) {
             coffee1Button.style.backgroundColor = '';
             coffee1Button.classList.remove('text-black');
+            coffee1Button.classList.add('text-gray-300');
         }
         if (coffee2Button) {
             coffee2Button.style.backgroundColor = '';
             coffee2Button.classList.remove('text-black');
         }
     }
-    updateTotalPrice();
+
+    // Unified price handling at the end
+    if (option === 'basic') {
+        totalPrice = 0;
+        const totalPriceElement = document.getElementById('total-price');
+        if (totalPriceElement) totalPriceElement.textContent = '0.00';
+        // Keep coffee price display at $5
+        const coffeePriceElement = document.getElementById('coffee-price');
+        if (coffeePriceElement) coffeePriceElement.textContent = '5.00';
+    } else {
+        if (!customPrice && coffeeCount === 0) {
+            coffeeCount = 1;  // Set default coffee count if none selected
+        }
+        updateTotalPrice();
+        // Update coffee price display
+        const coffeePriceElement = document.getElementById('coffee-price');
+        if (coffeePriceElement) {
+            coffeePriceElement.textContent = (customPrice || (coffeeCount * 5)).toFixed(2);
+        }
+    }
 }
 
 function handleCoffeeCountClick(count) {
@@ -232,29 +344,46 @@ function handleCoffeeCountClick(count) {
     customPrice = "";
     selectedOption = "coffee";
     const customPriceInput = document.getElementById("custom-price");
-    if (customPriceInput) customPriceInput.value = "";
     const coffee1Button = document.getElementById("coffee-1");
     const coffee2Button = document.getElementById("coffee-2");
+    const coffeePriceElement = document.getElementById('coffee-price'); // Add this line
+
+    if (customPriceInput) customPriceInput.value = "";
+
     if (coffee1Button) {
-      if (count === 1) {
-          coffee1Button.style.backgroundColor = '#F9F0E8';
-          coffee1Button.classList.add('text-black');
-      } else {
-          coffee1Button.style.backgroundColor = '';
-          coffee1Button.classList.remove('text-black');
-      }
+        if (count === 1) {
+            coffee1Button.style.backgroundColor = '#0F172A';
+            coffee1Button.classList.remove('text-gray-300');
+            coffee1Button.classList.add('text-white');
+            coffee1Button.classList.remove('border-gray-300');
+        } else {
+            coffee1Button.style.backgroundColor = '';
+            coffee1Button.classList.remove('text-white');
+            coffee1Button.classList.add('border-gray-300');
+        }
     }
+
     if (coffee2Button) {
-      if (count === 2) {
-          coffee2Button.style.backgroundColor = '#F9F0E8';
-          coffee2Button.classList.add('text-black');
-      } else {
-          coffee2Button.style.backgroundColor = '';
-          coffee2Button.classList.remove('text-black');
-      }
+        if (count === 2) {
+            coffee2Button.style.backgroundColor = '#0F172A';
+            coffee1Button.classList.remove('text-gray-300');
+            coffee2Button.classList.add('text-white');
+            coffee2Button.classList.add('border-0');
+            coffee2Button.classList.remove('border-gray-300');
+        } else {
+            coffee2Button.style.backgroundColor = '';
+            coffee2Button.classList.remove('text-white');
+            coffee2Button.classList.add('border-gray-300');
+        }
     }
+
+    totalPrice = count * 5;
+    if (coffeePriceElement) {
+        coffeePriceElement.textContent = totalPrice.toFixed(2);
+    }
+
     updateTotalPrice();
-  }
+}
 
 function handleCustomPriceChange(e) {
     const value = e.target.value;
@@ -383,7 +512,9 @@ function handleFiles(files) {
         const fileResetOption = document.getElementById('file-reset-option');
 
         if (fileNameDisplay) {
-            fileNameDisplay.textContent = file.name;
+            const truncatedName = truncateText(file.name);
+            fileNameDisplay.textContent = truncatedName;
+            fileNameDisplay.title = file.name; // Show full name on hover
         }
         if (convertFileButton) {
             toggleConvertButtonState(true, convertFileButton);
@@ -449,28 +580,15 @@ function initStripe() {
 
 async function initAuth0() {
     if (auth0Client) {
-        return auth0Client;
+        return { client: auth0Client, justHandledRedirect: false };
     }
 
-    const waitForAuth0 = () => {
-        return new Promise((resolve) => {
-            if (typeof auth0 !== 'undefined') {
-                resolve();
-            } else {
-                console.warn("Auth0 not loaded yet, retrying in 1 second...");
-                setTimeout(() => waitForAuth0().then(resolve), 1000);
-            }
-        });
-    };
-
     try {
-        await waitForAuth0();
-
         auth0Client = await auth0.createAuth0Client({
             domain: "dev-w0dm4z23pib7oeui.us.auth0.com",
             clientId: "iFAGGfUgqtWx7VuuQAVAgABC1Knn7viR",
             authorizationParams: {
-                redirect_uri: window.location.origin,
+                redirect_uri: DOMAIN,
                 audience: "https://platogram.vercel.app/",
                 scope: "openid profile email",
             },
@@ -478,14 +596,17 @@ async function initAuth0() {
         });
         console.log("Auth0 client initialized successfully");
 
+        let justHandledRedirect = false;
         // Handle the redirect flow
         if (window.location.search.includes("code=") && window.location.search.includes("state=")) {
             await auth0Client.handleRedirectCallback();
             window.history.replaceState({}, document.title, window.location.pathname);
+            console.log("Auth0 redirect handled");
+            justHandledRedirect = true;
         }
 
         auth0Initialized = true;
-        return auth0Client;
+        return { client: auth0Client, justHandledRedirect };
     } catch (error) {
         console.error("Error initializing Auth0:", error);
         throw error;
@@ -530,6 +651,7 @@ async function checkOngoingConversion() {
         const isAuthenticated = await auth0Client.isAuthenticated();
         if (!isAuthenticated) {
             console.log("User not authenticated, skipping ongoing conversion check");
+            updateUIStatus("idle");
             return;
         }
 
@@ -540,6 +662,12 @@ async function checkOngoingConversion() {
             }
         });
 
+        if (response.status === 502) {
+            console.log("Server is currently unavailable");
+            updateUIStatus("turn-off", "Our servers are currently undergoing maintenance. We'll be back soon!");
+            return;
+        }
+
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -548,43 +676,72 @@ async function checkOngoingConversion() {
         console.log("Current conversion status:", result.status);
 
         if (result.status && result.status !== 'idle') {
-            updateUIStatus(result.status, `Conversion ${result.status}...`, storedFileName);
+            updateUIStatus(result.status, `Shrinking complete. Your context-rich documents await in your inbox!`, storedFileName);
             if (['running', 'processing'].includes(result.status)) {
                 pollStatus(token);
+            } else if (result.status === 'done') {
+                isConversionComplete = true;
+                console.log("Conversion complete, UI updated to 'done' state");
             }
         } else {
             updateUIStatus("idle");
         }
     } catch (error) {
         console.error("Error checking ongoing conversion:", error);
-        updateUIStatus("idle");
+        if (error.message.includes("Load failed") || error.message.includes("NetworkError") || error.name === "TypeError") {
+            updateUIStatus("turn-off", "We're experiencing technical difficulties. Please try again later.");
+        } else {
+            updateUIStatus("error", "An unexpected error occurred. Please try again.");
+        }
     }
 }
 
-function updateUIStatus(status, message = "") {
-    if (isConversionComplete && status !== "done" && status !== "error") return; // Allow updates for final states
+async function updateUIStatus(status, message = "") {
+    if (isConversionComplete && status !== "done" && status !== "error") {
+        console.log("Preventing update to status:", status);
+        return; // Prevent updates after completion, except for "done" or "error" statuses
+    }
+
     debugLog(`Updating UI status: ${status}`);
     const inputSection = document.getElementById("input-section");
     const uploadProcessSection = document.getElementById("upload-process-section");
     const statusSection = document.getElementById("status-section");
     const doneSection = document.getElementById("done-section");
     const errorSection = document.getElementById("error-section");
+    const turnOffSection = document.getElementById("turn-off-section");
 
     const pendingConversionDataString = localStorage.getItem('pendingConversionData');
     const pendingConversionData = pendingConversionDataString ? JSON.parse(pendingConversionDataString) : null;
     const displayFileName = storedFileName || pendingConversionData?.fileName || document.getElementById("file-name")?.textContent || "Unknown file";
     debugLog("File name used in updateUIStatus: " + displayFileName);
-    const userEmail = document.getElementById("user-email")?.textContent || "Unknown email";
+
+    // Try to get the latest user email
+    let userEmail = "Not logged in";
+    try {
+        const isAuthenticated = await auth0Client.isAuthenticated();
+        if (isAuthenticated) {
+            const user = await auth0Client.getUser();
+            userEmail = user.email || "Email not available";
+        }
+        const userEmailElement = document.getElementById("user-email");
+        if (userEmailElement) {
+            userEmailElement.textContent = userEmail;
+        }
+    } catch (error) {
+        console.error("Error fetching user email:", error);
+    }
 
     // Hide all sections first
-    [inputSection, statusSection, uploadProcessSection, doneSection, errorSection].forEach(section => {
+    [inputSection, statusSection, uploadProcessSection, doneSection, errorSection, turnOffSection].forEach(section => {
         if (section) section.classList.add("hidden");
     });
 
     // Show the appropriate section based on status
     switch (status) {
         case "idle":
-            toggleSection("input-section");
+            if (!isConversionComplete) {
+                toggleSection("input-section");
+            }
             break;
         case "uploading":
             toggleSection("upload-process-section");
@@ -612,18 +769,20 @@ function updateUIStatus(status, message = "") {
             break;
         case "processing":
         case "running":
-            toggleSection("status-section");
-            if (statusSection) {
-                statusSection.innerHTML = `
-                    <p>File/URL: ${displayFileName}</p>
-                    <p>Email: ${userEmail}</p>
-                    <p>Status: ${status}</p>
-                    <p>${message}</p>
-                    <div id="processing-stage"></div>
-                `;
-                initializeProcessingStage();
-            }
-            break;
+          toggleSection("status-section");
+          if (statusSection) {
+              const defaultMessage = "The extracted audio is being shrinked into structured data. We'll email you when it's ready.";
+
+              statusSection.innerHTML = `
+                  <p>File/URL: ${displayFileName}</p>
+                  <p>Email: ${userEmail}</p>
+                  <p>Status: In Progress</p>
+                  <p>${message || defaultMessage}</p>
+                  <div id="processing-stage"></div>
+              `;
+              initializeProcessingStage();
+          }
+          break;
         case "done":
             toggleSection("done-section");
             if (doneSection) {
@@ -631,7 +790,7 @@ function updateUIStatus(status, message = "") {
                     <p>File/URL: ${displayFileName}</p>
                     <p>Email: ${userEmail}</p>
                     <p>Status: Completed</p><br>
-                    ${message ? `<p>${message}</p>` : ''}
+                    <p>${message || "Shrinking complete. Your context-rich documents await in your inbox!"}</p>
                     <button class="mx-left mt-8 block px-4 py-2 bg-black text-white rounded hover:bg-gray-950" onclick="reset()">Reset</button>
                 `;
             }
@@ -639,7 +798,6 @@ function updateUIStatus(status, message = "") {
             attachResetButtonListener();
             isConversionComplete = true;
             console.log("Conversion complete, UI updated to 'done' state");
-            clearConversionData();
             break;
         case "error":
             toggleSection("error-section");
@@ -654,11 +812,33 @@ function updateUIStatus(status, message = "") {
             }
             clearProcessingStageInterval();
             attachResetButtonListener();
-            clearConversionData();
+            break;
+        case "turn-off":
+            if (turnOffSection) {
+                turnOffSection.classList.remove("hidden");
+                turnOffSection.innerHTML = `
+                    <h2 class="text-2xl font-bold mb-4">Service Temporarily Unavailable</h2>
+                    <p class="mb-4">${message}</p>
+                    <p>We apologize for the inconvenience. Please check back later.</p>
+                `;
+            } else {
+                console.error("Turn-off section not found in the DOM");
+                // Fallback to error section if turn-off section doesn't exist
+                if (errorSection) {
+                    errorSection.classList.remove("hidden");
+                    errorSection.innerHTML = `
+                        <h2 class="text-2xl font-bold mb-4">Service Temporarily Unavailable</h2>
+                        <p class="mb-4">${message}</p>
+                        <p>We apologize for the inconvenience. Please check back later.</p>
+                    `;
+                }
+            }
             break;
         default:
             console.warn(`Unknown status: ${status}`);
-            toggleSection("input-section");
+            if (!isConversionComplete) {
+                toggleSection("input-section");
+            }
     }
 }
 
@@ -679,7 +859,8 @@ function attachResetButtonListener() {
 
 async function updateUI() {
     try {
-      await initAuth0();
+      const { client } = await initAuth0();
+      auth0Client = client;
       const isAuthenticated = await auth0Client.isAuthenticated();
       const loginButton = document.getElementById("login-button");
       const logoutButton = document.getElementById("logout-button");
@@ -731,75 +912,116 @@ async function updateUI() {
   }
 
 async function reset() {
-  try {
-    if (!auth0Client) throw new Error("Auth0 client not initialized");
+    try {
+        console.log("Reset function called");
 
-    const token = await auth0Client.getTokenSilently({
-      audience: "https://platogram.vercel.app",
-    });
+        if (!auth0Client) {
+            console.error("Auth0 client not initialized");
+            throw new Error("Auth0 client not initialized");
+        }
 
-    const response = await fetch("https://temporary.name/reset", {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+        const token = await auth0Client.getTokenSilently({
+            audience: "https://platogram.vercel.app",
+        });
 
-    if (!response.ok) throw new Error("Failed to reset");
+        // Call the server-side reset endpoint
+        const response = await fetch("https://temporary.name/reset", {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` },
+        });
 
-    const urlInput = document.getElementById("url-input");
-    const fileNameElement = document.getElementById("file-name");
+        if (!response.ok) {
+            console.error("Server reset failed:", response.statusText);
+            throw new Error("Failed to reset on server");
+        }
 
-    if (urlInput) urlInput.value = "";
-    if (fileNameElement) fileNameElement.textContent = "";
+        console.log("Server reset successful");
 
-    updateUIStatus("idle");  // Set status to idle after reset
-    clearConversionData();
-    pollStatus(token);
-  } catch (error) {
-    console.error("Error resetting:", error);
-    updateUIStatus("error", "Failed to reset. Please try again.");
-  }
+        // Reset UI elements
+        const urlInput = document.getElementById("url-input");
+        const fileNameElement = document.getElementById("file-name");
+        const fileNameDisplay = document.getElementById('file-name-display');
+        const convertFileButton = document.getElementById('convert-file-button');
+        const fileUploadPrompt = document.getElementById('file-upload-prompt');
+        const fileResetOption = document.getElementById('file-reset-option');
+
+        if (urlInput) urlInput.value = "";
+        if (fileNameElement) fileNameElement.textContent = "";
+        if (fileNameDisplay) fileNameDisplay.textContent = "";
+        if (convertFileButton) toggleConvertButtonState(false, convertFileButton);
+        if (fileUploadPrompt) fileUploadPrompt.classList.remove('hidden');
+        if (fileResetOption) fileResetOption.classList.add('hidden');
+
+        // Reset global variables
+        uploadedFile = null;
+        storedFileName = '';
+        isConversionComplete = false;
+        isConversionInProgress = false;
+
+        // Clear any stored conversion data
+        clearConversionData();
+
+        // Update UI status to idle
+        updateUIStatus("idle");
+
+        console.log("Reset complete, UI updated to idle state");
+
+        // Generate a new job ID
+        updateJobIdInUI();
+
+    } catch (error) {
+        console.error("Error during reset:", error);
+        updateUIStatus("error", "Failed to reset. Please try again.");
+    }
 }
 
 function getPriceFromUI() {
   const coffeePrice = document.getElementById('coffee-price').textContent;
   const price = parseFloat(coffeePrice.replace('$', ''));
-  return price;
+  return totalPrice;
 }
 
-async function createCheckoutSession(price, lang) {
-  const stripeInstance = initStripe();
-  if (!stripeInstance) {
-    console.error('Stripe has not been initialized');
-    return null;
-  }
-
-  try {
-    const response = await fetch('https://shrinked.ai/api/create-checkout-session', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${await auth0Client.getTokenSilently()}`,
-      },
-      body: JSON.stringify({ price, lang }),
-    });
-
-    const session = await response.json();
-
-    if (session.error) {
-      console.error('Error creating checkout session:', session.error);
-      updateUIStatus('error', 'Failed to create checkout session');
+async function createCheckoutSession(price, lang, saveFlag) {
+    const stripeInstance = initStripe();
+    if (!stripeInstance) {
+      console.error('Stripe has not been initialized');
       return null;
     }
 
-    return session;
-  } catch (error) {
-    console.error('Error creating checkout session:', error);
-    updateUIStatus('error', 'Failed to create checkout session');
-    return null;
-  }
-}
+    const domain = DOMAIN;
 
-const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+    try {
+      const response = await fetch(`${domain}/api/create-checkout-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await auth0Client.getTokenSilently()}`,
+        },
+        body: JSON.stringify({
+          price,
+          lang,
+          success_url: `${domain}/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${domain}/cancel`,
+        }),
+      });
+
+      const session = await response.json();
+
+      if (session.error) {
+        console.error('Error creating checkout session:', session.error);
+        updateUIStatus('error', 'Failed to create checkout session');
+        return null;
+      }
+
+      return session;
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+      updateUIStatus('error', 'Failed to create checkout session');
+      return null;
+    }
+  }
+
+const CHUNK_SIZE = 1024 * 1024; // 5MB chunks
 
 async function uploadLargeFile(file) {
   const fileId = Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -836,17 +1058,112 @@ async function uploadLargeFile(file) {
   return fileId;
 }
 
-function updateUploadProgress(progress) {
+// Initialize progress bar with improved styling
+function initializeUploadProgressBar() {
     const uploadProgressBar = document.getElementById('upload-progress-bar');
-    const uploadProgressText = document.getElementById('upload-progress-text');
-    if (uploadProgressBar && uploadProgressText) {
-        uploadProgressBar.style.width = `${progress}%`;
-        uploadProgressText.textContent = `Uploading: ${progress.toFixed(2)}%`;
-    } else {
-        console.error('Progress bar or text element not found');
+    const uploadProgressContainer = document.getElementById('upload-progress-container');
+    
+    if (uploadProgressBar) {
+        uploadProgressBar.style.transition = 'width 0.3s ease-in-out';
+        uploadProgressBar.style.backgroundColor = '#60A5FA';
+        uploadProgressBar.style.borderRadius = '0.5rem';
+        uploadProgressBar.style.width = '0%';
+    }
+
+    if (uploadProgressContainer) {
+        uploadProgressContainer.style.backgroundColor = '#EFF6FF';
+        uploadProgressContainer.style.borderRadius = '0.5rem';
+        uploadProgressContainer.style.overflow = 'hidden';
     }
 }
 
+function updateUploadProgress(progress) {
+    const uploadProgressBar = document.getElementById('upload-progress-bar');
+    const uploadProgressText = document.getElementById('upload-progress-text');
+    
+    if (!uploadProgressBar || !uploadProgressText) {
+        console.error('Progress bar or text element not found');
+        return;
+    }
+
+    // Update progress bar
+    uploadProgressBar.style.width = `${progress}%`;
+    uploadProgressBar.style.transition = 'width 0.3s ease-in-out';
+    
+    // Change color based on progress
+    if (progress < 30) {
+        uploadProgressBar.style.backgroundColor = '#60A5FA';
+    } else if (progress < 70) {
+        uploadProgressBar.style.backgroundColor = '#3B82F6';
+    } else {
+        uploadProgressBar.style.backgroundColor = '#2563EB';
+    }
+
+    // Progress text is now handled in the upload function
+    // to show more detailed information
+}
+
+// Helper function to format file sizes
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function startSimulatedProgress() {
+    currentProgress = 0;
+
+    // Clear any existing interval
+    if (uploadProgressInterval) {
+        clearInterval(uploadProgressInterval);
+    }
+
+    uploadProgressInterval = setInterval(() => {
+        const uploadProgressBar = document.getElementById('upload-progress-bar');
+        const uploadProgressText = document.getElementById('upload-progress-text');
+
+        if (!uploadProgressBar || !uploadProgressText) {
+            clearInterval(uploadProgressInterval);
+            return;
+        }
+
+        // More realistic progress simulation
+        let increment;
+        if (currentProgress < 30) {
+            increment = 1;
+        } else if (currentProgress < 60) {
+            increment = 0.5;
+        } else if (currentProgress < 85) {
+            increment = 0.2;
+        } else {
+            increment = 0.1;
+        }
+
+        currentProgress += increment;
+
+        // Cap at 95% for simulation (real progress will override this)
+        if (currentProgress > 95) {
+            currentProgress = 95;
+        }
+
+        const displayProgress = Math.min(Math.round(currentProgress), 95);
+        uploadProgressBar.style.width = `${displayProgress}%`;
+        uploadProgressBar.style.transition = 'width 0.5s ease-in-out';
+        
+        // Change color based on progress
+        if (displayProgress < 30) {
+            uploadProgressBar.style.backgroundColor = '#60A5FA';
+        } else if (displayProgress < 70) {
+            uploadProgressBar.style.backgroundColor = '#3B82F6';
+        } else {
+            uploadProgressBar.style.backgroundColor = '#2563EB';
+        }
+
+        uploadProgressText.textContent = `Uploading: ${displayProgress}%`;
+    }, 100);
+}
 // Initialize IndexedDB
 function initDB() {
     return new Promise((resolve, reject) => {
@@ -880,19 +1197,66 @@ async function storeFileTemporarily(file) {
 
 async function processYoutubeUrl(youtubeUrl) {
     try {
+        console.log('Processing YouTube URL:', youtubeUrl);
+
         const response = await fetch('/api/process-youtube', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ youtubeUrl }),
+            body: JSON.stringify({ youtubeUrl })
         });
+
         if (!response.ok) {
-            throw new Error('Failed to process YouTube URL');
+            throw new Error(`Failed to process YouTube URL: ${response.status}`);
         }
+
         const result = await response.json();
-        console.log('processYoutubeUrl result:', result);
-        return result[0].data; // Assuming the first item in the array contains the data we need
+        console.log('Initial response:', result);
+
+        let attempts = 0;
+        const maxAttempts = 60;
+        const retryDelay = 5000;
+
+        while (attempts < maxAttempts) {
+            console.log(`Polling attempt ${attempts + 1} for job ${result.data.jobId}`);
+
+            const statusResponse = await fetch(`/api/process-youtube?jobId=${result.data.jobId}`);
+
+            if (!statusResponse.ok) {
+                throw new Error(`Status check failed: ${statusResponse.status}`);
+            }
+
+            const statusResult = await statusResponse.json();
+            console.log('Status check result:', statusResult);
+
+            if (statusResult.status === 'finished') {
+                console.log('Full finished response:', statusResult);
+
+                if (!statusResult.data?.audio_url) {
+                    throw new Error('No audio URL in response');
+                }
+
+                const audioBlob = await downloadYoutubeAudio({
+                    audio_url: statusResult.data.audio_url,
+                    title: statusResult.data.title || 'youtube_audio'
+                });
+
+                return {
+                    audioBlob,
+                    title: statusResult.data.title || 'youtube_audio'
+                };
+            }
+
+            if (statusResult.status === 'failed') {
+                throw new Error(statusResult.error || 'Processing failed');
+            }
+
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            attempts++;
+        }
+
+        throw new Error('Processing timed out');
     } catch (error) {
         console.error('Error processing YouTube URL:', error);
         throw error;
@@ -901,26 +1265,21 @@ async function processYoutubeUrl(youtubeUrl) {
 
 async function downloadYoutubeAudio(audioData) {
     try {
-        console.log('Parsed audioData:', audioData);
+        console.log('Starting audio download:', audioData);
 
-        if (audioData.audio_url) {
-            const url = new URL('/api/download-audio', window.location.origin);
-            url.searchParams.append('url', audioData.audio_url);
-            url.searchParams.append('title', audioData.title || 'youtube_audio');
-
-            const response = await fetch(url, {
-                method: 'GET',
-            });
-
-            if (!response.ok) {
-                throw new Error(`Failed to download audio: ${response.statusText}`);
-            }
-
-            const blob = await response.blob();
-            return blob;
-        } else {
-            throw new Error('No audio URL found in the response');
+        if (!audioData.audio_url) {
+            throw new Error('No audio URL provided for download');
         }
+
+        // Directly fetch from the Sieve URL
+        const response = await fetch(audioData.audio_url);
+
+        if (!response.ok) {
+            throw new Error(`Failed to download audio: ${response.status} ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        return blob;
     } catch (error) {
         console.error('Error downloading YouTube audio:', error);
         throw error;
@@ -967,6 +1326,7 @@ async function handleSubmit(event) {
     if (event) event.preventDefault();
     console.log('handleSubmit called');
     const price = getPriceFromUI();
+    console.log('Submitting with price:', price);
     let inputData = getInputData();
     const submitButton = document.getElementById('submit-btn');
 
@@ -984,35 +1344,39 @@ async function handleSubmit(event) {
 
         closeLanguageModal();
 
+        const userEmailElement = document.getElementById("user-email");
+        const userEmail = userEmailElement ? userEmailElement.textContent : '';
+
+        const saveCheckbox = document.getElementById('save-checkbox');
+        const saveFlag = (userEmail === "hollow666metal@gmail.com" || userEmail === "cherepukhin@damn.vc") && saveCheckbox && saveCheckbox.checked;
+
+        await storeConversionData(inputData, selectedLanguage, price, false, saveFlag);
+
         if (price > 0) {
             console.log('Non-zero price detected, initiating paid conversion');
             await handlePaidConversion(inputData, price);
         } else {
-            // For free conversions, proceed with upload/conversion
             if (inputData instanceof File) {
                 updateUIStatus("uploading", "Uploading file...");
                 const uploadedUrl = await uploadFile(inputData);
                 inputData = uploadedUrl;
             } else if (inputData.includes('youtube.com') || inputData.includes('youtu.be')) {
                 console.log('Processing YouTube URL:', inputData);
-                updateUIStatus("processing", "Processing YouTube URL...");
-                const processedData = await processYoutubeUrl(inputData);
-                console.log('Processed YouTube data:', processedData);
-                const audioBlob = await downloadYoutubeAudio(processedData);
+                updateUIStatus("processing", " Identifying conversations and getting audio stream from YouTube. Keep this window open - we're almost there!");
+                const { audioBlob, title } = await processYoutubeUrl(inputData);
                 console.log('Audio blob received:', audioBlob);
-                const file = new File([audioBlob], `${processedData.title || 'youtube_audio'}.mp3`, { type: 'audio/mpeg' });
-                updateUIStatus("uploading", "Uploading processed YouTube audio...");
+                const file = new File([audioBlob], `${title || 'youtube_audio'}.mp4`, { type: 'audio/mp4' });
+                updateUIStatus("uploading", "Uploading processed YouTube audio ..");
                 const uploadedUrl = await uploadFile(file);
                 console.log('Uploaded URL:', uploadedUrl);
                 inputData = uploadedUrl;
             }
 
-            // Generate and update job ID
             updateJobIdInUI();
         }
 
-        // Call postToConvert here
-        await postToConvert(inputData, selectedLanguage, null, price, false);
+        await postToConvert(inputData, selectedLanguage, null, price, false, saveFlag);
+        updateUIStatus("processing", "The audio is being shrinked, extracting key information, and organizing the data into a structured format. You may close this window if you wish - we'll email you once it's processed.");
 
     } catch (error) {
         console.error('Error in handleSubmit:', error);
@@ -1027,50 +1391,64 @@ async function handleSubmit(event) {
 
 async function handlePaidConversion(inputData, price) {
     console.log('handlePaidConversion called', { price });
-    const user = await auth0Client.getUser();
-    const email = user.email || user["https://platogram.com/user_email"];
-    if (!email) {
-        throw new Error('User email not available');
-    }
-    console.log('User email retrieved', { email });
+    try {
+        const user = await auth0Client.getUser();
+        const email = user.email || user["https://platogram.com/user_email"];
+        if (!email) {
+            throw new Error('User email not available');
+        }
+        console.log('User email retrieved', { email });
 
-    // Remove this line as it's already done in onConvertClick
-    // await storeConversionData(inputData, selectedLanguage, price, false);
+        // Store the conversion data before creating the checkout session
+        await storeConversionData(inputData, selectedLanguage, price, false);
 
-    const pendingConversionDataString = localStorage.getItem('pendingConversionData');
-    const conversionData = JSON.parse(pendingConversionDataString);
-    console.log('Stored pendingConversionData:', conversionData);
+        const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+        if (!pendingConversionDataString) {
+            throw new Error('Failed to store conversion data');
+        }
 
-    if (testMode) {
-        console.log("Test mode: Simulating Stripe checkout");
-        await simulateStripeCheckout(conversionData);
-        return;
-    }
+        const conversionData = JSON.parse(pendingConversionDataString);
+        console.log('Stored pendingConversionData:', conversionData);
 
-    const response = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            price: price,
-            lang: selectedLanguage,
-            email: email,
-            inputData: conversionData.inputData
-        }),
-    });
+        if (!conversionData || !conversionData.inputData) {
+            throw new Error('Invalid conversion data');
+        }
 
-    if (!response.ok) {
-        throw new Error('Failed to create checkout session');
-    }
+        if (testMode) {
+            console.log("Test mode: Simulating Stripe checkout");
+            await simulateStripeCheckout(conversionData);
+            return;
+        }
 
-    const session = await response.json();
-    const result = await stripe.redirectToCheckout({
-        sessionId: session.id,
-    });
+        const response = await fetch('/api/create-checkout-session', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                price: price,
+                lang: selectedLanguage,
+                email: email,
+                inputData: conversionData.inputData,
+                save: conversionData.save
+            }),
+        });
 
-    if (result.error) {
-        throw new Error(result.error.message);
+        if (!response.ok) {
+            throw new Error('Failed to create checkout session');
+        }
+
+        const session = await response.json();
+        const result = await stripe.redirectToCheckout({
+            sessionId: session.id,
+        });
+
+        if (result.error) {
+            throw new Error(result.error.message);
+        }
+    } catch (error) {
+        console.error('Error in handlePaidConversion:', error);
+        updateUIStatus("error", `Error: ${error.message}`);
     }
 }
 
@@ -1083,28 +1461,37 @@ async function simulateStripeCheckout(conversionData) {
 
 async function storeConversionData(inputData, lang, price, isAuth = false) {
     let conversionData;
-    if (inputData instanceof File) {
-        const fileId = await storeFileTemporarily(inputData);
-        conversionData = {
-            inputData: fileId,
-            isFile: true,
-            fileName: inputData.name,
-            lang: lang,
-            price: price,
-            isAuth: isAuth
-        };
-    } else {
-        conversionData = {
-            inputData: inputData,
-            isFile: false,
-            fileName: inputData, // For URLs, the fileName is the URL itself
-            lang: lang,
-            price: price,
-            isAuth: isAuth
-        };
+    try {
+      const saveCheckbox = document.getElementById('save-checkbox');
+      const saveFlag = saveCheckbox && !saveCheckbox.classList.contains('hidden') && saveCheckbox.checked;
+        if (inputData instanceof File) {
+            const fileId = await storeFileTemporarily(inputData);
+            conversionData = {
+                inputData: fileId,
+                isFile: true,
+                fileName: inputData.name,
+                lang: lang,
+                price: price,
+                isAuth: isAuth,
+                save: saveFlag
+            };
+        } else {
+            conversionData = {
+                inputData: inputData,
+                isFile: false,
+                fileName: inputData, // For URLs, the fileName is the URL itself
+                lang: lang,
+                price: price,
+                isAuth: isAuth,
+                save: saveFlag
+            };
+        }
+        localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
+        console.log("Stored conversion data:", conversionData);
+    } catch (error) {
+        console.error("Error storing conversion data:", error);
+        throw error;
     }
-    localStorage.setItem('pendingConversionData', JSON.stringify(conversionData));
-    console.log("Stored conversion data:", conversionData);
 }
 
 // async function handleSuccessfulPayment() {
@@ -1164,7 +1551,7 @@ function handleStripeRedirect() {
             sessionStorage.setItem('successfulPayment', JSON.stringify({ session_id: sessionId }));
             updateUIStatus("success", "Payment successful! Redirecting...");
             setTimeout(() => {
-                window.location.href = '/';
+                window.location.href = DOMAIN;
             }, 6000);
         } else {
             console.error('Success route accessed without session ID');
@@ -1174,7 +1561,7 @@ function handleStripeRedirect() {
         console.log('Payment cancelled by user');
         updateUIStatus("cancelled", "Payment was cancelled. You can try again when you're ready.");
         setTimeout(() => {
-            window.location.href = '/';
+            window.location.href = DOMAIN;
         }, 6000);
     }
 }
@@ -1182,14 +1569,22 @@ function handleStripeRedirect() {
 async function handleAuthReturn() {
     console.log("Handling auth return");
     const pendingConversionDataString = localStorage.getItem('pendingConversionData');
+    console.log("Pending conversion data:", pendingConversionDataString);
 
-    if (pendingStripeSession) {
-        console.log("Found pending Stripe session, handling success");
-        localStorage.removeItem('pendingStripeSession');
-        await handleStripeSuccess(pendingStripeSession);
-    } else {
+     // if (pendingStripeSession) {
+    //     console.log("Found pending Stripe session, handling success");
+    //     localStorage.removeItem('pendingStripeSession');
+    //     await handleStripeSuccess(pendingStripeSession);
+    // } else {
+    //     // ... rest of the function
+    // }
+
+    // Instead, directly process the pendingConversionData
+    if (pendingConversionDataString) {
         const pendingConversionData = JSON.parse(pendingConversionDataString);
-        if (pendingConversionData.isAuth) {
+        console.log("Parsed pending conversion data:", pendingConversionData);
+
+        if (pendingConversionData && pendingConversionData.isAuth) {
             localStorage.removeItem('pendingConversionData');
             let inputData = pendingConversionData.inputData;
             const price = pendingConversionData.price;
@@ -1213,10 +1608,12 @@ async function handleAuthReturn() {
             // Show the language selection modal
             console.log("Showing language selection modal");
             showLanguageSelectionModal(inputData, price);
+        } else {
+            console.log("No auth-related pending conversion data found");
         }
+    } else {
+        console.log("No pending conversion data found");
     }
-    // Clear the authentication flag
-    sessionStorage.removeItem('isAuthenticating');
 }
 
 function handleStripeCancel() {
@@ -1294,79 +1691,223 @@ async function onConvertClick(event) {
       return sanitized;
     }
 
+async function extractAudioFromVideo(file) {
+        try {
+            console.log('Starting audio extraction from video:', file.name);
+            updateUIStatus("processing", "Extracting audio from video...");
+    
+            // Initialize FFmpeg
+            const { FFmpeg } = window.FFmpeg;
+            const { fetchFile } = window.FFmpegUtil;
+            
+            const ffmpeg = new FFmpeg();
+            
+            await ffmpeg.load({
+                coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
+                wasmURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm'
+            });
+    
+            // File handling
+            const inputFileName = `input${file.name.substring(file.name.lastIndexOf('.'))}`;
+            const outputFileName = 'output.mp3';
+    
+            await ffmpeg.writeFile(inputFileName, await fetchFile(file));
+    
+            ffmpeg.on('progress', ({ progress }) => {
+                const percentage = Math.round(progress * 100);
+                const uploadProgressText = document.getElementById('upload-progress-text');
+                if (uploadProgressText) {
+                    uploadProgressText.textContent = `Extracting audio: ${percentage}%`;
+                }
+            });
+    
+            await ffmpeg.exec([
+                '-i', inputFileName,
+                '-vn',
+                '-acodec', 'libmp3lame',
+                '-q:a', '2',
+                outputFileName
+            ]);
+    
+            const data = await ffmpeg.readFile(outputFileName);
+            const audioBlob = new Blob([data], { type: 'audio/mp3' });
+    
+            // Cleanup
+            await ffmpeg.deleteFile(inputFileName);
+            await ffmpeg.deleteFile(outputFileName);
+    
+            return new File([audioBlob], file.name.replace(/\.[^.]+$/, '.mp3'), {
+                type: 'audio/mp3'
+            });
+    
+        } catch (error) {
+            console.error('Error extracting audio:', error);
+            throw new Error('Failed to extract audio: ' + error.message);
+        }
+    }
+    
     async function uploadFile(file) {
-        console.log('Starting file upload process');
-        console.log('File details:', file.name, file.type, file.size);
-
+      console.log('Starting file upload process');
+      console.log('File details:', file.name, file.type, file.size);
+      
+      try {
+      // Extract audio if it's a video file
+      if (file.type.startsWith('video/')) {
+        console.log('Video file detected, extracting audio first');
+        file = await extractAudioFromVideo(file);
+        console.log('Using extracted audio file:', file.name, file.size);
+      }
+    
         const sanitizedFileName = sanitizeFileName(file.name);
         console.log('Sanitized file name:', sanitizedFileName);
-
+    
+        closeLanguageModal();
+        updateUIStatus("uploading", "Uploading file...");
+        updateUploadProgress(0);
+    
+        // Get the Auth0 token
+        let token;
         try {
-            closeLanguageModal();
-            updateUIStatus("uploading", "Uploading file...");
-
-            // Get the Auth0 token
-            let token;
-            try {
-                token = await auth0Client.getTokenSilently({
-                    audience: "https://platogram.vercel.app",
-                });
-                console.log('Auth token obtained');
-            } catch (authError) {
-                console.error('Error getting Auth0 token:', authError);
-                throw new Error('Authentication failed. Please try logging in again.');
-            }
-
-            // Get the Blob token
-            let blobToken;
-            try {
-                const blobTokenResponse = await fetch('/api/upload-file', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'X-Vercel-Blob-Token-Request': 'true'
-                    }
-                });
-                if (!blobTokenResponse.ok) {
-                    const errorText = await blobTokenResponse.text();
-                    throw new Error(`Failed to get Blob token: ${blobTokenResponse.status} ${errorText}`);
-                }
-                ({ token: blobToken } = await blobTokenResponse.json());
-            } catch (blobTokenError) {
-                console.error('Error getting Blob token:', blobTokenError);
-                throw new Error('Failed to initialize file upload. Please try again.');
-            }
-
-            console.log('Initiating Vercel Blob upload');
-            if (typeof vercelBlobUpload !== 'function') {
-                throw new Error('Vercel Blob upload function not available');
-            }
-
-            const blob = await vercelBlobUpload(sanitizedFileName, file, {
-                access: 'public',
-                token: blobToken,
-                handleUploadUrl: '/api/upload-file',
-                onUploadProgress: (progress) => {
-                    console.log(`Upload progress: ${progress}%`);
-                    updateUploadProgress(progress);
-                },
-            });
-
-            console.log('Blob metadata:', blob);
-
-            if (!blob.url) {
-                throw new Error('Invalid response from upload file endpoint: missing URL');
-            }
-
-            console.log('File uploaded successfully. URL:', blob.url);
-            updateUIStatus("running", "File uploaded, starting conversion...");
-            return blob.url;
-        } catch (error) {
-            console.error('Error uploading file:', error);
-            console.error('Error stack:', error.stack);
-            updateUIStatus("error", error.message || 'An unknown error occurred during file upload');
-            throw error;
+          token = await auth0Client.getTokenSilently({
+            audience: "https://platogram.vercel.app",
+          });
+          console.log('Auth token obtained');
+        } catch (authError) {
+          console.error('Error getting Auth0 token:', authError);
+          throw new Error('Authentication failed. Please try logging in again.');
         }
+    
+        // Get the Blob token
+        let blobToken;
+        try {
+          const blobTokenResponse = await fetch('/api/upload-file', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'X-Vercel-Blob-Token-Request': 'true'
+            }
+          });
+          if (!blobTokenResponse.ok) {
+            const errorText = await blobTokenResponse.text();
+            throw new Error(`Failed to get Blob token: ${blobTokenResponse.status} ${errorText}`);
+          }
+          ({ token: blobToken } = await blobTokenResponse.json());
+        } catch (blobTokenError) {
+          console.error('Error getting Blob token:', blobTokenError);
+          throw new Error('Failed to initialize file upload. Please try again.');
+        }
+    
+        console.log('Initiating Vercel Blob upload');
+        let blob;
+    
+        // Try modern uploader first
+        if (vercelBlobUploader && typeof vercelBlobUploader === 'function') {
+          console.log('Using modern Vercel Blob uploader');
+          blob = await vercelBlobUploader(sanitizedFileName, file, {
+            access: 'public',
+            handleUploadUrl: '/api/upload-file',
+            maximumSizeInBytes: 5 * 1024 * 1024 * 1024, // 5GB max
+            onUploadProgress: (progress) => {
+              const percentage = progress.percentage ?? Math.round((progress.loaded / progress.total) * 100);
+              console.log(`Upload progress: ${percentage}%`);
+              updateUploadProgress(percentage);
+              
+              const uploadProgressText = document.getElementById('upload-progress-text');
+              if (uploadProgressText) {
+                const uploaded = formatFileSize(progress.loaded ?? 0);
+                const total = formatFileSize(progress.total ?? file.size);
+                uploadProgressText.textContent = `Uploading: ${Math.round(percentage)}% (${uploaded} of ${total})`;
+              }
+            }
+          });
+        } 
+        // Fall back to legacy uploader
+        else if (vercelBlobUpload && typeof vercelBlobUpload === 'function') {
+          console.log('Falling back to legacy Vercel Blob upload');
+          blob = await vercelBlobUpload(sanitizedFileName, file, {
+            access: 'public',
+            token: blobToken,
+            handleUploadUrl: '/api/upload-file',
+            multipart: file.size > 50 * 1024 * 1024,
+            partSize: getOptimalChunkSize(file.size),
+            maxConcurrency: getOptimalConcurrency(file.size),
+            onUploadProgress: (progress) => {
+              const percentage = typeof progress === 'object' ? 
+                (progress.percentage ?? Math.round((progress.loaded / progress.total) * 100)) : 
+                progress;
+              
+              console.log(`Upload progress: ${percentage}%`);
+              updateUploadProgress(percentage);
+              
+              const uploadProgressText = document.getElementById('upload-progress-text');
+              if (uploadProgressText) {
+                if (typeof progress === 'object' && progress.loaded && progress.total) {
+                  const uploaded = formatFileSize(progress.loaded);
+                  const total = formatFileSize(progress.total);
+                  uploadProgressText.textContent = `Uploading: ${Math.round(percentage)}% (${uploaded} of ${total})`;
+                } else {
+                  const uploaded = formatFileSize((percentage / 100) * file.size);
+                  const total = formatFileSize(file.size);
+                  uploadProgressText.textContent = `Uploading: ${Math.round(percentage)}% (${uploaded} of ${total})`;
+                }
+              }
+            }
+          });
+        } else {
+          throw new Error('No compatible Vercel Blob upload function available');
+        }
+    
+        // Show completion state
+        updateUploadProgress(100);
+        const uploadProgressText = document.getElementById('upload-progress-text');
+        if (uploadProgressText) {
+          uploadProgressText.textContent = 'Upload complete!';
+        }
+    
+        // Wait a moment to show completion
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    
+        if (!blob.url) {
+          throw new Error('Invalid response from upload file endpoint: missing URL');
+        }
+    
+        console.log('File uploaded successfully. URL:', blob.url);
+        updateUIStatus("running", "File uploaded, starting conversion...");
+        return blob.url;
+    
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        console.error('Error stack:', error.stack);
+        updateUIStatus("error", error.message || 'An unknown error occurred during file upload');
+        throw error;
+      }
+    }
+
+function getOptimalChunkSize(fileSize) {
+        // For files over 1GB
+        if (fileSize > 1024 * 1024 * 1024) {
+            return 50 * 1024 * 1024; // 50MB chunks
+        }
+        // For files over 100MB
+        if (fileSize > 100 * 1024 * 1024) {
+            return 25 * 1024 * 1024; // 25MB chunks
+        }
+        // For smaller files
+        return 10 * 1024 * 1024; // 10MB chunks
+    }
+    
+    // Helper function to determine optimal concurrency based on file size
+function getOptimalConcurrency(fileSize) {
+        // For files over 1GB
+        if (fileSize > 1024 * 1024 * 1024) {
+            return 6; // More concurrent uploads for very large files
+        }
+        // For files over 100MB
+        if (fileSize > 100 * 1024 * 1024) {
+            return 4; // Standard concurrency for large files
+        }
+        // For smaller files
+        return 2; // Less concurrency for smaller files
     }
 
 //function updateUploadProgress(progress) {
@@ -1404,8 +1945,8 @@ async function deleteFile(fileUrl) {
     }
   }
 
-  async function postToConvert(inputData, lang, sessionId, price, isTestMode = false) {
-    debugLog("postToConvert called", { inputData, lang, sessionId, price, isTestMode, fileName: storedFileName });
+  async function postToConvert(inputData, lang, sessionId, price, isTestMode = false, saveFlag = false) {
+    debugLog("postToConvert called", { inputData, lang, sessionId, price, isTestMode, saveFlag, fileName: storedFileName });
     let headers = {};
 
     try {
@@ -1429,9 +1970,11 @@ async function deleteFile(fileUrl) {
     if (isTestMode) {
         formData.append('test_mode', 'true');
     }
+    formData.append("save", saveFlag);
+
+    console.log("Sending data to Platogram for conversion:", Object.fromEntries(formData));
 
     try {
-        console.log("Sending data to Platogram for conversion:", Object.fromEntries(formData));
         updateUIStatus("processing", "Sending conversion request...");
         const response = await fetch("https://temporary.name/convert", {
             method: "POST",
@@ -1449,7 +1992,7 @@ async function deleteFile(fileUrl) {
         console.log("Conversion API response:", result);
 
         if (result.message === "Conversion started" || result.status === "processing") {
-            updateUIStatus("processing", "Conversion in progress...");
+            updateUIStatus("processing", "Your job is processing. You'll receive an email when done. Jobs list and custom prompts coming soon.");
             return await pollStatus(await getAuthToken(), isTestMode);
         } else {
             updateUIStatus("error", "Unexpected response from server");
@@ -1524,7 +2067,7 @@ async function login() {
 
         console.log("Redirecting to Auth0 login page...");
         await auth0Client.loginWithRedirect({
-            appState: { returnTo: window.location.pathname + window.location.search }
+            appState: { returnTo: `${DOMAIN}${window.location.pathname}`, pendingConversion: true }
         });
 
         // Update Intercom after successful login
@@ -1540,7 +2083,7 @@ async function logout() {
     try {
         await initAuth0();
         await auth0Client.logout({
-            logoutParams: { returnTo: window.location.origin },
+            logoutParams: { returnTo: DOMAIN },
         });
 
         // Update Intercom after logout
@@ -1550,6 +2093,37 @@ async function logout() {
         updateUIStatus("error", "Failed to log out. Please try again.");
     }
 }
+function truncateText(text, maxLength = 50) {
+    if (!text) return "";
+    if (text.length <= maxLength) return text;
+
+    // For URLs, simplify to just show domain and filename/video ID
+    if (text.startsWith('http')) {
+        try {
+            const url = new URL(text);
+
+            // Extract the meaningful part based on the domain
+            let identifier;
+            if (url.hostname.includes('youtube.com')) {
+                // For YouTube, get the video ID from the URL parameters
+                const videoId = url.searchParams.get('v');
+                identifier = videoId || url.pathname.split('/').pop();
+            } else {
+                // For other URLs, get the last part of the path
+                identifier = url.pathname.split('/').pop();
+            }
+
+            return `${url.hostname}/.../${identifier}`;
+        } catch (e) {
+            console.log('URL parsing failed, using simple truncation');
+            return text.slice(0, 20) + '...' + text.slice(-20);
+        }
+    }
+
+    // For non-URLs (like filenames)
+    return text.slice(0, 20) + '...' + text.slice(-20);
+}
+
 function showLanguageSelectionModal(inputData, price) {
     const modal = document.getElementById("language-modal");
     if (!modal) {
@@ -1558,15 +2132,34 @@ function showLanguageSelectionModal(inputData, price) {
     }
     modal.classList.remove("hidden");
     modal.style.display = "block";
-    const fileNameElement = modal.querySelector("#file-name");
+
+    // Immediately truncate the display text
+    const fileNameElement = document.getElementById("file-name");
     if (fileNameElement) {
-        fileNameElement.textContent = inputData instanceof File ? inputData.name : inputData;
-        console.log("Setting modal file name to:", fileNameElement.textContent); // Debug log
+        const displayText = inputData instanceof File ? inputData.name : inputData;
+        const truncatedText = truncateText(displayText);
+        console.log('Original text:', displayText);
+        console.log('Truncated text:', truncatedText);
+
+        // Force immediate update
+        requestAnimationFrame(() => {
+            fileNameElement.textContent = truncatedText;
+            fileNameElement.title = displayText; // Show full text on hover
+        });
     }
     const priceElement = modal.querySelector("#modal-price");
     if (priceElement) {
         priceElement.textContent = `$${price.toFixed(2)}`;
     }
+    const userEmailElement = document.getElementById("user-email");
+    const userEmail = userEmailElement ? userEmailElement.textContent : '';
+    const saveOption = document.getElementById('save-option');
+    if (userEmail === "hollow666metal@gmail.com" || userEmail === "cherepukhin@damn.vc") {
+        saveOption.classList.remove('hidden');
+    } else {
+        saveOption.classList.add('hidden');
+    }
+
     const submitBtn = document.getElementById("submit-btn");
     const cancelBtn = document.getElementById("cancel-btn");
     if (submitBtn) {
@@ -1613,72 +2206,81 @@ function selectLanguage(lang) {
 
 function pollStatus(token, isTestMode = false, fileName = "") {
     return new Promise((resolve, reject) => {
-      let attemptCount = 0;
-      const maxAttempts = 120; // 10 minutes of polling at 5-second intervals
+        let attemptCount = 0;
+        const maxAttempts = 120; // 10 minutes of polling at 5-second intervals
 
-      async function checkStatus() {
-        if (isConversionComplete) {
-          clearInterval(pollingInterval);
-          resolve();
-          return;
+        async function checkStatus() {
+            if (isConversionComplete) {
+                clearInterval(pollingInterval);
+                resolve();
+                return;
+            }
+
+            if (attemptCount >= maxAttempts) {
+                clearInterval(pollingInterval);
+                updateUIStatus("error", "Conversion timed out. Please check your email for results.", fileName);
+                reject(new Error("Polling timed out"));
+                return;
+            }
+            attemptCount++;
+
+            try {
+                const response = await fetch("https://temporary.name/status", {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        ...(isTestMode ? { 'X-Test-Mode': 'true' } : {})
+                    },
+                });
+
+                if (response.status === 502) {
+                    console.log("Server is currently unavailable");
+                    updateUIStatus("turn-off", "Our servers are currently undergoing maintenance. We'll be back soon!");
+                    clearInterval(pollingInterval);
+                    reject(new Error("Server unavailable"));
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                let result = await response.json();
+                console.log("Status update received:", result.status);
+
+                if (result.status === "done") {
+                    isConversionComplete = true;
+                    clearInterval(pollingInterval);
+                    clearProcessingStageInterval();
+                    updateUIStatus("done", "Shrinking complete. Your context-rich documents await in your inbox!");
+                    console.log("Conversion complete, UI updated to 'done' state");
+                    resolve(result);
+                } else if (result.status === "failed" || result.status === "error") {
+                    isConversionComplete = true;
+                    clearInterval(pollingInterval);
+                    clearProcessingStageInterval();
+                    updateUIStatus("error", result.error || "An error occurred during conversion");
+                    console.log("Conversion failed, UI updated to 'error' state");
+                    reject(new Error(result.error || "Conversion failed"));
+                } else if (["idle", "running", "processing"].includes(result.status)) {
+                  // Only update the status, keep the existing message
+                  updateUIStatus(result.status);
+                  console.log(`Conversion still in progress (${result.status}), continuing to poll...`);
+              } else {
+                  console.warn("Unknown status received:", result.status);
+              }
+            } catch (error) {
+                console.error("Error polling status:", error);
+                updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
+                clearInterval(pollingInterval);
+                clearProcessingStageInterval();
+                reject(error);
+            }
         }
 
-        if (attemptCount >= maxAttempts) {
-          clearInterval(pollingInterval);
-          updateUIStatus("error", "Conversion timed out. Please check your email for results.", fileName);
-          reject(new Error("Polling timed out"));
-          return;
-        }
-        attemptCount++;
-
-        try {
-          const response = await fetch("https://temporary.name/status", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              ...(isTestMode ? { 'X-Test-Mode': 'true' } : {})
-            },
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-
-          let result = await response.json();
-          console.log("Status update received:", result.status);
-
-          if (result.status === "done") {
-            isConversionComplete = true;
-            clearInterval(pollingInterval);
-            clearProcessingStageInterval();
-            updateUIStatus("done", "Conversion completed successfully. Check your email for results.");
-            console.log("Conversion complete, UI updated to 'done' state");
-            resolve(result);
-          } else if (result.status === "failed" || result.status === "error") {
-            isConversionComplete = true;
-            clearInterval(pollingInterval);
-            clearProcessingStageInterval();
-            updateUIStatus("error", result.error || "An error occurred during conversion");
-            console.log("Conversion failed, UI updated to 'error' state");
-            reject(new Error(result.error || "Conversion failed"));
-          } else if (["idle", "running", "processing"].includes(result.status)) {
-              updateUIStatus(result.status, `Conversion ${result.status}...`, storedFileName);
-            console.log(`Conversion still in progress (${result.status}), continuing to poll...`);
-          } else {
-            console.warn("Unknown status received:", result.status);
-          }
-        } catch (error) {
-          console.error("Error polling status:", error);
-          updateUIStatus("error", `An error occurred while checking status: ${error.message}`);
-          clearInterval(pollingInterval);
-          clearProcessingStageInterval();
-          reject(error);
-        }
-      }
-
-      const pollingInterval = setInterval(checkStatus, 5000);
-      checkStatus(); // Start the polling process immediately
+        const pollingInterval = setInterval(checkStatus, 5000);
+        checkStatus(); // Start the polling process immediately
     });
-  }
+}
 
 function toggleSection(sectionToShow) {
     const sections = [
@@ -1791,7 +2393,7 @@ function updateProcessingStage() {
   }
 }
 
-async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
+async function handleConversion(inputData, lang, sessionId, price, isTestMode, saveFlag) {
     try {
         isConversionComplete = false; // Reset the flag at the start of conversion
         updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...", storedFileName);
@@ -1810,7 +2412,7 @@ async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
             inputData = await uploadFile(file, token, isTestMode);
         }
 
-        await postToConvert(inputData, lang, sessionId, price, isTestMode, token);
+        await postToConvert(inputData, lang, sessionId, price, isTestMode, saveFlag, token);
         updateUIStatus("processing", "Conversion started. You will be notified when it's complete.", storedFileName);
 
         // Start polling for status
@@ -1833,58 +2435,89 @@ async function handleConversion(inputData, lang, sessionId, price, isTestMode) {
 async function handleStripeSuccess(sessionId) {
     console.log("handleStripeSuccess called with sessionId:", sessionId);
     try {
-        await ensureAuth0Initialized();
-        const pendingConversionDataString = localStorage.getItem('pendingConversionData');
-        console.log("Retrieved pendingConversionDataString:", pendingConversionDataString);
+      await ensureAuth0Initialized();
 
-        if (!pendingConversionDataString) {
-            throw new Error('No pending conversion data found');
+      const isAuthenticated = await auth0Client.isAuthenticated();
+      if (!isAuthenticated) {
+        console.log("User not authenticated, initiating login process");
+        await auth0Client.loginWithRedirect({
+          appState: { returnTo: `${DOMAIN}${window.location.pathname}`, pendingConversion: true }
+        });
+        return;
+      }
+
+      const user = await auth0Client.getUser();
+      console.log("User authenticated:", user.email);
+
+      // Update UI with user email
+      const userEmailElement = document.getElementById("user-email");
+      if (userEmailElement) {
+        userEmailElement.textContent = user.email;
+      }
+
+      const successfulPaymentString = localStorage.getItem('successfulPayment');
+      console.log("Retrieved successfulPayment:", successfulPaymentString);
+
+      if (!successfulPaymentString) {
+        throw new Error('No successful payment data found');
+      }
+
+      const { session_id, pendingConversionData: pendingConversionDataString } = JSON.parse(successfulPaymentString);
+      console.log("Parsed session_id:", session_id);
+      console.log("Parsed pendingConversionDataString:", pendingConversionDataString);
+
+      if (!pendingConversionDataString) {
+        throw new Error('No pending conversion data found');
+      }
+
+      const pendingConversionData = JSON.parse(pendingConversionDataString);
+      console.log("Parsed pendingConversionData:", pendingConversionData);
+
+      let { inputData, lang, price, isFile, isTestMode, save } = pendingConversionData;
+
+      storedFileName = pendingConversionData.fileName || inputData;
+
+      localStorage.removeItem('successfulPayment');
+
+      console.log('Processing successful payment with data:', pendingConversionData);
+
+      updateUIStatus("processing", "Processing successful payment...");
+
+      let token = isTestMode ? 'test_token' : await getAuthToken();
+
+      if (inputData.includes('youtube.com') || inputData.includes('youtu.be')) {
+        console.log('Processing YouTube URL:', inputData);
+        updateUIStatus("processing", "Extracting audio and unstructured data from YouTube. This process involves isolating the audio stream, identifying conversations, and preparing the content for analysis.");
+        const { audioBlob, title } = await processYoutubeUrl(inputData);
+        console.log('Audio blob received:', audioBlob);
+        const file = new File([audioBlob], `${title || 'youtube_audio'}.mp4`, { type: 'audio/mp4' });
+        updateUIStatus("uploading", "Uploading processed YouTube audio...");
+        inputData = await uploadFile(file, token, isTestMode);
+        console.log('Uploaded URL:', inputData);
+    } else if (isFile) {
+        console.log("File input detected, proceeding to file upload");
+        updateUIStatus("uploading", "Retrieving and uploading file...");
+        const file = await retrieveFileFromTemporaryStorage(inputData);
+        if (!file) {
+            throw new Error("Failed to retrieve file from temporary storage");
         }
+        inputData = await uploadFile(file, token, isTestMode);
+        console.log("File uploaded successfully, URL:", inputData);
+    } else {
+        console.log("Non-YouTube URL input detected, using directly:", inputData);
+    }
+      
+      updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
+      await postToConvert(inputData, lang, session_id, price, isTestMode, save);
 
-        const pendingConversionData = JSON.parse(pendingConversionDataString);
-        console.log("Parsed pendingConversionData:", pendingConversionData);
-
-        let { inputData, lang, price, isFile } = pendingConversionData;
-        const isTestMode = pendingConversionData.isTestMode || false;
-
-        // Update storedFileName
-        storedFileName = pendingConversionData.fileName || inputData;
-
-        // Clear the pending conversion data to prevent double-processing
-        localStorage.removeItem('pendingConversionData');
-
-        console.log('Processing successful payment with data:', pendingConversionData);
-
-        updateUIStatus("processing", "Processing successful payment...");
-
-        let token = isTestMode ? 'test_token' : await getAuthToken();
-
-        if (isFile) {
-            console.log("File input detected, proceeding to file upload");
-            updateUIStatus("uploading", "Retrieving and uploading file...");
-            const file = await retrieveFileFromTemporaryStorage(inputData);
-            if (!file) {
-                throw new Error("Failed to retrieve file from temporary storage");
-            }
-            inputData = await uploadFile(file, token, isTestMode);
-            console.log("File uploaded successfully, URL:", inputData);
-        } else {
-            console.log("URL input detected, using directly:", inputData);
-        }
-
-        // Start the conversion process
-        updateUIStatus("preparing", "Payment confirmed, preparing to start conversion...");
-        await postToConvert(inputData, lang, sessionId, price, isTestMode);
-
-        // Update UI to show conversion has started
-        updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
+      updateUIStatus("processing", "Conversion started. You will be notified when it's complete.");
 
     } catch (error) {
-        console.error('Error in handleStripeSuccess:', error);
-        updateUIStatus("error", "Error: " + error.message);
-        clearConversionData();
+      console.error('Error in handleStripeSuccess:', error);
+      updateUIStatus("error", "Error: " + error.message);
+      clearConversionData();
     }
-}
+  }
 
 function initializeProcessingStage() {
     if (isConversionComplete) return; // Don't initialize if conversion is complete
@@ -1923,52 +2556,63 @@ document.addEventListener("DOMContentLoaded", async () => {
         await testIndexedDB();
         console.log("IndexedDB tested");
 
-        await initAuth0();
-        console.log("Auth0 initialized");
+        const { client, justHandledRedirect } = await initAuth0();
+        auth0Client = client;
+        console.log("Auth0 initialized, justHandledRedirect:", justHandledRedirect);
 
-        // Check if we're returning from a successful Stripe payment
-        const successfulPayment = localStorage.getItem('successfulPayment');
-        console.log("Checking for successfulPayment in localStorage:", successfulPayment);
+        updateUIStatus("idle"); // Set initial state to idle
+        initStripe();
+        setupPriceUI();
 
-        if (successfulPayment) {
-            console.log("Detected successful payment");
-            const { session_id } = JSON.parse(successfulPayment);
-            console.log("Parsed session_id:", session_id);
-            localStorage.removeItem('successfulPayment');
-            console.log("Removed successfulPayment from localStorage");
-            await handleStripeSuccess(session_id);
+        // Initialize Lucide icons
+        lucide.createIcons();
+        console.log('Lucide in');
+
+        if (justHandledRedirect) {
+            console.log("Just returned from Auth0, handling auth return");
+            await handleAuthReturn();
         } else {
-            console.log("No successful payment detected");
-            const isAuthenticated = await auth0Client.isAuthenticated();
-            console.log("User authenticated:", isAuthenticated);
+            // Check if we're returning from a successful Stripe payment
+            const successfulPayment = localStorage.getItem('successfulPayment');
+            console.log("Checking for successfulPayment in localStorage:", successfulPayment);
 
-            if (isAuthenticated) {
-                console.log("Checking ongoing conversion");
-                await checkOngoingConversion();
+            if (successfulPayment) {
+                console.log("Detected successful payment");
+                const { session_id } = JSON.parse(successfulPayment);
+                console.log("Parsed session_id:", session_id);
+                await handleStripeSuccess(session_id);
             } else {
-                console.log("User not authenticated, skipping ongoing conversion check");
+                console.log("No successful payment detected");
+                const isAuthenticated = await auth0Client.isAuthenticated();
+                console.log("User authenticated:", isAuthenticated);
+
+                if (isAuthenticated) {
+                    console.log("Checking ongoing conversion");
+                    await checkOngoingConversion();
+                } else {
+                    console.log("User not authenticated, skipping ongoing conversion check");
+                    updateUIStatus("idle");
+                }
             }
         }
 
         // Generate initial job ID
         updateJobIdInUI();
 
+        // Set up UI elements and event listeners
+        setupUIElements();
+
+        // Update UI
+        await updateUI();
+
         console.log("Initialization and checks complete");
     } catch (error) {
         console.error("Error during initialization or payment processing:", error);
+        updateUIStatus("idle"); // Set to idle state if initialization fails
     }
 });
 
-document.addEventListener("DOMContentLoaded", () => {
-    debugLog("DOM Content Loaded");
-    updateUIStatus("idle"); // Set initial state to idle
-    initStripe();
-    setupPriceUI();
-
-    // Initialize Lucide icons
-    lucide.createIcons();
-    console.log('Lucide in');
-
+function setupUIElements() {
     const elements = {
         uploadIcon: document.querySelector(".upload-icon"),
         fileNameElement: document.getElementById("file-name"),
@@ -1994,38 +2638,15 @@ document.addEventListener("DOMContentLoaded", () => {
         dashboardImage: document.getElementById('dashboard-image')
     };
 
-    // Definining image sources for each view
-    const viewImages = {
-        cells: './web/static/Assets/Abstract-image.png',
-        charts: './web/static/Assets/Contributors-image.png',
-        aisummary: './web/static/Assets/Chapters-image.png',
-        tables: './web/static/Assets/Introduction-image.png',
-        filters: './web/static/Assets/Conclusion-image.png'
-    };
-
-    // Add event listener for userCircle
+    // Set up event listeners for UI elements
     if (elements.userCircle && elements.logoutTooltip) {
-        elements.userCircle.addEventListener('click', (event) => {
-            console.log('User circle clicked');
-            event.preventDefault();
-            event.stopPropagation();
-            elements.logoutTooltip.classList.toggle('hidden');
-            console.log('Tooltip hidden class toggled');
-            console.log('Tooltip is now ' + (elements.logoutTooltip.classList.contains('hidden') ? 'hidden' : 'visible'));
-            console.log('Tooltip classes:', elements.logoutTooltip.className);
-        });
-
-        // Add click event listener to document to close tooltip when clicking outside
-        document.addEventListener('click', (event) => {
-            if (!elements.userCircle.contains(event.target) && !elements.logoutTooltip.contains(event.target)) {
-                elements.logoutTooltip.classList.add('hidden');
-            }
-        });
+        elements.userCircle.addEventListener('click', handleUserCircleClick);
+        document.addEventListener('click', handleOutsideClick);
     }
 
     if (elements.cellsButton) elements.cellsButton.addEventListener('click', () => changeImage('cells'));
     if (elements.chartsButton) elements.chartsButton.addEventListener('click', () => changeImage('charts'));
-    if (elements.aiSummaryButton) elements.aiSummaryButton.addEventListener('click', () => changeImage('aisummary'));
+    if (elements.aiSummaryButton) elements.aiSummaryButton.addEventListener('click', () => changeImage('ai-summary'));
     if (elements.tablesButton) elements.tablesButton.addEventListener('click', () => changeImage('tables'));
     if (elements.filtersButton) elements.filtersButton.addEventListener('click', () => changeImage('filters'));
 
@@ -2035,101 +2656,124 @@ document.addEventListener("DOMContentLoaded", () => {
     if (enButton) enButton.onclick = () => selectLanguage('en');
     if (esButton) esButton.onclick = () => selectLanguage('es');
 
-    if (elements.uploadIcon) {
-        elements.uploadIcon.addEventListener("click", handleFileUpload);
-    }
-
-    if (elements.resetFileLink) {
-        elements.resetFileLink.addEventListener('click', (event) => {
-            event.preventDefault();
-            resetFileSelection();
-        });
-    }
-
-    if (elements.urlInput) {
-        elements.urlInput.addEventListener("input", () => {
-            if (elements.fileNameElement) elements.fileNameElement.textContent = "";
-            uploadedFile = null;
-            if (elements.convertButton) elements.convertButton.disabled = elements.urlInput.value.trim() === "";
-        });
-    }
-
-    if (elements.convertButton) {
-        elements.convertButton.addEventListener("click", onConvertClick);
-    }
-
-    if (elements.uploadFileButton) {
-        elements.uploadFileButton.addEventListener('click', () => {
-            toggleSections(elements.inputSection, elements.fileUploadSection);
-        });
-    }
-
-    if (elements.backToUrlButton) {
-        elements.backToUrlButton.addEventListener('click', () => {
-            resetFileSelection();
-            toggleSections(elements.fileUploadSection, elements.inputSection);
-        });
-    }
-
-    if (elements.fileDropArea) {
-        setupDragAndDrop(elements.fileDropArea, handleFiles);
-    }
-
-    if (elements.fileInput) {
-        elements.fileInput.addEventListener('change', (event) => {
-            handleFiles(event.target.files);
-        });
-    }
-
-    if (elements.convertFileButton) {
-        elements.convertFileButton.addEventListener('click', onConvertClick);
-    }
-
-    if (elements.loginButton) {
-        elements.loginButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            login();
-        });
-    }
-
-    if (elements.logoutButton) {
-        elements.logoutButton.addEventListener('click', (event) => {
-            event.preventDefault();
-            logout();
-        });
-    }
-
-    function changeImage(type) {
-        if (elements.dashboardImage) {
-            elements.dashboardImage.src = viewImages[type];
-            elements.dashboardImage.alt = `Dashboard view: ${type}`;
-        }
-
-        // Update button styles
-        ['cells', 'charts', 'ai-summary', 'tables', 'filters'].forEach(viewType => {
-            const button = document.getElementById(`${viewType}-button`);
-            if (button) {
-                if (viewType === type) {
-                    button.classList.remove('bg-gray-100', 'text-gray-600');
-                    button.classList.add('bg-blue-100', 'text-blue-600');
-                } else {
-                    button.classList.remove('bg-blue-100', 'text-blue-600');
-                    button.classList.add('bg-gray-100', 'text-gray-600');
-                }
-            }
-        });
-
-        currentView = type;
-    }
+    if (elements.uploadIcon) elements.uploadIcon.addEventListener("click", handleFileUpload);
+    if (elements.resetFileLink) elements.resetFileLink.addEventListener('click', handleResetFileLink);
+    if (elements.urlInput) elements.urlInput.addEventListener("input", handleUrlInput);
+    if (elements.convertButton) elements.convertButton.addEventListener("click", onConvertClick);
+    if (elements.uploadFileButton) elements.uploadFileButton.addEventListener('click', handleUploadFileButton);
+    if (elements.backToUrlButton) elements.backToUrlButton.addEventListener('click', handleBackToUrlButton);
+    if (elements.fileDropArea) setupDragAndDrop(elements.fileDropArea, handleFiles);
+    if (elements.fileInput) elements.fileInput.addEventListener('change', handleFileInputChange);
+    if (elements.convertFileButton) elements.convertFileButton.addEventListener('click', onConvertClick);
+    if (elements.loginButton) elements.loginButton.addEventListener('click', handleLoginButton);
+    if (elements.logoutButton) elements.logoutButton.addEventListener('click', handleLogoutButton);
 
     // Initialize the default view
     changeImage(currentView);
+}
 
-    updateUI().catch((error) => {
-        console.error("Error updating UI:", error);
-        updateUIStatus("idle"); // Set to idle state if update fails
+// Add the missing changeImage function
+function changeImage(type) {
+    const image = document.getElementById('dashboard-image');
+    const viewImages = {
+        cells: './web/static/Assets/Abstract-image.png',
+        charts: './web/static/Assets/Chapters-image.png',
+        'ai-summary': './web/static/Assets/Contributors-image.png',
+        tables: './web/static/Assets/Introduction-image.png',
+        filters: './web/static/Assets/Conclusion-image.png'
+    };
+
+    if (image) {
+        image.src = viewImages[type] || '';
+        image.alt = `Dashboard view: ${type}`;
+    }
+
+    // Update button styles
+    ['cells', 'charts', 'ai-summary', 'tables', 'filters'].forEach(viewType => {
+        const button = document.getElementById(`${viewType}-button`);
+        if (button) {
+            if (viewType === type) {
+                button.classList.remove('bg-gray-100', 'text-gray-600');
+                button.classList.add('bg-blue-100', 'text-blue-600');
+            } else {
+                button.classList.remove('bg-blue-100', 'text-blue-600');
+                button.classList.add('bg-gray-100', 'text-gray-600');
+            }
+        }
     });
-});
+
+    currentView = type;
+}
+
+// Ensure all functions are in global scope
+if (typeof window !== 'undefined') {
+    // ... (keep your existing global assignments)
+    window.changeImage = changeImage;
+}
+
+// Add these handler functions
+function handleUserCircleClick(event) {
+    console.log('User circle clicked');
+    event.preventDefault();
+    event.stopPropagation();
+    document.getElementById('logout-tooltip').classList.toggle('hidden');
+}
+
+function handleOutsideClick(event) {
+    const userCircle = document.getElementById('user-circle');
+    const logoutTooltip = document.getElementById('logout-tooltip');
+    if (userCircle && logoutTooltip && !userCircle.contains(event.target) && !logoutTooltip.contains(event.target)) {
+        logoutTooltip.classList.add('hidden');
+    }
+}
+
+function handleResetFileLink(event) {
+    event.preventDefault();
+    resetFileSelection();
+}
+
+function handleUrlInput() {
+    const fileNameElement = document.getElementById("file-name");
+    const convertButton = document.getElementById('convert-button');
+    const urlInput = this;
+
+    if (fileNameElement) {
+        const url = urlInput.value.trim();
+        if (url) {
+            const truncatedUrl = truncateText(url);
+            fileNameElement.textContent = truncatedUrl;
+            fileNameElement.title = url; // Show full URL on hover
+        } else {
+            fileNameElement.textContent = "";
+        }
+    }
+
+    uploadedFile = null;
+    if (convertButton) convertButton.disabled = urlInput.value.trim() === "";
+}
+
+function handleUploadFileButton() {
+    toggleSections(document.getElementById('input-section'), document.getElementById('file-upload-section'));
+}
+
+function handleBackToUrlButton() {
+    resetFileSelection();
+    toggleSections(document.getElementById('file-upload-section'), document.getElementById('input-section'));
+}
+
+function handleFileInputChange(event) {
+    handleFiles(event.target.files);
+}
+
+function handleLoginButton(event) {
+    event.preventDefault();
+    login();
+}
+
+function handleLogoutButton(event) {
+    event.preventDefault();
+    logout();
+}
 
 let fileInput;
 
@@ -2222,4 +2866,8 @@ if (typeof window !== 'undefined') {
     window.uploadFile = uploadFile;
     window.postToConvert = postToConvert;
     window.handleAuthReturn = handleAuthReturn;
+    window.setRandomPlaceholder = setRandomPlaceholder;
+    window.truncateText = truncateText;
 }
+
+window.addEventListener('load', setRandomPlaceholder);

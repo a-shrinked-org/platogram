@@ -2,22 +2,60 @@
 const nextConfig = {
   reactStrictMode: true,
   typescript: {
-    // This will completely disable TypeScript during build
     ignoreBuildErrors: true,
   },
-  webpack: (config, { isServer }) => {
-    // This will make Next.js ignore TypeScript files
-    config.resolve.extensions = config.resolve.extensions.filter(ext => ext !== '.ts' && ext !== '.tsx')
-    return config
-  },
-}
-
-module.exports = {
   pageExtensions: ['js', 'jsx', 'ts', 'tsx'],
-  reactStrictMode: true,
-}
-
-module.exports = {
+  webpack: (config, { isServer }) => {
+    // Filter out TypeScript extensions
+    config.resolve.extensions = config.resolve.extensions.filter(ext => ext !== '.ts' && ext !== '.tsx');
+    
+    // Add FFmpeg.wasm fallbacks
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      path: false,
+      crypto: false,
+      os: false,
+      perf_hooks: false
+    };
+    
+    return config;
+  },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Cross-Origin-Embedder-Policy',
+            value: 'require-corp',
+          },
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin',
+          },
+          {
+            key: 'Cross-Origin-Resource-Policy',
+            value: 'cross-origin'
+          }
+        ],
+      },
+    ];
+  },
+  
+  webpack: (config) => {
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      path: false,
+      crypto: false,
+      os: false,
+      perf_hooks: false,
+      worker_threads: false,
+    };
+    return config;
+  }
+  
   async rewrites() {
     return [
       {
@@ -27,3 +65,5 @@ module.exports = {
     ];
   },
 };
+
+module.exports = nextConfig;

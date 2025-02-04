@@ -17,9 +17,18 @@
     "next": "latest",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "lucide-react": "0.454.0",
     "swr": "^2.0.0",
     "@auth0/auth0-react": "2.2.4",
-    "axios": "1.7.7"
+    "@aws-sdk/client-s3": "3.682.0",
+    "@aws-sdk/s3-request-presigner": "3.682.0",
+    "axios": "1.7.7",
+    "fluent-ffmpeg": "^2.1.2",
+    "ytdl-core": "^4.11.5",
+    "yt-dlp-wrap": "^2.3.12",
+    "node-fetch": "^2.7.0",
+    "@ffmpeg/ffmpeg": "0.12.7",
+    "@ffmpeg/util": "0.12.1"
   },
   "devDependencies": {
     "@types/node": "^18.0.2",

@@ -156,23 +156,36 @@
         }
         #url-input, #upload-file-button {
             font-family: 'IBM Plex Mono', sans-serif;
-            letter-spacing: -0.6px;
+            letter-spacing: -0.8px;
             font-size: 15px;
           }
 
-        .upload-file-buttons span, .inform {
+        .upload-file-buttons span{
             font-family: 'IBM Plex Mono', sans-serif;
             letter-spacing: -0.2px;
             font-weight:500;
+            font-size: 13px;
+          }
+        .inform {
+            font-family: 'IBM Plex Mono', sans-serif;
+            letter-spacing: -0.2px;
+            font-weight:400;
             font-size: 13px;
           }
 
         .upload-file-buttons span, .inform, #status-section {
             font-family: 'IBM Plex Mono', sans-serif;
             letter-spacing: -0.2px;
-            font-weight:400;
             font-size: 13px;
           }
+
+        #file-upload-prompt {
+            font-size: 14px;
+            font-weight: 500;
+        }
+        #file-drop-area {
+            cursor: grab;
+        }
 
         .input-section #convert-button:disabled {
             background-color: #D8D8D8;
@@ -225,7 +238,7 @@
             cursor: pointer;
         }
         .logout-tooltip button:hover {
-            background-color: #f7fafc;
+            background-color: #000;
         }
         #processing-stage {
             display: none !important;
@@ -294,8 +307,8 @@
 
             <div id="input-section" class="max-w-2xl mx-auto input-section">
                 <div class="flex items-center space-x-2 p-6 pb-4">
-                    <input id="url-input" type="text"
-                        placeholder="Paste a link to an YouTube video or Google Drive file?"
+                    <input id="url-input" type="text" name="fname" autofocus
+                        placeholder="Paste a link to an YouTube video or Google Drive file"
                         class="w-full p-3 border border-gray-300 focus:outline-none"
                         style="border:0 !important" />
                     <button id="convert-button" class="px-2.5" disabled>
@@ -385,39 +398,45 @@
               <button class="mx-auto block px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600" onclick="reset()">Reset</button>
             </div>
 
+            <div id="turn-off-section" class="hidden">
+                <h2 class="text-2xl font-bold mb-4">Service Temporarily Unavailable</h2>
+                <p class="mb-4">We're experiencing technical difficulties. Please try again later.</p>
+                <p>We apologize for the inconvenience. Please check back soon.</p>
+            </div>
+
             <div class="p-10 max-w-xl mx-auto text-center text-gray-400 text-sm inform">
                 Transcription times can vary depending on the file size, length of
                 the content, and how busy our servers are.
             </div>
         <div id="midwrap" class="bg-gray-100 m-0" style="padding-bottom:15px; margin-bottom:0 !important;">
             <section class="text-center mb-4 bg-gray-100">
-                <h2 class="font-perfectly-nineties text-3xl mt-12 text-black">FROM FILES TO DATA, IN A CLICK</h2>
+                <h2 class="font-perfectly-nineties text-3xl mt-12 text-black">FROM FILES TO DATA, IN A FEW CLICKS</h2>
          </section>
 
             <section class="grid md:grid-cols-3 gap-8 mb-16 max-w-5xl mx-auto  bg-gray-100">
                 <div>
-                    <h3 class="font-perfectly-nineties text-3xl mb-4 text-black text-left">Drop a link, get a document
+                    <h3 class="font-perfectly-nineties text-3xl mb-4 text-black text-left">Beyond Summarization
                     </h3>
-                    <p class="text-gray-600 text-left text-sm">
-                        Paste any audio/video URL - we'll email you a well-organized, readable document without storing
-                        your content.
+                    <p class="text-gray-600 text-left text-sm leading-5 tracking-tight">
+                        Drop any audio and video - we'll email you a well-organized, rewriten document.
+                        Capture nuanced context, speaker insights, and key moments.
                     </p>
                 </div>
                 <div>
-                    <h3 class="font-perfectly-nineties text-3xl mb-4 text-black text-left">References included</h3>
-                    <p class="text-gray-600 text-left text-sm">
-                        Each response is backed by precise references to the original content, ensuring credibility and
-                        context.
+                    <h3 class="font-perfectly-nineties text-3xl mb-4 text-black text-left">References Included</h3>
+                    <p class="text-gray-600 text-left text-sm leading-5 tracking-tight">
+                    All structured data is backed by hundreds to thousands of precise references to the original content,
+                    ensuring credibility and context.
                     </p>
                 </div>
                 <div>
                     <h3 class="font-perfectly-nineties text-3xl mb-4 text-black text-left">
-                        Build your dataset
+                        Context Storage
                         <span class="bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full ml-2">Soon</span>
                     </h3>
-                    <p class="text-gray-600 text-left text-sm">
-                        Select and combine audio/video links - create your own sharable, AI-ready context storage for
-                        powerful Q&A insights.
+                    <p class="text-gray-600 text-left text-sm leading-5 tracking-tight">
+                        Build powerful, multimodal datasets from processed files.
+                        Create a flexible foundation for advanced RAG and powerful Q&A insights.
                     </p>
                 </div>
             </section>
@@ -450,14 +469,14 @@
                     </button>
                 </div>
         <div class="py-14 px-20 rounded-lg overflow-hidden" style="background-color: #C9D7D5 !important">
-            <img id="dashboard-image" src="https://platogram.vercel.app/web/static/Assets/pdf_example.jpg"
+            <img id="dashboard-image" src="./web/static/Assets/pdf_example.jpg"
                 alt="AI-Powered Speech-to-Text and Knowledge Extraction" class="w-full h-auto">
         </div>
             </section>
             </div>
             <section class="bg-white m-0" style="padding-top:75px;">
                 <div class="max-w-6xl mx-auto">
-                    <h2 class="font-perfectly-nineties text-3xl text-black uppercase mb-8">Would could be Shrinked? YOU TELL US!</h2>
+                    <h2 class="font-perfectly-nineties text-3xl text-black uppercase mb-8">What could be Shrinked? YOU TELL US!</h2>
                  <div class="flex flex-col">
   <div class="flex flex-col md:flex-row md:items-center border-b-2 border-gray-200 pb-4">
     <div class="w-full md:w-5/12 text-left text-gray-400 text-sm">Document</div>
@@ -578,7 +597,7 @@
                 </section>
 
             <section class="text-center bg-white pb-20">
-                <img src="https://platogram.vercel.app/web/static/Assets/268vocabulary-1@2x.png" alt="Person reading"
+                <img src="./web/static/Assets/268vocabulary-1@2x.png" alt="Person reading"
                     class="mx-auto mb-6" style="max-width: 350px;">
                 <h2 class="font-perfectly-nineties text-3xl mb-4 bg-white text-black max-w-xl mx-auto pb-8">
                     Shrinked was created by two tech enthusiasts,
@@ -715,14 +734,14 @@
                     learning more about how Shrinked approach could work for your<br>
                     data, book a live demo with us.
                 </p>
-                <button class="bg-black text-white px-6 py-3 rounded-full text-lg">Contact Us</button>
+                <button onclick="location.href='mailto:cherepukhin@waff.ly'" type="button" class="bg-black text-white px-6 py-3 rounded-full text-lg">Contact Us</button>
             </section>
         <footer class="mt-16 mx-auto bg-black text-white" style="border-radius: 0px !important;">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-8 p-2 pb-40">
             <!-- Column 1: Contact -->
             <div class="text-left">
                 <p>Email: info@shrinked.ai</p>
-                <p>Twitter: @shrinked_ai</p>
+                <p>Twitter: <a href="https://x.com/WafflyHQ" target="_blank" class="text-white hover:underline hover:text-white">@WafflyHQ</a></p>
             </div>
 
             <!-- Column 2: Address and Legal -->
@@ -784,13 +803,22 @@
                 <h3 class="font-perfectly-nineties text-4xl text-gray-800">Shrinking your files</h3>
             </div>
 
-            <p class="text-gray-600 mb-6 text-sm">
-                We'll craft a well-organized, readable Pdf document delivered straight to your inbox.
-                Processing time varies based on content length and server load, typically ranging from 15 minutes to a few hours.
+            <p class="text-gray-800 mb-6 text-2sm" style="font-family:sans-serif">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g clip-path="url(#clip0_9_11464)">
+                    <path d="M7.00521 12.8332C10.2269 12.8332 12.8385 10.2216 12.8385 6.9999C12.8385 3.77824 10.2269 1.16656 7.00521 1.16656C3.78355 1.16656 1.17188 3.77824 1.17188 6.9999C1.17188 10.2216 3.78355 12.8332 7.00521 12.8332Z" stroke="black" stroke-width="1.16667" stroke-linecap="round" stroke-linejoin="round"></path>
+                    <path d="M7.00781 9.33323V6.9999M7.00781 4.66656H7.01365" stroke="black" stroke-width="1.16667" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </g>
+                    <defs>
+                    <clipPath id="clip0_9_11464">
+                    <rect width="14" height="14" fill="white"></rect>
+                    </clipPath>
+                    </defs>
+                  </svg> Receive a well-organized PDF delivered to your inbox. Processing usually takes 15 minutes to a few hours, depending on content length and server load.
             </p>
 
             <div class="mb-4">
-                <p class="text-sm text-gray-600 mb-2">Job #<span id="job-id" class="font-semibold">0032</span> details for <span id="user-email" class="font-semibold"></span></p>
+                <p class="text-2sm text-gray-800 tracking-tight mb-2">Job #<span id="job-id" class="font-semibold">0032</span> details for <span id="user-email" class="font-semibold"></span></p>
                 <div class="flex items-center bg-gray-100 rounded-md p-2">
                     <i data-lucide="link" class="w-5 h-5 text-gray-500 mr-2"></i>
                     <span id="file-name" class="text-gray-800"></span>
@@ -817,7 +845,7 @@
             </div>
 
             <div class="space-y-2 mb-1">
-                <button id="basic-job-button" class="w-full p-4 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
+                <button id="basic-job-button" class="w-full p-4 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors">
                  <div class="flex items-center">
                 <i data-lucide="check-circle" class="w-5 h-5 text-gray-500 mr-2 lucide-icon-filled"></i>
                 <div class="flex-grow flex items-center justify-between">
@@ -851,14 +879,19 @@
                 <input type="text" id="custom-price" style="width:48px!important;height:30px;border-color:lightgray;border-radius:6px;margin-top:10px!important" placeholder="$30" class="w-8 h-8 font-normal text-gray-300 text-sm p-1 border border-gray-300 rounded">
               </div>
             </div>
-
+            <div id="save-option" class="mb-4 hidden">
+              <label class="inline-flex items-center">
+                <input type="checkbox" id="save-checkbox" class="form-checkbox h-5 w-5 text-blue-600">
+                <span class="ml-2 text-gray-700">Publish?</span>
+              </label>
+            </div>
                 <div id="card-errors" class="text-red-500 text-sm mb-4" role="alert"></div>
 
-                <button id="submit-btn" class="w-full text-white py-2 px-4 rounded-lg hover:bg-black transition-colors" style="background-color:#0F172A;">
-                  Get your document $<span id="total-price">0.00</span>
+                <button id="submit-btn" class="w-full text-white py-3 px-4 hover:bg-black transition-colors uppercase" style="background-color:#0F172A;">
+                  Get your document $ - <span id="total-price">0.00</span>
                 </button>
 
-                <button id="cancel-btn" class="w-full mt-2 bg-gray-100 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors">
+                <button id="cancel-btn" class="w-full mt-2 bg-gray-100 text-gray-800 py-3 px-4 hover:bg-gray-200 transition-colors uppercase">
                   Cancel
                 </button>
     </div>
@@ -870,9 +903,12 @@
     import { put } from 'https://esm.sh/@vercel/blob/client';
     window.vercelBlobPut = put;
   </script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/umd/index.min.js"></script>
 <script type="module" src="./web/app.js"></script>
 <script>
-    let testMode = true;
+    let testMode = false;
     const TEST_PRICE = 5;
     const TEST_LANG = 'en';
 
@@ -997,10 +1033,16 @@
     window.testFileInput = testFileInput;
 
     // Call this function when the DOM is loaded
-    document.addEventListener('DOMContentLoaded', createTestPanel);
+    if (testMode) {
+        document.addEventListener('DOMContentLoaded', createTestPanel);
+    }
 </script>
 <script>
     (function(){var w=window;var ic=w.Intercom;if(typeof ic==="function"){ic('reattach_activator');ic('update',w.intercomSettings);}else{var d=document;var i=function(){i.c(arguments);};i.q=[];i.c=function(args){i.q.push(args);};w.Intercom=i;var l=function(){var s=d.createElement('script');s.type='text/javascript';s.async=true;s.src='https://widget.intercom.io/widget/i1z51z2x';var x=d.getElementsByTagName('script')[0];x.parentNode.insertBefore(s,x);};if(document.readyState==='complete'){l();}else if(w.attachEvent){w.attachEvent('onload',l);}else{w.addEventListener('load',l,false);}}})();
   </script>
+  <script>
+      window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>

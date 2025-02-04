@@ -654,7 +654,7 @@ async function checkOngoingConversion() {
         }
 
         const token = await getAuthToken();
-        const response = await fetch("https://temporary.name/status", {
+        const response = await fetch("https://sandbox.temporary.name/status", {
             headers: {
                 Authorization: `Bearer ${token}`
             }
@@ -923,7 +923,7 @@ async function reset() {
         });
 
         // Call the server-side reset endpoint
-        const response = await fetch("https://temporary.name/reset", {
+        const response = await fetch("https://sandbox.temporary.name/reset", {
             method: "GET",
             headers: { Authorization: `Bearer ${token}` },
         });
@@ -1913,7 +1913,7 @@ async function deleteFile(fileUrl) {
 
     try {
         updateUIStatus("processing", "Sending conversion request...");
-        const response = await fetch("https://temporary.name/convert", {
+        const response = await fetch("https://sandbox.temporary.name/convert", {
             method: "POST",
             headers: headers,
             body: formData,
@@ -2162,7 +2162,7 @@ function pollStatus(token, isTestMode = false, fileName = "") {
             attemptCount++;
 
             try {
-                const response = await fetch("https://temporary.name/status", {
+                const response = await fetch("https://sandbox.temporary.name/status", {
                     headers: {
                         Authorization: `Bearer ${token}`,
                         ...(isTestMode ? { 'X-Test-Mode': 'true' } : {})
